@@ -1,6 +1,9 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+
+import matplotlib as plt
+plt.use('Agg')
 import pandas as pd
 import pandas.io.sql as psql
 import numpy as np
@@ -9,11 +12,20 @@ import os.path as path
 import MySQLdb
 import time
 import igraph as ig
+import time
 
+from scipy.stats import hypergeom
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform
 
-import matplotlib as plt
+class Cobject(object):
+    log_file = sys.stderr
+    def init(self,log_file=None):
+        if log_file:
+            self.log_file = open(log_file,'w')
+    def log(self,*args):
+        ''' shared object logging '''
+        print(time.ctime(),'-',*args,file=self.log_file)
 
 class COBDatabase(object):
     def sensitive(sens):
@@ -30,18 +42,65 @@ class COBDatabase(object):
         passwd = sensitive("MySQLPasswd"),
         db     = sensitive("MySQLDB")
     )
-
     def __init__(self,network="Developmental"):
         self.network = network
     def query(self, query, *variables):
         ''' Returns a pandas dataframe '''
         query = query.format(*variables)
         return psql.frame_query(query,self.db)
-
+    def execute(self,query,*variables):
+        ''' perform a database execution '''
+        cur = self.db.cursor()
+        cur.execute(query.format(*variables))
     def add_gene(self,gene_name):
         '''adds the gene name to the database '''
         cur = self.db.cursor()
         cur.execute("INSERT IGNORE INTO mzn_gene_name (gene_name) VALUES ('{}')".format(gene_name))
+    def gene_id(self,gene_name):
+        pass
+    
+
+class COBGene(COBDatabase):
+    def __init__(self,id):
+        self.id = id   
+
+    @property
+    def gramene(self):
+        pass
+ 
+
+class COBDataset(COBDatabase):
+    def __init__(self,name,description):
+        super(COBDataset,self).__init__()
+        self.name = name
+        self.description = description
+        self.exp_vals = pd.DataFrame()
+        self.id = None
+
+    def save(self):
+        self.id = self.query("SELECT MAX(id) as MID FROM datasets;").iloc[0]['MID'] + 1
+        # add the entry into the database
+        self.execute("INSERT INTO datasets (id, name, description) VALUES ({}, '{}', '{}')",self.id,self.name,self.description)
+
+    
+    
+
+def from_csv(filename,FPKM=True,sep="\t"):
+    expr_vals = pd.read_table(filename,sep=sep)
+    try:
+        expr_vals[expr_vals.columns] = expr_vals[expr_vals.columns].convert_objects(convert_numeric = True)
+    except e:
+        exit("csv expression values must be numbers")
+    
+
+    # Register new dataset
+    # Need to import rawexp values
+        # register new accessions
+        # register new genes/probes
+    # Import new accessions
+    # 
+    # Need to import 
+
 
 class Chrom(object):
     def __init__(self,id,length):
@@ -91,13 +150,15 @@ class Locus(COBDatabase):
         self.id    = id
         self.gene_build = gene_build
 
-    def genes(self):
+    def genes(self,gene_build=None):
         ''' returns genes within the locus '''
+        if not gene_build:
+           gene_build = self.gene_build 
         genes = self.query('''SELECT * FROM mzn_gene_loci WHERE chromosome = {}
             AND chromo_start > {}
             AND chromo_end < {}
             AND gene_build = '{}'
-            ORDER BY chromo_start''', self.chrom, self.start, self.end, self.gene_build)
+            ORDER BY chromo_start''', self.chrom, self.start, self.end, gene_build)
         return genes
     def upstream_genes(self,limit=100):
         ''' returns the X amount of upstream genes '''
@@ -134,9 +195,9 @@ class Locus(COBDatabase):
         return self.end - self.start
 
     def __str__(self):
-        return self.id
+        return "Locus Type Object: {}".format(str(self.id))
     def __repr__(self):
-        return self.id
+        return str(self.id)
 
 
 class SNP(Locus):
@@ -184,14 +245,56 @@ class SNP(Locus):
                     upstream_index = downstream_index -1
                     return genes.ix[[upstream_index,downstream_index]]
 
-
 class QTL(Locus):
     def __init__(self,chrom,start,end,id=None):
         if id == None:
             self.id = "QTL-chr{}:{}-{}".format(chrom,start,end)
+        else:
+            self.id = id
         super(QTL,self).__init__(chrom,start,end,self.id)
     def __str__(self):
-        return "{} - {} - {} - {}".format(self.id,self.chrom,self.start,self.end)
+        return "{}".format(self.id)
+
+
+class Gene(Locus):
+    def __init__(self,id,gene_build='4a.53'):
+        info = self.query('''SELECT chromosome, chromo_start, chromo_end FROM mzn_gene_loci 
+            WHERE gene_id = {} and gene_build = '{}' ''',id,gene_build)
+        super(Gene,self).__init__(info.iloc[0]['chromosome'],info.iloc[0]['chromo_start'],info.iloc[0]['chromo_end'])
+        self.id = int(id)
+
+    @property
+    def gramene_id(self):
+        return self.query("SELECT gene_name FROM mzn_gene_name WHERE gene_id = {}",self.id).iloc[0]['gene_name']
+
+    @property
+    def common_name(self):
+        info = self.query("SELECT common_name FROM mzn_gene_common WHERE common_id = {}",self.id)
+        return None if info.shape[0] == 0 else info.iloc[0]['common_name']
+
+    @property
+    def arab_ortho(self):
+        info = self.query('''SELECT * FROM mzn_arab_orthologs orth
+            LEFT JOIN mzn_arab_gene info ON info.arab_id = orth.arab_id 
+            LEFT JOIN mzn_arab_gene_types type ON info.type_id = type.type_id
+            LEFT JOIN mzn_arab_short_desc short ON info.short_id = short.short_id
+            LEFT JOIN mzn_arab_curator_desc cur ON info.curated_id = cur.curator_id
+            LEFT JOIN mzn_arab_comp_desc comp ON info.comp_id = comp.comp_id
+            WHERE gene_id = {} ''',self.id)
+        return info
+
+    @property
+    def go_terms(self):
+        info = self.query('''SELECT term_name, term_short_desc, term_long_desc, space_desc
+            FROM mzn_gene_go_terms
+            LEFT JOIN mzn_go_terms ON go_id = term_id
+            LEFT JOIN mzn_go_space ON term_space = space_id
+            WHERE gene_id = {}
+        ''',self.id)
+        return info
+
+
+            
 
 class COB(COBDatabase):
     def __init__(self,network="Developmental"):
@@ -203,6 +306,8 @@ class COB(COBDatabase):
         self.raw       = self.dataset_info.raw_edges[0]
         self.id        = self.dataset_info.id[0]
         self.log_file  = sys.stderr
+        self.verbose   = True
+        self.num_go_genes_total = 25288
 
     def id2gene(self,id):
         ''' returns a gene name from its id '''
@@ -217,19 +322,21 @@ class COB(COBDatabase):
 
     def gene2id(self,gene,add_if_missing=False): 
         ''' returns an id from a gene name, option to add gene name to database '''
-        if isinstance(gene,(int,long)):
-                return gene
-        ser = self.query("SELECT gene_id as id FROM mzn_gene_name WHERE gene_name = '{}'",gene)
-        if ser.empty:
-            ser = self.query("SELECT common_id as id FROM mzn_gene_common WHERE common_name = '{}'",gene)
-        if ser.empty: 
-            if add_if_missing == True:
-                pass
-                #self.query("INSERT INTO mzn_gene_name (gene_name) VALUES ({})",name) 
-                #cur = self.query("SELECT gene_id FROM mnz_gene_name WHERE gene_name = '{}'",gene)
-            else:
-                return None
-        return int(ser['id'])
+        try:
+            id = int(gene)
+            return id
+        except:
+            ser = self.query("SELECT gene_id as id FROM mzn_gene_name WHERE gene_name = '{}'",gene)
+            if ser.empty:
+                ser = self.query("SELECT common_id as id FROM mzn_gene_common WHERE common_name = '{}'",gene)
+            if ser.empty: 
+                if add_if_missing == True:
+                    pass
+                    #self.query("INSERT INTO mzn_gene_name (gene_name) VALUES ({})",name) 
+                    #cur = self.query("SELECT gene_id FROM mnz_gene_name WHERE gene_name = '{}'",gene)
+                else:
+                    return None
+            return int(ser['id'])
     
     def genes2ids(self,gene_list):
         return [self.gene2id(gene) for gene in gene_list]
@@ -346,8 +453,8 @@ class COB(COBDatabase):
             return norm/np.std(norm)
         return pd.DataFrame({gid:zscore(group) for gid,group in expr_vals.groupby('gene_id')})
 
-    def heatmap(self,dm):
-       
+    def heatmap(self,dm,filename=None):
+
         D = np.array(dm) 
         D1 = squareform(pdist(dm, metric='euclidean'))
         D2 = squareform(pdist(dm.T, metric='euclidean'))
@@ -392,6 +499,10 @@ class COB(COBDatabase):
         axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
         f.colorbar(im,orientation='horizontal',cax=axColorBar,ticks=np.arange(np.ceil(vmin),np.ceil(vmax),2))
 
+        if filename:
+            plt.pyplot.savefig(filename)
+            plt.pyplot.close()
+
         return {'ordered' : D, 'rorder' : Z1['leaves'], 'corder' : Z2['leaves']} 
 
     def url(self,gene_list,size=65):
@@ -402,14 +513,64 @@ class COB(COBDatabase):
             size
         )   
            
- 
+    def go_enrichment(self,gene_list,pval_cutoff = 0.05):
+        if self.verbose:
+            self.log("Calculating go enrichment for {}",",".join(map(str,gene_list)))
+        if not gene_list:
+            return pd.DataFrame()
+        gene_ids = self.genes2ids(gene_list)
+        go_terms = self.query('''SELECT DISTINCT(go_id) FROM mzn_gene_go_terms 
+            JOIN mzn_go_terms ON go_id = term_id 
+            WHERE gene_id IN ({}) ''',",".join(map(str,gene_ids)))
+        if go_terms.empty:
+            return pd.DataFrame()
+        terms = []
+        for id in go_terms.go_id.values:
+            annotation = self.query("SELECT * FROM mzn_go_terms WHERE term_id = {}",id).iloc[0]
+            genes_in_go_term = self.query('''SELECT gene_id FROM mzn_gene_go_terms WHERE go_id = {}''',id)
+            num_genes_in_go_term = len(genes_in_go_term)
+            overlap = set(genes_in_go_term.gene_id).intersection(set(gene_ids))
+            num_genes_total = self.num_go_genes_total
+            pval = hypergeom.sf(len(overlap),num_genes_total,num_genes_in_go_term,len(gene_ids))
+            terms.append({
+                "term_name" : annotation.term_name,
+                "pvalue" : pval,
+                "num_in_go" : num_genes_in_go_term,
+                "num_overlap":len(overlap),
+                "num_total" : num_genes_total,
+                "num_in_cluster":len(gene_ids),
+                "short_desc" : annotation.term_short_desc
+            })
+        terms = pd.DataFrame(terms).sort("pvalue",ascending=True)
+        return terms[terms.pvalue <= pval_cutoff]
+            
+    def gene_summary(self,gene_list, gene_in=dict(), sep = "\n"):
+        ''' Returns a table summarizing features of the gene list. kwargs include gene_in
+            which is a dictionary containing keys which are name ofgroups of loci and values which
+            are lists of loci and each will be translated to a column in the final dataframe'''
+        tbl = pd.DataFrame()
+        tbl['GRAMENEID'] = [x.gramene_id for x in gene_list]
+        tbl['COMMON']    = [x.common_name for x in gene_list] 
+        tbl['CHR'] = [x.chrom for x in gene_list]
+        tbl['START'] = [x.start for x in gene_list]
+        tbl['STOP'] = [x.end for x in gene_list]
+        tbl['GO_TERM'] = [sep.join(x.go_terms.term_name) for x in gene_list]
+        tbl['GO_DESC'] = [sep.join(x.go_terms.term_short_desc) for x in gene_list]
+        tbl['ARAB_ORTH'] = [sep.join(x.arab_ortho.arab_name) for x in gene_list]
+        for loci_name,locus_list in gene_in.items():
+            tbl[loci_name] = [sep.join(
+                map(str,filter(
+                    lambda locus: str(locus.id) if gene in locus else None, locus_list 
+                ))) for gene in gene_list
+            ]
+        return tbl
+
 
     ############################################################################
     # Helper Functions
     ############################################################################
     def log(self, string, *args, **kwargs):
         print('[LOG]',time.ctime(), "-", string.format(*args),file=self.log_file)
-
 
     @property 
     def cmap(self):
