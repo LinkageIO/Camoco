@@ -4,19 +4,18 @@ from __future__ import print_function
 
 import matplotlib as plt
 plt.use('Agg')
-import pandas as pd
-import pandas.io.sql as psql
 import numpy as np
-import sys
-import os.path as path
-import MySQLdb
 import time
 import igraph as ig
 import time
+import sys
 
 from scipy.stats import hypergeom
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform
+
+from COBDatabase import *
+from COBDataset import *
 
 class Cobject(object):
     log_file = sys.stderr
@@ -27,80 +26,14 @@ class Cobject(object):
         ''' shared object logging '''
         print(time.ctime(),'-',*args,file=self.log_file)
 
-class COBDatabase(object):
-    def sensitive(sens):
-        ''' retrieves sensitive variables from the 'sensitive' directory in the 
-            base dir. Useful for when you want to post code online and not have
-            people trash your database... '''
-        with open(path.join("/heap/cobDev/pyCOB/sensitive",sens),'r') as sens_file:
-            return sens_file.readline().strip()
-    # The Database Connection needs to be shared between all classes which inherit COBDatabase
-    # Otherwise we open too many connections
-    db = MySQLdb.connect(
-        host   = sensitive("MySQLHost"),
-        user   = sensitive("MySQLUser"),
-        passwd = sensitive("MySQLPasswd"),
-        db     = sensitive("MySQLDB")
-    )
-    def __init__(self,network="Developmental"):
-        self.network = network
-    def query(self, query, *variables):
-        ''' Returns a pandas dataframe '''
-        query = query.format(*variables)
-        return psql.frame_query(query,self.db)
-    def execute(self,query,*variables):
-        ''' perform a database execution '''
-        cur = self.db.cursor()
-        cur.execute(query.format(*variables))
-    def add_gene(self,gene_name):
-        '''adds the gene name to the database '''
-        cur = self.db.cursor()
-        cur.execute("INSERT IGNORE INTO mzn_gene_name (gene_name) VALUES ('{}')".format(gene_name))
-    def gene_id(self,gene_name):
-        pass
-    
-
 class COBGene(COBDatabase):
     def __init__(self,id):
         self.id = id   
 
     @property
-    def gramene(self):
+    def grameneID(self):
         pass
  
-
-class COBDataset(COBDatabase):
-    def __init__(self,name,description):
-        super(COBDataset,self).__init__()
-        self.name = name
-        self.description = description
-        self.exp_vals = pd.DataFrame()
-        self.id = None
-
-    def save(self):
-        self.id = self.query("SELECT MAX(id) as MID FROM datasets;").iloc[0]['MID'] + 1
-        # add the entry into the database
-        self.execute("INSERT INTO datasets (id, name, description) VALUES ({}, '{}', '{}')",self.id,self.name,self.description)
-
-    
-    
-
-def from_csv(filename,FPKM=True,sep="\t"):
-    expr_vals = pd.read_table(filename,sep=sep)
-    try:
-        expr_vals[expr_vals.columns] = expr_vals[expr_vals.columns].convert_objects(convert_numeric = True)
-    except e:
-        exit("csv expression values must be numbers")
-    
-
-    # Register new dataset
-    # Need to import rawexp values
-        # register new accessions
-        # register new genes/probes
-    # Import new accessions
-    # 
-    # Need to import 
-
 
 class Chrom(object):
     def __init__(self,id,length):
@@ -254,47 +187,6 @@ class QTL(Locus):
         super(QTL,self).__init__(chrom,start,end,self.id)
     def __str__(self):
         return "{}".format(self.id)
-
-
-class Gene(Locus):
-    def __init__(self,id,gene_build='4a.53'):
-        info = self.query('''SELECT chromosome, chromo_start, chromo_end FROM mzn_gene_loci 
-            WHERE gene_id = {} and gene_build = '{}' ''',id,gene_build)
-        super(Gene,self).__init__(info.iloc[0]['chromosome'],info.iloc[0]['chromo_start'],info.iloc[0]['chromo_end'])
-        self.id = int(id)
-
-    @property
-    def gramene_id(self):
-        return self.query("SELECT gene_name FROM mzn_gene_name WHERE gene_id = {}",self.id).iloc[0]['gene_name']
-
-    @property
-    def common_name(self):
-        info = self.query("SELECT common_name FROM mzn_gene_common WHERE common_id = {}",self.id)
-        return None if info.shape[0] == 0 else info.iloc[0]['common_name']
-
-    @property
-    def arab_ortho(self):
-        info = self.query('''SELECT * FROM mzn_arab_orthologs orth
-            LEFT JOIN mzn_arab_gene info ON info.arab_id = orth.arab_id 
-            LEFT JOIN mzn_arab_gene_types type ON info.type_id = type.type_id
-            LEFT JOIN mzn_arab_short_desc short ON info.short_id = short.short_id
-            LEFT JOIN mzn_arab_curator_desc cur ON info.curated_id = cur.curator_id
-            LEFT JOIN mzn_arab_comp_desc comp ON info.comp_id = comp.comp_id
-            WHERE gene_id = {} ''',self.id)
-        return info
-
-    @property
-    def go_terms(self):
-        info = self.query('''SELECT term_name, term_short_desc, term_long_desc, space_desc
-            FROM mzn_gene_go_terms
-            LEFT JOIN mzn_go_terms ON go_id = term_id
-            LEFT JOIN mzn_go_space ON term_space = space_id
-            WHERE gene_id = {}
-        ''',self.id)
-        return info
-
-
-            
 
 class COB(COBDatabase):
     def __init__(self,network="Developmental"):
