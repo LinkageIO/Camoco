@@ -1,25 +1,82 @@
 #!/usr/bin/python
+from __future__ import division,print_function
 
 from COBDatabase import *
+from COBGene import COBGene
+from numpy import matrix,arcsinh,zeros,arange
+from scipy.stats import pearsonr
+from pandas import Series
+import time
+import math as math
+import multiprocessing as multiprocessing
+import itertools
+import os as os
+
+def _PCCUp(tpl):
+    ''' Returns a tuple containing indices i,j and their Pearson Correlation Coef '''
+    i,m = (tpl)
+    return [pearsonr(m[i,:],m[j,:])[0] for j in arange(i+1,len(m))] 
 
 class COBDataset(COBDatabase):
-    def __init__(self,name,description):
+    def __init__(self,name,description, FPKM=True,gene_build='5b'):
         super(COBDataset,self).__init__()
         self.name = name
         self.description = description
-        self.expr_vals = pd.DataFrame()
+        # rows of matrix are genes and columns are accessions
+        self.expr = matrix([0])
+        self.genes = Series()
+        self.accessions = Series()
+        self.FPKM = FPKM
+        self.gene_build = gene_build
+        # Database specific stuff
         self.id = None
-        self.FPKM = None
 
-    def from_csv(self,filename,FPKM=True,sep="\t"):
+    def from_csv(self,filename,sep="\t"):
         ''' Returns a COBDataset from a CSV '''
-        self.expr_vals = pd.read_table(filename,sep=sep)
-        try:
-            self.expr_vals[self.expr_vals.columns] = self.expr_vals[self.expr_vals.columns].convert_objects(convert_numeric = True)
-        except e:
-            exit("csv expression values must be numbers")
+        df = pd.read_table(filename,sep=sep)
+        self.from_DataFrame(df)
 
-    def save(self):
-        self.id = self.query("SELECT MAX(id) as MID FROM datasets;").iloc[0]['MID'] + 1
-        # add the entry into the database
-        self.execute("INSERT INTO datasets (id, name, description) VALUES ({}, '{}', '{}')",self.id,self.name,self.description)
+    def from_DataFrame(self,df):
+        self.genes = Series([COBGene(GrameneID,gene_build=self.gene_build) for GrameneID in df.index])
+        self.accessions = Series(df.columns)
+        self.expr = df.as_matrix()
+        if self.FPKM:
+            # FPKM values get the inverse hyperbolic sine transform
+            self.expr = arcsinh(self.expr)
+
+    @property
+    def num_genes(self):
+        return len(self.genes)
+
+    def coex(self,multi=True,UseGramene=False,DatasetID=0):
+        if not multi: 
+            scores = itertools.imap(_PCCUp,( (i,self.genes,self.expr,UseGramene) for i in arange(self.num_genes)))
+        else:
+            pool = multiprocessing.Pool()
+            scores = np.array(list(itertools.chain(*pool.imap(_PCCUp,[ (i,self.expr) for i in arange(self.num_genes)]))))
+            pool.close()
+            pool.join()
+            return scores
+
+    def to_Dat(self,filename,UseGramene=True,**kw):
+        with open(filename,'w') as FOUT:
+            for gene in enumerate([x.ID for x in self.genes]):
+                print("")
+                for i,j,r in chunk:
+                    print("{}\t{}\t{}".format(i,j,r),file=FOUT)
+
+    def test(self):
+        old_per = 0
+        total_genes = (((len(self.genes)**2)/2)-len(self.genes))
+        for i,j in enumerate(self.coex()):
+            cur_per = math.floor((i / total_genes) * 100)
+            if cur_per > old_per:
+                old_per = cur_per
+                print("{} - {}% complete ({} edges)".format(time.ctime(),cur_per,i))
+
+    def __str__(self):
+        return '''
+            COB Dataset:
+            {} Genes
+            {} Accessions
+        '''.format(len(self.genes),len(self.accessions))
