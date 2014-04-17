@@ -3,12 +3,13 @@
 from __future__ import print_function
 
 import matplotlib as plt
-plt.use('Agg')
+#plt.use('Agg')
 import numpy as np
 import time
 import igraph as ig
 import time
 import sys
+import pandas as pd
 
 from scipy.stats import hypergeom
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -17,8 +18,11 @@ from scipy.spatial.distance import pdist, squareform
 from COBDatabase import *
 from COBDataset import *
 from COBLocus import*
+from COBGene import *
+from Genome import *
+from Chrom import *
 
-class Cobject(object):
+class Log(object):
     log_file = sys.stderr
     def init(self,log_file=None):
         if log_file:
@@ -28,80 +32,46 @@ class Cobject(object):
         print(time.ctime(),'-',*args,file=self.log_file)
 
 
-class COB(COBDatabase):
-    def __init__(self,network="Developmental"):
+class COB(COBDatabase,Log):
+    ''' 
+        This class implements the basic interface to the COB Database. It provides routine
+        analysis functions for basic netowrk queries.
+    '''
+    def __init__(self,network=None):
+        ''' Ititialized a COB object based on a dataset Name '''
         super(COB,self).__init__()
         # HouseKeeping
-        self.dataset_info = self.query("SELECT * FROM datasets WHERE name = '{}'",network)
-        self.network   = network
-        self.sig_edges = self.dataset_info.sig_edges[0]
-        self.raw       = self.dataset_info.raw_edges[0]
-        self.id        = self.dataset_info.id[0]
-        self.log_file  = sys.stderr
-        self.verbose   = True
-        self.num_go_genes_total = 25288
-
-    def id2gene(self,id):
-        ''' returns a gene name from its id '''
-        if isinstance(id,(str)):
-            return id
-        ser = self.query("SELECT gene_name FROM mzn_gene_name WHERE gene_id = {}",id)
-        return(ser['gene_name'][0])
-
-    def ids2genes(self,id_list):
-        ''' returns a list of gene names from a list of ids '''
-        return [self.id2gene(id) for id in id_list]
-
-    def gene2id(self,gene,add_if_missing=False): 
-        ''' returns an id from a gene name, option to add gene name to database '''
-        try:
-            id = int(gene)
-            return id
-        except:
-            ser = self.query("SELECT gene_id as id FROM mzn_gene_name WHERE gene_name = '{}'",gene)
-            if ser.empty:
-                ser = self.query("SELECT common_id as id FROM mzn_gene_common WHERE common_name = '{}'",gene)
-            if ser.empty: 
-                if add_if_missing == True:
-                    pass
-                    #self.query("INSERT INTO mzn_gene_name (gene_name) VALUES ({})",name) 
-                    #cur = self.query("SELECT gene_id FROM mnz_gene_name WHERE gene_name = '{}'",gene)
-                else:
-                    return None
-            return int(ser['id'])
-    
-    def genes2ids(self,gene_list):
-        return [self.gene2id(gene) for gene in gene_list]
-
-    def in_network(self,gene_list):
-        gene_ids = self.genes2ids(gene_list)
-        raw_exp = self.query('''SELECT * FROM mzn_rawexp_values 
-            WHERE gene_id in ({})
-            AND dataset_id = {}
-        ''',','.join(map(str,gene_ids)),self.id)
-        return raw_exp.gene_id.unique()
+        (self.DatasetID, self.name, self.desc, self.FPKM, self.build) = self.fetchone("SELECT * FROM datasets WHERE name = '{}'",network)
+        
 
     def neighbors(self,gene_list):
-        ''' Returns the neighbors for a list of genes '''
-        gene_list = self.genes2ids(gene_list)
+        ''' 
+            Input : a list of COBGene Objects
+            Output: Returns the neighbors for a list of genes as a DataFrame
+            Columns returned: gene, neighbor_name, neighbor, score
+        '''
         return pd.concat([
-            self.query('''SELECT gene_b as gene, gene_name as neighbor_name, gene_a as neighbor, score
-            FROM {} net JOIN mzn_gene_name name ON net.gene_a = name.gene_id
-            WHERE gene_b IN ({})''', self.sig_edges, ",".join(map(str,gene_list))),
-            self.query('''SELECT gene_a as gene, gene_name as neighbor_name, gene_b as neighbor, score
-            FROM {} net JOIN mzn_gene_name name ON net.gene_b = name.gene_id
-            WHERE gene_a IN ({})''', self.sig_edges, ",".join(map(str,gene_list)))
+            self.query('''SELECT gene_b as gene, GrameneID as neighbor_name, gene_a as neighbor, score
+            FROM coex JOIN genes ON coex.gene_a = genes.ID
+            WHERE DatasetID = {} AND significant = 1 AND gene_b IN ({})''', self.DatasetID, ",".join(map(str,[x.ID for x in gene_list]))),
+            self.query('''SELECT gene_a as gene, GrameneID as neighbor_name, gene_b as neighbor, score
+            FROM coex JOIN genes ON coex.gene_b = genes.ID
+            WHERE DatasetID = {} AND significant = 1 AND gene_a IN ({})''', self.DatasetID, ','.join(map(str,[x.ID for x in gene_list])))
         ])
 
     def num_neighbors(self,gene_list):
         ''' return the number of significant global and local neighbors '''
-        gene_list = self.genes2ids(gene_list)
         neighbors = self.neighbors(gene_list)
-        return pd.DataFrame({
-            'gene'  : [gene for gene,group in neighbors.groupby('gene')],
-            'global': [len(group) for gene,group in neighbors.groupby('gene')],
-            'local' : [len(set(gene_list).intersection(group['neighbor'])) for gene,group in neighbors.groupby('gene')]
-        })
+        def get_nums(df):
+            global_length =  len(df)
+            local_length = len(set(neighbors.gene).intersection(set(df.neighbor)))
+            return pd.Series({
+                'global': global_length,
+                'local' : local_length 
+                })
+        return neighbors.groupby('gene').apply(lambda x : get_nums(x))
+
+# Unimplemented Below Here ------------------------------------------
 
     def density(self,gene_list):
         ''' calculate the density of the network between a set of genes '''

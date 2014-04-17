@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import pandas as pd
 from COBLocus import COBLocus
 
 class COBGene(COBLocus):
@@ -7,11 +8,16 @@ class COBGene(COBLocus):
         self.GrameneID = GrameneID
         # Create a dummy locus
         super(COBGene,self).__init__(0,0,0,gene_build)
-        (self.ID,
-         self.chromosome,
-         self.chromo_start,
-         self.chromo_end) = self.query('''SELECT ID, chromosome, chromo_start, chromo_end
-            FROM genes WHERE GrameneID = '{}' and build = '{}' '''.format(self.GrameneID,self.gene_build)).iloc[0]
+        try:
+            (self.ID,
+            self.chromosome,
+            self.chromo_start,
+            self.chromo_end) = self.fetchone('''SELECT ID, chromosome, chromo_start, chromo_end
+                FROM genes WHERE GrameneID = '{}' and build = '{}' '''.format(self.GrameneID,self.gene_build))
+        except TypeError: 
+            self.log("{} Not found for build {}".format(GrameneID,gene_build))
+            return None
+
     @property
     def common_name(self):
         pass
@@ -30,7 +36,8 @@ class COBGene(COBLocus):
     def __str__(self):
         return "COBGene: {}".format(self.GrameneID)
 
-
-def from_GrameneID(GrameneID):
-    ''' Creates a COBGene object from a gramene ID '''
-    
+def import_gene_list(filename,delim="\n",gene_build='5a'):
+    ''' This reads a file in line by line and creates a list of gene object
+        the filter call is to get rid of genes not in the database, since the
+        COBGene class returns None for genes it does not find in database '''
+    return filter(lambda x:x, [COBGene(x,gene_build) for x in open(filename,'r').read().strip().split(delim)])

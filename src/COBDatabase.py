@@ -39,9 +39,14 @@ class COBDatabase(object):
         cur = self.db.cursor()
         cur.execute(query.format(*variables))
         cur.close()
+    def fetchone(self,query,*variables):
+        ''' Used for queries which only should have one row '''
+        cur = self.db.cursor()
+        cur.execute(query.format(*variables))
+        return cur.fetchone()
 
     def log(self, *args):
-        print(time.ctime(),"-",*args,file=self.log_file)        
+        print("[COB LOG] ",time.ctime(),"-",*args,file=self.log_file)        
 
 class COBDatabaseBuilder(COBDatabase): 
     def __init__(self):
