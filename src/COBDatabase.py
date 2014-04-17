@@ -43,10 +43,13 @@ class COBDatabase(object):
         ''' Used for queries which only should have one row '''
         cur = self.db.cursor()
         cur.execute(query.format(*variables))
-        return cur.fetchone()
+        if cur.rowcount == 0:
+            return (None,)
+        else:
+            return cur.fetchone()
 
-    def log(self, *args):
-        print("[COB LOG] ",time.ctime(),"-",*args,file=self.log_file)        
+    def log(self, msg, *args):
+        print("[COB LOG] ",time.ctime(),"-",msg.format(*args),file=self.log_file)        
 
 class COBDatabaseBuilder(COBDatabase): 
     def __init__(self):
@@ -71,16 +74,44 @@ class COBDatabaseBuilder(COBDatabase):
             VALUES ({}, {}, {}, {});'''.format(dataset_id, gene_a, gene_b, score)
         )
 
+    def del_dataset(self,name):
+        ''' Deletes a dataset by name '''
+        # Grab the DatasetID
+        (DatasetID,) = self.fetchone("SELECT ID FROM datasets WHERE name = '{}'",name)
+        if not DatasetID:
+            self.log("'{}' was not in database",name)
+        else:
+            self.execute('''
+                DELETE FROM datasets WHERE ID = {};
+                DELETE FROM accessions WHERE DatasetID = {};
+                DELETE FROM expression WHERE DatasetID = {};
+                DELETE FROM coex WHERE DatasetID = {};
+            ''',DatasetID,DatasetID,DatasetID,DatasetID)
 
     def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3): 
         ''' Imports a COBDataset into the Database '''
+        # Insert the new dataset name
         self.execute('''INSERT INTO datasets (name, description, FPKM, gene_build) 
         VALUES ('{}', '{}', {}, '{}')''',dataset.name, dataset.description, dataset.FPKM, dataset.gene_build)
         # This fetches the primary key for dataset
         dataset.id = self.db.insert_id()
         # Check that the genes are all in the database
         assert len(set([x.GrameneID for x in dataset.genes]) - set(self.query("SELECT GrameneID FROM genes").GrameneID))  == 0, "You must import all genes before you import the Dataset"
-        # Create a Dataframe in memory
+    
+        # Raw expression data
+        #--------------------
+        for i,acc in enumerate(dataset.accessions):
+            # Take care of the accessions
+            acc_id = i + 1 # mysql keys cannot be zero
+            self.execute(''' INSERT INTO accessions (ID,DatasetID, name, class, description)
+                VALUES ({}, {}, '{}', '{}', '{}')''', acc_id, dataset.id, acc, '', ''
+            )
+            # Take care of the rawexp Values
+            for j,gene in enumerate(dataset.genes):
+                self.execute('''INSERT INTO  expression (GeneID, AccessionID, DatasetID, value)
+                    VALUES ({}, {}, {}, {})''', gene.ID, acc_id, dataset.id, dataset.expr[j,i] 
+                )
+        # Take care of coexpression values
         self.log("Calculating Z-Scores for {}".format(dataset.name))
         scores = dataset.coex()
         # Calculate fisher transform
@@ -93,7 +124,7 @@ class COBDatabaseBuilder(COBDatabase):
         tbl['score'] = scores
         tbl['significant'] = np.array(tbl['score'] >= significance_thresh,dtype=int)
         # Disable Keys on the coex table
-        self.log('Adding Raw DataFrame to Database')
+        self.log('Adding Z-Score DataFrame to Database')
         self.execute("ALTER TABLE coex DISABLE KEYS")
         tmp_file = '/tmp/tmp{}.txt'.format(dataset.id)
         with open(tmp_file,'w') as FOUT:
@@ -109,7 +140,10 @@ class COBDatabaseBuilder(COBDatabase):
             TRUNCATE TABLE datasets;
             DELETE FROM coex;
             DELETE FROM datasets;
+            DELETE FROM accessions;
+            DELETE FROM expression;
             ALTER TABLE datasets AUTO_INCREMENT = 1;
+            ALTER TABLE accessions AUTO_INCREMENT = 1;
         ''')
 
     def __create_tables__(self): 
@@ -141,8 +175,8 @@ class COBDatabaseBuilder(COBDatabase):
             DatasetID INT UNSIGNED NOT NULL,
             name varchar(128) NOT NULL,
             class varchar(128),
-            description TEXT NOT NULL,
-            PRIMARY KEY(ID)
+            description TEXT,
+            PRIMARY KEY(ID,DatasetID)
         );
         ''')
         self.execute(''' 
