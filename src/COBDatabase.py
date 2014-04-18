@@ -73,6 +73,11 @@ class COBDatabaseBuilder(COBDatabase):
         self.execute('''INSERT IGNORE INTO coex (DatasetID, gene_a, gene_b, score) 
             VALUES ({}, {}, {}, {});'''.format(dataset_id, gene_a, gene_b, score)
         )
+    
+    def add_common(self,gene,commonName):
+        self.execute(''' INSERT IGNORE INTO common (GeneID, name)
+            VALUES ({},'{}')
+        ''',gene.ID,commonName)
 
     def del_dataset(self,name):
         ''' Deletes a dataset by name '''
@@ -91,6 +96,7 @@ class COBDatabaseBuilder(COBDatabase):
     def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3): 
         ''' Imports a COBDataset into the Database '''
         # Insert the new dataset name
+        self.log("Creating new dataset called: {}",dataset.name)
         self.execute('''INSERT INTO datasets (name, description, FPKM, gene_build) 
         VALUES ('{}', '{}', {}, '{}')''',dataset.name, dataset.description, dataset.FPKM, dataset.gene_build)
         # This fetches the primary key for dataset
@@ -103,6 +109,7 @@ class COBDatabaseBuilder(COBDatabase):
         for i,acc in enumerate(dataset.accessions):
             # Take care of the accessions
             acc_id = i + 1 # mysql keys cannot be zero
+            self.log('Importing expression values for {}',acc)
             self.execute(''' INSERT INTO accessions (ID,DatasetID, name, class, description)
                 VALUES ({}, {}, '{}', '{}', '{}')''', acc_id, dataset.id, acc, '', ''
             )
@@ -131,6 +138,8 @@ class COBDatabaseBuilder(COBDatabase):
             tbl[['DatasetID','gene_a','gene_b','score','significant']].to_csv(FOUT,sep="\t",index=False,header=False)
         self.execute("LOAD DATA INFILE '{}' INTO TABLE coex FIELDS TERMINATED BY '\t';".format(tmp_file))
         self.execute("ALTER TABLE coex ENABLE KEYS")
+        # Clean up after yourself, you filthy animal
+        os.remove(tmp_file)
         
         self.log('Done Adding to Database')
 
@@ -166,7 +175,7 @@ class COBDatabaseBuilder(COBDatabase):
             chromo_end INT UNSIGNED, 
             strand TINYINT, 
             build ENUM('4a.53','5a','5b'), 
-            PRIMARY KEY(ID)
+            PRIMARY KEY(ID,GrameneID,build)
         );
         ''')
         self.execute(''' 
@@ -196,6 +205,14 @@ class COBDatabaseBuilder(COBDatabase):
             score FLOAT, INDEX USING BTREE(score),
             significant BOOL, INDEX USING BTREE(significant),
             PRIMARY KEY(DatasetID,gene_a,gene_b)
+        );
+        ''')
+        self.execute('''
+        CREATE TABLE IF NOT EXISTS common (
+            GeneID INT UNSIGNED,
+            name varchar(128),
+            description varchar(128),
+            PRIMARY KEY(GeneID,name)
         );
         ''')
         self.execute('''

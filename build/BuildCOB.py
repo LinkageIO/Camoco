@@ -9,17 +9,30 @@ cb = cob.COBDatabaseBuilder()
 #cb.clear_datasets()
 #cb.log('Done')
 
-# -----------------------
-# Genotype Network PNAS
-#Load the Genotype Datasets
+## -----------------------
+## Genotype Network PNAS
+##Load the Genotype Datasets
 #cb.log("Reading in Genotype Dataset")
 #GenRaw = pd.read_csv("./datasets/CghFilteredCombined.txt",sep="\t")
 #Geno = cob.COBDataset("Genotype","Rewiring of the Maize Transcriptome",FPKM=False,gene_build='4a.53')
 #Geno.from_DataFrame(GenRaw)
-#cb.log("Adding Dataset: ", Geno)
-#cb.add_dataset(Geno)
-#cb.log("Done")
-
+#
+##cb.log("Adding Dataset: ", Geno)
+##cb.add_dataset(Geno)
+##cb.log("Done")
+#        
+##------------------------
+## Devel Network PNAS
+## Load the Devel Network
+#cb.log('Reading in the DevelArray Network')
+#DevRaw = pd.read_csv("./datasets/DevelAtlasArray.txt",sep="\t")
+#Devl = cob.COBDataset("Devel","Sekhon 2011 Gene Expression Maize Developmental Atlas",FPKM=False,gene_build='4a.53')
+#Devl.from_DataFrame(DevRaw)
+#
+##cb.log("Adding Dataset:",Devl)
+##cb.add_dataset(Devl)
+##cb.log('Done')
+#
 #------------------------
 # Devel Network RNASEQ
 # Load the transcript expression data from csv
@@ -42,14 +55,21 @@ DvlRaw = pd.read_csv("./datasets/DevelAtlasRNASEQ.csv",sep="\t")
 DvlRaw = DvlRaw.ix[Zm5bGenes['transcript_id']]
 # Convert transcript IDs to gene IDs
 DvlRaw.index = Zm5bGenes.ix[DvlRaw.index]['gene_id']
-# Filter out rows which are do not have FPKM > 0 in at least one tissue
-DvlRaw = DvlRaw[DvlRaw.apply(lambda  x: any(x > 0),axis=1)]
+# Filter out rows which are do not have FPKM > 0 in at least 20% of tissues
+DvlRaw = DvlRaw[DvlRaw.apply(lambda  x: (sum(x > 0) > (len(x)*.2)) ,axis=1)]
 # Fill on data from DataFrame
 Devel.from_DataFrame(DvlRaw)
 Devel.log("Adding Dataset:",Devel)
 cb.add_dataset(Devel)
-
 exit()
+
+
+SAM = cob.COBDataset('COBSAM','Lin Devel Atlas plus SAM',FPKM=True,gene_build='5b')
+SAMRaw = pd.read_csv("./datasets/TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt")
+# Filter genes with less than 20% data
+SAMRaw = SAMRaw[SAMRaw.apply(lambda x: (sum(x>0) > len(x)*.20)axis=1)]
+SAM.from_DataFrame(SAMRaw[1:100])
+
 
 #------------------------
 # Genotype Network ProbeBlast PNAS
@@ -72,10 +92,10 @@ Zm4aGenes = Zm4aGenes.groupby('gene_id').apply(lambda a : a.ix[(a.transcript_end
 # Set the index to be transcript ID
 Zm4aGenes.index = Zm4aGenes.transcript_id
 
-#Zm4aGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
-#    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '4a.53'),
-#    axis = 1
-#)
+Zm4aGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
+    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '4a.53'),
+    axis = 1
+)
 
 
 # Import 5b Genes 
@@ -88,9 +108,9 @@ Zm5bGenes = Zm5bGenes.groupby('gene_id').apply(lambda a : a.ix[(a.transcript_end
 # Set the index to be transcript ID
 Zm5bGenes.index = Zm5bGenes.transcript_id
 
-#Zm5bGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
-#    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '5b'),
-#    axis = 1
-#)
+Zm5bGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
+    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '5b'),
+    axis = 1
+)
 
 

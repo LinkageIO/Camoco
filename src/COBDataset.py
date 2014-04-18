@@ -37,9 +37,15 @@ class COBDataset(COBDatabase):
         self.from_DataFrame(df)
 
     def from_DataFrame(self,df):
-        self.genes = Series([COBGene(GrameneID,gene_build=self.gene_build) for GrameneID in df.index])
+        all_genes = Series([COBGene(GrameneID,gene_build=self.gene_build) for GrameneID in df.index])
+        # Filter out genes which are not in Database
+        valid_gene_indices = [x.ID is not None for x in all_genes]
+        self.genes = all_genes[valid_gene_indices]
         self.accessions = Series(df.columns)
-        self.expr = df.as_matrix()
+        self.expr = df[valid_gene_indices].as_matrix()
+        # Log how many genes we dropped
+        
+        self.log("{} out of {} genes were kept for {}",len(self.expr),len(df),self.name)
         if self.FPKM:
             # FPKM values get the inverse hyperbolic sine transform
             self.expr = arcsinh(self.expr)
@@ -57,6 +63,14 @@ class COBDataset(COBDatabase):
             pool.close()
             pool.join()
             return scores
+
+    def dat(self):
+        tbl = pd.DataFrame(list(itertools.combinations([gene.GrameneID for gene in self.genes],2)),columns=['gene_a','gene_b'])
+        scores = self.coex() 
+        assert len(scores) == len(tbl)
+        tbl['scores' ] = scores
+        return tbl
+    
 
     def to_Dat(self,filename,UseGramene=True,**kw):
         with open(filename,'w') as FOUT:
@@ -80,3 +94,6 @@ class COBDataset(COBDatabase):
             {} Genes
             {} Accessions
         '''.format(len(self.genes),len(self.accessions))
+
+    def __repr__(self):
+        return str(self)

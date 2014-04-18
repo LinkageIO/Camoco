@@ -17,7 +17,7 @@ from scipy.spatial.distance import pdist, squareform
 
 from COBDatabase import *
 from COBDataset import *
-from COBLocus import*
+from COBLocus import *
 from COBGene import *
 from Genome import *
 from Chrom import *
@@ -43,6 +43,9 @@ class COB(COBDatabase,Log):
         # HouseKeeping
         (self.DatasetID, self.name, self.desc, self.FPKM, self.build) = self.fetchone("SELECT * FROM datasets WHERE name = '{}'",network)
         
+    @property
+    def genes(self):
+        return [COBGene(x,self.build) for x in self.query("SELECT DISTINCT(GrameneID) FROM expression JOIN genes ON expression.GeneID = genes.ID WHERE DatasetID = {}",self.DatasetID).GrameneID]
 
     def neighbors(self,gene_list):
         ''' 
@@ -53,14 +56,20 @@ class COB(COBDatabase,Log):
         return pd.concat([
             self.query('''SELECT gene_b as gene, GrameneID as neighbor_name, gene_a as neighbor, score
             FROM coex JOIN genes ON coex.gene_a = genes.ID
-            WHERE DatasetID = {} AND significant = 1 AND gene_b IN ({})''', self.DatasetID, ",".join(map(str,[x.ID for x in gene_list]))),
+            WHERE DatasetID = {} AND significant = 1 AND gene_b IN ({})''',
+                 self.DatasetID, ",".join(map(str,[x.ID for x in gene_list]))),
             self.query('''SELECT gene_a as gene, GrameneID as neighbor_name, gene_b as neighbor, score
             FROM coex JOIN genes ON coex.gene_b = genes.ID
-            WHERE DatasetID = {} AND significant = 1 AND gene_a IN ({})''', self.DatasetID, ','.join(map(str,[x.ID for x in gene_list])))
+            WHERE DatasetID = {} AND significant = 1 AND gene_a IN ({})''', 
+                self.DatasetID, ','.join(map(str,[x.ID for x in gene_list])))
         ])
 
     def num_neighbors(self,gene_list):
-        ''' return the number of significant global and local neighbors '''
+        ''' 
+            Input: a list of COBGene Object
+            Output: Dataframe containing the number of significant global
+                    and local neighbors for each gene in list
+        '''
         neighbors = self.neighbors(gene_list)
         def get_nums(df):
             global_length =  len(df)
@@ -71,22 +80,23 @@ class COB(COBDatabase,Log):
                 })
         return neighbors.groupby('gene').apply(lambda x : get_nums(x))
 
-# Unimplemented Below Here ------------------------------------------
-
     def density(self,gene_list):
-        ''' calculate the density of the network between a set of genes '''
+        ''' 
+            calculate the density of the ENTIRE network between a set of genes 
+            Input: A list of COBGene Objects
+            Output: a scalar value representing the density of genes
+        '''
         if len(gene_list) == 0:
             return 0
-        gene_list = self.genes2ids(gene_list)    
-        scores = self.query("SELECT score FROM {} WHERE gene_a IN ({}) AND gene_b IN ({})",
-            self.raw,
-            ",".join(map(str,gene_list)),
-            ",".join(map(str,gene_list))
+        scores = self.query("SELECT score FROM coex WHERE gene_a IN ({}) AND gene_b IN ({})",
+            ",".join(map(str,[x.ID for x in gene_list])),
+            ",".join(map(str,[x.ID for x in gene_list]))
         ).score
         if len(scores) == 0:
             return 0
         return (scores.mean()/(1/np.sqrt(len(scores))))
    
+
     def neighbors_score(self,gene_list):
         ''' returns a series containing the strongest connected neighbors '''
         neighbors = self.neighbors(gene_list)
@@ -94,6 +104,7 @@ class COB(COBDatabase,Log):
             scores = neighbors.groupby('neighbor').score.sum()
             scores.sort(ascending=False)
         return scores
+# Unimplemented Below Here ------------------------------------------
 
     def seed(self, gene_list, max_show = 65): 
         ''' given a set of nodes, add on the next X strongest connected nodes ''' 
