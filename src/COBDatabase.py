@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from __future__ import print_function
+from __future__ import print_function,division
 import pandas as pd
 import pandas.io.sql as psql
 import numpy as np
@@ -93,17 +93,7 @@ class COBDatabaseBuilder(COBDatabase):
                 DELETE FROM coex WHERE DatasetID = {};
             ''',DatasetID,DatasetID,DatasetID,DatasetID)
 
-    def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3): 
-        ''' Imports a COBDataset into the Database '''
-        # Insert the new dataset name
-        self.log("Creating new dataset called: {}",dataset.name)
-        self.execute('''INSERT INTO datasets (name, description, FPKM, gene_build) 
-        VALUES ('{}', '{}', {}, '{}')''',dataset.name, dataset.description, dataset.FPKM, dataset.gene_build)
-        # This fetches the primary key for dataset
-        dataset.id = self.db.insert_id()
-        # Check that the genes are all in the database
-        assert len(set([x.GrameneID for x in dataset.genes]) - set(self.query("SELECT GrameneID FROM genes").GrameneID))  == 0, "You must import all genes before you import the Dataset"
-    
+    def add_rawexp(self,dataset):
         # Raw expression data
         #--------------------
         for i,acc in enumerate(dataset.accessions):
@@ -115,29 +105,59 @@ class COBDatabaseBuilder(COBDatabase):
             )
             # Take care of the rawexp Values
             for j,gene in enumerate(dataset.genes):
-                self.execute('''INSERT INTO  expression (GeneID, AccessionID, DatasetID, value)
+                self.execute('''INSERT IGNORE INTO  expression (GeneID, AccessionID, DatasetID, value)
                     VALUES ({}, {}, {}, {})''', gene.ID, acc_id, dataset.id, dataset.expr[j,i] 
                 )
+    def add_avgexp(self,dataset):
         # Take care of coexpression values
-        self.log("Calculating Z-Scores for {}".format(dataset.name))
-        scores = dataset.coex()
-        # Calculate fisher transform
-        scores = transform(scores)
-        # Normalize to standard normal dist with mean == 0 and std == 1
-        scores = (scores-scores.mean())/scores.std()
-        # Create the dataframe
-        tbl = pd.DataFrame(list(itertools.combinations([gene.ID for gene in dataset.genes],2)),columns=['gene_a','gene_b'])
-        tbl['DatasetID'] = dataset.id
-        tbl['score'] = scores
-        tbl['significant'] = np.array(tbl['score'] >= significance_thresh,dtype=int)
-        # Disable Keys on the coex table
-        self.log('Adding Z-Score DataFrame to Database')
-        self.execute("ALTER TABLE coex DISABLE KEYS")
+        # Average Gene Expression Values
+        #-----------------------------------
+        for j,gene in enumerate(dataset.genes):
+            if j%1000 == 0 :
+                self.log("{}% complete",j/len(dataset.genes))
+            # calculate mean and sd for gene
+            self.execute('''INSERT IGNORE INTO  avgexpr (GeneID,DatasetID,meanExpr,stdExpr)
+                 VALUES ({},{},{},{})''',
+                 gene.ID, dataset.id,
+                 dataset.expr[j,:].mean(), dataset.expr[j,:].std()
+            )
+
+
+    def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3): 
+        ''' Imports a COBDataset into the Database '''
+        # Insert the new dataset name
+        self.log("Creating new dataset called: {}",dataset.name)
+        self.execute('''INSERT IGNORE INTO datasets (name, description, FPKM, gene_build) 
+        VALUES ('{}', '{}', {}, '{}')''',
+            dataset.name, dataset.description, dataset.FPKM, dataset.gene_build
+        )
+        # This fetches the primary key for dataset
+        dataset.id = self.db.insert_id()
+        # Check that the genes are all in the database
+        assert len(set([x.GrameneID for x in dataset.genes]) - set(self.query("SELECT GrameneID FROM genes").GrameneID))  == 0, "You must import all genes before you import the Dataset"
+        self.add_rawexp(dataset) 
+        self.add_avgexp(dataset)
+        #-------------------------
+        # Calculate and add coexpression data (must be done with generator)
         tmp_file = '/tmp/tmp{}.txt'.format(dataset.id)
         with open(tmp_file,'w') as FOUT:
+            self.log("Calculating Z-Scores for {}".format(dataset.name))
+            scores = dataset.coex()
+            # Calculate transform specified in the function arguments
+            scores = transform(scores)
+            # Normalize to standard normal dist with mean == 0 and std == 1
+            scores = (scores-scores.mean())/scores.std()
+            # Create the dataframe
+            tbl = pd.DataFrame(list(itertools.combinations([gene.ID for gene in dataset.genes],2)),columns=['gene_a','gene_b'])
+            tbl['DatasetID'] = dataset.id
+            tbl['score'] = scores
+            tbl['significant'] = np.array(tbl['score'] >= significance_thresh,dtype=int)
+            # Disable Keys on the coex table
+            self.log('Adding Z-Score DataFrame to Database')
+            self.execute("ALTER TABLE coex DISABLE KEYS")
             tbl[['DatasetID','gene_a','gene_b','score','significant']].to_csv(FOUT,sep="\t",index=False,header=False)
-        self.execute("LOAD DATA INFILE '{}' INTO TABLE coex FIELDS TERMINATED BY '\t';".format(tmp_file))
-        self.execute("ALTER TABLE coex ENABLE KEYS")
+            self.execute("LOAD DATA INFILE '{}' INTO TABLE coex FIELDS TERMINATED BY '\t';".format(tmp_file))
+            self.execute("ALTER TABLE coex ENABLE KEYS")
         # Clean up after yourself, you filthy animal
         os.remove(tmp_file)
         
@@ -196,6 +216,15 @@ class COBDatabaseBuilder(COBDatabase):
             value FLOAT,
             PRIMARY KEY(GeneID,AccessionID,DatasetID)
         );
+        ''')
+        self.execute('''
+        CREATE TABLE IF NOT EXISTS avgexpr (
+            GeneID INT UNSIGNED,
+            DatasetID INT UNSIGNED,
+            meanExpr FLOAT,
+            stdExpr FLOAT,
+            PRIMARY KEY(GeneID,DatasetID)
+        ); 
         ''')
         self.execute(''' 
         CREATE TABLE IF NOT EXISTS coex (
