@@ -47,6 +47,11 @@ class COB(COBDatabase,Log):
     def genes(self):
         return [COBGene(x,self.build) for x in self.query("SELECT DISTINCT(GrameneID) FROM expression JOIN genes ON expression.GeneID = genes.ID WHERE DatasetID = {}",self.DatasetID).GrameneID]
 
+    def degree(self,gene_list):
+        ''' Input: a list of COBGene Objects
+            Output: Returns degree for each COBGene object
+        '''
+
     def neighbors(self,gene_list):
         ''' 
             Input : a list of COBGene Objects
@@ -104,6 +109,29 @@ class COB(COBDatabase,Log):
             scores = neighbors.groupby('neighbor').score.sum()
             scores.sort(ascending=False)
         return scores
+
+    def gene_expr_vals(self,gene_list):
+        expr_vals = self.query(
+         '''SELECT 
+            GrameneID, expression.GeneID, expression.AccessionID, expression.DatasetID,
+                 value, meanExpr, stdExpr, name, class,description
+            FROM expression
+            JOIN avgexpr ON expression.GeneID = avgexpr.GeneID 
+                AND expression.DatasetID = avgexpr.DatasetID
+            JOIN accessions ON expression.AccessionID = accessions.ID 
+                AND expression.DatasetID = accessions.DatasetID
+            JOIN genes ON expression.GeneID = genes.ID
+            WHERE expression.GeneID IN ({})
+            AND   expression.DatasetID = {}''',
+            ",".join(map(str,[x.ID for x in gene_list])), 
+            self.DatasetID
+        )
+        def zscore(group):
+            group.index = group.name
+            norm = (group.value-group.value.mean())/group.value.std()
+            return norm
+        return pd.DataFrame({gid:zscore(group) for gid,group in expr_vals.groupby('GrameneID')})
+
 # Unimplemented Below Here ------------------------------------------
 
     def seed(self, gene_list, max_show = 65): 
@@ -148,23 +176,6 @@ class COB(COBDatabase,Log):
             graph.add_edge(source=graph.vs.find(name=edge[1]),target=graph.vs.find(name=edge[2]),weight=edge[3])
         return graph 
         
-    def gene_expr_vals(self,gene_list):
-        ids = self.genes2ids(gene_list)
-        expr_vals = self.query(
-         '''SELECT  val.gene_id, name, tissue_desc, organ_name, growth_stage , log_value, avg_log_value
-            FROM mzn_rawexp_values val
-            JOIN mzn_rawexp_avg avg ON val.gene_id = avg.gene_id AND val.dataset_id = avg.dataset_id 
-            JOIN mzn_rawexp_accessions acc ON val.accession_id = acc.accession_id 
-            WHERE val.gene_id IN ({})
-            AND val.dataset_id = {}''',
-            ",".join(map(str,ids)), 
-            self.id
-        )
-        def zscore(group):
-            group.index = group.name
-            norm = group.log_value-group.avg_log_value
-            return norm/np.std(norm)
-        return pd.DataFrame({gid:zscore(group) for gid,group in expr_vals.groupby('gene_id')})
 
     def heatmap(self,dm,filename=None):
 
