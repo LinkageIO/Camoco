@@ -19,12 +19,15 @@ class COBDatabase(object):
             return sens_file.readline().strip()
     # The Database Connection needs to be shared between all classes which inherit COBDatabase
     # Otherwise we open too many connections
-    db = MySQLdb.connect(
-        host   = sensitive("MySQLHost"),
-        user   = sensitive("MySQLUser"),
-        passwd = sensitive("MySQLPasswd"),
-        db     = sensitive("MySQLDB")
-    )
+    try:
+        db = MySQLdb.connect(
+            host   = sensitive("MySQLHost"),
+            user   = sensitive("MySQLUser"),
+            passwd = sensitive("MySQLPasswd"),
+            db     = sensitive("MySQLDB")
+        )
+    except Exception as e:
+        sys.exit("Connection to database '{}' could not be made".format(sensitive("MySQLDB")))
     def __init__(self, log_file=sys.stderr):
         if log_file != sys.stderr:
             self.log_file = open(log_file,'w')
@@ -112,15 +115,17 @@ class COBDatabaseBuilder(COBDatabase):
         # Take care of coexpression values
         # Average Gene Expression Values
         #-----------------------------------
+        self.log("Calculating gene expression averages...")
         for j,gene in enumerate(dataset.genes):
             if j%1000 == 0 :
-                self.log("{}% complete",j/len(dataset.genes))
+                self.log("\t{}% complete",j/len(dataset.genes)*100)
             # calculate mean and sd for gene
             self.execute('''INSERT IGNORE INTO  avgexpr (GeneID,DatasetID,meanExpr,stdExpr)
                  VALUES ({},{},{},{})''',
                  gene.ID, dataset.id,
                  dataset.expr[j,:].mean(), dataset.expr[j,:].std()
             )
+        self.log("...done")
 
 
     def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3): 
@@ -148,32 +153,32 @@ class COBDatabaseBuilder(COBDatabase):
             # Normalize to standard normal dist with mean == 0 and std == 1
             scores = (scores-scores.mean())/scores.std()
             # Create the dataframe
-            tbl = pd.DataFrame(list(itertools.combinations([gene.ID for gene in dataset.genes],2)),columns=['gene_a','gene_b'])
+            tbl = pd.DataFrame(
+                list(
+                    itertools.combinations([gene.ID for gene in dataset.genes],2)),
+                    columns=['gene_a','gene_b']
+            )
             tbl['DatasetID'] = dataset.id
             tbl['score'] = scores
             tbl['significant'] = np.array(tbl['score'] >= significance_thresh,dtype=int)
             # Disable Keys on the coex table
             self.log('Adding Z-Score DataFrame to Database')
-            self.execute("ALTER TABLE coex DISABLE KEYS")
+            self.execute("ALTER TABLE coex DISABLE KEYS;")
+            self.execute('LOCK TABLES coex WRITE;')
             tbl[['DatasetID','gene_a','gene_b','score','significant']].to_csv(FOUT,sep="\t",index=False,header=False)
-            self.execute("LOAD DATA INFILE '{}' INTO TABLE coex FIELDS TERMINATED BY '\t';".format(tmp_file))
+            self.execute('''LOAD DATA INFILE '{}' INTO TABLE coex 
+                FIELDS TERMINATED BY '\t';'''.format(tmp_file))
+            self.execute('UNLOCK TABLES;')
             self.execute("ALTER TABLE coex ENABLE KEYS")
         # Clean up after yourself, you filthy animal
         os.remove(tmp_file)
         
         self.log('Done Adding to Database')
 
-    def clear_datasets(self):
-        self.execute('''
-            TRUNCATE TABLE coex; 
-            TRUNCATE TABLE datasets;
-            DELETE FROM coex;
-            DELETE FROM datasets;
-            DELETE FROM accessions;
-            DELETE FROM expression;
-            ALTER TABLE datasets AUTO_INCREMENT = 1;
-            ALTER TABLE accessions AUTO_INCREMENT = 1;
-        ''')
+    def clear_database(self):
+        tables = self.query("SHOW TABLES;")
+        for table in tables.iloc[:,0].values:
+            self.execute("DROP TABLE {}",table)
 
     def __create_tables__(self): 
         self.execute(''' 
@@ -232,8 +237,7 @@ class COBDatabaseBuilder(COBDatabase):
             gene_a INT UNSIGNED, INDEX USING BTREE(gene_a),
             gene_b INT UNSIGNED, INDEX USING BTREE(gene_b),
             score FLOAT, INDEX USING BTREE(score),
-            significant BOOL, INDEX USING BTREE(significant),
-            PRIMARY KEY(DatasetID,gene_a,gene_b)
+            significant BOOL, INDEX USING BTREE(significant)
         );
         ''')
         self.execute('''
