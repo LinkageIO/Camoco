@@ -138,7 +138,6 @@ class COB(COBDatabase,Log):
         ''' given a set of nodes, add on the next X strongest connected nodes ''' 
         if len(gene_list) == 0:
             return []
-        gene_list = self.genes2ids(gene_list)
         neighbors = self.neighbors_score(gene_list)
         seed_set =  set(gene_list).union(neighbors.index[0:min(len(neighbors),max_show)])
         return seed_set

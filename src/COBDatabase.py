@@ -9,6 +9,7 @@ import os as os
 import time
 import itertools
 import tempfile
+from scipy.misc import comb
 
 class COBDatabase(object):
     def sensitive(sens):
@@ -128,7 +129,7 @@ class COBDatabaseBuilder(COBDatabase):
         self.log("...done")
 
 
-    def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3): 
+    def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3,tmpdir="/tmp/"): 
         ''' Imports a COBDataset into the Database '''
         # Insert the new dataset name
         self.log("Creating new dataset called: {}",dataset.name)
@@ -144,7 +145,7 @@ class COBDatabaseBuilder(COBDatabase):
         self.add_avgexp(dataset)
         #-------------------------
         # Calculate and add coexpression data (must be done with generator)
-        tmp_file = '/tmp/tmp{}.txt'.format(dataset.id)
+        tmp_file = os.path.join(tmpdir,'tmp{}.txt'.format(dataset.id))
         with open(tmp_file,'w') as FOUT:
             self.log("Calculating Z-Scores for {}".format(dataset.name))
             scores = dataset.coex()
@@ -161,11 +162,16 @@ class COBDatabaseBuilder(COBDatabase):
             tbl['DatasetID'] = dataset.id
             tbl['score'] = scores
             tbl['significant'] = np.array(tbl['score'] >= significance_thresh,dtype=int)
+            if len(tbl) != comb(dataset.num_genes(),2,exact=True):
+                self.log("ERROR: The number of genes in the table ({}) does not equal the number in dataset ({})",
+                    len(tbl),dataset.num_genes()
+                )
             # Disable Keys on the coex table
             self.log('Adding Z-Score DataFrame to Database')
             self.execute("ALTER TABLE coex DISABLE KEYS;")
             self.execute('LOCK TABLES coex WRITE;')
             tbl[['DatasetID','gene_a','gene_b','score','significant']].to_csv(FOUT,sep="\t",index=False,header=False)
+            FOUT.flush()
             self.execute('''LOAD DATA INFILE '{}' INTO TABLE coex 
                 FIELDS TERMINATED BY '\t';'''.format(tmp_file))
             self.execute('UNLOCK TABLES;')
