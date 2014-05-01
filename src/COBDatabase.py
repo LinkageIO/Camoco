@@ -162,7 +162,7 @@ class COBDatabaseBuilder(COBDatabase):
             tbl['DatasetID'] = dataset.id
             tbl['score'] = scores
             tbl['significant'] = np.array(tbl['score'] >= significance_thresh,dtype=int)
-            if len(tbl) != comb(dataset.num_genes(),2,exact=True):
+            if len(tbl) != comb(dataset.num_genes,2,exact=True):
                 self.log("ERROR: The number of genes in the table ({}) does not equal the number in dataset ({})",
                     len(tbl),dataset.num_genes()
                 )
@@ -194,6 +194,7 @@ class COBDatabaseBuilder(COBDatabase):
             description varchar(4096),
             FPKM BOOL,
             gene_build ENUM('4a.53','5a','5b'),
+            date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY(ID) 
         )
         ''')
