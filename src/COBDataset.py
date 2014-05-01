@@ -14,12 +14,22 @@ import os as os
 
 def _PCCUp(tpl):
     ''' Returns a tuple containing indices i,j and their Pearson Correlation Coef '''
-    i,m = (tpl)
+    i,m,l = (tpl) # values are index, exprMatrix, and lock
+    total = ((m.shape[0]**2)-m.shape[0])/2 # total number of calculations we need to do
+    left = ((m.shape[0]-i)**2-(m.shape[0]-i))/2 # How many we have left
+    percent_done = math.floor((1-left/total)*100) # percent complete based on i and m
+    if percent_done % 10 == 0: # report at 10% intervals
+        l.acquire() # We need to lock because we are running in parallel
+        print("\t\t{} {}% Complete".format(time.ctime(),percent_done))
+        l.release()
     return [pearsonr(m[i,:],m[j,:])[0] for j in arange(i+1,len(m))] 
 
-class COBDataset(COBDatabase):
-    def __init__(self,name,description, FPKM=True,gene_build='5b'):
-        super(COBDataset,self).__init__()
+class COBDatasetBuilder(COBDatabaseBuilder):
+    def __init__(self,name,description='',FPKM=True,gene_build='5b'):
+        super(COBDatasetBuilder,self).__init__()
+        # Warn us if there is already a Dataset named this
+        assert self.fetchone("SELECT COUNT(*) FROM datasets WHERE name = '{}'",name)[0] == 0,\
+            self.log("There is already a dataset named '{}'. Please choose something else.",name) 
         self.name = name
         self.description = description
         # rows of matrix are genes and columns are accessions
@@ -58,8 +68,10 @@ class COBDataset(COBDatabase):
         if not multi: 
             scores = itertools.imap(_PCCUp,( (i,self.genes,self.expr,UseGramene) for i in arange(self.num_genes)))
         else:
+            manager = multiprocessing.Manager()
+            lock = manager.Lock()
             pool = multiprocessing.Pool()
-            scores = np.array(list(itertools.chain(*pool.imap(_PCCUp,[ (i,self.expr) for i in arange(self.num_genes)]))))
+            scores = np.array(list(itertools.chain(*pool.imap(_PCCUp,[ (i,self.expr,lock) for i in arange(self.num_genes)]))))
             pool.close()
             pool.join()
             return scores
@@ -79,21 +91,13 @@ class COBDataset(COBDatabase):
                 for i,j,r in chunk:
                     print("{}\t{}\t{}".format(i,j,r),file=FOUT)
 
-    def test(self):
-        old_per = 0
-        total_genes = (((len(self.genes)**2)/2)-len(self.genes))
-        for i,j in enumerate(self.coex()):
-            cur_per = math.floor((i / total_genes) * 100)
-            if cur_per > old_per:
-                old_per = cur_per
-                print("{} - {}% complete ({} edges)".format(time.ctime(),cur_per,i))
-
     def __str__(self):
         return '''
-            COB Dataset:
+            COB Dataset Builder: {}
+            desc: '{}'
             {} Genes
             {} Accessions
-        '''.format(len(self.genes),len(self.accessions))
+        '''.format(self.name,self.description,len(self.genes),len(self.accessions))
 
     def __repr__(self):
         return str(self)
