@@ -76,13 +76,38 @@ class COBDatasetBuilder(COBDatabaseBuilder):
             pool.join()
             return scores
 
-    def dat(self):
+    def dat(self,score_cutoff=None,transform=np.arctanh,normalize=True):
         tbl = pd.DataFrame(list(itertools.combinations([gene.GrameneID for gene in self.genes],2)),columns=['gene_a','gene_b'])
         scores = self.coex() 
         assert len(scores) == len(tbl)
+        if transform:
+            scores[scores == 1] = 0.999999
+            scores = transform(scores)
+        if normalize:
+            scores = (scores -scores.mean()) / scores.std()
         tbl['scores' ] = scores
+        # If there is a cutoff, filter it out
+        if score_cutoff:
+            tbl = tbl[tbl.scores > score_cutoff]
         return tbl
-    
+   
+    def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
+        ''' Compare the number of significant edges with a DAT file '''
+        ref_dat = pd.read_table(filename,sep=sep,names=['gene_a','gene_b','scores'])
+        dat = self.dat(score_cutoff=score_cutoff) 
+        # Get a list of genes in the dataset
+        genes = set(dat.gene_a).union(set(dat.gene_b))
+        for gene in genes:
+            # Compare the degree of each gene with the reference dat
+            ref_degree = len(ref_dat[(ref_dat.gene_a == gene) | (ref_dat.gene_b == gene)])
+            degree     = len(dat[(dat.gene_a == gene)|(dat.gene_b == gene)])
+            if ref_degree != degree:
+                self.log("{} degree didn't match! ref: {} vs {}",gene,ref_degree,degree)
+                print(ref_dat[(ref_dat.gene_a == gene) | (ref_dat.gene_b == gene)])
+                print("----------------------------------------------------")
+                print(dat[(dat.gene_a == gene)|(dat.gene_b == gene)])
+            else:
+                self.log("{} matches!".format(gene))
 
     def to_Dat(self,filename,UseGramene=True,**kw):
         with open(filename,'w') as FOUT:
