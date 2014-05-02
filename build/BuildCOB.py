@@ -1,43 +1,92 @@
 #!/usr/bin/python
 import pandas as pd
+import numpy as np
 import itertools
 import COB as cob
 # Only in extreme cases
 cb = cob.COBDatabaseBuilder()
-#cb.__create_tables__()
-#cb.log('Clearing Database')
-#cb.clear_datasets()
-#cb.log('Done')
+cb.log('Clearing Database')
+cb.clear_database()
+cb.__create_tables__()
+cb.log('Done')
+
+# Compare Old database with new database
+
+# -----------------------
+# Import Gene Sets
+
+# Import 4a.53 genes
+Zm4aGenes = pd.read_table("./genes/ZmB73_4a.53_FGS_info.txt")
+Zm4aGenes.chromosome.replace({'chrMt':'chr11'},inplace=True)
+Zm4aGenes.chromosome.replace({'chrPt':'chr12'},inplace=True)
+Zm4aGenes.chromosome = Zm4aGenes.chromosome.apply(lambda x : int(x.replace('chr','')))
+# Filter out Zm4aGenes to only contain the longest transcript
+Zm4aGenes = Zm4aGenes.groupby('gene_id').apply(lambda a : a.ix[(a.transcript_end - a.transcript_start).idxmax()])
+# Set the index to be transcript ID
+Zm4aGenes.index = Zm4aGenes.transcript_id
+Zm4aGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
+    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '4a.53'),
+    axis = 1
+)
+# Import 5b Genes 
+Zm5bGenes = pd.read_table("./genes/ZmB73_5b_FGS_info.txt")
+Zm5bGenes.chromosome.replace({'chrMt':'chr11'},inplace=True)
+Zm5bGenes.chromosome.replace({'chrPt':'chr12'},inplace=True)
+Zm5bGenes.chromosome = Zm5bGenes.chromosome.apply(lambda x : int(x.replace('chr','')))
+# Filter out Zm5bGenes to only contain the longest transcript
+Zm5bGenes = Zm5bGenes.groupby('gene_id').apply(lambda a : a.ix[(a.transcript_end - a.transcript_start).idxmax()])
+# Set the index to be transcript ID
+Zm5bGenes.index = Zm5bGenes.transcript_id
+Zm5bGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
+    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '5b'),
+    axis = 1
+)
+
 
 # -----------------------
 # Genotype Network PNAS
 #Load the Genotype Datasets
 cb.log("Reading in Genotype Dataset")
 GenRaw = pd.read_csv("./datasets/CghFilteredCombined.txt",sep="\t")
-Geno = cob.COBDataset("Genotype","Rewiring of the Maize Transcriptome",FPKM=False,gene_build='4a.53')
+Geno = cob.COBDatasetBuilder("Genotype","Rewiring of the Maize Transcriptome",FPKM=False,gene_build='4a.53')
 Geno.from_DataFrame(GenRaw)
 
-cb.log("Adding Dataset: ", Geno)
-cb.add_dataset(Geno)
-cb.log("Done")
+Geno.log("Adding Dataset: ", Geno)
+Geno.add_dataset(Geno)
+Geno.log("Done")
         
 #------------------------
 # Devel Network PNAS
 # Load the Devel Network
 cb.log('Reading in the DevelArray Network')
 DevRaw = pd.read_csv("./datasets/DevelAtlasArray.txt",sep="\t")
-Devl = cob.COBDataset("Developmental","Sekhon 2011 Gene Expression Maize Developmental Atlas",FPKM=False,gene_build='4a.53')
+Devl = cob.COBDatasetBuilder("Developmental","Sekhon 2011 Gene Expression Maize Developmental Atlas",FPKM=False,gene_build='4a.53')
 Devl.from_DataFrame(DevRaw)
 
 cb.log("Adding Dataset:",Devl)
 cb.add_dataset(Devl)
 cb.log('Done')
 
+
+#------------------------
+# Developmental Atlas and SAM
+# Create a new DataSet
+SAM = cob.COBDatasetBuilder('COBSAM','Lin Devel Atlas plus SAM',FPKM=True,gene_build='5b')
+SAMRaw = pd.read_csv("./datasets/TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt",sep="\t")
+# Filter genes with less than 20% data
+SAMRaw = SAMRaw[SAMRaw.apply(l:ambda x: (sum(np.isnan(x)) < len(x)*.20),axis=1)]
+SAMRaw[np.isnan(SAMRaw)] = -1:
+SAM.from_DataFrame(SAMRaw)
+
+cb.log("Adding Dataset:",SAM)
+cb.add_dataset(SAM)
+cb.log("Done")
+
 #------------------------
 # Devel Network RNASEQ
 # Load the transcript expression data from csv
 # Create a new DataSet
-Devel = cob.COBDataset("DevelRNASEQ","Developmental Atlas RNASEQ dataset",FPKM=True,gene_build='5b')
+Devel = cob.COBDatasetBuilder("DevelRNASEQ","Developmental Atlas RNASEQ dataset",FPKM=True,gene_build='5b')
 # Import 5b Genes 
 Devel.log("Reading in Zm5B Gene Table")
 Zm5bGenes = pd.read_table("./genes/ZmB73_4a.53_FGS_info.txt")
@@ -64,15 +113,6 @@ cb.add_dataset(Devel)
 exit()
 
 
-#------------------------
-# Developmental Atlas and SAM
-# Create a new DataSet
-SAM = cob.COBDataset('COBSAM','Lin Devel Atlas plus SAM',FPKM=True,gene_build='5b')
-SAMRaw = pd.read_csv("./datasets/TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt")
-# Filter genes with less than 20% data
-SAMRaw = SAMRaw[SAMRaw.apply(lambda x: (sum(x>0) > len(x)*.20)axis=1)]
-SAM.from_DataFrame(SAMRaw[1:100])
-
 
 #------------------------
 # Genotype Network ProbeBlast PNAS
@@ -82,38 +122,5 @@ ProbeBlast = RawProbeBlast[RawProbeBlast.NUMBER_OF_BLAST_HITS == 1]
 # Figure  out why there are only 54 inds and if it matters
 PBRaw = pd.read_table("./datasets/GSE30036_series_matrix.txt",mangle_dupe_cols=False).groupby(level=0,axis=1).mean()
 
-
-# Compare Old database with new database
-
-# Import 4a.53 genes
-Zm4aGenes = pd.read_table("./genes/ZmB73_4a.53_FGS_info.txt")
-Zm4aGenes.chromosome.replace({'chrMt':'chr11'},inplace=True)
-Zm4aGenes.chromosome.replace({'chrPt':'chr12'},inplace=True)
-Zm4aGenes.chromosome = Zm4aGenes.chromosome.apply(lambda x : int(x.replace('chr','')))
-# Filter out Zm4aGenes to only contain the longest transcript
-Zm4aGenes = Zm4aGenes.groupby('gene_id').apply(lambda a : a.ix[(a.transcript_end - a.transcript_start).idxmax()])
-# Set the index to be transcript ID
-Zm4aGenes.index = Zm4aGenes.transcript_id
-
-Zm4aGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
-    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '4a.53'),
-    axis = 1
-)
-
-
-# Import 5b Genes 
-Zm5bGenes = pd.read_table("./genes/ZmB73_5b_FGS_info.txt")
-Zm5bGenes.chromosome.replace({'chrMt':'chr11'},inplace=True)
-Zm5bGenes.chromosome.replace({'chrPt':'chr12'},inplace=True)
-Zm5bGenes.chromosome = Zm5bGenes.chromosome.apply(lambda x : int(x.replace('chr','')))
-# Filter out Zm5bGenes to only contain the longest transcript
-Zm5bGenes = Zm5bGenes.groupby('gene_id').apply(lambda a : a.ix[(a.transcript_end - a.transcript_start).idxmax()])
-# Set the index to be transcript ID
-Zm5bGenes.index = Zm5bGenes.transcript_id
-
-Zm5bGenes[['chromosome','gene_id','transcript_start','transcript_end','transcript_strand']].drop_duplicates().apply(
-    lambda x: cb.add_gene(x.gene_id, x.chromosome, x.transcript_start, x.transcript_end, x.transcript_strand, '5b'),
-    axis = 1
-)
 
 

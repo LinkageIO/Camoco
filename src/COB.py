@@ -31,11 +31,14 @@ class Log(object):
         ''' shared object logging '''
         print(time.ctime(),'-',*args,file=self.log_file)
 
+def available_datasets():
+        c = COBDatabase()
+        return c.query('''SELECT name,id FROM datasets''')
 
 class COB(COBDatabase,Log):
     ''' 
         This class implements the basic interface to the COB Database. It provides routine
-        analysis functions for basic netowrk queries.
+        analysis functions for basic network queries.
     '''
     def __init__(self,network=None):
         ''' Ititialized a COB object based on a dataset Name '''
@@ -51,6 +54,7 @@ class COB(COBDatabase,Log):
         ''' Input: a list of COBGene Objects
             Output: Returns degree for each COBGene object
         '''
+        pass
 
     def neighbors(self,gene_list):
         ''' 

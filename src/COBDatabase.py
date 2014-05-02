@@ -149,6 +149,7 @@ class COBDatabaseBuilder(COBDatabase):
         with open(tmp_file,'w') as FOUT:
             self.log("Calculating Z-Scores for {}".format(dataset.name))
             scores = dataset.coex()
+            scores[scores == 1] = 0.9999
             # Calculate transform specified in the function arguments
             scores = transform(scores)
             # Normalize to standard normal dist with mean == 0 and std == 1
