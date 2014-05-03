@@ -76,6 +76,12 @@ class COBDatasetBuilder(COBDatabaseBuilder):
             pool.join()
             return scores
 
+    def profile(self,gene_names):
+        '''return the expression profile based on gene name '''
+        matches = [ i for i,x in enumerate(self.genes) if x.GrameneID in gene_names ]
+        return self.expr[matches,:]
+        
+
     def dat(self,score_cutoff=None,transform=np.arctanh,normalize=True):
         tbl = pd.DataFrame(list(itertools.combinations([gene.GrameneID for gene in self.genes],2)),columns=['gene_a','gene_b'])
         scores = self.coex() 
