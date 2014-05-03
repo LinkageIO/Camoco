@@ -128,24 +128,16 @@ class COBDatabaseBuilder(COBDatabase):
             )
         self.log("...done")
 
-
-    def add_dataset(self,dataset,transform=np.arctanh,significance_thresh=3,tmpdir="/tmp/"): 
-        ''' Imports a COBDataset into the Database '''
-        # Insert the new dataset name
-        self.log("Creating new dataset called: {}",dataset.name)
-        self.execute('''INSERT IGNORE INTO datasets (name, description, FPKM, gene_build) 
-        VALUES ('{}', '{}', {}, '{}')''',
-            dataset.name, dataset.description, dataset.FPKM, dataset.gene_build
-        )
-        # This fetches the primary key for dataset
-        dataset.id = self.db.insert_id()
-        # Check that the genes are all in the database
-        assert len(set([x.GrameneID for x in dataset.genes]) - set(self.query("SELECT GrameneID FROM genes").GrameneID))  == 0, "You must import all genes before you import the Dataset"
-        self.add_rawexp(dataset) 
-        self.add_avgexp(dataset)
-        #-------------------------
-        # Calculate and add coexpression data (must be done with generator)
+    def add_coex(self,dataset,transform=np.arctanh,significance_thresh=3,tmpdir="/tmp/"):
         tmp_file = os.path.join(tmpdir,'tmp{}.txt'.format(dataset.id))
+        # A coex table needs to be created because things are slow
+        coex_table_name = "coex_{}".format(dataset.name.replace(' ','_'))
+        self.execute(''' CREATE TABLE IF NOT EXISTS {} (
+            gene_a INT UNSIGNED, INDEX USING BTREE(gene_a), 
+            gene_b INT UNSIGNED, INDEX USING BTREE(gene_b), 
+            score FLOAT, INDEX USING BTREE(score),
+            significant BOOL, INDEX USING BTREE(significant)
+        );'''.format(coex_table_name))
         with open(tmp_file,'w') as FOUT:
             self.log("Calculating Z-Scores for {}".format(dataset.name))
             scores = dataset.coex()
@@ -163,23 +155,40 @@ class COBDatabaseBuilder(COBDatabase):
             tbl['DatasetID'] = dataset.id
             tbl['score'] = scores
             tbl['significant'] = np.array(tbl['score'] >= significance_thresh,dtype=int)
+            # Sanity check: number of interactions should equal genes choose 2
             if len(tbl) != comb(dataset.num_genes,2,exact=True):
                 self.log("ERROR: The number of genes in the table ({}) does not equal the number in dataset ({})",
                     len(tbl),dataset.num_genes()
                 )
+            # Write Data to tmp file
+            tbl[['gene_a','gene_b','score','significant']].to_csv(FOUT,sep="\t",index=False,header=False)
+            FOUT.flush()
             # Disable Keys on the coex table
             self.log('Adding Z-Score DataFrame to Database')
-            self.execute("ALTER TABLE coex DISABLE KEYS;")
-            self.execute('LOCK TABLES coex WRITE;')
-            tbl[['DatasetID','gene_a','gene_b','score','significant']].to_csv(FOUT,sep="\t",index=False,header=False)
-            FOUT.flush()
-            self.execute('''LOAD DATA INFILE '{}' INTO TABLE coex 
-                FIELDS TERMINATED BY '\t';'''.format(tmp_file))
-            self.execute('UNLOCK TABLES;')
-            self.execute("ALTER TABLE coex ENABLE KEYS")
+            self.execute("ALTER TABLE {} DISABLE KEYS;", coex_table_name)
+            self.execute('''LOAD DATA INFILE '{}' INTO TABLE {}
+                FIELDS TERMINATED BY '\t';''', tmp_file, coex_table_name)
+            self.log("Rebuilding Indices")
+            self.execute("ALTER TABLE {} ENABLE KEYS", coex_table_name)
         # Clean up after yourself, you filthy animal
         os.remove(tmp_file)
-        
+
+    def add_dataset(self,dataset): 
+        ''' Imports a COBDataset into the Database '''
+        # Insert the new dataset name
+        self.log("Creating new dataset called: {}",dataset.name)
+        self.execute('''INSERT IGNORE INTO datasets (name, description, FPKM, gene_build) 
+        VALUES ('{}', '{}', {}, '{}')''',
+            dataset.name, dataset.description, dataset.FPKM, dataset.gene_build
+        )
+        # This fetches the primary key for dataset
+        dataset.id = self.db.insert_id()
+        # Check that the genes are all in the database
+        assert len(set([x.GrameneID for x in dataset.genes]) - set(self.query("SELECT GrameneID FROM genes").GrameneID))  == 0, "You must import all genes before you import the Dataset"
+        # Calculate and add coexpression data (must be done with generator)
+        self.add_rawexp(dataset) 
+        self.add_avgexp(dataset)
+        self.add_coex(dataset)
         self.log('Done Adding to Database')
 
     def clear_database(self):
@@ -238,15 +247,6 @@ class COBDatabaseBuilder(COBDatabase):
             stdExpr FLOAT,
             PRIMARY KEY(GeneID,DatasetID)
         ); 
-        ''')
-        self.execute(''' 
-        CREATE TABLE IF NOT EXISTS coex (
-            DatasetID INT UNSIGNED, INDEX USING BTREE(DatasetID),
-            gene_a INT UNSIGNED, INDEX USING BTREE(gene_a),
-            gene_b INT UNSIGNED, INDEX USING BTREE(gene_b),
-            score FLOAT, INDEX USING BTREE(score),
-            significant BOOL, INDEX USING BTREE(significant)
-        );
         ''')
         self.execute('''
         CREATE TABLE IF NOT EXISTS common (
