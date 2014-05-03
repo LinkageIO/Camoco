@@ -50,6 +50,10 @@ class COB(COBDatabase,Log):
     def genes(self):
         return [COBGene(x,self.build) for x in self.query("SELECT DISTINCT(GrameneID) FROM expression JOIN genes ON expression.GeneID = genes.ID WHERE DatasetID = {}",self.DatasetID).GrameneID]
 
+    @property
+    def coex_table_name(self):
+        return "coex_{}".format(self.name.replace(' ','_'))
+
     def degree(self,gene_list):
         ''' Input: a list of COBGene Objects
             Output: Returns degree for each COBGene object
@@ -64,13 +68,13 @@ class COB(COBDatabase,Log):
         '''
         return pd.concat([
             self.query('''SELECT gene_b as gene, GrameneID as neighbor_name, gene_a as neighbor, score
-            FROM coex JOIN genes ON coex.gene_a = genes.ID
+            FROM {} coex JOIN genes ON coex.gene_a = genes.ID
             WHERE DatasetID = {} AND significant = 1 AND gene_b IN ({})''',
-                 self.DatasetID, ",".join(map(str,[x.ID for x in gene_list]))),
+                 self.coex_table_name, self.DatasetID, ",".join(map(str,[x.ID for x in gene_list]))),
             self.query('''SELECT gene_a as gene, GrameneID as neighbor_name, gene_b as neighbor, score
-            FROM coex JOIN genes ON coex.gene_b = genes.ID
+            FROM {} coex JOIN genes ON coex.gene_b = genes.ID
             WHERE DatasetID = {} AND significant = 1 AND gene_a IN ({})''', 
-                self.DatasetID, ','.join(map(str,[x.ID for x in gene_list])))
+                self.coex_table_name, self.DatasetID, ','.join(map(str,[x.ID for x in gene_list])))
         ])
 
     def num_neighbors(self,gene_list):
@@ -97,7 +101,8 @@ class COB(COBDatabase,Log):
         '''
         if len(gene_list) == 0:
             return 0
-        scores = self.query("SELECT score FROM coex WHERE gene_a IN ({}) AND gene_b IN ({})",
+        scores = self.query("SELECT score FROM {} coex WHERE gene_a IN ({}) AND gene_b IN ({})",
+            self.coex_table_name(),
             ",".join(map(str,[x.ID for x in gene_list])),
             ",".join(map(str,[x.ID for x in gene_list]))
         ).score
