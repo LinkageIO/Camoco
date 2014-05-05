@@ -87,6 +87,7 @@ class COBDatabaseBuilder(COBDatabase):
         ''' Deletes a dataset by name '''
         # Grab the DatasetID
         (DatasetID,) = self.fetchone("SELECT ID FROM datasets WHERE name = '{}'",name)
+        coex_table_name = "coex_{}".format(name.replace(' ','_')) 
         if not DatasetID:
             self.log("'{}' was not in database",name)
         else:
@@ -94,8 +95,8 @@ class COBDatabaseBuilder(COBDatabase):
                 DELETE FROM datasets WHERE ID = {};
                 DELETE FROM accessions WHERE DatasetID = {};
                 DELETE FROM expression WHERE DatasetID = {};
-                DELETE FROM coex WHERE DatasetID = {};
-            ''',DatasetID,DatasetID,DatasetID,DatasetID)
+                DROP TABLE {};
+            ''',DatasetID,DatasetID,DatasetID,DatasetID,coex_table_name,coex_table_name)
 
     def add_rawexp(self,dataset):
         # Raw expression data
