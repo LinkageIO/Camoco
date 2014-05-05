@@ -33,7 +33,7 @@ class Log(object):
 
 def available_datasets():
         c = COBDatabase()
-        return c.query('''SELECT name,id FROM datasets''')
+        return c.query('''SELECT * FROM datasets''')
 
 class COB(COBDatabase,Log):
     ''' 
@@ -44,11 +44,32 @@ class COB(COBDatabase,Log):
         ''' Ititialized a COB object based on a dataset Name '''
         super(COB,self).__init__()
         # HouseKeeping
-        (self.DatasetID, self.name, self.desc, self.FPKM, self.build) = self.fetchone("SELECT * FROM datasets WHERE name = '{}'",network)
-        
+        try:
+            (self.DatasetID, self.name, self.desc, self.FPKM, self.build,self.date_added) = self.fetchone("SELECT * FROM datasets WHERE name = '{}'",network)
+        except Exception as e:
+            self.log("Dataset not found.")
+            
+
+    @property        
+    def geneIDS(self):
+        return self.query('''
+            SELECT DISTINCT(GrameneID) FROM expression 
+            JOIN genes ON expression.GeneID = genes.ID
+            WHERE DatasetID = {}''',self.DatasetID).GrameneID
+
     @property
     def genes(self):
-        return [COBGene(x,self.build) for x in self.query("SELECT DISTINCT(GrameneID) FROM expression JOIN genes ON expression.GeneID = genes.ID WHERE DatasetID = {}",self.DatasetID).GrameneID]
+        return [COBGene(x,self.build) for x in self.query('''
+            SELECT DISTINCT(GrameneID) FROM expression 
+            JOIN genes ON expression.GeneID = genes.ID 
+            WHERE DatasetID = {}''',self.DatasetID).GrameneID]
+    
+    @property
+    def accessions(self):
+        return self.query('''
+            SELECT name FROM accessions
+            WHERE DatasetID = {}
+         ''',self.DatasetID).name
 
     @property
     def coex_table_name(self):
@@ -318,4 +339,15 @@ class COB(COBDatabase,Log):
         heatmap_cmap = plt.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
         return heatmap_cmap
 
-
+    def __repr__(self):
+        return '''
+        Name: {}
+        Description: {}
+        DatasetID: {}
+        FPKM: {}
+        Gene Build: {}
+        Date Added: {}
+        Number of Genes: {}
+        Number of accessions: {}
+        '''.format(self.name, self.desc, self.DatasetID, self.FPKM,
+            self.build, self.date_added, len(self.geneIDS), len(self.accessions)) 
