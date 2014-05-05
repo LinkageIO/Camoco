@@ -12,16 +12,26 @@ import multiprocessing as multiprocessing
 import itertools
 import os as os
 
+class progress_bar(object):
+    def __init__(self,manager,interval=10): 
+        self.interval = interval
+        self.lock = manager.Lock()
+        self.old_per = manager.Value(float,0.0)
+    def update(self,cur_per):
+        cur_per = math.floor(cur_per)
+        if cur_per > self.old_per.value and cur_per % self.interval == 0:
+            self.lock.acquire()
+            print("\t\t{} {}% Complete".format(time.ctime(),cur_per))
+            self.old_per.set(cur_per)
+            self.lock.release()
+
 def _PCCUp(tpl):
     ''' Returns a tuple containing indices i,j and their Pearson Correlation Coef '''
-    i,m,l = (tpl) # values are index, exprMatrix, and lock
+    i,m,pb = (tpl) # values are index, exprMatrix, and lock
     total = ((m.shape[0]**2)-m.shape[0])/2 # total number of calculations we need to do
     left = ((m.shape[0]-i)**2-(m.shape[0]-i))/2 # How many we have left
-    percent_done = math.floor((1-left/total)*100) # percent complete based on i and m
-    if percent_done % 10 == 0: # report at 10% intervals
-        l.acquire() # We need to lock because we are running in parallel
-        print("\t\t{} {}% Complete".format(time.ctime(),percent_done))
-        l.release()
+    percent_done = (1-left/total)*100 # percent complete based on i and m
+    pb.update(percent_done)
     return [pearsonr(m[i,:],m[j,:])[0] for j in arange(i+1,len(m))] 
 
 class COBDatasetBuilder(COBDatabaseBuilder):
@@ -41,25 +51,6 @@ class COBDatasetBuilder(COBDatabaseBuilder):
         # Database specific stuff
         self.id = None
 
-    def from_csv(self,filename,sep="\t"):
-        ''' Returns a COBDataset from a CSV '''
-        df = pd.read_table(filename,sep=sep)
-        self.from_DataFrame(df)
-
-    def from_DataFrame(self,df):
-        all_genes = Series([COBGene(GrameneID,gene_build=self.gene_build) for GrameneID in df.index])
-        # Filter out genes which are not in Database
-        valid_gene_indices = [x.ID is not None for x in all_genes]
-        self.genes = all_genes[valid_gene_indices]
-        self.accessions = Series(df.columns)
-        self.expr = df[valid_gene_indices].as_matrix()
-        # Log how many genes we dropped
-        
-        self.log("{} out of {} genes were kept for {}",len(self.expr),len(df),self.name)
-        if self.FPKM:
-            # FPKM values get the inverse hyperbolic sine transform
-            self.expr = arcsinh(self.expr)
-
     @property
     def num_genes(self):
         return len(self.genes)
@@ -68,10 +59,9 @@ class COBDatasetBuilder(COBDatabaseBuilder):
         if not multi: 
             scores = itertools.imap(_PCCUp,( (i,self.genes,self.expr,UseGramene) for i in arange(self.num_genes)))
         else:
-            manager = multiprocessing.Manager()
-            lock = manager.Lock()
+            progress = progress_bar(multiprocessing.Manager())
             pool = multiprocessing.Pool()
-            scores = np.array(list(itertools.chain(*pool.imap(_PCCUp,[ (i,self.expr,lock) for i in arange(self.num_genes)]))))
+            scores = np.array(list(itertools.chain(*pool.imap(_PCCUp,[(i,self.expr,progress) for i in arange(self.num_genes)]))))
             pool.close()
             pool.join()
             return scores
@@ -80,8 +70,7 @@ class COBDatasetBuilder(COBDatabaseBuilder):
         '''return the expression profile based on gene name '''
         matches = [ i for i,x in enumerate(self.genes) if x.GrameneID in gene_names ]
         return self.expr[matches,:]
-        
-
+       
     def dat(self,score_cutoff=None,transform=np.arctanh,normalize=True):
         tbl = pd.DataFrame(list(itertools.combinations([gene.GrameneID for gene in self.genes],2)),columns=['gene_a','gene_b'])
         scores = self.coex() 
@@ -103,17 +92,43 @@ class COBDatasetBuilder(COBDatabaseBuilder):
         dat = self.dat(score_cutoff=score_cutoff) 
         # Get a list of genes in the dataset
         genes = set(dat.gene_a).union(set(dat.gene_b))
+        ref_genes = set(ref_dat.gene_a).union(set(ref_dat.gene_b))
+        assert False
         for gene in genes:
             # Compare the degree of each gene with the reference dat
-            ref_degree = len(ref_dat[(ref_dat.gene_a == gene) | (ref_dat.gene_b == gene)])
-            degree     = len(dat[(dat.gene_a == gene)|(dat.gene_b == gene)])
-            if ref_degree != degree:
-                self.log("{} degree didn't match! ref: {} vs {}",gene,ref_degree,degree)
-                print(ref_dat[(ref_dat.gene_a == gene) | (ref_dat.gene_b == gene)])
+            ref_edges = ref_dat[(ref_dat.gene_a == gene) | (ref_dat.gene_b == gene)]
+            edges     = dat[(dat.gene_a == gene)|(dat.gene_b == gene)]
+            ref_neighbors = set(ref_edges.gene_a).union(set(ref_edges.gene_b))
+            neighbors     = set(edges.gene_a).union(set(edges.gene_b))
+            if len(ref_edges) > len(edges): # the number of edges is the degree
+                self.log("{} reg degree bigger! ref: {} vs {}",gene,len(ref_edges),len(edges))
+                print(ref_neighbors - neighbors)
                 print("----------------------------------------------------")
-                print(dat[(dat.gene_a == gene)|(dat.gene_b == gene)])
+            if len(ref_edges) < len(edges): # the number of edges is the degree
+                self.log("{} degree bigger! ref: {} vs {}",gene,len(ref_edges),len(edges))
+                print(neighbors - ref_neighbors)
+                print("----------------------------------------------------")
             else:
                 self.log("{} matches!".format(gene))
+
+    def from_csv(self,filename,sep="\t"):
+        ''' Returns a COBDataset from a CSV '''
+        df = pd.read_table(filename,sep=sep)
+        self.from_DataFrame(df)
+
+    def from_DataFrame(self,df):
+        all_genes = Series([COBGene(GrameneID,gene_build=self.gene_build) for GrameneID in df.index])
+        # Filter out genes which are not in Database
+        valid_gene_indices = [x.ID is not None for x in all_genes]
+        self.genes = all_genes[valid_gene_indices]
+        self.accessions = Series(df.columns)
+        self.expr = df[valid_gene_indices].as_matrix()
+        # Log how many genes we dropped
+        
+        self.log("{} out of {} genes were kept for {}",len(self.expr),len(df),self.name)
+        if self.FPKM:
+            # FPKM values get the inverse hyperbolic sine transform
+            self.expr = arcsinh(self.expr)
 
     def to_Dat(self,filename,UseGramene=True,**kw):
         with open(filename,'w') as FOUT:
