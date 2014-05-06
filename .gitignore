@@ -1,4 +1,5 @@
 analyses/*
+build/*
 sensitive/*
 *.pyc
 *.py.swp
