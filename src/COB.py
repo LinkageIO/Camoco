@@ -75,27 +75,25 @@ class COB(COBDatabase,Log):
     def coex_table_name(self):
         return "coex_{}".format(self.name.replace(' ','_'))
 
-    def degree(self,gene_list):
-        ''' Input: a list of COBGene Objects
-            Output: Returns degree for each COBGene object
-        '''
-        pass
-
     def neighbors(self,gene_list):
         ''' 
             Input : a list of COBGene Objects
             Output: Returns the neighbors for a list of genes as a DataFrame
-            Columns returned: gene, neighbor_name, neighbor, score
+            Columns returned: query_name, queryID, neighbor_name, neighbor, score
         '''
         return pd.concat([
-            self.query('''SELECT gene_b as gene, GrameneID as neighbor_name, gene_a as neighbor, score
-            FROM {} coex JOIN genes ON coex.gene_a = genes.ID
-            WHERE DatasetID = {} AND significant = 1 AND gene_b IN ({})''',
-                 self.coex_table_name, self.DatasetID, ",".join(map(str,[x.ID for x in gene_list]))),
-            self.query('''SELECT gene_a as gene, GrameneID as neighbor_name, gene_b as neighbor, score
-            FROM {} coex JOIN genes ON coex.gene_b = genes.ID
-            WHERE DatasetID = {} AND significant = 1 AND gene_a IN ({})''', 
-                self.coex_table_name, self.DatasetID, ','.join(map(str,[x.ID for x in gene_list])))
+            self.query('''SELECT query.GrameneID as query_name, gene_b as query, neighbor.GrameneID as neighbor_name, gene_a as neighbor, score
+            FROM {} coex
+            JOIN genes neighbor ON coex.gene_a = neighbor.ID
+            JOIN genes query    ON coex.gene_b = query.ID
+            WHERE significant = 1 AND gene_b IN ({})''',
+                 self.coex_table_name, ",".join(map(str,[x.ID for x in gene_list]))),
+            self.query('''SELECT query.GrameneID as query_name, gene_a as query, neighbor.GrameneID as neighbor_name, gene_b as neighbor, score
+            FROM {} coex 
+            JOIN genes neighbor ON coex.gene_b = neighbor.ID
+            JOIN genes query    ON coex.gene_a = query.ID
+            WHERE significant = 1 AND gene_a IN ({})''', 
+                self.coex_table_name, ','.join(map(str,[x.ID for x in gene_list])))
         ])
 
     def num_neighbors(self,gene_list):
@@ -107,40 +105,78 @@ class COB(COBDatabase,Log):
         neighbors = self.neighbors(gene_list)
         def get_nums(df):
             global_length =  len(df)
-            local_length = len(set(neighbors.gene).intersection(set(df.neighbor)))
+            local_length = len(set(neighbors['query']).intersection(set(df.neighbor)))
             return pd.Series({
                 'global': global_length,
                 'local' : local_length 
                 })
-        return neighbors.groupby('gene').apply(lambda x : get_nums(x))
+        return neighbors.groupby('query_name').apply(lambda x : get_nums(x))
 
+    def neighbors_score(self,gene_list):
+        ''' returns a series containing the strongest connected neighbors '''
+        neighbors = self.neighbors(gene_list)
+        if len(neighbors) > 0:
+            scores = neighbors.groupby('neighbor_name').score.sum()
+            scores.sort(ascending=False)
+        return scores
+
+    def neighborhood(self,gene_list):
+        ''' Input: A gene List
+            Output: a Dataframe containing gene ids which have at least one edge
+                    with another gene in the input list. Also returns global degree '''
+        if len(gene_list) == 0:
+            return []
+        self.log("Analyzing {} Genes for {} Network",len(gene_list),self.name)
+        self.log("Found {} genes in COB",len(gene_list))
+        neighbors = self.num_neighbors(gene_list)
+        local = neighbors[neighbors.local >= 1]
+        self.log("Found {} genes in subnetwork",len(local))
+        return(local)
+
+    def subnetwork(self,gene_list):
+        ''' Input: a gene list
+            Output: a dataframe containing all edges between genes within list
+        '''
+        if len(gene_list) == 0:
+            return pd.DataFrame()
+        subnet = self.query(''' 
+            SELECT source.GrameneID source, gene_a, target.GrameneID as target, gene_b, score FROM {} coex 
+            JOIN genes source ON source.ID = gene_a
+            JOIN genes target ON target.ID = gene_b
+            WHERE significant = 1 
+            AND gene_a IN ({})
+            AND gene_b IN ({}) ''', self.coex_table_name, ','.join(map(str,[x.ID for x in gene_list])), ",".join(map(str,[x.ID for x in gene_list]))
+        )
+        return subnet
+ 
     def density(self,gene_list):
-        ''' 
-            calculate the density of the ENTIRE network between a set of genes 
+        ''' calculate the density of the ENTIRE network between a set of genes 
             Input: A list of COBGene Objects
             Output: a scalar value representing the density of genes
         '''
         if len(gene_list) == 0:
             return 0
         scores = self.query("SELECT score FROM {} coex WHERE gene_a IN ({}) AND gene_b IN ({})",
-            self.coex_table_name(),
+            self.coex_table_name,
             ",".join(map(str,[x.ID for x in gene_list])),
             ",".join(map(str,[x.ID for x in gene_list]))
         ).score
         if len(scores) == 0:
             return 0
         return (scores.mean()/(1/np.sqrt(len(scores))))
-   
-
-    def neighbors_score(self,gene_list):
-        ''' returns a series containing the strongest connected neighbors '''
-        neighbors = self.neighbors(gene_list)
-        if len(neighbors) > 0:
-            scores = neighbors.groupby('neighbor').score.sum()
-            scores.sort(ascending=False)
-        return scores
+ 
+    def seed(self, gene_list, max_show = 65): 
+        ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
+        if len(gene_list) == 0:
+            return []
+        neighbors = self.neighbors_score(gene_list)
+        seed_set =  set(self._gene_ids(gene_list)).union(neighbors.index[0:min(len(neighbors),max_show)])
+        return seed_set
 
     def gene_expr_vals(self,gene_list):
+        ''' Input: A list of COBGenes
+            Output: A dataframe containing normalized expression values for gene_list
+        '''
         expr_vals = self.query(
          '''SELECT 
             GrameneID, expression.GeneID, expression.AccessionID, expression.DatasetID,
@@ -162,49 +198,23 @@ class COB(COBDatabase,Log):
             return norm
         return pd.DataFrame({gid:zscore(group) for gid,group in expr_vals.groupby('GrameneID')})
 
-# Unimplemented Below Here ------------------------------------------
-
-    def seed(self, gene_list, max_show = 65): 
-        ''' given a set of nodes, add on the next X strongest connected nodes ''' 
-        if len(gene_list) == 0:
-            return []
-        neighbors = self.neighbors_score(gene_list)
-        seed_set =  set(gene_list).union(neighbors.index[0:min(len(neighbors),max_show)])
-        return seed_set
-
-    def subnetwork(self,gene_list):
-        ''' Calculates a subnetwork based on connected nodes within the input gene list '''
-        if len(gene_list) == 0:
-            return []
-        self.log("Analyzing {} Genes for {} Network",len(gene_list),self.network)
-        self.log("Found {} genes in COB",len(gene_list))
-        neighbors = self.num_neighbors(gene_list)
-        local = neighbors[neighbors.local >= 1]
-        self.log("Found {} genes in subnetwork",len(local))
-        return(self.ids2genes(local.gene))
-   
  
     def graph(self,gene_list):
-        ''' Finds the largest connected component from the gene list '''
+        ''' Input: a gene list
+            Output: a iGraph object '''
         if len(gene_list) == 0:
             return []
-        neighbors = self.num_neighbors(gene_list)
-        neighbors = neighbors[neighbors.local >= 1]
-        local = self.query('''SELECT gene_a, gene_b, score FROM {}
-            WHERE gene_a in ({}) and gene_b in ({})''',
-            self.sig_edges,
-            ",".join(map(str,neighbors.gene)),
-            ",".join(map(str,neighbors.gene))
-        )
-        nodes = list(set(local.gene_a).union(local.gene_b))
-        nodes.sort()
+        # retrieve all first neighbors
+        edges = self.subnetwork(gene_list)
+        nodes = list(set(edges.source).union(edges.target))
         graph = ig.Graph()
         for node in nodes:
-            graph.add_vertex(name=node,label=self.id2gene(node))
-        for edge in local[['gene_a','gene_b','score']].itertuples():
+            graph.add_vertex(name=node,label=node)
+        for edge in edges[['source','target','score']].itertuples():
             graph.add_edge(source=graph.vs.find(name=edge[1]),target=graph.vs.find(name=edge[2]),weight=edge[3])
         return graph 
         
+# Unimplemented Below Here ------------------------------------------
 
     def heatmap(self,dm,filename=None):
 
@@ -241,9 +251,9 @@ class COB(COBDatabase,Log):
         im = axmatrix.matshow(D, aspect='auto', cmap=self.cmap,vmax=vmax,vmin=vmin)
         # Handle Axis Labels
         axmatrix.set_xticks(np.arange(D.shape[1]))
-        axmatrix.set_xticklabels(self.ids2genes(dm.columns[idx2]))
         axmatrix.xaxis.tick_bottom()
         axmatrix.tick_params(axis='x',labelsize='xx-small')
+        axmatrix.set_xticklabels(dm.columns[idx2],rotation=90,ha='right')
         axmatrix.yaxis.tick_right()
         axmatrix.set_yticks(np.arange(D.shape[0]))
         axmatrix.set_yticklabels(dm.index[idx1])
@@ -324,6 +334,10 @@ class COB(COBDatabase,Log):
     ############################################################################
     def log(self, string, *args, **kwargs):
         print('[LOG]',time.ctime(), "-", string.format(*args),file=self.log_file)
+
+    def _gene_ids(self, gene_list, attr="ID"):
+        ''' return a list of ids from a gene list '''
+        return [getattr(x,attr) for x in gene_list]
 
     @property 
     def cmap(self):
