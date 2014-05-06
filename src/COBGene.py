@@ -42,6 +42,6 @@ def import_gene_list(filename,delim="\n",gene_build='5a'):
         COBGene class returns None for genes it does not find in database '''
     return filter(lambda x:x, [COBGene(x,gene_build) for x in open(filename,'r').read().strip().split(delim)])
 
-def gene_list(gene_build='5a',*args):
+def gene_list(gene_list,gene_build='5a'):
     ''' This creates a list of COBGene objects from grmzm names '''
-    return filter(lambda x:x, [COBGene(x,gene_build) for x in args])
+    return filter(lambda x:x, [COBGene(x,gene_build) for x in gene_list])
