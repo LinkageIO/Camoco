@@ -46,9 +46,9 @@ class COBLocus(COBDatabase):
             self.downstream_genes(limit=np.ceil(limit/2))
         ])
     def __contains__(self,locus):
-        if (locus.chrom == self.chromosome and
-               (( locus.start >= self.chromo_start and locus.start <= self.chromo_end)
-               or(locus.end   <= self.chromo_end   and locus.end   >= self.chromo_start)
+        if (locus.chromosome == self.chromosome and
+               (( locus.chromo_start >= self.chromo_start and locus.chromo_start <= self.chromo_end)
+               or(locus.chromo_end   <= self.chromo_end   and locus.chromo_end   >= self.chromo_start)
             )):
             return True
         else:
@@ -61,3 +61,4 @@ class COBLocus(COBDatabase):
     def __repr__(self):
         return str(self.id)
 
+    

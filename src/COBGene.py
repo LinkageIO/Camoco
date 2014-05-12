@@ -36,12 +36,12 @@ class COBGene(COBLocus):
     def __str__(self):
         return "COBGene: {}".format(self.GrameneID)
 
-def import_gene_list(filename,delim="\n",gene_build='5a'):
+def import_gene_list(filename,delim="\n",gene_build='5b'):
     ''' This reads a file in line by line and creates a list of gene object
         the filter call is to get rid of genes not in the database, since the
         COBGene class returns None for genes it does not find in database '''
     return filter(lambda x:x, [COBGene(x,gene_build) for x in open(filename,'r').read().strip().split(delim)])
 
-def gene_list(gene_list,gene_build='5a'):
+def gene_list(gene_list,gene_build='5b'):
     ''' This creates a list of COBGene objects from grmzm names '''
     return filter(lambda x:x, [COBGene(x,gene_build) for x in gene_list])

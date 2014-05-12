@@ -4,8 +4,8 @@ from COBLocus import *
 
 class COBSNP(COBLocus):
     def __init__(self,chrom,pos,alt=None,ref=None,id=None):
-        super(SNP,self).__init__(chrom,pos,pos,id)
-        self.chrom = chrom
+        super(COBSNP,self).__init__(chrom,pos,pos,id)
+        self.chromosome = chrom
         self.pos = pos
         self.id = id
         self.alt = alt
@@ -18,7 +18,7 @@ class COBSNP(COBLocus):
             AND chromo_start > {}
             AND chromo_end < {}
             AND gene_build = '{}'
-            ORDER BY chromo_start''', self.chrom, upstream, downstream, self.gene_build)
+            ORDER BY chromo_start''', self.chromosome, upstream, downstream, self.gene_build)
         return genes
 
     def nearest_gene(self,window=100000):
@@ -26,7 +26,7 @@ class COBSNP(COBLocus):
             AND chromo_start < {}
             AND chromo_end > {}
             AND gene_build = '{}'
-            ORDER BY chromo_start''', self.chrom, self.pos, self.pos, self.gene_build)
+            ORDER BY chromo_start''', self.chromosome, self.pos, self.pos, self.gene_build)
         if genes.empty:
             downstream = np.floor(self.pos+(window/2))
             upstream   = np.floor(self.pos-(window/2))
@@ -34,7 +34,7 @@ class COBSNP(COBLocus):
                 AND chromo_start > {}
                 AND chromo_end < {}
                 AND gene_build = '{}'
-                ORDER BY chromo_start''', self.chrom, upstream, downstream, self.gene_build)
+                ORDER BY chromo_start''', self.chromosome, upstream, downstream, self.gene_build)
             if len(genes) > 2:
                 if sum(genes.chromo_end < self.pos) == len(genes.chromo_end):
                     # All the genes are before the SNP, return the last
