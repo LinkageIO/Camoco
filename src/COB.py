@@ -19,6 +19,8 @@ from COBDatabase import *
 from COBDataset import *
 from COBLocus import *
 from COBGene import *
+from COBQTL import *
+from COBSNP import *
 from Genome import *
 from Chrom import *
 
@@ -35,6 +37,14 @@ def available_datasets():
         c = COBDatabase()
         return c.query('''SELECT * FROM datasets''')
 
+def edit_dataset(dataset_name, field, new_field):
+        c = COBDatabase()
+        assert field in ["name","description","FPKM",'gene_build'],'nope'
+        try:
+            c.execute("UPDATE datasets SET {} = '{}' WHERE name = {};",field,new_field,dataset_name)
+        except Exception as e:
+            c.log("{} was not changeable in {}",field,dataset_name)
+
 class COB(COBDatabase,Log):
     ''' 
         This class implements the basic interface to the COB Database. It provides routine
@@ -45,7 +55,12 @@ class COB(COBDatabase,Log):
         super(COB,self).__init__()
         # HouseKeeping
         try:
-            (self.DatasetID, self.name, self.desc, self.FPKM, self.build,self.date_added) = self.fetchone("SELECT * FROM datasets WHERE name = '{}'",network)
+            (self.DatasetID, self.name, self.desc,
+             self.FPKM, self.build,
+             self.date_added
+            ) = self.fetchone('''
+                SELECT * FROM datasets WHERE name = '{}' ''',network
+            )
         except Exception as e:
             self.log("Dataset not found.")
             
@@ -82,13 +97,17 @@ class COB(COBDatabase,Log):
             Columns returned: query_name, queryID, neighbor_name, neighbor, score
         '''
         return pd.concat([
-            self.query('''SELECT query.GrameneID as query_name, gene_b as query, neighbor.GrameneID as neighbor_name, gene_a as neighbor, score
+            self.query('''
+            SELECT query.GrameneID as query_name, gene_b as query, 
+                   neighbor.GrameneID as neighbor_name, gene_a as neighbor, score
             FROM {} coex
             JOIN genes neighbor ON coex.gene_a = neighbor.ID
             JOIN genes query    ON coex.gene_b = query.ID
             WHERE significant = 1 AND gene_b IN ({})''',
                  self.coex_table_name, ",".join(map(str,[x.ID for x in gene_list]))),
-            self.query('''SELECT query.GrameneID as query_name, gene_a as query, neighbor.GrameneID as neighbor_name, gene_b as neighbor, score
+            self.query('''
+            SELECT query.GrameneID as query_name, gene_a as query, 
+                   neighbor.GrameneID as neighbor_name, gene_b as neighbor, score
             FROM {} coex 
             JOIN genes neighbor ON coex.gene_b = neighbor.ID
             JOIN genes query    ON coex.gene_a = query.ID
@@ -140,12 +159,17 @@ class COB(COBDatabase,Log):
         if len(gene_list) == 0:
             return pd.DataFrame()
         subnet = self.query(''' 
-            SELECT source.GrameneID source, gene_a, target.GrameneID as target, gene_b, score FROM {} coex 
+            SELECT source.GrameneID source, gene_a, 
+                target.GrameneID as target, gene_b, score 
+            FROM {} coex 
             JOIN genes source ON source.ID = gene_a
             JOIN genes target ON target.ID = gene_b
             WHERE significant = 1 
             AND gene_a IN ({})
-            AND gene_b IN ({}) ''', self.coex_table_name, ','.join(map(str,[x.ID for x in gene_list])), ",".join(map(str,[x.ID for x in gene_list]))
+            AND gene_b IN ({}) ''', 
+                self.coex_table_name, 
+                ','.join(map(str,[x.ID for x in gene_list])), 
+                ",".join(map(str,[x.ID for x in gene_list]))
         )
         return subnet
  
@@ -198,7 +222,6 @@ class COB(COBDatabase,Log):
             return norm
         return pd.DataFrame({gid:zscore(group) for gid,group in expr_vals.groupby('GrameneID')})
 
- 
     def graph(self,gene_list):
         ''' Input: a gene list
             Output: a iGraph object '''
@@ -214,7 +237,6 @@ class COB(COBDatabase,Log):
             graph.add_edge(source=graph.vs.find(name=edge[1]),target=graph.vs.find(name=edge[2]),weight=edge[3])
         return graph 
         
-# Unimplemented Below Here ------------------------------------------
 
     def heatmap(self,dm,filename=None):
 
@@ -268,6 +290,7 @@ class COB(COBDatabase,Log):
 
         return {'ordered' : D, 'rorder' : Z1['leaves'], 'corder' : Z2['leaves']} 
 
+# Unimplemented Below Here ------------------------------------------
     def url(self,gene_list,size=65):
         gene_list = self.ids2genes(gene_list)
         return "http://lovelace.cs.umn.edu/cob?results_source={}&action=seed&q_list={}&neighborhood_size={}".format(
@@ -341,10 +364,11 @@ class COB(COBDatabase,Log):
 
     @property 
     def cmap(self):
-        heatmapdict = {'red': ((0.0, 1.0, 1.0),
+        heatmapdict = {
+            'red': ((0.0, 1.0, 1.0),
                     (0.5, 1.0, 1.0),
                     (1.0, 0.0, 0.0)),
-            'green': ((0.0, 1.0, 1.0),
+            'green':((0.0, 1.0, 1.0),
                     (0.5, 1.0, 1.0),
                     (1.0, 0.0, 0.0)),
             'blue': ((0.0, 0.0, 0.0),
@@ -365,3 +389,43 @@ class COB(COBDatabase,Log):
         Number of accessions: {}
         '''.format(self.name, self.desc, self.DatasetID, self.FPKM,
             self.build, self.date_added, len(self.geneIDS), len(self.accessions)) 
+
+
+
+    def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
+        ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
+        self.log("Reading in {}",filename)
+        ref_dat = pd.read_table(filename,sep=sep,names=['gene_a','gene_b','score'])
+        self.log("Retrieving network edges...")
+        dat = self.query('''SELECT source.GrameneID as gene_a, target.GrameneID as gene_b, score 
+            FROM {} coex 
+            JOIN genes source ON coex.gene_a = source.ID
+            JOIN genes target ON coex.gene_b = target.ID
+            WHERE score >= {};
+            ''',self.coex_table_name,score_cutoff)
+        # Get a list of genes in the dataset as well as reference
+        genes = set(dat.gene_a).union(set(dat.gene_b))
+        self.log("Found {} genes in {}",len(genes),self.name)
+        ref_genes = set(ref_dat.gene_a).union(set(ref_dat.gene_b))
+        self.log("Found {} genes in {}",len(ref_genes),filename)
+        self.log("Found {} genes in intersection",len(genes.intersection(ref_genes)))
+        if len(genes) != len(ref_genes):
+            # Draw a venn diagram you lazy sac
+            self.log("Genes not in {}: {}",self.name,"\n".join(ref_genes.difference(genes.intersection(ref_genes))))
+            self.log("Genes not in {}: {}",filename,"\n".join(genes.difference(genes.intersection(ref_genes))))
+        def compare_edges(gene):
+            # Compare the degree of each gene with the reference dat
+            ref_edges = ref_dat[(ref_dat.gene_a == gene) | (ref_dat.gene_b == gene)]
+            edges     = dat[(dat.gene_a == gene)|(dat.gene_b == gene)]
+            ref_neighbors = set(ref_edges.gene_a).union(set(ref_edges.gene_b))
+            neighbors     = set(edges.gene_a).union(set(edges.gene_b))
+            if len(ref_edges) > len(edges): # the number of edges is the degree
+                self.log("{} reg degree bigger! ref: {} vs {}",gene,len(ref_edges),len(edges))
+                return ref_neighbors - neighbors
+            if len(ref_edges) < len(edges): # the number of edges is the degree
+                self.log("{} degree bigger! ref: {} vs {}",gene,len(ref_edges),len(edges))
+                return neighbors - ref_neighbors
+            else:
+                return set()
+        return [compare_edges(gene) for gene in genes]
+
