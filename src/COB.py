@@ -7,7 +7,6 @@ import matplotlib as plt
 import numpy as np
 import time
 import igraph as ig
-import time
 import sys
 import pandas as pd
 
@@ -23,6 +22,7 @@ from COBQTL import *
 from COBSNP import *
 from Genome import *
 from Chrom import *
+from COBHapMap import *
 
 class Log(object):
     log_file = sys.stderr

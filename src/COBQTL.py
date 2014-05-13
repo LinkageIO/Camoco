@@ -8,7 +8,7 @@ class COBQTL(COBLocus):
             self.id = "QTL-chr{}:{}-{}".format(chrom,start,end)
         else:
             self.id = id
-        super(QTL,self).__init__(chrom,start,end,self.id)
+        super(COBQTL,self).__init__(chrom,start,end,self.id)
     def __str__(self):
         return "{}".format(self.id)
 

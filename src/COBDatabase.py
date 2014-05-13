@@ -280,4 +280,3 @@ class COBDatabaseBuilder(COBDatabase):
             PRIMARY KEY(ID)
         );
         ''')
-
