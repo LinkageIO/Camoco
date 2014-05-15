@@ -1,6 +1,6 @@
 #!/usr/bin/python
 from __future__ import print_function,division
-import sqlite3 as lite
+import apsw as lite
 import os as os
 import time as time
 import sys
@@ -32,7 +32,7 @@ class Camoco(object):
 
     def database(self,dbname):
         # return a connection if exists
-        return lite.connect(self._resource("databases",str(dbname)+".db"))
+        return lite.Connection(self._resource("databases",str(dbname)+".db"))
     def tmp_file(self):
         # returns a handle to a tmp file
         return tempfile.NamedTemporaryFile(dir=os.path.join(self.basedir,"tmp"))
@@ -50,17 +50,15 @@ class Camoco(object):
             # update information table
             cur.execute('''
                 INSERT INTO datasets (name,description,type)
-                VALUES ('{}','{}','{}')'''.format(name,description,type))
-            con.commit()
+                VALUES (?,?,?)''',(name,description,type))
             # create new sqlite file for dataset
             self.database(".".join([type,name]))
-        except lite.IntegrityError as e:
-            self.log("{} already added to database.",name)
+        except Exception as e:
+            self.log("{} already added to database: {}",name,e)
 
     def del_dataset(self,name,type):
-        con = self.database('camoco')
+        con = self.database('camoco').cursor()
         con.execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
-        con.commit() 
         os.remove(self._resource("databases",".".join([type,name])+".db"))
 
     def _create_tables(self):

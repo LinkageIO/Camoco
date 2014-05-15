@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 from __future__ import print_function,division
-import sqlite3 as lite
+#import sqlite3 as lite
+import apsw as lite
 import os as os
 import time as time
 import sys
@@ -10,7 +11,7 @@ from Camoco import Camoco
 class HapMap(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
         # initialize super class
-        super(HapMap,self).__init__(basedir)
+        super(self.__class__,self).__init__(basedir)
         # get meta information
         (ID,name,description,type,added) = self.database('camoco').execute(
             "SELECT rowid,* FROM datasets WHERE name = '{}' AND type = 'HapMap'",).fetchone()
@@ -38,7 +39,11 @@ class HapMapBuilder(Camoco):
             genotype_rows = []
             snp_rows = []
             snpRowID = 1 # 
-            con = self.db
+            record_dump_size = 100000
+            cur = self.db.cursor()
+            cur.execute('PRAGMA synchronous = off')
+            cur.execute('PRAGMA journal_mode = memory')
+            cur.execute("BEGIN TRANSACTION")
             for i,line in enumerate(INVCF):
                 line = line.strip()
                 if line.startswith("##"):
@@ -47,7 +52,7 @@ class HapMapBuilder(Camoco):
                     # we are at the header section, extract accessions here
                     (chrom,pos,id,ref,alt,qual,fltr,info,fmt,*accessions) = line.split()
                     for accession in accessions:
-                        con.execute('''
+                        cur.execute('''
                             INSERT INTO accessions VALUES('{}');
                         '''.format(accession)
                         )
@@ -60,40 +65,60 @@ class HapMapBuilder(Camoco):
                         (allele1,allele2) = genotype.split(":")[GT_ind].replace("|","/").split("/")
                         genotype_rows.append((snpRowID,accessionRowID+1,allele1,allele2))
                     snpRowID += 1 # <- Do NOT fuck this up, genotypes need to reference correct SNPId
-                if i % 1000000 == 0 and i > 0:
-                    self.log(" {} records reached dumping data",i)
+                if i % record_dump_size == 0 and i > 0:
+                    self.log(" {} records reached. dumping data",i)
                     start_time = time.time()
                     # Bulk import the genotype values
                     self.log("\tInserting snps...")
-                    con.executemany(''' 
+                    cur.executemany(''' 
                         INSERT INTO snps (chromosome,position,id,alt,ref,qual)
                          VALUES(?,?,?,?,?,?)
                     ''',snp_rows)
                     self.log("\tInserting genotypes...")
-                    con.executemany('''
+                    cur.executemany('''
                         INSERT INTO genotypes VALUES(?,?,?,?)
                     ''',genotype_rows)
+                    self.log("Total execution time for block: {} seconds : {} per second",
+                        time.time()-start_time,
+                        (len(genotype_rows)+len(snp_rows)) / (time.time()-start_time)
+                    )
                     genotype_rows = []
                     snp_rows = []
-                    con.commit()
-                    self.log("Total execution time for block: {} seconds",time.time()-start_time)
+        cur.execute("END TRANSACTION")
+        self.log("Creating Indices")
+        self._build_indices()
         self.log("Import finished")
                     
-    def _create_indices(self):
-        self.db.execute('''
-            CREATE INDEX IF NOT EXISTS genoAccID ON genotypes (accessionRowID);
-        ''')
-        self.db.execute('''
+    def _build_indices(self):
+        self._drop_indices()
+        cur = self.db.cursor()
+        self.log("Building snp chromo index")
+        cur.execute('''
             CREATE INDEX IF NOT EXISTS snpChrom ON snps (chromosome);
         ''')
-        self.db.execute('''
+        self.log("Building snp position index")
+        cur.execute('''
             CREATE INDEX IF NOT EXISTS snpPos ON snps (position);
+        ''')
+        self.log("Building genotype index")
+        cur.execute('''
+            CREATE INDEX IF NOT EXISTS genoSnpID ON genotypes (snpRowID);
+        ''')
+        self.log("Done")
+
+    def _drop_indices(self):
+        cur = self.db.cursor()
+        cur.execute('''
+            DROP INDEX IF EXISTS snpChrom;
+            DROP INDEX IF EXISTS snpPos;
+            FROP INDEX IF EXISTS genpSnpID;
         ''')
 
     def _create_tables(self):
-        self.db.execute("PRAGMA page_size = 8192;")
-        self.db.execute("PRAGMA cache_size = 10000;")
-        self.db.execute(''' 
+        cur = self.db.cursor()
+        cur.execute("PRAGMA page_size = 262144;")
+        cur.execute("PRAGMA cache_size = 100000;")
+        cur.execute(''' 
             CREATE TABLE IF NOT EXISTS snps (
                 chromosome INTEGER NOT NULL,
                 position INTEGER NOT NULL,
@@ -103,7 +128,7 @@ class HapMapBuilder(Camoco):
                 qual REAL
             );
         ''')
-        self.db.execute(''' 
+        cur.execute(''' 
             CREATE TABLE IF NOT EXISTS snp_info (
                 snpID INTEGER,
                 key TEXT,
@@ -111,12 +136,12 @@ class HapMapBuilder(Camoco):
             )
         ''')
         # sqlite has rowids by default, use that for numbering accessions
-        self.db.execute('''
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS accessions (
                 name TEXT NOT NULL
             );  
         ''')    
-        self.db.execute(''' 
+        cur.execute(''' 
             CREATE TABLE IF NOT EXISTS genotypes (
                 snpRowID INTEGER,
                 accessionRowID INTEGER,
