@@ -22,7 +22,6 @@ from COBQTL import *
 from COBSNP import *
 from Genome import *
 from Chrom import *
-from COBHapMap import *
 
 class Log(object):
     log_file = sys.stderr
@@ -419,13 +418,6 @@ class COB(COBDatabase,Log):
             edges     = dat[(dat.gene_a == gene)|(dat.gene_b == gene)]
             ref_neighbors = set(ref_edges.gene_a).union(set(ref_edges.gene_b))
             neighbors     = set(edges.gene_a).union(set(edges.gene_b))
-            if len(ref_edges) > len(edges): # the number of edges is the degree
-                self.log("{} reg degree bigger! ref: {} vs {}",gene,len(ref_edges),len(edges))
-                return ref_neighbors - neighbors
-            if len(ref_edges) < len(edges): # the number of edges is the degree
-                self.log("{} degree bigger! ref: {} vs {}",gene,len(ref_edges),len(edges))
-                return neighbors - ref_neighbors
-            else:
-                return set()
-        return [compare_edges(gene) for gene in genes]
+            return (len(neighbors),len(ref_neighbors))
+        return [compare_edges(gene) for gene in genes.intersection(ref_genes)]
 
