@@ -28,7 +28,7 @@ class Camoco(object):
         print("[CAMOCO]",time.ctime(), '-', msg.format(*args),file=self.log_file)
            
     def _resource(self,type,filename):
-        return os.path.join(self.basedir,type,filename)
+        return os.path.expanduser(os.path.join(self.basedir,type,filename))
 
     def database(self,dbname):
         # return a connection if exists
