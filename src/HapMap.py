@@ -7,25 +7,30 @@ import time as time
 import sys
 import numpy as np
 from scipy.stats import pearsonr
+from lowess import lowess
 
 from Camoco import Camoco
 from Locus import SNP
 
 from matplotlib import pylab
+from Chrom import Chrom
 
 class HapMap(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
         # initialize super class
-        super(self.__class__,self).__init__(basedir)
-        # get meta information
-        (ID,name,description,type,added) = self.database('camoco').cursor().execute(
-            "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",(name,"HapMap")).fetchone()
-        self.name = name
-        self.description = description
-        self.type = "HapMap"
-        self.basedir = basedir
-        self.db = self.database(".".join([self.type,self.name]))
-    
+        super(self.__class__,self).__init__(name,type='HapMap',basedir=basedir)
+        # get chromosome information
+        self.chromosomes = []
+        for (chrom,) in self.db.cursor().execute('''SELECT DISTINCT chromosome FROM snps;'''):
+            (max_pos,) = self.db.cursor().execute('''
+                SELECT MAX(position) FROM snps WHERE chromosome = ?''', (chrom,)
+            ).fetchone()
+            self.chromosomes.append(Chrom(chrom,max_pos))
+
+    def accessions(self):
+        ''' returns genotypes for HapMap object '''
+        return [ x[0] for x in self.db.cursor().execute('SELECT * FROM accessions ORDER BY rowid').fetchall()]
+
     def snps(self,chromo,start,end):
         ''' Returns SNPs within range '''
         return self.db.cursor().execute(
@@ -42,6 +47,10 @@ class HapMap(Camoco):
         if len(genos) == 0:
             return None
         return np.array(genos[0])
+
+    def genotype_missing_mask(self,snp):
+        ''' returns a boolean mask on missing genotypes '''
+        return self.genotypes(snp) == 9
 
     def ld(self,snp1,snp2,nearest=False):
         ''' returns the pearson r2 between two snps, if snps are not in the database,
@@ -61,25 +70,26 @@ class HapMap(Camoco):
         return [SNP(*x) for x in self.db.cursor().execute(''' 
             SELECT chromosome,position,id FROM snps 
             WHERE chromosome = ?
-            AND position >= ?
-            AND position <= ?
+            AND position > ?
+            AND position < ?
             ORDER BY position ASC
             LIMIT ?
-            ''',(snp.chrom,snp.pos,snp.pos+pos_limit,int(snp_limit)))]
+            ''',(snp.chrom,snp.start,snp.start+pos_limit,int(snp_limit)))]
     def upstream_snps(self,snp,snp_limit=1000,pos_limit=1000000):
         ''' returns snps upstream of input '''
         return [SNP(*x) for x in self.db.cursor().execute(''' 
             SELECT chromosome,position,id FROM snps 
             WHERE chromosome = ?
-            AND position <= ?
-            AND position >= ?
-            ORDER BY position DESC
+            AND position < ?
+            AND position > ?
+            ORDER BY position ASC
             LIMIT ?
-            ''',(snp.chrom,snp.pos,snp.pos-pos_limit,int(snp_limit)))]
+            ''',(snp.chrom,snp.start,snp.start-pos_limit,int(snp_limit)))]
 
-    def flanking_snps(self,snp,limit=100):
+    def flanking_snps(self,snp,snp_limit=100,pos_limit=1000000):
         ''' returns snps flanking '''
-        return self.upstream_snps(snp,limit=limit/2) + self.downstream_snps(snp,limit=limit/2)
+        return (self.upstream_snps(snp,snp_limit=snp_limit/2,pos_limit=pos_limit),
+                self.downstream_snps(snp,snp_limit=snp_limit/2,pos_limit=pos_limit))
 
     def nearest_snp(self,snp):
         ''' retruns the nearest upstream or downstream SNP '''
@@ -98,34 +108,41 @@ class HapMap(Camoco):
             This implementation calls the edge when the best fit
             line drops below the edge_cutoff parameter '''
         # grab upstream snp
-        downstream = self.downstream_snps(snp,snp_limit=snp_limit,pos_limit=pos_limit) 
+        downstream = self.flanking_snps(snp,snp_limit=snp_limit,pos_limit=pos_limit) 
         # mask out snps with < 80 points with filter
-        ld = list(filter(lambda x: x[1] > 95, [self.ld(snp,x) for x in downstream]))
+        ld = [self.ld(snp,x) for x in downstream]
         # filter out nans
-        distances = [x[2] for x in ld]
-        r2 = [x[0] for x in ld]
-        # fit a line  
-        #best_fit = np.polyfit(distances,r2,deg=1,full=True)
-        #slope = best_fit[0][0]
-        #intercept = best_fit[0][1]
-        a=(distances,r2)#,intercept,slope)
+        n = np.array([x[1] for x in ld])
+        mask = n>(max(n)/2)
+        distances = np.array([snp.pos+x[2] for x in ld])[mask]
+        r2 = np.array([x[0] for x in ld])[mask]
+        downstream = np.array(downstream)[mask]
+        r2[np.isnan(r2)] = 0
+        # fit a lowess 
+        a=(distances,n,r2,downstream)#,intercept,slope)
         pylab.clf()
-        pylab.scatter(a[0],a[1])
-        #pylab.plot(np.arange(max(a[0])),a[3]*np.arange(max(a[0]))+a[2])     
-        pylab.savefig('tmp.png')
+        pylab.scatter(distances,r2,alpha=0.5,label='pairwise ld')
+        pylab.ticklabel_format(axis='x',style='plain')
+        try:
+            yest = lowess(distances,r2,iter=10)
+            pylab.plot(distances,yest,label='lowess')
+        except Exception as e:
+            pass
+        pylab.legend()
+        pylab.axvline(snp.pos,color='k')
+        pylab.savefig('{}-{}:{}.png'.format(snp.id,snp.chrom,snp.pos))
+        return a
+
+    def sliding_window(self,interval=1000000):
+        ''' Calculates average pairwise LD between SNPS within sliding window '''
+        pass 
 
 
 class HapMapBuilder(Camoco):
     def __init__(self,name,description="",basedir="~/.camoco"):
         # add entry to camoco database
-        self.name = name
-        self.description = description
-        self.type = "HapMap"
-        self.basedir = basedir
         # add yourself to the database
-        super().__init__(basedir)
-        self.add_dataset(name=name,description=description,type="HapMap")
-        self.db = self.database(".".join([self.type,self.name]))
+        super().__init__(name,description=description,type='HapMap',basedir=basedir)
         self._create_tables()
 
     def import_vcf(self,filename):
@@ -206,6 +223,9 @@ class HapMapBuilder(Camoco):
         self.log("Building genotype index")
         cur.execute('''
             CREATE INDEX IF NOT EXISTS genoSnpID ON genotypes (snpRowID);
+        ''')
+        cur.execute('''
+            CREATE UNIQUE INDEX IF NOT EXISTS uniqchrom ON snps (chromosome)
         ''')
         self.log("Done")
 
