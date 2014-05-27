@@ -12,4 +12,3 @@ class COBQTL(COBLocus):
     def __str__(self):
         return "{}".format(self.id)
 
-
