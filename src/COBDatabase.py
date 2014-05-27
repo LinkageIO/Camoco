@@ -264,19 +264,3 @@ class COBDatabaseBuilder(COBDatabase):
             Degree INT UNSIGNED
         )
         ''')
-        self.execute('''
-        CREATE TABLE IF NOT EXISTS gene_ontology(
-            GeneID INT UNSIGNED,
-            OntologyID INT UNSIGNED,
-            PRIMARY KEY(GeneID,OntologyID)
-        )
-        ''')
-        self.execute('''
-        CREATE TABLE IF NOT EXISTS ontology (
-            ID INT UNSIGNED AUTO_INCREMENT,
-            name varchar(128),
-            short_desc TEXT,
-            long_desc MEDIUMTEXT,
-            PRIMARY KEY(ID)
-        );
-        ''')
