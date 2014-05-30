@@ -2,6 +2,8 @@
 
 from Camoco import Camoco
 from Locus import Gene
+from Chrom import Chrom
+from Genome import Genome
 
 class RefGen(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
@@ -14,9 +16,27 @@ class RefGen(Camoco):
             '''.format("'.'".join(id_list)))
         ]
 
+    def genome(self):
+        ''' returns a genome object based on loaded chromosome object'''
+        return Genome(
+            self.type+self.name,
+            chroms = [Chrom(*x) for x in  self.db.cursor().execute(''' 
+                SELECT id,length FROM chromosomes
+            ''')] 
+        )
+    def chromosome(self,id):
+        ''' returns a chromosome object '''
+        try:
+            return Chrom(*self.db.cursor().execute(
+                '''SELECT id,length FROM chromosomes WHERE id = ?''',(id,)).fetchone()
+            ) 
+        except Exception as e:
+            self.log("No chromosome where id = {}. Error: {}",id,e)
+        
+
     def upstream_genes(self,locus,gene_limit=1000,pos_limit=10e6):
         ''' returns genes upstream of a locus '''
-        return [Gene(*x) for x in self.db.cursor().execute(''' 
+        return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes
             WHERE chromosome = ?
             AND start < ?
@@ -27,7 +47,7 @@ class RefGen(Camoco):
     
     def downstream_genes(self,locus,gene_limit=1000,pos_limit=10e6):
         ''' returns genes downstream of a locus '''
-        return [Gene(*x) for x in self.db.cursor().execute(''' 
+        return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes
             WHERE chromosome = ?
             AND start > ?
@@ -57,6 +77,9 @@ class RefGenBuilder(Camoco):
         # Initiate CAmoco instance
         super().__init__(name,description=description,type="RefGen",basedir=basedir)
         self._create_tables()
+        # Set the table globals
+        self._global('build',build)
+        self._global('organism',organism)
 
     def _build_indices(self):
         cur = self.db.cursor()
@@ -68,6 +91,12 @@ class RefGenBuilder(Camoco):
         self.db.cursor().execute(''' 
             INSERT OR IGNORE INTO genes VALUES (?,?,?,?,?)
         ''',(id,chromosome,start,end,strand))
+
+    def add_chromosome(self,chrom):
+        ''' adds a chromosome object to the class '''
+        self.db.cursor().execute('''
+            INSERT OR REPLACE INTO chromosomes VALUES (?,?)
+        ''',(chrom.id,chrom.length))
 
     def import_from_txt(self,filename,sep="\t"):
         ''' assumes columns are in the order: id, chromosome, start, end, strand ''' 
@@ -82,15 +111,21 @@ class RefGenBuilder(Camoco):
             VALUES (?,?,?,?,?)''',genes)
         cur.execute('END TRANSACTION')
 
+    def import_from_fasta(self,filename):
+        pass
        
     def _create_tables(self):
         cur = self.db.cursor()
         cur.execute("PRAGMA page_size = 1024;")
         cur.execute("PRAGMA cache_size = 100000;")
         cur.execute(''' 
+            CREATE TABLE IF NOT EXISTS chromosomes (
+                id TEXT NOT NULL UNIQUE,
+                length INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS genes (
                 id TEXT NOT NULL,
-                chromosome TEXT NUT NULL,
+                chromosome TEXT NOT NULL,
                 start INTEGER,
                 end INTEGER,
                 strand INTEGER
