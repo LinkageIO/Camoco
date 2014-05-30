@@ -51,7 +51,7 @@ class COB(COBDatabase,Log):
     '''
     def __init__(self,network=None):
         ''' Ititialized a COB object based on a dataset Name '''
-        super(COB,self).__init__()
+        super().__init__()
         # HouseKeeping
         try:
             (self.DatasetID, self.name, self.desc,
@@ -71,7 +71,6 @@ class COB(COBDatabase,Log):
             JOIN genes ON expression.GeneID = genes.ID
             WHERE DatasetID = {}''',self.DatasetID).GrameneID
 
-    @property
     def genes(self):
         return [COBGene(x,self.build) for x in self.query('''
             SELECT DISTINCT(GrameneID) FROM expression 
@@ -229,13 +228,35 @@ class COB(COBDatabase,Log):
         # retrieve all first neighbors
         edges = self.subnetwork(gene_list)
         nodes = list(set(edges.source).union(edges.target))
-        graph = ig.Graph()
-        for node in nodes:
-            graph.add_vertex(name=node,label=node)
-        for edge in edges[['source','target','score']].itertuples():
-            graph.add_edge(source=graph.vs.find(name=edge[1]),target=graph.vs.find(name=edge[2]),weight=edge[3])
+        idmap = dict()
+        for i,node in enumerate(nodes):
+            idmap[node] = i
+        graph = ig.Graph([ (idmap[source],idmap[target]) for source,target,score in edges[['source','target','score']].itertuples(index=False)])
+        #graph.add_vertex(name=i,label=node)
         return graph 
         
+    def to_GML(self,gene_list):
+        ''' Returns a string representing the graph in GML format '''
+        edges = self.subnetwork(gene_list)
+        nodes = set(edges.source).union(edges.target)
+        gml = "\n".join([
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '<graphml xmlns="http://graphml.graphdrawing.org/xmlns"',
+                'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
+                'xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns',
+                'http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">',
+                "\n".join(['<node id="{}">'.format(n) for n in nodes]),
+                "\n".join(['<edge source="{}" target="{}" directed="false">'.format(*e) for e in edges[['source','target']].itertuples(index=False)]),
+                '</graph>',
+                '</graphml>'
+            ])
+        return gml
+
+    def to_edge_list(self,gene_list):
+        ''' returns a string representing the graph in edge list format '''
+        edges = self.subnetwork(gene_list)
+        return "V1\tV2\tweight\n" + "\n".join(["{}\t{}\t{}".format(*e) for e in edges[['source','target','score']].itertuples(index=False)])
+ 
 
     def heatmap(self,dm,filename=None):
 
@@ -289,46 +310,6 @@ class COB(COBDatabase,Log):
 
         return {'ordered' : D, 'rorder' : Z1['leaves'], 'corder' : Z2['leaves']} 
 
-# Unimplemented Below Here ------------------------------------------
-    def url(self,gene_list,size=65):
-        gene_list = self.ids2genes(gene_list)
-        return "http://lovelace.cs.umn.edu/cob?results_source={}&action=seed&q_list={}&neighborhood_size={}".format(
-            self.network,
-            ",".join(map(str,gene_list)),
-            size
-        )   
-           
-    def go_enrichment(self,gene_list,pval_cutoff = 0.05):
-        if self.verbose:
-            self.log("Calculating go enrichment for {}",",".join(map(str,gene_list)))
-        if not gene_list:
-            return pd.DataFrame()
-        gene_ids = self.genes2ids(gene_list)
-        go_terms = self.query('''SELECT DISTINCT(go_id) FROM mzn_gene_go_terms 
-            JOIN mzn_go_terms ON go_id = term_id 
-            WHERE gene_id IN ({}) ''',",".join(map(str,gene_ids)))
-        if go_terms.empty:
-            return pd.DataFrame()
-        terms = []
-        for id in go_terms.go_id.values:
-            annotation = self.query("SELECT * FROM mzn_go_terms WHERE term_id = {}",id).iloc[0]
-            genes_in_go_term = self.query('''SELECT gene_id FROM mzn_gene_go_terms WHERE go_id = {}''',id)
-            num_genes_in_go_term = len(genes_in_go_term)
-            overlap = set(genes_in_go_term.gene_id).intersection(set(gene_ids))
-            num_genes_total = self.num_go_genes_total
-            pval = hypergeom.sf(len(overlap),num_genes_total,num_genes_in_go_term,len(gene_ids))
-            terms.append({
-                "term_name" : annotation.term_name,
-                "pvalue" : pval,
-                "num_in_go" : num_genes_in_go_term,
-                "num_overlap":len(overlap),
-                "num_total" : num_genes_total,
-                "num_in_cluster":len(gene_ids),
-                "short_desc" : annotation.term_short_desc
-            })
-        terms = pd.DataFrame(terms).sort("pvalue",ascending=True)
-        return terms[terms.pvalue <= pval_cutoff]
-            
     def gene_summary(self,gene_list, gene_in=dict(), sep = "\n"):
         ''' Returns a table summarizing features of the gene list. kwargs include gene_in
             which is a dictionary containing keys which are name ofgroups of loci and values which
