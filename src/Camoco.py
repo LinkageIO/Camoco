@@ -31,6 +31,13 @@ class Camoco(object):
             "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
             (name,type)
         ).fetchone()
+        self.db.cursor().execute('''
+            CREATE TABLE IF NOT EXISTS globals (
+                key TEXT,
+                val TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
+        ''')
 
     def log(self,msg,*args):
         print("[CAMOCO]",time.ctime(), '-', msg.format(*args),file=sys.stderr)
@@ -49,13 +56,27 @@ class Camoco(object):
 
     def available_datasets(self):
         cur=self.database("camoco").cursor()
-        return cur.execute("SELECT rowid,* FROM datasets;").fetchall()
+        return cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
 
     def del_dataset(self):
         con = self.database('camoco').cursor()
         con.execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(self.name,self.type))
         os.remove(self._resource("databases",".".join([self.type,self.name])+".db"))
 
+    def _global(self,key,val=None):
+        # set the global for the dataset
+        if val is not None:
+            self.db.cursor().execute('''
+                INSERT OR REPLACE INTO globals (key,val)VALUES (?,?)''',(key,val)
+            )
+        else:
+            try:
+                return self.db.cursor().execute(
+                    '''SELECT val FROM globals WHERE key = ?''',(key,)
+                ).fetchone()[0]
+            except Exception as e:
+                return None
+            
     def _create_tables(self):
         camocodb = self.database("camoco")
         camocodb.execute(''' 
@@ -68,4 +89,6 @@ class Camoco(object):
             )
         ''')
 
+    def __getattr__(self,name):
+        return self._global(name)
 
