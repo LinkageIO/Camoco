@@ -1,31 +1,22 @@
 #!/usr/bin/python3
-from __future__ import print_function,division
-#import sqlite3 as lite
 import apsw as lite
 import os as os
 import time as time
 import sys
 import numpy as np
 from scipy.stats import pearsonr
-from lowess import lowess
 
+from lowess import lowess
 from Camoco import Camoco
 from Locus import SNP
+from Chrom import Chrom
 
 from matplotlib import pylab
-from Chrom import Chrom
 
 class HapMap(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
         # initialize super class
         super(self.__class__,self).__init__(name,type='HapMap',basedir=basedir)
-        # get chromosome information
-        self.chromosomes = []
-        for (chrom,) in self.db.cursor().execute('''SELECT DISTINCT chromosome FROM snps;'''):
-            (max_pos,) = self.db.cursor().execute('''
-                SELECT MAX(position) FROM snps WHERE chromosome = ?''', (chrom,)
-            ).fetchone()
-            self.chromosomes.append(Chrom(chrom,max_pos))
 
     def accessions(self):
         ''' returns genotypes for HapMap object '''
@@ -37,7 +28,7 @@ class HapMap(Camoco):
             '''SELECT rowid,* FROM snps WHERE chromosome = ? AND position >= ? AND position <= ?''',
             (chromo,start,end)
         )
-    def genotypes(self,snp):
+    def genotypes(self,snp,accessions=None):
         ''' returns the genotypes as a list based on position or snpid,
             returns None if snp not in database '''
         genos = [list(map(int,list(x[0]))) for x in self.db.cursor().execute(
@@ -46,6 +37,11 @@ class HapMap(Camoco):
         )]
         if len(genos) == 0:
             return None
+        if accessions is not None:
+            try:
+                return np.array(genos[0])[list(map(self.accessions().index,accessions))]
+            except ValueError as e:
+                self.log(e)
         return np.array(genos[0])
 
     def genotype_missing_mask(self,snp):
@@ -65,7 +61,7 @@ class HapMap(Camoco):
         non_missing = (geno1!=9)&(geno2!=9)
         return (pearsonr(geno1[non_missing],geno2[non_missing])[0]**2,sum(non_missing),snp2-snp1)
 
-    def downstream_snps(self,snp,snp_limit=1000,pos_limit=1000000):
+    def downstream_snps(self,snp,snp_limit=1000,pos_limit=1e8):
         ''' returns snps downstream of snp '''
         return [SNP(*x) for x in self.db.cursor().execute(''' 
             SELECT chromosome,position,id FROM snps 
@@ -75,7 +71,7 @@ class HapMap(Camoco):
             ORDER BY position ASC
             LIMIT ?
             ''',(snp.chrom,snp.start,snp.start+pos_limit,int(snp_limit)))]
-    def upstream_snps(self,snp,snp_limit=1000,pos_limit=1000000):
+    def upstream_snps(self,snp,snp_limit=1000,pos_limit=1e8):
         ''' returns snps upstream of input '''
         return [SNP(*x) for x in self.db.cursor().execute(''' 
             SELECT chromosome,position,id FROM snps 
@@ -86,15 +82,20 @@ class HapMap(Camoco):
             LIMIT ?
             ''',(snp.chrom,snp.start,snp.start-pos_limit,int(snp_limit)))]
 
-    def flanking_snps(self,snp,snp_limit=100,pos_limit=1000000):
+    def flanking_snps(self,snp,snp_limit=100,pos_limit=1e8):
         ''' returns snps flanking '''
-        return (self.upstream_snps(snp,snp_limit=snp_limit/2,pos_limit=pos_limit),
-                self.downstream_snps(snp,snp_limit=snp_limit/2,pos_limit=pos_limit))
+        return (self.upstream_snps(snp,snp_limit=snp_limit,pos_limit=pos_limit),
+                self.downstream_snps(snp,snp_limit=snp_limit,pos_limit=pos_limit))
 
-    def nearest_snp(self,snp):
+    def nearest_snp(self,snp,pos_limit=1e8):
         ''' retruns the nearest upstream or downstream SNP '''
-        nearest = self.upstream_snps(snp,snp_limit=1) + self.downstream_snps(snp,snp_limit=1)
-        if len(nearest) == 1:
+        if snp in self:
+            return snp
+        nearest = (self.upstream_snps(snp,snp_limit=1,pos_limit=pos_limit) +
+                   self.downstream_snps(snp,snp_limit=1,pos_limit=pos_limit))
+        if len(nearest) == 0:
+            self.log("No nearest SNPs within {}",pos_limit)
+        elif len(nearest) == 1:
             return nearest[0]
         elif abs(snp - nearest[0]) < abs(snp - nearest[1]):
             return nearest[0]
@@ -102,41 +103,59 @@ class HapMap(Camoco):
             return nearest[1]
         return nearest
         
-    def ld_interval(self,snp,edge_cutoff = 0.5,snp_limit=10,pos_limit=10000):
+    def ld_interval(self,snp,edge_cutoff = 0.5,snp_limit=1000,pos_limit=10000):
         ''' Returns the interval around a locus/snp based on 
-            a linear regression of LD ~ distance-from-locus.
+            a lowess regression of LD ~ distance-from-locus.
             This implementation calls the edge when the best fit
             line drops below the edge_cutoff parameter '''
         # grab upstream snp
-        downstream = self.flanking_snps(snp,snp_limit=snp_limit,pos_limit=pos_limit) 
+        upstream,downstream = self.flanking_snps(snp,snp_limit=snp_limit,pos_limit=pos_limit) 
         # mask out snps with < 80 points with filter
-        ld = [self.ld(snp,x) for x in downstream]
+        ld = [self.ld(snp,x) for x in upstream+downstream]
         # filter out nans
         n = np.array([x[1] for x in ld])
         mask = n>(max(n)/2)
         distances = np.array([snp.pos+x[2] for x in ld])[mask]
         r2 = np.array([x[0] for x in ld])[mask]
-        downstream = np.array(downstream)[mask]
+        flanking = np.array(upstream+downstream)[mask]
         r2[np.isnan(r2)] = 0
         # fit a lowess 
-        a=(distances,n,r2,downstream)#,intercept,slope)
+        a=(distances,n,r2,flanking)#,intercept,slope)
         pylab.clf()
-        pylab.scatter(distances,r2,alpha=0.5,label='pairwise ld')
-        pylab.ticklabel_format(axis='x',style='plain')
+        fig = pylab.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.scatter(distances,r2,alpha=0.5,label='pairwise ld')
+        ax.ticklabel_format(axis='x',style='plain')
         try:
             yest = lowess(distances,r2,iter=10)
-            pylab.plot(distances,yest,label='lowess')
+            ax.plot(distances,yest,label='lowess')
         except Exception as e:
             pass
-        pylab.legend()
-        pylab.axvline(snp.pos,color='k')
-        pylab.savefig('{}-{}:{}.png'.format(snp.id,snp.chrom,snp.pos))
+        ax.legend()
+        ax.set_ylim([0,1])
+        ax.axvline(snp.pos,color='k')
+        #ax.set_xticklabels(ax.xaxis.get_majorticklabels(), rotation=45)
+        fig.tight_layout()
+        fig.savefig('{}-{}:{}.png'.format(snp.id,snp.chrom,snp.pos))
         return a
 
     def sliding_window(self,interval=1000000):
         ''' Calculates average pairwise LD between SNPS within sliding window '''
         pass 
 
+
+    def __contains__(self,obj):
+        if isinstance(obj,SNP):
+            (count,) = self.db.cursor().execute('''
+                SELECT COUNT(*) FROM snps WHERE chromosome = ? AND position = ? ''',
+                (obj.chrom,obj.pos)
+            ).fetchone()
+            if int(count) == 1:
+                return True
+            else:
+                return False
+        else:
+            self.log("{} must be a SNP instance",obj)
 
 class HapMapBuilder(Camoco):
     def __init__(self,name,description="",basedir="~/.camoco"):
