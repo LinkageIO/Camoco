@@ -56,5 +56,14 @@ class Gene(Locus):
     def __init__(self,chrom=None,start=None,end=None,strand=None,id=None,build='5b',organism='Zea'):
         super().__init__(chrom,start,end,id,build,organism) 
 
+class QTL(Locus):
+    def __init__(self,chrom,start,end,id=None,build='5b',organism='Zea'):
+        if id == None:
+            self.id = "QTL-chr{}:{}-{}".format(chrom,start,end)
+        else:
+            self.id = id
+        super().__init__(chrom,start,end,self.id)
+    def __str__(self):
+        return "{}".format(self.id)
 
 
