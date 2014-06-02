@@ -57,7 +57,10 @@ class COBDatasetBuilder(COBDatabaseBuilder):
 
     def coex(self,multi=True,UseGramene=False,DatasetID=0):
         if not multi: 
-            scores = itertools.imap(_PCCUp,( (i,self.genes,self.expr,UseGramene) for i in arange(self.num_genes)))
+            scores = itertools.imap( _PCCUp,
+                ( (i,self.genes,self.expr,UseGramene)
+                 for i in arange(self.num_genes))
+            )
         else:
             progress = progress_bar(multiprocessing.Manager())
             pool = multiprocessing.Pool()
@@ -72,7 +75,9 @@ class COBDatasetBuilder(COBDatabaseBuilder):
         return self.expr[matches,:]
        
     def dat(self,score_cutoff=None,transform=np.arctanh,normalize=True):
-        tbl = pd.DataFrame(list(itertools.combinations([gene.GrameneID for gene in self.genes],2)),columns=['gene_a','gene_b'])
+        tbl = pd.DataFrame(list(
+            itertools.combinations([gene.GrameneID for gene in self.genes],2)
+        ),columns=['gene_a','gene_b'])
         scores = self.coex() 
         assert len(scores) == len(tbl)
         if transform:
