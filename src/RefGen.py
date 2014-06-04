@@ -9,11 +9,15 @@ class RefGen(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
         super().__init__(name,type="RefGen",basedir=basedir)
 
+    def num_genes(self):
+        ''' returns the number of genes in the dataset '''
+        return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
+
     def from_ids(self,id_list):
         ''' returns gene objects from an id  '''
         return [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,id,strand FROM genes WHERE id IN ('?')
-            '''.format("'.'".join(id_list)))
+            SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
+            '''.format("','".join(id_list)))
         ]
 
     def genome(self):
@@ -35,18 +39,20 @@ class RefGen(Camoco):
         
 
     def upstream_genes(self,locus,gene_limit=1000,pos_limit=10e6):
-        ''' returns genes upstream of a locus '''
+        ''' returns genes upstream of a locus. Genes are ordered so that the
+            nearest genes are at the beginning of the list.'''
         return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes
             WHERE chromosome = ?
             AND start < ?
             AND start > ?
-            ORDER BY start ASC
+            ORDER BY start DESC
             LIMIT ?
         ''',(locus.chrom, locus.start, locus.start - int(pos_limit), int(gene_limit)))]
     
     def downstream_genes(self,locus,gene_limit=1000,pos_limit=10e6):
-        ''' returns genes downstream of a locus '''
+        ''' returns genes downstream of a locus. Genes are ordered so that the 
+            nearest genes are at the beginning of the list. '''
         return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes
             WHERE chromosome = ?
@@ -71,6 +77,13 @@ class RefGen(Camoco):
             return up[0]
         else:
             return down[0] 
+
+    def __repr__(self):
+        return ("\n".join([
+            'Reference Genone: {} - {} - {}',
+            '{} genes',
+            'Genome:',
+            '{}']).format(self.organism,self.build,self.name,self.num_genes(),self.genome()))
 
 class RefGenBuilder(Camoco):
     def __init__(self,name,description,build,organism,basedir="~/.camoco"):
@@ -131,3 +144,4 @@ class RefGenBuilder(Camoco):
                 strand INTEGER
             );
         ''');
+

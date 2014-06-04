@@ -40,9 +40,10 @@ class Locus(object):
         return '''
             organism:{} 
             type: {}
+            id: {}
             chromosome: {}
             start: {}
-            end: {}'''.format(self.organism,self.__class__,self.chrom,self.start,self.stop)
+            end: {}'''.format(self.organism,self.__class__,self.id,self.chrom,self.start,self.stop)
     def __repr__(self):
         return str(self)
 
@@ -55,6 +56,7 @@ class SNP(Locus):
 class Gene(Locus):
     def __init__(self,chrom=None,start=None,end=None,strand=None,id=None,build='5b',organism='Zea'):
         super().__init__(chrom,start,end,id,build,organism) 
+        self.strand = strand
 
 class QTL(Locus):
     def __init__(self,chrom,start,end,id=None,build='5b',organism='Zea'):
