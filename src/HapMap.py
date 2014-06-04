@@ -32,7 +32,7 @@ class HapMap(Camoco):
         ''' returns the genotypes as a list based on position or snpid,
             returns None if snp not in database '''
         genos = [list(map(int,list(x[0]))) for x in self.db.cursor().execute(
-        ''' SELECT alleles FROM snps JOIN genotypes ON snps.rowid = genotypes.snpRowID
+        ''' SELECT alleles FROM snps JOIN genotypes ON genotypes.snpRowID = snps.rowid
             WHERE snps.chromosome = ? AND snps.position = ?''', (snp.chrom,snp.pos)
         )]
         if len(genos) == 0:
@@ -42,7 +42,8 @@ class HapMap(Camoco):
                 return np.array(genos[0])[list(map(self.accessions().index,accessions))]
             except ValueError as e:
                 self.log(e)
-        return np.array(genos[0])
+        else:
+            return np.array(genos[0])
 
     def genotype_missing_mask(self,snp):
         ''' returns a boolean mask on missing genotypes '''
