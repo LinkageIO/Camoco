@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 class Camoco(object):
-    def __init__(self,name,description='',type='Camoco',basedir="~/.camoco"):
+    def __init__(self,name,description=None,type='Camoco',basedir="~/.camoco"):
         # Set up our base directory
         self.basedir = os.path.realpath(os.path.expanduser(basedir))
         if not os.path.exists(self.basedir):
@@ -21,23 +21,28 @@ class Camoco(object):
             except Exception as e:
                 print("[CAMOCO]",time.ctime(), '-', *args,file=sys.stderr)
         self.log_file = open(os.path.join(self.basedir,"logs","logfile.txt"),'w')
-        self.database('camoco').cursor().execute('''
-            INSERT OR IGNORE INTO datasets (name,description,type)
-            VALUES (?,?,?)''',(name,description,type))
-        # create new sqlite file for dataset
-        self.db = self.database(".".join([type,name]))
-        (self.ID,self.name,self.description,
-        self.type,self.added) = self.database('camoco').cursor().execute(
-            "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
-            (name,type)
-        ).fetchone()
-        self.db.cursor().execute('''
-            CREATE TABLE IF NOT EXISTS globals (
-                key TEXT,
-                val TEXT
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
-        ''')
+        if description is not None:
+            self.database('camoco').cursor().execute('''
+                INSERT OR IGNORE INTO datasets (name,description,type)
+                VALUES (?,?,?)''',(name,description,type))
+            # create new sqlite file for dataset
+        try:
+            self.db = self.database(".".join([type,name]))
+            (self.ID,self.name,self.description,
+            self.type,self.added) = self.database('camoco').cursor().execute(
+                "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
+                (name,type)
+            ).fetchone()
+            self.db.cursor().execute('''
+                CREATE TABLE IF NOT EXISTS globals (
+                    key TEXT,
+                    val TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
+                ''')
+        except Exception as e:
+            self.log("Camoco Dataset does not exist, create one using the Builder Class")
+            self.log("Error: {}",e)
 
     def log(self,msg,*args):
         print("[CAMOCO]",time.ctime(), '-', msg.format(*args),file=sys.stderr)
