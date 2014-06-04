@@ -16,10 +16,7 @@ from scipy.spatial.distance import pdist, squareform
 
 from COBDatabase import *
 from COBDataset import *
-from COBLocus import *
-from COBGene import *
-from COBQTL import *
-from COBSNP import *
+from Locus import *
 from Genome import *
 from Chrom import *
 
