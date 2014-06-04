@@ -2,7 +2,6 @@
 from __future__ import division,print_function
 
 from COBDatabase import *
-from COBGene import COBGene
 from numpy import matrix,arcsinh,zeros,arange
 from scipy.stats import pearsonr
 from pandas import Series

@@ -17,4 +17,7 @@ class Genome(object):
     def rLocus(self):
         ''' returns a random 'SNP' from the genome '''
         return self.rChrom().rLocus()
+
+    def __repr__(self):
+        return "\n".join(map(str,self.chroms))
  
