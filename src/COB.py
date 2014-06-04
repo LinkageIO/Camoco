@@ -1,89 +1,45 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
-from __future__ import print_function
-
-import matplotlib as plt
-#plt.use('Agg')
-import numpy as np
-import time
-import igraph as ig
-import sys
 import pandas as pd
+
+from Camoco import Camoco
+from numpy import matrix,arcsinh
+from Locus import Locus,Gene
+from scipy.stats import pearsonr
+
+import igraph as ig
+import numpy as np
+import pandas as pd
+import time
+import math as math
+import multiprocessing as multiprocessing
+import itertools
+import matplotlib as plt
 
 from scipy.stats import hypergeom
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform
+ 
 
-from COBDatabase import *
-from COBDataset import *
-from Locus import *
-from Genome import *
-from Chrom import *
-
-class Log(object):
-    log_file = sys.stderr
-    def init(self,log_file=None):
-        if log_file:
-            self.log_file = open(log_file,'w')
-    def log(self,*args):
-        ''' shared object logging '''
-        print(time.ctime(),'-',*args,file=self.log_file)
-
-def available_datasets():
-        c = COBDatabase()
-        return c.query('''SELECT * FROM datasets''')
-
-def edit_dataset(dataset_name, field, new_field):
-        c = COBDatabase()
-        assert field in ["name","description","FPKM",'gene_build'],'nope'
-        try:
-            c.execute("UPDATE datasets SET {} = '{}' WHERE name = {};",field,new_field,dataset_name)
-        except Exception as e:
-            c.log("{} was not changeable in {}",field,dataset_name)
-
-class COB(COBDatabase,Log):
-    ''' 
-        This class implements the basic interface to the COB Database. It provides routine
-        analysis functions for basic network queries.
-    '''
-    def __init__(self,network=None):
-        ''' Ititialized a COB object based on a dataset Name '''
-        super().__init__()
-        # HouseKeeping
-        try:
-            (self.DatasetID, self.name, self.desc,
-             self.FPKM, self.build,
-             self.date_added
-            ) = self.fetchone('''
-                SELECT * FROM datasets WHERE name = '{}' ''',network
-            )
-        except Exception as e:
-            self.log("Dataset not found.")
-            
-
-    @property        
-    def geneIDS(self):
-        return self.query('''
-            SELECT DISTINCT(GrameneID) FROM expression 
-            JOIN genes ON expression.GeneID = genes.ID
-            WHERE DatasetID = {}''',self.DatasetID).GrameneID
-
-    def genes(self):
-        return [COBGene(x,self.build) for x in self.query('''
-            SELECT DISTINCT(GrameneID) FROM expression 
-            JOIN genes ON expression.GeneID = genes.ID 
-            WHERE DatasetID = {}''',self.DatasetID).GrameneID]
-    
-    @property
-    def accessions(self):
-        return self.query('''
-            SELECT name FROM accessions
-            WHERE DatasetID = {}
-         ''',self.DatasetID).name
+class COB(Camoco):
+    def __init__(self,name=None,basedir="~/.camoco"):
+        if name is None:
+            self.log('You must provide a name')
+        else:
+            super().__init__(name=name,type="COB",basedir=basedir)
 
     @property
-    def coex_table_name(self):
-        return "coex_{}".format(self.name.replace(' ','_'))
+    def num_genes(self):
+        return self.db.cursor().execute("SELECT COUNT(DISTINCT(gene)) FROM expression").fetchone()[0]
+
+    @property
+    def num_accessions(self):
+        return self.db.cursor().execute("SELECT COUNT(DISTINCT(accession)) FROM expression").fetchone()[0]
+   
+    @property
+    def num_sig_interactions(self):
+        return self.db.cursor().execute("SELECT COUNT(*) FROM coex WHERE significant = 1;").fetchone()[0]
+
 
     def neighbors(self,gene_list):
         ''' 
@@ -91,46 +47,49 @@ class COB(COBDatabase,Log):
             Output: Returns the neighbors for a list of genes as a DataFrame
             Columns returned: query_name, queryID, neighbor_name, neighbor, score
         '''
-        return pd.concat([
-            self.query('''
-            SELECT query.GrameneID as query_name, gene_b as query, 
-                   neighbor.GrameneID as neighbor_name, gene_a as neighbor, score
-            FROM {} coex
-            JOIN genes neighbor ON coex.gene_a = neighbor.ID
-            JOIN genes query    ON coex.gene_b = query.ID
-            WHERE significant = 1 AND gene_b IN ({})''',
-                 self.coex_table_name, ",".join(map(str,[x.ID for x in gene_list]))),
-            self.query('''
-            SELECT query.GrameneID as query_name, gene_a as query, 
-                   neighbor.GrameneID as neighbor_name, gene_b as neighbor, score
-            FROM {} coex 
-            JOIN genes neighbor ON coex.gene_b = neighbor.ID
-            JOIN genes query    ON coex.gene_a = query.ID
-            WHERE significant = 1 AND gene_a IN ({})''', 
-                self.coex_table_name, ','.join(map(str,[x.ID for x in gene_list])))
-        ])
+        gene_list = "','".join([x.id for x in gene_list])
+        cur = self.db.cursor()
+        return pd.DataFrame(
+            data=(cur.execute(''' 
+                SELECT gene_a AS source, gene_b AS target, score FROM coex 
+                WHERE 
+                gene_a IN ('{}')  
+                AND significant = 1;
+                '''.format(gene_list,gene_list)).fetchall() + 
+                cur.execute(''' 
+                SELECT gene_b AS source, gene_a AS target, score FROM coex 
+                WHERE 
+                gene_b IN ('{}')  
+                AND significant = 1;
+                '''.format(gene_list,gene_list)).fetchall()
+            ),
+            columns=['source','target','score'] 
+        ) 
 
     def num_neighbors(self,gene_list):
         ''' 
-            Input: a list of COBGene Object
+            Input: a list of Gene Objects
             Output: Dataframe containing the number of significant global
                     and local neighbors for each gene in list
         '''
         neighbors = self.neighbors(gene_list)
         def get_nums(df):
-            global_length =  len(df)
-            local_length = len(set(neighbors['query']).intersection(set(df.neighbor)))
+            global_length = len(df)
+            local_length = len(set(neighbors['source']).intersection(set(df['target'])))
             return pd.Series({
-                'global': global_length,
-                'local' : local_length 
-                })
-        return neighbors.groupby('query_name').apply(lambda x : get_nums(x))
+                'global' : global_length,
+                'local'  : local_length
+            })
+        return neighbors.groupby('source').apply(get_nums)
+
+    def degree(self,gene_list):
+        return self.num_neighbors(gene_list)
 
     def neighbors_score(self,gene_list):
         ''' returns a series containing the strongest connected neighbors '''
         neighbors = self.neighbors(gene_list)
         if len(neighbors) > 0:
-            scores = neighbors.groupby('neighbor_name').score.sum()
+            scores = neighbors.groupby('target').score.sum()
             scores.sort(ascending=False)
         return scores
 
@@ -149,25 +108,21 @@ class COB(COBDatabase,Log):
 
     def subnetwork(self,gene_list):
         ''' Input: a gene list
-            Output: a dataframe containing all edges between genes within list
+            Output: a dataframe containing all edges EXCLUSIVELY between genes within list
         '''
         if len(gene_list) == 0:
             return pd.DataFrame()
-        subnet = self.query(''' 
-            SELECT source.GrameneID source, gene_a, 
-                target.GrameneID as target, gene_b, score 
-            FROM {} coex 
-            JOIN genes source ON source.ID = gene_a
-            JOIN genes target ON target.ID = gene_b
+        gene_list = "','".join([x.id for x in gene_list])
+        subnet = pd.DataFrame(
+            self.db.cursor().execute(''' 
+            SELECT gene_a, gene_b, score FROM coex
             WHERE significant = 1 
-            AND gene_a IN ({})
-            AND gene_b IN ({}) ''', 
-                self.coex_table_name, 
-                ','.join(map(str,[x.ID for x in gene_list])), 
-                ",".join(map(str,[x.ID for x in gene_list]))
-        )
+            AND gene_a IN ('{}')
+            AND gene_b IN ('{}') '''.format(gene_list,gene_list)).fetchall(),
+            columns = ['source','target','score']
+        )   
         return subnet
- 
+
     def density(self,gene_list):
         ''' calculate the density of the ENTIRE network between a set of genes 
             Input: A list of COBGene Objects
@@ -175,48 +130,37 @@ class COB(COBDatabase,Log):
         '''
         if len(gene_list) == 0:
             return 0
-        scores = self.query("SELECT score FROM {} coex WHERE gene_a IN ({}) AND gene_b IN ({})",
-            self.coex_table_name,
-            ",".join(map(str,[x.ID for x in gene_list])),
-            ",".join(map(str,[x.ID for x in gene_list]))
-        ).score
+        ids = "','".join([x.id for x in gene_list])
+        scores = np.array(list(itertools.chain(*self.db.cursor().execute('''
+            SELECT score FROM coex WHERE gene_a IN ('{}') AND gene_b IN ('{}')
+            '''.format(ids,ids)
+        ).fetchall())))
         if len(scores) == 0:
             return 0
         return (scores.mean()/(1/np.sqrt(len(scores))))
- 
+
     def seed(self, gene_list, max_show = 65): 
         ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
         if len(gene_list) == 0:
             return []
         neighbors = self.neighbors_score(gene_list)
-        seed_set =  set(self._gene_ids(gene_list)).union(neighbors.index[0:min(len(neighbors),max_show)])
+        seed_set =  set([x.id for x in gene_list]).union(neighbors.index[0:min(len(neighbors),max_show)])
         return seed_set
 
-    def gene_expr_vals(self,gene_list):
+    def gene_expression_vals(self,gene_list,zscore=True):
         ''' Input: A list of COBGenes
             Output: A dataframe containing normalized expression values for gene_list
         '''
-        expr_vals = self.query(
-         '''SELECT 
-            GrameneID, expression.GeneID, expression.AccessionID, expression.DatasetID,
-                 value, meanExpr, stdExpr, name, class,description
-            FROM expression
-            JOIN avgexpr ON expression.GeneID = avgexpr.GeneID 
-                AND expression.DatasetID = avgexpr.DatasetID
-            JOIN accessions ON expression.AccessionID = accessions.ID 
-                AND expression.DatasetID = accessions.DatasetID
-            JOIN genes ON expression.GeneID = genes.ID
-            WHERE expression.GeneID IN ({})
-            AND   expression.DatasetID = {}''',
-            ",".join(map(str,[x.ID for x in gene_list])), 
-            self.DatasetID
-        )
-        def zscore(group):
-            group.index = group.name
-            norm = (group.value-group.value.mean())/group.value.std()
-            return norm
-        return pd.DataFrame({gid:zscore(group) for gid,group in expr_vals.groupby('GrameneID')})
-
+        expr = pd.DataFrame(
+            data = self.db.cursor().execute(
+            '''SELECT gene,accession,value FROM expression WHERE gene in ('{}')
+            '''.format("','".join([x.id for x in gene_list])), 
+            ).fetchall(),columns=['gene','accession','value']
+        ).pivot(index="accession",columns="gene",values='value')
+        if zscore:
+            expr = expr.apply(lambda x: (x-x.mean())/x.std(),axis=0)
+        return expr
+        
     def graph(self,gene_list):
         ''' Input: a gene list
             Output: a iGraph object '''
@@ -231,29 +175,7 @@ class COB(COBDatabase,Log):
         graph = ig.Graph([ (idmap[source],idmap[target]) for source,target,score in edges[['source','target','score']].itertuples(index=False)])
         #graph.add_vertex(name=i,label=node)
         return graph 
-        
-    def to_GML(self,gene_list):
-        ''' Returns a string representing the graph in GML format '''
-        edges = self.subnetwork(gene_list)
-        nodes = set(edges.source).union(edges.target)
-        gml = "\n".join([
-                '<?xml version="1.0" encoding="UTF-8"?>',
-                '<graphml xmlns="http://graphml.graphdrawing.org/xmlns"',
-                'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
-                'xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns',
-                'http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">',
-                "\n".join(['<node id="{}">'.format(n) for n in nodes]),
-                "\n".join(['<edge source="{}" target="{}" directed="false">'.format(*e) for e in edges[['source','target']].itertuples(index=False)]),
-                '</graph>',
-                '</graphml>'
-            ])
-        return gml
 
-    def to_edge_list(self,gene_list):
-        ''' returns a string representing the graph in edge list format '''
-        edges = self.subnetwork(gene_list)
-        return "V1\tV2\tweight\n" + "\n".join(["{}\t{}\t{}".format(*e) for e in edges[['source','target','score']].itertuples(index=False)])
- 
 
     def heatmap(self,dm,filename=None):
 
@@ -304,40 +226,9 @@ class COB(COBDatabase,Log):
         if filename:
             plt.pyplot.savefig(filename)
             plt.pyplot.close()
+        f.show()
 
         return {'ordered' : D, 'rorder' : Z1['leaves'], 'corder' : Z2['leaves']} 
-
-    def gene_summary(self,gene_list, gene_in=dict(), sep = "\n"):
-        ''' Returns a table summarizing features of the gene list. kwargs include gene_in
-            which is a dictionary containing keys which are name ofgroups of loci and values which
-            are lists of loci and each will be translated to a column in the final dataframe'''
-        tbl = pd.DataFrame()
-        tbl['GRAMENEID'] = [x.gramene_id for x in gene_list]
-        tbl['COMMON']    = [x.common_name for x in gene_list] 
-        tbl['CHR'] = [x.chrom for x in gene_list]
-        tbl['START'] = [x.start for x in gene_list]
-        tbl['STOP'] = [x.end for x in gene_list]
-        tbl['GO_TERM'] = [sep.join(x.go_terms.term_name) for x in gene_list]
-        tbl['GO_DESC'] = [sep.join(x.go_terms.term_short_desc) for x in gene_list]
-        tbl['ARAB_ORTH'] = [sep.join(x.arab_ortho.arab_name) for x in gene_list]
-        for loci_name,locus_list in gene_in.items():
-            tbl[loci_name] = [sep.join(
-                map(str,filter(
-                    lambda locus: str(locus.id) if gene in locus else None, locus_list 
-                ))) for gene in gene_list
-            ]
-        return tbl
-
-
-    ############################################################################
-    # Helper Functions
-    ############################################################################
-    def log(self, string, *args, **kwargs):
-        print('[LOG]',time.ctime(), "-", string.format(*args),file=self.log_file)
-
-    def _gene_ids(self, gene_list, attr="ID"):
-        ''' return a list of ids from a gene list '''
-        return [getattr(x,attr) for x in gene_list]
 
     @property 
     def cmap(self):
@@ -354,32 +245,17 @@ class COB(COBDatabase,Log):
         heatmap_cmap = plt.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
         return heatmap_cmap
 
-    def __repr__(self):
-        return '''
-        Name: {}
-        Description: {}
-        DatasetID: {}
-        FPKM: {}
-        Gene Build: {}
-        Date Added: {}
-        Number of Genes: {}
-        Number of accessions: {}
-        '''.format(self.name, self.desc, self.DatasetID, self.FPKM,
-            self.build, self.date_added, len(self.geneIDS), len(self.accessions)) 
-
-
-
     def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
         self.log("Reading in {}",filename)
         ref_dat = pd.read_table(filename,sep=sep,names=['gene_a','gene_b','score'])
         self.log("Retrieving network edges...")
-        dat = self.query('''SELECT source.GrameneID as gene_a, target.GrameneID as gene_b, score 
-            FROM {} coex 
-            JOIN genes source ON coex.gene_a = source.ID
-            JOIN genes target ON coex.gene_b = target.ID
-            WHERE score >= {};
-            ''',self.coex_table_name,score_cutoff)
+        dat = pd.DataFrame(self.db.cursor().execute('''SELECT gene_a, gene_b, score 
+            FROM  coex 
+            WHERE score >= ?;
+            ''',(score_cutoff,)).fetchall(),
+            columns=['gene_a','gene_b','score']
+        )
         # Get a list of genes in the dataset as well as reference
         genes = set(dat.gene_a).union(set(dat.gene_b))
         self.log("Found {} genes in {}",len(genes),self.name)
@@ -396,6 +272,173 @@ class COB(COBDatabase,Log):
             edges     = dat[(dat.gene_a == gene)|(dat.gene_b == gene)]
             ref_neighbors = set(ref_edges.gene_a).union(set(ref_edges.gene_b))
             neighbors     = set(edges.gene_a).union(set(edges.gene_b))
-            return (len(neighbors),len(ref_neighbors))
-        return [compare_edges(gene) for gene in genes.intersection(ref_genes)]
+            return (gene,len(neighbors),len(ref_neighbors))
+        return pd.DataFrame(
+                    [compare_edges(gene) for gene in genes.intersection(ref_genes)],
+                    columns = ['gene','degree','ref_degree']
+                )
 
+    def __repr__(self):
+        return '''
+            COB Dataset: {} - {} - {}
+                Desc: {}
+                FPKM: {}
+                Num Genes: {}
+                Num Accessions: {}
+                Num Sig. Interactions: {}
+        '''.format(self.name, self.organism, self.build,
+                self.description,
+                self.FPKM == 'FPKM',
+                self.num_genes,
+                self.num_accessions,
+                self.num_sig_interactions
+        )
+
+class COBBuilder(Camoco):
+    def __init__(self,name,description,FPKM,gene_build,organism,basedir="~/.camoco"):
+        super().__init__(name,description,type="COB",basedir=basedir)
+        self._global('FPKM',FPKM)
+        self._global('build',gene_build)
+        self._global('organism',organism)
+        self.expr = matrix(0)
+        self.genes = []
+        self._create_tables()
+
+    def add_accession(self,name,type="",description=""):
+        ''' adds an accession to the database, useful for updating accessions with 
+            details after importing them from a DataFrame '''
+        self.db.cursor().execute(''' 
+            INSERT OR UPDATE INTO accessions (name,type,description) VALUES (?,?,?)''',(name,type,description)
+        )
+
+    def from_DataFrame(self,df,transform=np.arctanh,significance_thresh=3):
+        ''' assumes genes as rows and accessions as columns '''
+        genes = df.index 
+        accessions = df.columns
+        expr = df.as_matrix()
+        self.log("Imported {} genes and {} accession",len(genes),len(accessions))
+        if self.FPKM == 'FPKM':
+            self.log("Performing FPKM normalization using arcsinh")
+            expr = np.arcsinh(expr) 
+        else:
+            self.log("WARNING! Make sure you normalized according to best practices for {}",self.FPKM)
+        cur = self.db.cursor()
+        try:
+            cur.execute("BEGIN TRANSACTION")
+            self._drop_indices()
+            self.log("Adding Accession Values")
+            cur.executemany("INSERT OR IGNORE INTO accessions (name) VALUES (?)",
+                [(a,) for a in accessions]) 
+            self.log("Adding Expression Values")
+            cur.executemany("INSERT OR IGNORE INTO expression (gene,accession,value) VALUES (?,?,?)",
+                # This comprehension iterates over matrix cells
+                [(gene,acc,val) for acc,genevals in df.iteritems() for gene,val in genevals.iteritems()] 
+            )
+            self.log("Calculating Coexpression")
+            tbl = pd.DataFrame(
+                list(itertools.combinations(genes,2)),
+                columns=['gene_a','gene_b']
+            )
+            # Now add coexpression data
+            tbl['score'] = self._coex(expr)
+            tbl['score'][tbl['score'] == 1] = 0.99999999 
+            tbl['score'] = transform(tbl['score'])
+            tbl['score'] = (tbl['score']-tbl.score.mean())/tbl.score.std()
+            tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
+            cur.executemany(
+                ''' INSERT INTO coex (gene_a,gene_b,score,significant) VALUES (?,?,?,?)''',
+                map(lambda x: (x[0],x[1],x[2],int(x[3])), tbl.itertuples(index=False))
+            )
+            cur.execute("END TRANSACTION")
+            self.log("Building indices")
+            self._build_indices()
+            self.log("Done")
+        except Exception as e:
+            self.log("Something bad happened:{}",e)
+            cur.execute("ROLLBACK")
+        
+    def _coex(self,matrix,parallelize=True):
+        if parallelize: 
+            progress = progress_bar(multiprocessing.Manager())
+            pool = multiprocessing.Pool()
+            scores = np.array(list(itertools.chain(
+                *pool.imap(_PCCUp,[(i,matrix,progress) for i in range(len(matrix))])
+            )))
+            pool.close()
+            pool.join()
+            return scores
+        else:
+            scores = itertools.imap( _PCCUp,
+                ( (i,self.genes,self.expr,UseGramene)
+                 for i in range(self.num_genes))
+            )
+
+    def from_csv(self,filename,sep="\t"):
+        ''' assumes genes as rows and accessions as columns '''
+        df = pd.read_table(filename,sep=sep)
+        self.from_DataFrame(df)
+    
+    def _build_indices(self):
+        self.db.cursor().execute(''' 
+            CREATE INDEX IF NOT EXISTS coex_abs ON coex (gene_a); 
+            CREATE INDEX IF NOT EXISTS coex_gene_b ON coex (gene_b); 
+            CREATE INDEX IF NOT EXISTS coex_gen_ab ON coex (gene_a,gene_b); 
+            CREATE INDEX IF NOT EXISTS coex_score ON coex (score); 
+            CREATE INDEX IF NOT EXISTS coex_significant ON coex (significant); 
+            ANALYZE;
+        ''')
+
+    def _drop_indices(self):
+        self.db.cursor().execute(''' 
+            DROP INDEX IF EXISTS coex_gene_a;
+            DROP INDEX IF EXISTS coex_gene_b;
+            DROP INDEX IF EXISTS coex_score;
+            DROP INDEX IF EXISTS coex_significant;
+        ''')
+
+    def _create_tables(self):
+        cur = self.db.cursor()
+        cur.execute('PRAGMA page_size = 1024;') 
+        cur.execute('PRAGMA cache_size = 100000;') 
+        cur.execute(''' 
+            CREATE TABLE IF NOT EXISTS accessions (
+                name TEXT,
+                type TEXT,
+                description TEXT
+            );
+            CREATE TABLE IF NOT EXISTS expression (
+                gene TEXT,
+                accession TEXT,
+                value REAL
+            );
+            CREATE TABLE IF NOT EXISTS coex (
+                gene_a TEXT,
+                gene_b TEXT,
+                score REAL,
+                significant INTEGER 
+            );
+        ''') 
+
+
+class progress_bar(object):
+    def __init__(self,manager,interval=10): 
+        self.interval = interval
+        self.lock = manager.Lock()
+        self.old_per = manager.Value(float,0.0)
+    def update(self,cur_per):
+        cur_per = math.floor(cur_per)
+        if cur_per > self.old_per.value and cur_per % self.interval == 0:
+            self.lock.acquire()
+            print("\t\t{} {}% Complete".format(time.ctime(),cur_per))
+            self.old_per.set(cur_per)
+            self.lock.release()
+
+
+def _PCCUp(tpl):
+    ''' Returns a tuple containing indices i,j and their Pearson Correlation Coef '''
+    i,m,pb = (tpl) # values are index, exprMatrix, and lock
+    total = ((m.shape[0]**2)-m.shape[0])/2 # total number of calculations we need to do
+    left = ((m.shape[0]-i)**2-(m.shape[0]-i))/2 # How many we have left
+    percent_done = (1-left/total)*100 # percent complete based on i and m
+    pb.update(percent_done)
+    return [pearsonr(m[i,:],m[j,:])[0] for j in range(i+1,len(m))] 
