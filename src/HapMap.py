@@ -18,20 +18,28 @@ class HapMap(Camoco):
         # initialize super class
         super(self.__class__,self).__init__(name,type='HapMap',basedir=basedir)
 
+    @property
+    def num_accessions(self):
+        return self.db.cursor().execute("SELECT COUNT(*) FROM accessions").fetchone()[0]
+
+    @property
+    def num_snps(self):
+        return self.db.cursor().execute("SELECT COUNT(*) FROM snps").fetchone()[0]
+
     def accessions(self):
         ''' returns genotypes for HapMap object '''
         return [ x[0] for x in self.db.cursor().execute('SELECT * FROM accessions ORDER BY rowid').fetchall()]
 
     def snps(self,chromo,start,end):
         ''' Returns SNPs within range '''
-        return self.db.cursor().execute(
-            '''SELECT rowid,* FROM snps WHERE chromosome = ? AND position >= ? AND position <= ?''',
-            (chromo,start,end)
-        )
+        return [SNP(*x) for x in self.db.cursor().execute(
+            '''SELECT chromosome,position,id FROM snps WHERE chromosome = ? AND position >= ? AND position <= ?''',
+            (chromo,start,end)).fetchall()]
+
     def genotypes(self,snp,accessions=None):
         ''' returns the genotypes as a list based on position or snpid,
             returns None if snp not in database '''
-        genos = [list(map(int,list(x[0]))) for x in self.db.cursor().execute(
+        genos = [list(map(float,x[0].split("\t"))) for x in self.db.cursor().execute(
         ''' SELECT alleles FROM snps JOIN genotypes ON genotypes.snpRowID = snps.rowid
             WHERE snps.chromosome = ? AND snps.position = ?''', (snp.chrom,snp.pos)
         )]
@@ -156,7 +164,18 @@ class HapMap(Camoco):
             else:
                 return False
         else:
-            self.log("{} must be a SNP instance",obj)
+            raise Exception("{} must be a SNP object".format(obj))
+
+    def __str__(self):
+        return '''
+            HapMap: {}
+            desc: {}
+            #SNPs: {}
+            #Accessions: {}
+        '''.format(self.name,self.description,self.num_snps,self.num_accesions)
+
+    def __repr__(self):
+        return str(self)
 
 class HapMapBuilder(Camoco):
     def __init__(self,name,description="",basedir="~/.camoco"):
@@ -164,6 +183,44 @@ class HapMapBuilder(Camoco):
         # add yourself to the database
         super().__init__(name,description=description,type='HapMap',basedir=basedir)
         self._create_tables()
+        self.snp_rows = []
+        self.genotype_rows = []
+        self.snpRowID = 1
+        record_dump_size = 100000
+
+    @property
+    def num_accessions(self):
+        return self.db.cursor().execute("SELECT COUNT(*) FROM accessions").fetchone()[0]
+   
+    def add_accession(self,accession_name):
+        cur = self.db.cursor()
+        try:    
+            cur.execute('BEGIN TRANSACTION')
+            cur.execute("INSERT INTO accessions VALUES(?)",(accession_name,)) 
+            cur.execute('END TRANSACTION')
+            return True
+        except Exception as e:
+            self.log('Something Bad Happened: {}',e)
+            cur.execute("ROLLBACK")
+            return False
+             
+    def add_snp(self,chrom,pos,snpid,alt,ref,qual,tabbed_genotypes):
+        cur = self.db.cursor()
+        if len(tabbed_genotypes.split("\t")) != self.num_accessions:
+            self.log("The number of genotypes in does not match number of accessions")
+            self.log("{} vs {}",len(tabbed_genotypes.split("\t")),self.num_accessions)
+        try:    
+            cur.execute('BEGIN TRANSACTION')
+            cur.execute('''INSERT INTO snps
+                VALUES (?,?,?,?,?,?)''',(int(chrom),int(pos),snpid,alt,ref,float(qual))) 
+            snp_row_id = self.db.last_insert_rowid()
+            cur.execute('''INSERT INTO genotypes VALUES (?,?)''',(snp_row_id,tabbed_genotypes))
+            cur.execute('END TRANSACTION')
+            return True
+        except Exception as e:
+            self.log('Something Bad Happened: {}',e)
+            cur.execute("ROLLBACK")
+            return False
 
     def import_vcf(self,filename):
         ''' imports hapmap information from a VCF '''
@@ -192,7 +249,9 @@ class HapMapBuilder(Camoco):
                 else:
                     # we are at records, insert snp line by line but bulk insert genotypes
                     (chrom,pos,snpid,ref,alt,qual,fltr,info,fmt,*genotypes) = line.split()
-                    snp_rows.append((chrom,pos,snpid,ref,alt,qual))
+                    if qual == '.':
+                        qual = -1
+                    snp_rows.append((chrom,int(pos),snpid,ref,alt,float(qual)))
                     GT_ind = fmt.split(":").index("GT") # we need to find the GT field
                     def zygosity(alleles):
                         if '.' in alleles:
@@ -203,7 +262,7 @@ class HapMapBuilder(Camoco):
                             return '1'
                         else:
                             return '2'
-                    alleles = "".join(
+                    alleles = "\t".join(
                         [zygosity(x.split(':')[GT_ind].replace("|","/").replace("/",""))
                              for x in genotypes
                         ]
@@ -244,9 +303,6 @@ class HapMapBuilder(Camoco):
         cur.execute('''
             CREATE INDEX IF NOT EXISTS genoSnpID ON genotypes (snpRowID);
         ''')
-        cur.execute('''
-            CREATE UNIQUE INDEX IF NOT EXISTS uniqchrom ON snps (chromosome)
-        ''')
         self.log("Done")
 
     def _drop_indices(self):
@@ -263,7 +319,7 @@ class HapMapBuilder(Camoco):
         cur.execute("PRAGMA cache_size = 100000;")
         cur.execute(''' 
             CREATE TABLE IF NOT EXISTS snps (
-                chromosome INTEGER NOT NULL,
+                chromosome TEXT NOT NULL,
                 position INTEGER NOT NULL,
                 id TEXT NOT NULL,
                 alt TEXT,
