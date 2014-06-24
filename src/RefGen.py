@@ -1,33 +1,33 @@
 #!/usr/bin/python3
 
 from Camoco import Camoco
-from Locus import Gene
+from Locus import Gene,non_overlapping
 from Chrom import Chrom
 from Genome import Genome
+
+import itertools
 
 class RefGen(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
         super().__init__(name,type="RefGen",basedir=basedir)
-
-    def num_genes(self):
-        ''' returns the number of genes in the dataset '''
-        return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
-
-    def from_ids(self,id_list):
-        ''' returns gene objects from an id  '''
-        return [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
-            '''.format("','".join(id_list)))
-        ]
-
-    def genome(self):
-        ''' returns a genome object based on loaded chromosome object'''
-        return Genome(
+        self.genome = Genome(
             self.type+self.name,
             chroms = [Chrom(*x) for x in  self.db.cursor().execute(''' 
                 SELECT id,length FROM chromosomes
             ''')] 
         )
+
+    def num_genes(self):
+        ''' returns the number of genes in the dataset '''
+        return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
+
+    def from_ids(self,*args):
+        ''' returns gene object iterable from an iterable of id strings  '''
+        return [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
+            SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
+            '''.format("','".join(args)))
+        ]
+
     def chromosome(self,id):
         ''' returns a chromosome object '''
         try:
@@ -37,7 +37,6 @@ class RefGen(Camoco):
         except Exception as e:
             self.log("No chromosome where id = {}. Error: {}",id,e)
         
-
     def upstream_genes(self,locus,gene_limit=1000,pos_limit=10e6):
         ''' returns genes upstream of a locus. Genes are ordered so that the
             nearest genes are at the beginning of the list.'''
@@ -78,12 +77,55 @@ class RefGen(Camoco):
         else:
             return down[0] 
 
+    def bootstrap_genes(self,*gene_list):
+        ''' returns a random set of non overlapping genes as larges as 
+            the gene list passed in '''
+        bootstrap = [ self.nearest_gene(self.genome.rSNP()) for gene in gene_list ]
+        if non_overlapping(bootstrap):
+            return bootstrap
+        else:
+            return self.bootstrap_genes(gene_list)
+
+    def bootstrap_flanking_genes(self,locus,gene_limit=4,pos_limit=50000):
+        ''' Returns a randoms set of non overlapping flanking genes calculated from 
+            SNPs flanking genes which is the same number of genes as would be calculated
+            from the actual flanking genes from SNP list'''
+        num_flanking_genes = len(list(itertools.chain(*self.flanking_genes(locus,gene_limit,pos_limit))))
+        while True:
+            bootstrapped = self.flanking_genes(self.genome.rSNP(),gene_limit,pos_limit)
+            if len(list(itertools.chain(*bootstrapped))) == num_flanking_genes:
+                return bootstrapped
+            
+
     def __repr__(self):
         return ("\n".join([
             'Reference Genone: {} - {} - {}',
             '{} genes',
             'Genome:',
-            '{}']).format(self.organism,self.build,self.name,self.num_genes(),self.genome()))
+            '{}']).format(self.organism,self.build,self.name,self.num_genes(),self.genome))
+
+    def __contains__(self,obj):
+        ''' flexible on what you pass into the 'in' function '''
+        try:
+            # you can pass in a gene object (this should ALWAYS be true if you created gene object from this RefGen)
+            if self.db.cursor().execute('''
+                SELECT COUNT(*) FROM genes WHERE id = ?''',(obj.id,)).fetchone()[0] == 1:
+                return True
+            else:
+                return False
+        except Exception as e:
+            pass
+        try:
+            # Can be a string object
+            if self.db.cursor().execute('''
+                SELECT COUNT(*) FROM genes WHERE id = ?''',(str(obj),)).fetchone()[0] == 1:
+                return True
+            else:
+                return False
+        except Exception as e:
+            pass
+        self.log("object {} not correct type to test membership in {}",obj,self.name)
+
 
 class RefGenBuilder(Camoco):
     def __init__(self,name,description,build,organism,basedir="~/.camoco"):
