@@ -6,6 +6,7 @@ from Camoco import Camoco
 from numpy import matrix,arcsinh
 from Locus import Locus,Gene
 from scipy.stats import pearsonr
+from collections import defaultdict
 
 import igraph as ig
 import numpy as np
@@ -19,7 +20,20 @@ import matplotlib as plt
 from scipy.stats import hypergeom
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform
- 
+
+import collections
+import functools
+
+def memoize(obj):
+    cache = obj.cache = {}
+
+    @functools.wraps(obj)
+    def memoizer(*args, **kwargs):
+        key = str(args) + str(kwargs)
+        if key not in cache:
+            cache[key] = obj(*args, **kwargs)
+        return cache[key]
+    return memoizer
 
 class COB(Camoco):
     def __init__(self,name=None,basedir="~/.camoco"):
@@ -29,17 +43,57 @@ class COB(Camoco):
             super().__init__(name=name,type="COB",basedir=basedir)
 
     @property
+    @memoize
     def num_genes(self):
         return self.db.cursor().execute("SELECT COUNT(DISTINCT(gene)) FROM expression").fetchone()[0]
 
     @property
+    @memoize
+    def num_sig_edges(self):
+        return self.db.cursor().execute("SELECT COUNT(*) FROM coex WHERE significant = 1;").fetchone()[0]
+
+    @property
+    @memoize
+    def num_edges(self):
+        return self.db.cursor().execute("SELECT COUNT(*) FROM coex").fetchone()[0]
+
+    @property
+    @memoize
     def num_accessions(self):
         return self.db.cursor().execute("SELECT COUNT(DISTINCT(accession)) FROM expression").fetchone()[0]
    
     @property
+    @memoize
     def num_sig_interactions(self):
         return self.db.cursor().execute("SELECT COUNT(*) FROM coex WHERE significant = 1;").fetchone()[0]
 
+    @memoize
+    def accessions(self):
+        ''' returns a list of accessions used to build COB '''
+        return self.db.cursor().execute("SELECT * FROM accessions").fetchall()
+
+    @memoize
+    def sig_edges(self,limit=None):
+        ''' returns a dataframe containing significant edges '''
+        if not limit:
+            return pd.DataFrame(
+                self.db.cursor().execute(
+                '''SELECT gene_a,gene_b,score
+                FROM coex WHERE significant = 1''').fetchall(),
+                columns = ['gene_a','gene_b','score']
+            )
+        else:
+            return pd.DataFrame(
+                self.db.cursor().execute(
+                '''SELECT gene_a,gene_b,score
+                FROM coex ORDER BY score DESC LIMIT ?''',(limit,)).fetchall(),
+                columns = ['gene_a','gene_b','score']
+            )
+
+    @memoize
+    def sig_genes(self,limit=None):
+        sig_edges = self.sig_edges(limit=limit)
+        return [Gene(0,0,0,id=x) for x in set(sig_edges.gene_a).union(sig_edges.gene_b)]
 
     def neighbors(self,gene_list):
         ''' 
@@ -123,7 +177,7 @@ class COB(Camoco):
         )   
         return subnet
 
-    def density(self,gene_list):
+    def density(self,gene_list,return_mean=True):
         ''' calculate the density of the ENTIRE network between a set of genes 
             Input: A list of COBGene Objects
             Output: a scalar value representing the density of genes
@@ -131,13 +185,16 @@ class COB(Camoco):
         if len(gene_list) == 0:
             return 0
         ids = "','".join([x.id for x in gene_list])
-        scores = np.array(list(itertools.chain(*self.db.cursor().execute('''
-            SELECT score FROM coex WHERE gene_a IN ('{}') AND gene_b IN ('{}')
+        scores = pd.DataFrame(self.db.cursor().execute('''
+            SELECT gene_a,gene_b,score FROM coex WHERE gene_a IN ('{}') AND gene_b IN ('{}')
             '''.format(ids,ids)
-        ).fetchall())))
+        ).fetchall(),columns=['gene_a','gene_b','score'])
         if len(scores) == 0:
             return 0
-        return (scores.mean()/(1/np.sqrt(len(scores))))
+        if return_mean:
+            return (scores.score.mean()/(1/np.sqrt(len(scores))))
+        else:
+            return scores
 
     def seed(self, gene_list, max_show = 65): 
         ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
@@ -172,8 +229,17 @@ class COB(Camoco):
         idmap = dict()
         for i,node in enumerate(nodes):
             idmap[node] = i
-        graph = ig.Graph([ (idmap[source],idmap[target]) for source,target,score in edges[['source','target','score']].itertuples(index=False)])
-        #graph.add_vertex(name=i,label=node)
+        graph = ig.Graph(
+            edges = [(idmap[source],idmap[target]) for source,target 
+                in edges[['source','target']].itertuples(index=False)],
+            directed = False,
+            vertex_attrs = {
+                "label" : nodes,
+            },
+            edge_attrs = {
+                "weight" : edges.score
+            }
+        )
         return graph 
 
 
@@ -229,6 +295,39 @@ class COB(Camoco):
         f.show()
 
         return {'ordered' : D, 'rorder' : Z1['leaves'], 'corder' : Z2['leaves']} 
+  
+    def coordinates(self,gene_list,layout=None):
+        ''' returns the static layout, you can change the stored layout by passing 
+            in a new layout object. If no layout has been stored or a gene does not have
+            coordinates, returns (0,0) for each mystery gene'''
+        if not layout:
+            # return the current layout for gene list
+            return ig.Layout([
+                self.db.cursor().execute(
+                    '''SELECT x,y FROM coor WHERE gene = ?''',
+                    (gene.id,)).fetchone() or (0,0) for gene in gene_list
+            ])
+        else:
+            self.db.cursor().executemany('''INSERT OR UPDATE INTO coor (gene,x,y) VALUES (?,?,?)''',
+                [(gene.id,layout[i][0],layout[i][1]) for i,gene in enumerate(gene_list)]
+            )
+
+    def mcl(self,gene_list):
+        from subprocess import Popen, PIPE
+        MCLstr = "\n".join(["{}\t{}\t{}".format(a,b,c) for a,b,c in self.subnetwork(gene_list).itertuples(index=False)])
+        cmd = "mcl - --abc -scheme 6 -I 2.0 -o -"
+        p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=True)
+        sout,serr = p.communicate(MCLstr.encode('utf-8'))
+        p.wait()
+        print( "return code: {}".format(p.returncode))
+        if p.returncode==0 and len(sout)>0:
+            return [ [Gene(0,0,0,id=gene.decode('utf-8')) for gene in line.split()] for line in sout.splitlines() ]
+            
+ 
+    def plot(self,gene_list,filename=None,width=3000,height=3000,**kwargs):
+        if not filename:
+            filename = "{}.png".format(self.name)
+        ig.plot(self.graph(gene_list),layout=self.coordinates(gene_list),target=filename,bbox=(width,height),**kwargs)
 
     @property 
     def cmap(self):
@@ -250,49 +349,114 @@ class COB(Camoco):
         self.log("Reading in {}",filename)
         ref_dat = pd.read_table(filename,sep=sep,names=['gene_a','gene_b','score'])
         self.log("Retrieving network edges...")
-        dat = pd.DataFrame(self.db.cursor().execute('''SELECT gene_a, gene_b, score 
+        dat = pd.DataFrame(self.db.cursor().execute(
+            '''SELECT gene_a, gene_b, score 
             FROM  coex 
             WHERE score >= ?;
             ''',(score_cutoff,)).fetchall(),
             columns=['gene_a','gene_b','score']
         )
+        ref_set = set(list(ref_dat.gene_a)+list(ref_dat.gene_b))
         # Get a list of genes in the dataset as well as reference
-        genes = set(dat.gene_a).union(set(dat.gene_b))
-        self.log("Found {} genes in {}",len(genes),self.name)
-        ref_genes = set(ref_dat.gene_a).union(set(ref_dat.gene_b))
-        self.log("Found {} genes in {}",len(ref_genes),filename)
-        self.log("Found {} genes in intersection",len(genes.intersection(ref_genes)))
-        if len(genes) != len(ref_genes):
-            # Draw a venn diagram you lazy sac
-            self.log("Genes not in {}: {}",self.name,"\n".join(ref_genes.difference(genes.intersection(ref_genes))))
-            self.log("Genes not in {}: {}",filename,"\n".join(genes.difference(genes.intersection(ref_genes))))
-        def compare_edges(gene):
-            # Compare the degree of each gene with the reference dat
-            ref_edges = ref_dat[(ref_dat.gene_a == gene) | (ref_dat.gene_b == gene)]
-            edges     = dat[(dat.gene_a == gene)|(dat.gene_b == gene)]
-            ref_neighbors = set(ref_edges.gene_a).union(set(ref_edges.gene_b))
-            neighbors     = set(edges.gene_a).union(set(edges.gene_b))
-            return (gene,len(neighbors),len(ref_neighbors))
-        return pd.DataFrame(
-                    [compare_edges(gene) for gene in genes.intersection(ref_genes)],
-                    columns = ['gene','degree','ref_degree']
-                )
+        gene_freqs = defaultdict(lambda:0)
+        for gene_a,gene_b in (dat[["gene_a",'gene_b']].itertuples(index=False)):
+            if gene_a in ref_set and gene_b in ref_set:
+                gene_freqs[gene_a] += 1
+                gene_freqs[gene_b] += 1
+        ref_gene_freqs = defaultdict(lambda:0)
+        for gene_a,gene_b in (ref_dat[["gene_a",'gene_b']].itertuples(index=False)):
+            if gene_a in ref_set and gene_b in ref_set:
+                ref_gene_freqs[gene_a] += 1
+                ref_gene_freqs[gene_b] += 1
+        # report list sizes
+        self.log("Found {} genes in {}",len(gene_freqs),self.name)
+        self.log("Found {} genes in {}",len(ref_gene_freqs),filename)
+        # calculate the sets of significant genes
+        self.log("Merging degree sets...")
+        degrees = pd.DataFrame(pd.Series(gene_freqs),columns=["Dat"]).merge(
+            pd.DataFrame(pd.Series(ref_gene_freqs),columns=["RefDat"]),
+            how='right',
+            left_index=True,
+            right_index=True
+        )
+        self.log("...Done")
+        return degrees
+
+    def compare_degree(self,obj,score_cutoff=3):
+        self.log("Retrieving network edges...")
+        ref_dat = pd.DataFrame(obj.db.cursor().execute(''' 
+            SELECT gene_a,gene_b,score FROM coex
+            WHERE score > ?
+        ''',(score_cutoff,)).fetchall(),columns=['gene_a','gene_b','score'])
+        dat = pd.DataFrame(self.db.cursor().execute(
+            '''SELECT gene_a, gene_b, score 
+            FROM  coex 
+            WHERE score >= ?;
+            ''',(score_cutoff,)).fetchall(),
+            columns=['gene_a','gene_b','score']
+        )
+        ref_set = set(list(ref_dat.gene_a)+list(ref_dat.gene_b))
+        # Get a list of genes in the dataset as well as reference
+        gene_freqs = defaultdict(lambda:0)
+        for gene_a,gene_b in (dat[["gene_a",'gene_b']].itertuples(index=False)):
+            if gene_a in ref_set and gene_b in ref_set:
+                gene_freqs[gene_a] += 1
+                gene_freqs[gene_b] += 1
+        ref_gene_freqs = defaultdict(lambda:0)
+        for gene_a,gene_b in (ref_dat[["gene_a",'gene_b']].itertuples(index=False)):
+            if gene_a in ref_set and gene_b in ref_set:
+                ref_gene_freqs[gene_a] += 1
+                ref_gene_freqs[gene_b] += 1
+        # report list sizes
+        self.log("Found {} genes in {}",len(gene_freqs),self.name)
+        self.log("Found {} genes in {}",len(ref_gene_freqs),obj.name)
+        # calculate the sets of significant genes
+        self.log("Merging degree sets...")
+        degrees = pd.DataFrame(pd.Series(gene_freqs),columns=["Dat"]).merge(
+            pd.DataFrame(pd.Series(ref_gene_freqs),columns=["RefDat"]),
+            how='right',
+            left_index=True,
+            right_index=True
+        )
+        self.log("...Done")
+        return degrees
+
 
     def __repr__(self):
         return '''
             COB Dataset: {} - {} - {}
                 Desc: {}
                 FPKM: {}
-                Num Genes: {}
-                Num Accessions: {}
-                Num Sig. Interactions: {}
         '''.format(self.name, self.organism, self.build,
                 self.description,
                 self.FPKM == 'FPKM',
-                self.num_genes,
-                self.num_accessions,
-                self.num_sig_interactions
         )
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __contains__(self,obj):
+        try:
+            if self.db.cursor().execute('''
+                SELECT COUNT(*) FROM expression WHERE gene = ?''',(obj.id,)).fetchone()[0] > 0:
+                return True
+            else:
+                return False
+        except Exception as e:
+            pass
+        try:
+            # Can be a string object
+            if self.db.cursor().execute('''
+                SELECT COUNT(*) FROM expression WHERE gene = ?''',(str(obj),)).fetchone()[0] > 0:
+                return True
+            else:
+                return False
+        except Exception as e:
+            pass
+
+        self.log("object '{}' is not correct type to test for membership in {}",obj,self.name)
+
+        
 
 class COBBuilder(Camoco):
     def __init__(self,name,description,FPKM,gene_build,organism,basedir="~/.camoco"):
@@ -385,6 +549,10 @@ class COBBuilder(Camoco):
             CREATE INDEX IF NOT EXISTS coex_gen_ab ON coex (gene_a,gene_b); 
             CREATE INDEX IF NOT EXISTS coex_score ON coex (score); 
             CREATE INDEX IF NOT EXISTS coex_significant ON coex (significant); 
+            CREATE INDEX IF NOT EXISTS expression_gene_name ON expression (gene);
+            CREATE INDEX IF NOT EXISTS coor_gene ON coor(gene);
+            CREATE INDEX IF NOT EXISTS coor_x ON coor(x);
+            CREATE INDEX IF NOT EXISTS coor_y ON coor(y);
             ANALYZE;
         ''')
 
@@ -417,6 +585,11 @@ class COBBuilder(Camoco):
                 score REAL,
                 significant INTEGER 
             );
+            CREATE TABLE IF NOT EXISTS coor (
+                gene TEXT,
+                x REAL,
+                y REAL
+            );
         ''') 
 
 
@@ -441,4 +614,8 @@ def _PCCUp(tpl):
     left = ((m.shape[0]-i)**2-(m.shape[0]-i))/2 # How many we have left
     percent_done = (1-left/total)*100 # percent complete based on i and m
     pb.update(percent_done)
-    return [pearsonr(m[i,:],m[j,:])[0] for j in range(i+1,len(m))] 
+    vals = list()
+    for j in range(i+1,len(m)): 
+        mask = np.logical_and(np.isfinite(m[i,:]),np.isfinite(m[j,:]))
+        vals.append(pearsonr(m[i,mask],m[j,mask])[0] )
+    return vals
