@@ -20,7 +20,7 @@ class Camoco(object):
                 os.mkdir(os.path.join(self.basedir,"tmp"))
             except Exception as e:
                 print("[CAMOCO]",time.ctime(), '-', *args,file=sys.stderr)
-        self.log_file = open(os.path.join(self.basedir,"logs","logfile.txt"),'w')
+        self.log_file = open(os.path.join(self.basedir,"logs","logfile.txt"),'a')
         if description is not None:
             self.database('camoco').cursor().execute('''
                 INSERT OR IGNORE INTO datasets (name,description,type)
@@ -41,12 +41,11 @@ class Camoco(object):
                 CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
                 ''')
         except Exception as e:
-            self.log("Camoco Dataset does not exist, create one using the Builder Class")
-            self.log("Error: {}",e)
+            self.log("Camoco Dataset {} does not exist, create one using the Builder Class",name)
 
     def log(self,msg,*args):
-        print("[CAMOCO]",time.ctime(), '-', msg.format(*args),file=sys.stderr)
-        print("[CAMOCO]",time.ctime(), '-', msg.format(*args),file=self.log_file)
+        print("[CAMOCO]",time.ctime(), '-', self.name, '-', msg.format(*args),file=sys.stderr)
+        print("[CAMOCO]",time.ctime(), '-', self.name, '-', msg.format(*args),file=self.log_file)
            
     def _resource(self,type,filename):
         return os.path.expanduser(os.path.join(self.basedir,type,filename))
