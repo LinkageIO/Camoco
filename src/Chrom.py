@@ -8,17 +8,17 @@ class Chrom(object):
         self.id = id
         self.length = length
 
-    def rQTL(self,length):
+    def rLocus(self,length):
         ''' returns a random QTL within the chromosome '''
         start = np.random.randint(0,self.length)
         while start+length > self.length:
             start = np.random.randint(0,self.length)
-        return Locus(chrom=self.id,start=start,end=start+length,id="RQTL-{}".format(length))
+        return Locus(chrom=self.id,start=start,end=start+length,id="rLocus-{}".format(length))
 
-    def rLocus(self):
-        ''' returns a random Locus from within the chromosome '''
+    def rSNP(self):
+        ''' returns a random single nucleotide (position) from within the chromosome '''
         pos = np.random.randint(0,self.length)
-        return Locus(chrom=self.id,start=pos,end=pos,id='rLocus-chr{}:{}'.format(self.id,pos))
+        return Locus(chrom=self.id,start=pos,end=pos,id='rSNP-chr{}:{}'.format(self.id,pos))
 
     def __len__(self):
         return self.length
