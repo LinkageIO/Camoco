@@ -10,6 +10,12 @@ class Ontology(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
         super(self.__class__,self).__init__(name,type='Ontology',basedir=basedir)
 
+    def term_genes(self,term):
+        return [x[0] for x in self.db.cursor().execute("SELECT gene from gene_terms WHERE term = ?",(term,)).fetchall()]
+
+    def terms(self):
+        return self.db.cursor().execute("SELECT * from terms").fetchall()
+
     def enrichment(self,gene_list,pval_cutoff=0.05):
         # extract possible terms for genes
         cur = self.db.cursor()
