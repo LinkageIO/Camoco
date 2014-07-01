@@ -180,28 +180,28 @@ class COB(Camoco):
     def density(self,gene_list,return_mean=True):
         ''' calculate the density of the ENTIRE network between a set of genes 
             Input: A list of COBGene Objects
-            Output: a scalar value representing the density of genes
-        '''
-        if len(gene_list) == 0:
-            return 0
+            Output: a scalar value representing the density of genes '''
         ids = "','".join([x.id for x in gene_list])
-        scores = pd.DataFrame(self.db.cursor().execute('''
+        scores = self.db.cursor().execute('''
             SELECT gene_a,gene_b,score FROM coex WHERE gene_a IN ('{}') AND gene_b IN ('{}')
             '''.format(ids,ids)
-        ).fetchall(),columns=['gene_a','gene_b','score'])
+        ).fetchall()
         if len(scores) == 0:
-            return 0
+            return np.nan
+        scores = pd.DataFrame(scores,columns=['gene_a','gene_b','score'])
         if return_mean:
-            return (scores.score.mean()/(1/np.sqrt(len(scores))))
+            return (scores.score.mean()/((scores.score.std())/np.sqrt(len(scores))))
         else:
             return scores
 
-    def seed(self, gene_list, max_show = 65): 
+    def seed(self, gene_list, limit=65): 
         ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
         if len(gene_list) == 0:
             return []
         neighbors = self.neighbors_score(gene_list)
-        seed_set =  set([x.id for x in gene_list]).union(neighbors.index[0:min(len(neighbors),max_show)])
+        seed_set =  [Gene(id=x) for x in 
+            set([x.id for x in gene_list]).union(neighbors.index[0:min(len(neighbors),limit)])
+        ]
         return seed_set
 
     def gene_expression_vals(self,gene_list,zscore=True):
@@ -243,14 +243,12 @@ class COB(Camoco):
         return graph 
 
 
-    def heatmap(self,dm,filename=None):
+    def heatmap(self,dm,filename=None,figsize=16,maskNaNs=True):
 
         D = np.array(dm) 
-        D1 = squareform(pdist(dm, metric='euclidean'))
-        D2 = squareform(pdist(dm.T, metric='euclidean'))
-        
-        f = plt.pylab.figure(figsize=(16, 16),facecolor='white')
-
+        D1 = squareform(pdist(dm, metric='correlation'))
+        D2 = squareform(pdist(dm.T, metric='correlation'))
+        f = plt.pylab.figure(figsize=(figsize,figsize),facecolor='white')
         # add first dendrogram
         ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
         ax1.set_frame_on(False)
@@ -258,7 +256,6 @@ class COB(Camoco):
         Z1 = dendrogram(Y, orientation='right')
         ax1.set_xticks([])
         ax1.set_yticks([])
-
         # add second dendrogram
         ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
         ax2.set_frame_on(False)
@@ -266,26 +263,31 @@ class COB(Camoco):
         Z2 = dendrogram(Y)
         ax2.set_xticks([])
         ax2.set_yticks([])
-
         # add matrix plot
         axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
         idx1 = Z1['leaves']
         idx2 = Z2['leaves']
         D = D[idx1, :]
         D = D[:, idx2]
-        vmax = max(abs(D).min(),abs(D).max())
+        vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
         vmin = vmax*-1
-        im = axmatrix.matshow(D, aspect='auto', cmap=self.cmap,vmax=vmax,vmin=vmin)
+        self.log("Extremem Values: {}",vmax)
+        cmap = self.cmap
+        im = axmatrix.matshow(D, aspect='auto', cmap=cmap,vmax=vmax,vmin=vmin)
+        # Handle NaNs
+        if maskNaNs:
+            nan_mask = np.ma.array(D,mask=np.isnan(D))
+            cmap.set_bad('grey',1.0)
+            im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
         # Handle Axis Labels
         axmatrix.set_xticks(np.arange(D.shape[1]))
         axmatrix.xaxis.tick_bottom()
         axmatrix.tick_params(axis='x',labelsize='xx-small')
-        axmatrix.set_xticklabels(dm.columns[idx2],rotation=90,ha='right')
+        axmatrix.set_xticklabels(dm.columns[idx2],rotation=90,ha='center')
         axmatrix.yaxis.tick_right()
         axmatrix.set_yticks(np.arange(D.shape[0]))
         axmatrix.set_yticklabels(dm.index[idx1])
         axmatrix.tick_params(axis='y',labelsize='x-small')
-
         axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
         f.colorbar(im,orientation='horizontal',cax=axColorBar,ticks=np.arange(np.ceil(vmin),np.ceil(vmax),2))
 
@@ -293,7 +295,6 @@ class COB(Camoco):
             plt.pyplot.savefig(filename)
             plt.pyplot.close()
         f.show()
-
         return {'ordered' : D, 'rorder' : Z1['leaves'], 'corder' : Z2['leaves']} 
   
     def coordinates(self,gene_list,layout=None):
@@ -421,6 +422,22 @@ class COB(Camoco):
         self.log("...Done")
         return degrees
 
+    def summary(self):
+        print( '''
+            COB Dataset: {} - {} - {}
+                Desc: {}
+                FPKM: {}
+                Num Genes: {}
+                Num Accessions: {}
+                Sig./Total Interactions: {}
+        '''.format(self.name, self.organism, self.build,
+                self.description,
+                self.FPKM == 'FPKM',
+                self.num_genes,
+                self.num_accessions,
+                self.num_sig_edges/self.num_edges
+        ))
+
 
     def __repr__(self):
         return '''
@@ -475,8 +492,23 @@ class COBBuilder(Camoco):
             INSERT OR UPDATE INTO accessions (name,type,description) VALUES (?,?,?)''',(name,type,description)
         )
 
-    def from_DataFrame(self,df,transform=np.arctanh,significance_thresh=3):
-        ''' assumes genes as rows and accessions as columns '''
+    def from_DataFrame(self, df, transform=np.arctanh, significance_thresh=3, min_FPKM=1, 
+        min_missing_data=0.2, min_single_accession_expr=5, membership=None ):
+        ''' Import a COB dataset from a pandas dataframe. Assumes genes/traits as rows and accessions/genotypes as columns.
+            Options:
+                transform                   - a vectorizable (numpy) function used to normalize expression data. 
+                                            Default is inverse hyperbolic sin which transforms larger values more than smaller ones. 
+                                            see DOI:10.1371/journal.pone.0061005
+                significance_threshold      - a Z-score threshold at which each interaction will be called significant.
+                min_FPKM                    - FPKM lower than this will be set as NaN and not used in correlation.
+                min_missing_data            - The threshold of percent missing data for a gene/trait to be thrown out.
+                min_single_accession_expr   - The minimum threshold a gene/trait needs to meet in a single accession
+                                              to be considered expressed and worth correlating.
+                membership                  - a class instance or object implementing the contains method
+                                              in which to filter out genes which the object does not
+                                              contain.
+            '''
+        # Perform  
         genes = df.index 
         accessions = df.columns
         expr = df.as_matrix()
