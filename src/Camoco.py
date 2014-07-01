@@ -5,9 +5,39 @@ import os as os
 import time as time
 import sys
 import tempfile
+import pandas as pd
+
+def available_datasets(type=None, basedir="~/.camoco"):
+    cur = Camoco("Camoco").db.cursor()
+    if type:
+        datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
+    else:
+        datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
+    if datasets:
+        return pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
+    else:
+        return pd.DataFrame(columns=["Type","Name","Description","Date Added"])
+
+def del_dataset(type,name,safe=True,basedir="~/.camoco"):
+    c = Camoco("Camoco")
+    if safe:
+        c.log("Are you sure you want to delete {}",name)
+        if input("[Y/n]:") == 'Y':
+            c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
+            os.remove(c._resource("databases",".".join([type,name])+".db"))
+        else:
+            c.log("Nothing Deleted")
+    else:
+        c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
+        os.remove(c._resource("databases",".".join([type,name])+".db"))
+
+def mv_dataset(type,name,new_name,basedir="~/.camoco"):
+    c = Camoco("Camoco")
+    c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
+    os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
 
 class Camoco(object):
-    def __init__(self,name,description=None,type='Camoco',basedir="~/.camoco"):
+    def __init__(self,name="Camoco",description=None,type='Camoco',basedir="~/.camoco"):
         # Set up our base directory
         self.basedir = os.path.realpath(os.path.expanduser(basedir))
         if not os.path.exists(self.basedir):
@@ -22,14 +52,15 @@ class Camoco(object):
                 print("[CAMOCO]",time.ctime(), '-', *args,file=sys.stderr)
         self.log_file = open(os.path.join(self.basedir,"logs","logfile.txt"),'a')
         if description is not None:
-            self.database('camoco').cursor().execute('''
+            # create new sqlite file for dataset
+            self.database('Camoco.Camoco').cursor().execute('''
                 INSERT OR IGNORE INTO datasets (name,description,type)
                 VALUES (?,?,?)''',(name,description,type))
-            # create new sqlite file for dataset
         try:
+            # A dataset already exists, return it
             self.db = self.database(".".join([type,name]))
             (self.ID,self.name,self.description,
-            self.type,self.added) = self.database('camoco').cursor().execute(
+                self.type,self.added) = self.database('Camoco.Camoco').cursor().execute(
                 "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
                 (name,type)
             ).fetchone()
@@ -58,14 +89,6 @@ class Camoco(object):
         # returns a handle to a tmp file
         return tempfile.NamedTemporaryFile(dir=os.path.join(self.basedir,"tmp"))
 
-    def available_datasets(self):
-        cur=self.database("camoco").cursor()
-        return cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
-
-    def del_dataset(self):
-        con = self.database('camoco').cursor()
-        con.execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(self.name,self.type))
-        os.remove(self._resource("databases",".".join([self.type,self.name])+".db"))
 
     def _global(self,key,val=None):
         # set the global for the dataset
