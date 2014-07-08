@@ -19,7 +19,7 @@ import matplotlib as plt
 
 from scipy.stats import hypergeom
 from scipy.cluster.hierarchy import linkage, dendrogram
-from scipy.spatial.distance import pdist, squareform
+from scipy.spatial.distance import pdist, squareform, euclidean
 
 import collections
 import functools
@@ -194,6 +194,16 @@ class COB(Camoco):
         else:
             return scores
 
+    def bootstrap_density(self,gene_list,refgen,gene_limit=4,pos_limit=50000):
+        ''' performs a stepdown bootstrap for gene list from RefGen ''' 
+        emp = self.density(gene_list)
+        bootstrap = [
+                self.density(list(itertools.chain(
+                    *[refgen.bootstrap_flanking_genes(gene) for gene in gene_list]))
+                )
+        for x in range(10)]
+        return bootstrap
+
     def seed(self, gene_list, limit=65): 
         ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
         if len(gene_list) == 0:
@@ -243,32 +253,41 @@ class COB(Camoco):
         return graph 
 
 
-    def heatmap(self,dm,filename=None,figsize=16,maskNaNs=True):
-
+    def heatmap(self,dm,filename=None,figsize=16,maskNaNs=True,cluster_x=True,cluster_y=True,cluster_method="euclidian"):
         D = np.array(dm) 
-        D1 = squareform(pdist(dm, metric='correlation'))
-        D2 = squareform(pdist(dm.T, metric='correlation'))
+        row_labels = dm.index
+        col_labels = dm.columns
         f = plt.pylab.figure(figsize=(figsize,figsize),facecolor='white')
-        # add first dendrogram
-        ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
-        ax1.set_frame_on(False)
-        Y = linkage(D1, method='complete')
-        Z1 = dendrogram(Y, orientation='right')
-        ax1.set_xticks([])
-        ax1.set_yticks([])
-        # add second dendrogram
-        ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
-        ax2.set_frame_on(False)
-        Y = linkage(D2, method='complete')
-        Z2 = dendrogram(Y)
-        ax2.set_xticks([])
-        ax2.set_yticks([])
         # add matrix plot
         axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
-        idx1 = Z1['leaves']
-        idx2 = Z2['leaves']
-        D = D[idx1, :]
-        D = D[:, idx2]
+        def masked_corr(x,y):
+            mask = np.logical_and(np.isfinite(x),np.isfinite(y)) 
+            if cluster_method == "euclidean":
+                return euclidean(x[mask],y[mask])
+            else:
+                return pearsonr(x[mask],y[mask])[1]
+        # add first dendrogram
+        if cluster_y:
+            D1 = squareform(pdist(D, masked_corr))
+            ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
+            ax1.set_frame_on(False)
+            Y = linkage(D1, method='complete')
+            Z1 = dendrogram(Y, orientation='right')
+            row_labels = row_labels[Z1['leaves']]
+            D = D[Z1['leaves'], :]
+            ax1.set_xticks([])
+            ax1.set_yticks([])
+        # add second dendrogram
+        if cluster_x:
+            D2 = squareform(pdist(D.T, masked_corr))
+            ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
+            ax2.set_frame_on(False)
+            Y = linkage(D2, method='complete')
+            Z2 = dendrogram(Y)
+            D = D[:, Z2['leaves']]
+            col_labels = col_labels[Z2['leaves']]
+            ax2.set_xticks([])
+            ax2.set_yticks([])
         vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
         vmin = vmax*-1
         self.log("Extremem Values: {}",vmax)
@@ -283,19 +302,18 @@ class COB(Camoco):
         axmatrix.set_xticks(np.arange(D.shape[1]))
         axmatrix.xaxis.tick_bottom()
         axmatrix.tick_params(axis='x',labelsize='xx-small')
-        axmatrix.set_xticklabels(dm.columns[idx2],rotation=90,ha='center')
+        axmatrix.set_xticklabels(col_labels,rotation=90,ha='center')
         axmatrix.yaxis.tick_right()
         axmatrix.set_yticks(np.arange(D.shape[0]))
-        axmatrix.set_yticklabels(dm.index[idx1])
+        axmatrix.set_yticklabels(row_labels)
         axmatrix.tick_params(axis='y',labelsize='x-small')
+        # Add color bar
         axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
         f.colorbar(im,orientation='horizontal',cax=axColorBar,ticks=np.arange(np.ceil(vmin),np.ceil(vmax),2))
-
         if filename:
             plt.pyplot.savefig(filename)
             plt.pyplot.close()
-        f.show()
-        return {'ordered' : D, 'rorder' : Z1['leaves'], 'corder' : Z2['leaves']} 
+        return f
   
     def coordinates(self,gene_list,layout=None):
         ''' returns the static layout, you can change the stored layout by passing 
@@ -313,16 +331,17 @@ class COB(Camoco):
                 [(gene.id,layout[i][0],layout[i][1]) for i,gene in enumerate(gene_list)]
             )
 
-    def mcl(self,gene_list):
+    def mcl(self,gene_list,I=2.0):
         from subprocess import Popen, PIPE
         MCLstr = "\n".join(["{}\t{}\t{}".format(a,b,c) for a,b,c in self.subnetwork(gene_list).itertuples(index=False)])
-        cmd = "mcl - --abc -scheme 6 -I 2.0 -o -"
-        p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=True)
+        cmd = "mcl - --abc -scheme 6 -I {} -o -".format(I)
+        p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=self.log_file, shell=True)
         sout,serr = p.communicate(MCLstr.encode('utf-8'))
         p.wait()
-        print( "return code: {}".format(p.returncode))
         if p.returncode==0 and len(sout)>0:
             return [ [Gene(0,0,0,id=gene.decode('utf-8')) for gene in line.split()] for line in sout.splitlines() ]
+        else:
+            self.log( "MCL return code: {}".format(p.returncode))
             
  
     def plot(self,gene_list,filename=None,width=3000,height=3000,**kwargs):
