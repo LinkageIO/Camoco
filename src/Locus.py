@@ -73,6 +73,10 @@ class Gene(Locus):
     def __init__(self,chrom=None,start=None,end=None,strand=None,id=None,build='5b',organism='Zea'):
         super().__init__(chrom,start,end,id,build,organism) 
         self.strand = strand
+    def __str__(self):
+        return self.id
+    def __repr__(self):
+        return str(self)
 
 class QTL(Locus):
     def __init__(self,chrom,start,end,id=None,build='5b',organism='Zea'):
