@@ -3,3 +3,5 @@ build/*
 sensitive/*
 *.pyc
 *.py.swp
+*.swn
+*.swo
