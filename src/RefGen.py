@@ -36,6 +36,18 @@ class RefGen(Camoco):
             ) 
         except Exception as e:
             self.log("No chromosome where id = {}. Error: {}",id,e)
+
+    def within_gene(self,locus):
+        ''' returns the gene the locus is within, or None '''
+        try:
+            return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
+                SELECT chromosome,start,end,strand,id FROM genes 
+                WHERE chromosome = ?
+                AND start < ?
+                AND end > ?
+            ''',(locus.chrom,locus.start,locus.start))][0]
+        except Exception as e:
+            return None
         
     def upstream_genes(self,locus,gene_limit=1000,pos_limit=10e6):
         ''' returns genes upstream of a locus. Genes are ordered so that the
@@ -61,21 +73,40 @@ class RefGen(Camoco):
             LIMIT ?
         ''',(locus.chrom, locus.start, locus.start + int(pos_limit), int(gene_limit)))]
 
-    def flanking_genes(self, locus, gene_limit=2, pos_limit=10e6):
-        return (self.upstream_genes(locus,gene_limit=gene_limit/2,pos_limit=pos_limit),
+
+    def flanking_genes(self, locus, gene_limit=2, pos_limit=10e6,chain=True):
+        ''' Returns genes upstream and downstream from a locus '''
+        if chain:
+            return list(itertools.chain.from_iterable((self.upstream_genes(locus,gene_limit=gene_limit/2,pos_limit=pos_limit),
+                self.downstream_genes(locus,gene_limit=gene_limit/2,pos_limit=pos_limit))))
+        else:
+            return (self.upstream_genes(locus,gene_limit=gene_limit/2,pos_limit=pos_limit),
                 self.downstream_genes(locus,gene_limit=gene_limit/2,pos_limit=pos_limit))
+
+    def candidate_genes(self, locus, gene_limit=2, pos_limit=10e6,chain=True):
+        ''' if locus is within gene, returns that genes, otherwise returns flanking genes '''
+        within = self.within_gene(locus)
+        if within is not None:
+            return [within]
+        else:
+            return self.flanking_genes(locus,gene_limit,pos_limit,chain=chain)
 
     def nearest_gene(self,locus):
         ''' return the gene nearest the locus '''
-        up,down = self.flanking_genes(locus,gene_limit=2,pos_limit=100e6)
-        if locus in up[0]:
+        within = self.within_gene(locus)
+        if within:
+            return within
+        up,down = self.flanking_genes(locus,gene_limit=2,pos_limit=100e6,chain=False)
+        if len(down) == 0 and len(up) ==1:
             return up[0]
-        elif locus in down[0]:
+        elif len(up) == 0 and len(down) == 1:
             return down[0]
         elif abs(up[0] - locus) < abs(down[0] - locus):
             return up[0]
+        elif len(up) == 0 or (abs(up[0] - locus) > abs(down[0] - locus)):
+            return down[0]
         else:
-            return down[0] 
+            return None
 
     def bootstrap_genes(self,*gene_list):
         ''' returns a random set of non overlapping genes as larges as 
@@ -90,10 +121,10 @@ class RefGen(Camoco):
         ''' Returns a randoms set of non overlapping flanking genes calculated from 
             SNPs flanking genes which is the same number of genes as would be calculated
             from the actual flanking genes from SNP list'''
-        num_flanking_genes = len(list(itertools.chain(*self.flanking_genes(locus,gene_limit,pos_limit))))
+        num_genes = len(self.candidate_genes(locus,gene_limit,pos_limit))
         while True:
-            bootstrapped = self.flanking_genes(self.genome.rSNP(),gene_limit,pos_limit)
-            if len(list(itertools.chain(*bootstrapped))) == num_flanking_genes:
+            bootstrapped = self.candidate_genes(self.genome.rSNP(),gene_limit,pos_limit)
+            if len(bootstrapped) == num_genes:
                 return bootstrapped
             
 
