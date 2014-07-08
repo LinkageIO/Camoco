@@ -1,4 +1,5 @@
 import os
+from itertools import chain
 
 def ext(filename):
     return os.path.join(os.path.expanduser("~/MetaboloCOB/"+filename))
@@ -14,12 +15,11 @@ def B73_eq_Mo17(snp,HM):
         return True
     else:
         return False
-def flanking_genes(snps):
+def flanking_genes(snps,ZM):
     return list(chain(*[list(chain(*ZM.flanking_genes(s,gene_limit=4,pos_limit=50000))) for s in snps]))
-def heatmap(snps,network,ZM,filename):
-    genes = ZM.from_ids(list(chain(
-            *map(flanking_genes,map(snp_from_str,snps))
-    )))
-    network.heatmap(network.gene_expr_vals(genes),filename)
+def Bootrap(snps,networks,reference,ontologies):
+    pass 
 
 
+
+TEST_GENES = ZM.from_ids('GRMZM2G024993','GRMZM2G138060','GRMZM2G015534','GRMZM2G348551')
