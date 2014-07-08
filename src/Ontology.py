@@ -37,19 +37,17 @@ class Ontology(Camoco):
             overlap = set(genes_in_term).intersection(set([x.id for x in gene_list]))
             num_genes_total, = cur.execute('SELECT COUNT(DISTINCT(gene)) FROM gene_terms;').fetchone()
             pval = hypergeom.sf(len(overlap)-1,num_genes_total,num_genes_in_term,len(gene_list))
-            enrichment.append({
-                'TermID':id,
-                'Name':name,
-                'pval':pval,
-                'LenTerm':num_genes_in_term,
-                'LenOverlap':len(overlap),
-                'LenList':len(gene_list),
-                'LenTotal':num_genes_total,
-                'Type':type,
-                'Desc':desc
-            })
-        enrichment = DataFrame(enrichment).sort('pval',ascending=True)
-        enrichment.index = enrichment.TermID
+            enrichment.append(
+                (id,name,pval,num_genes_in_term,len(overlap),len(gene_list),num_genes_total,type,desc)
+            )
+        try:
+            enrichment = DataFrame(enrichment,
+                columns = ['TermID','Name','pval','LenTerm','LenOverlap','LenList','LenTotal','Type','Desc']
+            ).sort('pval',ascending=True)
+            enrichment.index = enrichment.TermID
+        except ValueError as e:
+            self.log("No enrichment for {}",",".join([x.id for x in gene_list]))
+            return DataFrame()
         return enrichment[enrichment.pval <= pval_cutoff]
 
     def term(self,id):
