@@ -67,6 +67,8 @@ class SNP(Locus):
     def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea'):
         self.pos = int(pos)
         super(self.__class__,self).__init__(str(chrom),int(pos),int(pos),id,gene_build,organism)
+    def summary(self):
+        return "SNP-{}-{}:{}".format(self.id,self.chrom,self.start)
        
 
 class Gene(Locus):
@@ -77,6 +79,8 @@ class Gene(Locus):
         return self.id
     def __repr__(self):
         return str(self)
+    def summary(self):
+        return "Gene-{}-{}:{}-{}".format(self.id,self.chrom,self.start,self.end)
 
 class QTL(Locus):
     def __init__(self,chrom,start,end,id=None,build='5b',organism='Zea'):
