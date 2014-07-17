@@ -18,7 +18,6 @@ class Genome(object):
     def rSNP(self):
         ''' returns a random 'SNP' from the genome '''
         return self.rChrom().rSNP()
-
     def __repr__(self):
         return "\n".join(map(str,self.chroms))
  

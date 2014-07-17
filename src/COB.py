@@ -55,7 +55,7 @@ class COB(Camoco):
     @property
     @memoize
     def num_edges(self):
-        return self.db.cursor().execute("SELECT COUNT(*) FROM coex").fetchone()[0]
+            return self.db.cursor().execute("SELECT COUNT(*) FROM coex").fetchone()[0]
 
     @property
     @memoize
@@ -94,6 +94,16 @@ class COB(Camoco):
     def sig_genes(self,limit=None):
         sig_edges = self.sig_edges(limit=limit)
         return [Gene(0,0,0,id=x) for x in set(sig_edges.gene_a).union(sig_edges.gene_b)]
+
+    def coexpression(self,gene_a,gene_b):
+        ''' returns coexpression z-score between two genes '''
+        return self.db.cursor().execute(
+            ''' SELECT score FROM coex WHERE 
+                (gene_a = ? AND gene_b = ?) 
+                OR (gene_b = ? AND gene_a = ?)'''
+            ,(gene_a.id,gene_b.id,gene_a.id,gene_b.id)
+        ).fetchone()[0]
+        
 
     def neighbors(self,gene_list):
         ''' 
@@ -177,10 +187,28 @@ class COB(Camoco):
         )   
         return subnet
 
+    def trans_density(self,gene_list,pos_limit=50000,return_mean=True):
+        ''' calculates the denisty of the ENTIRE network amongst genes
+            not within a certain distance of each other. This corrects for
+            cis regulatory elements increasing noise in coexpression network '''
+        # filter for only genes within network
+        gene_list = list(filter(lambda x: x in self, gene_list))
+        scores = []
+        for gene_a,gene_b in itertools.combinations(gene_list,2):
+            if abs(gene_a-gene_b) > pos_limit:
+                scores.append((gene_a,gene_b,self.coexpression(gene_a,gene_b)) )
+        if len(scores) == 0:
+            return np.nan
+        scores = pd.DataFrame(scores,columns=['gene_a','gene_b','score'])
+        if return_mean:
+            return (scores.score.mean()/((scores.score.std())/np.sqrt(len(scores))))
+
     def density(self,gene_list,return_mean=True):
         ''' calculate the density of the ENTIRE network between a set of genes 
             Input: A list of COBGene Objects
             Output: a scalar value representing the density of genes '''
+        # Only genes in network can be used
+        gene_list = list(filter(lambda x: x in self, gene_list))
         ids = "','".join([x.id for x in gene_list])
         scores = self.db.cursor().execute('''
             SELECT gene_a,gene_b,score FROM coex WHERE gene_a IN ('{}') AND gene_b IN ('{}')
@@ -193,16 +221,6 @@ class COB(Camoco):
             return (scores.score.mean()/((scores.score.std())/np.sqrt(len(scores))))
         else:
             return scores
-
-    def bootstrap_density(self,gene_list,refgen,gene_limit=4,pos_limit=50000):
-        ''' performs a stepdown bootstrap for gene list from RefGen ''' 
-        emp = self.density(gene_list)
-        bootstrap = [
-                self.density(list(itertools.chain(
-                    *[refgen.bootstrap_flanking_genes(gene) for gene in gene_list]))
-                )
-        for x in range(10)]
-        return bootstrap
 
     def seed(self, gene_list, limit=65): 
         ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
@@ -253,11 +271,13 @@ class COB(Camoco):
         return graph 
 
 
-    def heatmap(self,dm,filename=None,figsize=16,maskNaNs=True,cluster_x=True,cluster_y=True,cluster_method="euclidian"):
+    def heatmap(self,dm,filename=None,figsize=(16,16), maskNaNs=True, cluster_x=True, cluster_y=True,
+        cluster_method="euclidian", title=None):
+        ''' Draw clustered heatmaps of an expression matrix'''
         D = np.array(dm) 
         row_labels = dm.index
         col_labels = dm.columns
-        f = plt.pylab.figure(figsize=(figsize,figsize),facecolor='white')
+        f = plt.pylab.figure(figsize=figsize,facecolor='white')
         # add matrix plot
         axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
         def masked_corr(x,y):
@@ -267,7 +287,7 @@ class COB(Camoco):
             else:
                 return pearsonr(x[mask],y[mask])[1]
         # add first dendrogram
-        if cluster_y:
+        if cluster_y and len(dm.index) > 1:
             D1 = squareform(pdist(D, masked_corr))
             ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
             ax1.set_frame_on(False)
@@ -278,7 +298,7 @@ class COB(Camoco):
             ax1.set_xticks([])
             ax1.set_yticks([])
         # add second dendrogram
-        if cluster_x:
+        if cluster_x and len(dm.columns) > 1:
             D2 = squareform(pdist(D.T, masked_corr))
             ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
             ax2.set_frame_on(False)
@@ -288,6 +308,8 @@ class COB(Camoco):
             col_labels = col_labels[Z2['leaves']]
             ax2.set_xticks([])
             ax2.set_yticks([])
+        if title:
+            plt.pylab.title(title)
         vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
         vmin = vmax*-1
         self.log("Extremem Values: {}",vmax)
@@ -310,6 +332,7 @@ class COB(Camoco):
         # Add color bar
         axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
         f.colorbar(im,orientation='horizontal',cax=axColorBar,ticks=np.arange(np.ceil(vmin),np.ceil(vmax),2))
+        plt.pylab.title("Expression Z-Score")
         if filename:
             plt.pyplot.savefig(filename)
             plt.pyplot.close()
@@ -327,7 +350,7 @@ class COB(Camoco):
                     (gene.id,)).fetchone() or (0,0) for gene in gene_list
             ])
         else:
-            self.db.cursor().executemany('''INSERT OR UPDATE INTO coor (gene,x,y) VALUES (?,?,?)''',
+            self.db.cursor().executemany('''INSERT OR REPLACE INTO coor (gene,x,y) VALUES (?,?,?)''',
                 [(gene.id,layout[i][0],layout[i][1]) for i,gene in enumerate(gene_list)]
             )
 
@@ -511,23 +534,44 @@ class COBBuilder(Camoco):
             INSERT OR UPDATE INTO accessions (name,type,description) VALUES (?,?,?)''',(name,type,description)
         )
 
-    def from_DataFrame(self, df, transform=np.arctanh, significance_thresh=3, min_FPKM=1, 
-        min_missing_data=0.2, min_single_accession_expr=5, membership=None ):
+    def from_DataFrame(self, df, transform=np.arctanh, significance_thresh=3, min_expr=1, 
+        min_missing_data=0.2, min_single_sample_expr=5, membership=None ):
         ''' Import a COB dataset from a pandas dataframe. Assumes genes/traits as rows and accessions/genotypes as columns.
             Options:
                 transform                   - a vectorizable (numpy) function used to normalize expression data. 
                                             Default is inverse hyperbolic sin which transforms larger values more than smaller ones. 
                                             see DOI:10.1371/journal.pone.0061005
                 significance_threshold      - a Z-score threshold at which each interaction will be called significant.
-                min_FPKM                    - FPKM lower than this will be set as NaN and not used in correlation.
+                min_expr                    - expr (usually FPKM) lower than this will be set as NaN and not used in correlation.
                 min_missing_data            - The threshold of percent missing data for a gene/trait to be thrown out.
-                min_single_accession_expr   - The minimum threshold a gene/trait needs to meet in a single accession
+                min_single_sample_expr      - The minimum threshold a gene/trait needs to meet in a single sample
                                               to be considered expressed and worth correlating.
                 membership                  - a class instance or object implementing the contains method
                                               in which to filter out genes which the object does not
-                                              contain.
+                                              contain. Useful with RefGen objects to get rid of unmapped genes.
             '''
-        # Perform  
+        # ----- Perform QC steps ----
+        # Remember build options for later
+        self._global('build_transform',transform.__name__)
+        self._global('build_significance_thresh',significance_thresh)
+        self._global('build_min_expr',min_expr)
+        self._global('build_min_missing_data',min_missing_data)
+        self._global('build_min_single_sample_expr',min_single_sample_expr)
+        self._global('build_membership',str(membership))
+        # Filter out genes which are not in the membership object
+        if membership:
+            self.log("Filtering out genes not in {}",membership)
+            df = df[[x in membership for x in df.index]]
+        # Set minimum FPKM threshold
+        self.log("Filtering out expression values lower than {}",min_expr)
+        df[df < min_expr] = np.nan
+        # filter out genes with too much missing data
+        self.log("Filtering out genes with < {} missing data",min_missing_data)
+        df = df[df.apply(lambda x : ((sum(np.isnan(x))) < len(x)*min_missing_data),axis=1)] 
+        # filter out genes which do not meet a minimum expr threshold in at least one sample
+        self.log("Filtering out genes which do not have one sample above {}",min_single_sample_expr)
+        df = df[df.apply(lambda x: any(x >= min_single_sample_expr),axis=1)]
+        # ----- import into Database -----
         genes = df.index 
         accessions = df.columns
         expr = df.as_matrix()
