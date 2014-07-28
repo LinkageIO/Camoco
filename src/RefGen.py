@@ -22,11 +22,13 @@ class RefGen(Camoco):
         ''' returns the number of genes in the dataset '''
         return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
 
-    def from_ids(self,*args):
+    def from_ids(self,*args,gene_filter=None):
         ''' returns gene object iterable from an iterable of id strings  '''
+        if not gene_filter:
+            gene_filter = self
         return [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
-            '''.format("','".join(args)))
+            '''.format("','".join(args))) if Gene(*x) in gene_filter
         ]
 
     def chromosome(self,id):
@@ -50,6 +52,20 @@ class RefGen(Camoco):
                 AND end > ?
             ''',(locus.chrom,locus.start,locus.start)) if Gene(*x) in gene_filter][0]
             return x
+        except Exception as e:
+            return None
+
+    def genes_within(self,locus,gene_filter=None):
+        ''' Returns the genes within a locus, or None '''
+        if not gene_filter:
+            gene_filter = self
+        try:
+            return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
+                SELECT chromosome,start,end,strand,id FROM genes
+                WHERE chromosome = ?
+                AND start > ?
+                AND end < ?
+            ''',(locus.chrom,locus.start,locus.end)) if Gene(*x) in gene_filter]
         except Exception as e:
             return None
         
