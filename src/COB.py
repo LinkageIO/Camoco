@@ -3,6 +3,7 @@
 import pandas as pd
 
 from Camoco import Camoco
+from RefGen import RefGen
 from numpy import matrix,arcsinh
 from Locus import Locus,Gene
 from scipy.stats import pearsonr
@@ -41,6 +42,7 @@ class COB(Camoco):
             self.log('You must provide a name')
         else:
             super().__init__(name=name,type="COB",basedir=basedir)
+            self.refgen = RefGen(self.refgen) 
 
     @property
     @memoize
@@ -73,6 +75,13 @@ class COB(Camoco):
         return self.db.cursor().execute("SELECT * FROM accessions").fetchall()
 
     @memoize
+    def genes(self):
+        ''' returns a list of genes used to build COB '''
+        return self.refgen.from_ids(*[x[0] for x in 
+            self.db.cursor().execute('SELECT DISTINCT(gene) FROM expression').fetchall()
+        ])
+
+    @memoize
     def sig_edges(self,limit=None):
         ''' returns a dataframe containing significant edges '''
         if not limit:
@@ -93,7 +102,7 @@ class COB(Camoco):
     @memoize
     def sig_genes(self,limit=None):
         sig_edges = self.sig_edges(limit=limit)
-        return [Gene(0,0,0,id=x) for x in set(sig_edges.gene_a).union(sig_edges.gene_b)]
+        return self.refgen.from_ids(*set(sig_edges.gene_a).union(sig_edges.gene_b))
 
     def coexpression(self,gene_a,gene_b):
         ''' returns coexpression z-score between two genes '''
@@ -187,52 +196,60 @@ class COB(Camoco):
         )   
         return subnet
 
-    def trans_density(self,gene_list,pos_limit=50000,return_mean=True):
+    def density(self,gene_list,pos_limit=50000,return_mean=True,trans_only=True):
         ''' calculates the denisty of the ENTIRE network amongst genes
             not within a certain distance of each other. This corrects for
             cis regulatory elements increasing noise in coexpression network '''
         # filter for only genes within network
         gene_list = list(filter(lambda x: x in self, gene_list))
         scores = []
-        for gene_a,gene_b in itertools.combinations(gene_list,2):
-            if abs(gene_a-gene_b) > pos_limit:
-                scores.append((gene_a,gene_b,self.coexpression(gene_a,gene_b)) )
+        if trans_only:
+            for gene_a,gene_b in itertools.combinations(gene_list,2):
+                if abs(gene_a-gene_b) > pos_limit:
+                    scores.append((gene_a,gene_b,self.coexpression(gene_a,gene_b)) )
+        else:
+            ids = "','".join([x.id for x in gene_list])
+            scores = self.db.cursor().execute('''
+                SELECT gene_a,gene_b,score FROM coex WHERE gene_a IN ('{}') AND gene_b IN ('{}')
+                '''.format(ids,ids)
+            ).fetchall()
         if len(scores) == 0:
             return np.nan
-        scores = pd.DataFrame(scores,columns=['gene_a','gene_b','score'])
-        if return_mean:
-            return (scores.score.mean()/((scores.score.std())/np.sqrt(len(scores))))
-
-    def density(self,gene_list,return_mean=True):
-        ''' calculate the density of the ENTIRE network between a set of genes 
-            Input: A list of COBGene Objects
-            Output: a scalar value representing the density of genes '''
-        # Only genes in network can be used
-        gene_list = list(filter(lambda x: x in self, gene_list))
-        ids = "','".join([x.id for x in gene_list])
-        scores = self.db.cursor().execute('''
-            SELECT gene_a,gene_b,score FROM coex WHERE gene_a IN ('{}') AND gene_b IN ('{}')
-            '''.format(ids,ids)
-        ).fetchall()
-        if len(scores) == 0:
-            return np.nan
+        if len(scores) == 1:
+            return scores[0][2]
         scores = pd.DataFrame(scores,columns=['gene_a','gene_b','score'])
         if return_mean:
             return (scores.score.mean()/((scores.score.std())/np.sqrt(len(scores))))
         else:
             return scores
 
+    def bootstrap_density(self,gene_list,miniter=20,maxiter=200,trans_only=True,pos_limit=50000):
+        ''' Returns the number of bootstrapped densities higher that the 
+            empirical value '''
+        emp_density = self.density(gene_list,trans_only=trans_only,pos_limit=pos_limit)
+        bootstraps = []
+        while True:
+            bootstraps.append(emp_density < self.density(
+                itertools.chain.from_iterable([self.refgen.bootstrap_flanking_genes(gene,gene_filter=self) for gene in gene_list])
+            ))
+            if len(bootstraps) % miniter == 0 and np.sum(bootstraps) > miniter:
+                break
+            if len(bootstraps) >= maxiter:
+                break
+        return (np.sum(bootstraps)/len(bootstraps),len(bootstraps))
+                
+
     def seed(self, gene_list, limit=65): 
         ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
         if len(gene_list) == 0:
             return []
         neighbors = self.neighbors_score(gene_list)
-        seed_set =  [Gene(id=x) for x in 
-            set([x.id for x in gene_list]).union(neighbors.index[0:min(len(neighbors),limit)])
-        ]
+        seed_set =  self.refgen.from_ids(
+            *set([x.id for x in gene_list]).union(neighbors.index[0:min(len(neighbors),limit)])
+        )
         return seed_set
 
-    def gene_expression_vals(self,gene_list,zscore=True):
+    def gene_expression_vals(self,gene_list,accession_list=None,zscore=True,transform=None):
         ''' Input: A list of COBGenes
             Output: A dataframe containing normalized expression values for gene_list
         '''
@@ -242,6 +259,10 @@ class COB(Camoco):
             '''.format("','".join([x.id for x in gene_list])), 
             ).fetchall(),columns=['gene','accession','value']
         ).pivot(index="accession",columns="gene",values='value')
+        if accession_list:
+            expr = expr.ix[accession_list]
+        if transform:
+            expr = transform(expr)
         if zscore:
             expr = expr.apply(lambda x: (x-x.mean())/x.std(),axis=0)
         return expr
@@ -272,7 +293,7 @@ class COB(Camoco):
 
 
     def heatmap(self,dm,filename=None,figsize=(16,16), maskNaNs=True, cluster_x=True, cluster_y=True,
-        cluster_method="euclidian", title=None):
+        cluster_method="euclidian", title=None, heatmap_unit_label='Expression Z Score'):
         ''' Draw clustered heatmaps of an expression matrix'''
         D = np.array(dm) 
         row_labels = dm.index
@@ -331,12 +352,19 @@ class COB(Camoco):
         axmatrix.tick_params(axis='y',labelsize='x-small')
         # Add color bar
         axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
-        f.colorbar(im,orientation='horizontal',cax=axColorBar,ticks=np.arange(np.ceil(vmin),np.ceil(vmax),2))
-        plt.pylab.title("Expression Z-Score")
+        f.colorbar(im,orientation='horizontal',cax=axColorBar,
+            ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
+        )
+        plt.pylab.title(heatmap_unit_label)
         if filename:
             plt.pyplot.savefig(filename)
             plt.pyplot.close()
-        return f
+        return pd.DataFrame(
+            data=D,
+            index=row_labels,
+            columns=col_labels
+        )
+
   
     def coordinates(self,gene_list,layout=None):
         ''' returns the static layout, you can change the stored layout by passing 
@@ -362,10 +390,14 @@ class COB(Camoco):
         sout,serr = p.communicate(MCLstr.encode('utf-8'))
         p.wait()
         if p.returncode==0 and len(sout)>0:
-            return [ [Gene(0,0,0,id=gene.decode('utf-8')) for gene in line.split()] for line in sout.splitlines() ]
+            return [ self.refgen.from_ids(*[gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
         else:
             self.log( "MCL return code: {}".format(p.returncode))
-            
+
+    def to_dat(self,gene_list,filename):
+        with open(filename, 'w') as OUT:
+            for a,b,c in self.subnetwork(gene_list).itertuples(index=False):
+                print("{}\t{}\t{}".format(a,b,c),file=OUT)
  
     def plot(self,gene_list,filename=None,width=3000,height=3000,**kwargs):
         if not filename:
@@ -518,11 +550,10 @@ class COB(Camoco):
         
 
 class COBBuilder(Camoco):
-    def __init__(self,name,description,FPKM,gene_build,organism,basedir="~/.camoco"):
+    def __init__(self,name,description,FPKM,refgen,organism,basedir="~/.camoco"):
         super().__init__(name,description,type="COB",basedir=basedir)
         self._global('FPKM',FPKM)
-        self._global('build',gene_build)
-        self._global('organism',organism)
+        self._global('refgen',refgen.name)
         self.expr = matrix(0)
         self.genes = []
         self._create_tables()
@@ -564,9 +595,9 @@ class COBBuilder(Camoco):
             df = df[[x in membership for x in df.index]]
         # Set minimum FPKM threshold
         self.log("Filtering out expression values lower than {}",min_expr)
-        df[df < min_expr] = np.nan
+        df.loc[df < min_expr] = np.nan
         # filter out genes with too much missing data
-        self.log("Filtering out genes with < {} missing data",min_missing_data)
+        self.log("Filtering out genes with > {} missing data",min_missing_data)
         df = df[df.apply(lambda x : ((sum(np.isnan(x))) < len(x)*min_missing_data),axis=1)] 
         # filter out genes which do not meet a minimum expr threshold in at least one sample
         self.log("Filtering out genes which do not have one sample above {}",min_single_sample_expr)
@@ -604,6 +635,7 @@ class COBBuilder(Camoco):
             tbl['score'] = transform(tbl['score'])
             tbl['score'] = (tbl['score']-tbl.score.mean())/tbl.score.std()
             tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
+            self.log("Building Database")
             cur.executemany(
                 ''' INSERT INTO coex (gene_a,gene_b,score,significant) VALUES (?,?,?,?)''',
                 map(lambda x: (x[0],x[1],x[2],int(x[3])), tbl.itertuples(index=False))
