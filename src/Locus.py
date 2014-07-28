@@ -44,14 +44,27 @@ class Locus(object):
         return self.stop - self.start + 1
 
     def __cmp__(self,locus):
-        return self.start - locus.start
-
+        if self.chrom == locus.chrom:
+            return self.start - locus.start
+        elif self.chrom > locus.chrom:
+            return 1
+        else:
+            return -1
     def __lt__(self,locus):
-        return self.start < locus.start    
+        if self.chrom == locus.chrom:
+            return self.start < locus.start    
+        else:
+            return self.chrom < locus.chrom
     def __gt__(self,locus):
-        return self.start > locus.start
+        if self.chrom == locus.chrom:
+            return self.start > locus.start
+        else:
+            return self.chrom > locus.chrom
     def __sub__(self,other):
-        return self.start - other.start
+        if self.chrom != other.chrom:
+            return float('Inf')
+        else:
+            return self.start - other.start
     def __str__(self):
         return '''
             organism:{} 
@@ -62,6 +75,8 @@ class Locus(object):
             end: {}'''.format(self.organism,self.__class__,self.id,self.chrom,self.start,self.stop)
     def __repr__(self):
         return str(self)
+    def __hash__(self):
+        return int("{}{}".format(self.chrom,self.start))
 
 class SNP(Locus):
     def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea'):
