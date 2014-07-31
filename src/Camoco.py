@@ -7,35 +7,6 @@ import sys
 import tempfile
 import pandas as pd
 
-def available_datasets(type=None, basedir="~/.camoco"):
-    cur = Camoco("Camoco").db.cursor()
-    if type:
-        datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
-    else:
-        datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
-    if datasets:
-        return pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
-    else:
-        return pd.DataFrame(columns=["Type","Name","Description","Date Added"])
-
-def del_dataset(type,name,safe=True,basedir="~/.camoco"):
-    c = Camoco("Camoco")
-    if safe:
-        c.log("Are you sure you want to delete {}",name)
-        if input("[Y/n]:") == 'Y':
-            c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
-            os.remove(c._resource("databases",".".join([type,name])+".db"))
-        else:
-            c.log("Nothing Deleted")
-    else:
-        c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
-        os.remove(c._resource("databases",".".join([type,name])+".db"))
-
-def mv_dataset(type,name,new_name,basedir="~/.camoco"):
-    c = Camoco("Camoco")
-    c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
-    os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
-
 class Camoco(object):
     def __init__(self,name="Camoco",description=None,type='Camoco',basedir="~/.camoco"):
         # Set up our base directory
@@ -75,8 +46,8 @@ class Camoco(object):
             self.log("Camoco Dataset {} does not exist, create one using the Builder Class",name)
 
     def log(self,msg,*args):
-        print("[CAMOCO]",time.ctime(), '-', self.name, '-', msg.format(*args),file=sys.stderr)
-        print("[CAMOCO]",time.ctime(), '-', self.name, '-', msg.format(*args),file=self.log_file)
+        print("[LOG]",time.ctime(), '-', self.name, '-', msg.format(*args),file=sys.stderr)
+        print("[LOG]",time.ctime(), '-', self.name, '-', msg.format(*args),file=self.log_file)
            
     def _resource(self,type,filename):
         return os.path.expanduser(os.path.join(self.basedir,type,filename))
@@ -88,7 +59,6 @@ class Camoco(object):
     def tmp_file(self):
         # returns a handle to a tmp file
         return tempfile.NamedTemporaryFile(dir=os.path.join(self.basedir,"tmp"))
-
 
     def _global(self,key,val=None):
         # set the global for the dataset
@@ -119,3 +89,33 @@ class Camoco(object):
     def __getattr__(self,name):
         return self._global(name)
 
+    @staticmethod
+    def available_datasets(type=None, basedir="~/.camoco"):
+        cur = Camoco("Camoco").db.cursor()
+        if type:
+            datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
+        else:
+            datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
+        if datasets:
+            return pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
+        else:
+            return pd.DataFrame(columns=["Type","Name","Description","Date Added"])
+    @staticmethod
+    def del_dataset(type,name,safe=True,basedir="~/.camoco"):
+        c = Camoco("Camoco")
+        if safe:
+            c.log("Are you sure you want to delete {}",name)
+            if input("[Y/n]:") == 'Y':
+                c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
+                os.remove(c._resource("databases",".".join([type,name])+".db"))
+            else:
+                c.log("Nothing Deleted")
+        else:
+            c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
+            os.remove(c._resource("databases",".".join([type,name])+".db"))
+    @staticmethod
+    def mv_dataset(type,name,new_name,basedir="~/.camoco"):
+        c = Camoco("Camoco")
+        c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
+        os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
+ 
