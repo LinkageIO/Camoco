@@ -5,3 +5,5 @@ sensitive/*
 *.py.swp
 *.swn
 *.swo
+*.swm
+*.swp
