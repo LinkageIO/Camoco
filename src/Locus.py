@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from collections import defaultdict
+import re
 
 class Locus(object):
     def __init__(self, chrom, start, end, id=None ,gene_build='5b', organism='Zea'):
@@ -84,18 +85,45 @@ class SNP(Locus):
         super(self.__class__,self).__init__(str(chrom),int(pos),int(pos),id,gene_build,organism)
     def summary(self):
         return "SNP-{}-{}:{}".format(self.id,self.chrom,self.start)
+
+    @classmethod
+    def from_str(cls,string,regex='.*(\d+)_(\d+).*'):
+        m = re.search(regex,string)
+        if m is not None:
+            return cls(m.group(1),m.group(2))
        
 
 class Gene(Locus):
     def __init__(self,chrom=None,start=None,end=None,strand=None,id=None,build='5b',organism='Zea'):
         super().__init__(chrom,start,end,id,build,organism) 
         self.strand = strand
+        self.attributes = dict()
     def __str__(self):
         return self.id
     def __repr__(self):
         return str(self)
     def summary(self):
         return "Gene-{}-{}:{}-{}".format(self.id,self.chrom,self.start,self.end)
+
+    def to_gtf(self):
+        return "\t".join(
+            [self.chrom,'Camoco','Gene',self.start,self.end,".",self.strand,'0',
+            "ID={};Organism={};Build={}".format(self.id, self.organism, self.build)]
+        )
+
+    @classmethod
+    def from_gtf(cls,line,attribute_id="ID"):
+        # GTF fields MUST be tab seperated as per Ensemble rules
+        seqname,source,feature,start,end,score,strand,frame,attributes = line.strip().split()
+        attributes = attributes.replace('=',';').split(";")
+        attributes = dict(zip(attributes[::2],attributes[1::2]))
+        if 'build 'not in attributes:
+            attributes['build'] = None
+        if 'organism' not in attributes:
+            attributes['organism'] = None
+        self = cls(chrom=seqname,start=start,end=end,strand=strand,id=attributes[attribute_id],build=attributes['build'],organism=attributes['organism'])
+        self.attributes = attributes
+        return self
 
 class QTL(Locus):
     def __init__(self,chrom,start,end,id=None,build='5b',organism='Zea'):
