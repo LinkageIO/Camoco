@@ -1,11 +1,15 @@
 #!/usr/bin/python3
 
+from collections import defaultdict
+
 from Camoco import Camoco
 from Locus import Gene,non_overlapping
 from Chrom import Chrom
 from Genome import Genome
+from Tools import memoize
 
 import itertools
+import random
 
 class RefGen(Camoco):
     def __init__(self,name,basedir="~/.camoco"):
@@ -18,18 +22,40 @@ class RefGen(Camoco):
             ''')] 
         )
 
+    @memoize
     def num_genes(self):
         ''' returns the number of genes in the dataset '''
         return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
 
-    def from_ids(self,*args,gene_filter=None):
+    def random_gene(self):
+        return Gene(*self.db.cursor().execute(''' 
+            SELECT chromosome,start,end,strand,id from genes WHERE rowid = ?
+            ''',(random.randint(1,self.num_genes()),)).fetchone()
+        )
+
+    def iter_chromosomes(self):
+        ''' returns chrom object iterator '''
+        return ( Chrom(*x) for x in self.db.cursor().execute(''' 
+            SELECT id,length FROM chromosomee
+        '''))
+
+    def iter_genes(self,gene_filter=None):
+        ''' iterates over genes in refgen, only returns genes within gene filter '''
+        if not gene_filter:
+            gene_filter = self
+        return ( Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute('''
+            SELECT chromosome,start,end,strand,id FROM genes
+            ''') if Gene(*x) in gene_filter
+        )
+
+    def from_ids(self,gene_list,gene_filter=None):
         ''' returns gene object iterable from an iterable of id strings  '''
         if not gene_filter:
             gene_filter = self
-        return [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
+        return ( Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
             '''.format("','".join(args))) if Gene(*x) in gene_filter
-        ]
+        )
 
     def chromosome(self,id):
         ''' returns a chromosome object '''
@@ -77,8 +103,8 @@ class RefGen(Camoco):
         return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes
             WHERE chromosome = ?
-            AND start < ?
-            AND start > ?
+            AND start <= ?
+            AND start >= ?
             ORDER BY start DESC
             LIMIT ?
             ''',(locus.chrom, locus.start, locus.start - int(pos_limit), 100*int(gene_limit))
@@ -147,16 +173,23 @@ class RefGen(Camoco):
         ''' Returns a randoms set of non overlapping flanking genes calculated from 
             SNPs flanking genes which is the same number of genes as would be calculated
             from the actual flanking genes from SNP list'''
+        flanking_genes_index = self.flanking_genes_index(gene_limit=gene_limit,pos_limit=pos_limit)
         num_genes = len(self.flanking_genes(locus,gene_limit,pos_limit,gene_filter=gene_filter))
-        while True:
-            bootstrapped = self.flanking_genes(
-                self.genome.rSNP(),
-                gene_limit,
-                pos_limit,
-                gene_filter=gene_filter
-            )
-            if len(bootstrapped) == num_genes:
-                return bootstrapped
+        return random.choice(flanking_genes_index[num_genes] )
+
+    @memoize
+    def flanking_genes_index(self,pos_limit=50000,gene_limit=4):
+        ''' Generate an index of flanking genes useful for bootstrapping (i.e. we can get rid of while loop '''
+        # iterate over genes keeping track of number of flanking genes 
+        self.log("Generating flanking gene index...")
+        index = defaultdict(list)
+        for gene in self.iter_genes():
+            flanks = self.flanking_genes(gene,gene_limit=gene_limit,pos_limit=pos_limit)
+            index[len(flanks)].append(flanks)
+        for num in index:
+            self.log("Found {} genes with {} flanking genes",len(index[num]),num)
+        return index
+ 
            
     def summary(self): 
         return ("\n".join([
@@ -207,10 +240,10 @@ class RefGenBuilder(Camoco):
             CREATE INDEX IF NOT EXISTS genepos ON genes (chromosome,start);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
         ''')
-    def add_gene(self,id,chromosome,start,end,strand):
+    def add_gene(self,gene):
         self.db.cursor().execute(''' 
             INSERT OR IGNORE INTO genes VALUES (?,?,?,?,?)
-        ''',(id,chromosome,start,end,strand))
+        ''',(gene.id,gene.chrom,gene.start,gene.end,gene.strand))
 
     def add_chromosome(self,chrom):
         ''' adds a chromosome object to the class '''
@@ -231,8 +264,21 @@ class RefGenBuilder(Camoco):
             VALUES (?,?,?,?,?)''',genes)
         cur.execute('END TRANSACTION')
 
-    def import_from_fasta(self,filename):
+    def import_from_gtf(self,filename):
         pass
+
+    @classmethod
+    def import_from_RefGen(cls,name,description,refgen,gene_filter=None,basedir="~/.camoco"):
+        ''' copies from a previous instance of refgen, making sure each gene is within gene filter '''
+        self = cls(name,description,refgen.build,refgen.organism,basedir)
+        if not gene_filter:
+            gene_filter = refgen
+        for chrom in refgen.iter_chromosomes():
+            self.add_chromosome(chrom)
+        for gene in refgen.iter_genes(gene_filter=gene_filter):
+            self.add_gene(gene)
+        self._build_indices()
+        return self.name
        
     def _create_tables(self):
         cur = self.db.cursor()
