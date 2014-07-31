@@ -3,9 +3,10 @@
 import pandas as pd
 
 from Camoco import Camoco
-from RefGen import RefGen
+from RefGen import RefGen,RefGenBuilder
 from numpy import matrix,arcsinh
 from Locus import Locus,Gene
+from Tools import memoize
 from scipy.stats import pearsonr
 from collections import defaultdict
 
@@ -23,18 +24,6 @@ from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform, euclidean
 
 import collections
-import functools
-
-def memoize(obj):
-    cache = obj.cache = {}
-
-    @functools.wraps(obj)
-    def memoizer(*args, **kwargs):
-        key = str(args) + str(kwargs)
-        if key not in cache:
-            cache[key] = obj(*args, **kwargs)
-        return cache[key]
-    return memoizer
 
 class COB(Camoco):
     def __init__(self,name=None,basedir="~/.camoco"):
@@ -77,7 +66,7 @@ class COB(Camoco):
     @memoize
     def genes(self):
         ''' returns a list of genes used to build COB '''
-        return self.refgen.from_ids(*[x[0] for x in 
+        return self.refgen.from_ids([x[0] for x in 
             self.db.cursor().execute('SELECT DISTINCT(gene) FROM expression').fetchall()
         ])
 
@@ -102,7 +91,7 @@ class COB(Camoco):
     @memoize
     def sig_genes(self,limit=None):
         sig_edges = self.sig_edges(limit=limit)
-        return self.refgen.from_ids(*set(sig_edges.gene_a).union(sig_edges.gene_b))
+        return self.refgen.from_ids(set(sig_edges.gene_a).union(sig_edges.gene_b))
 
     def coexpression(self,gene_a,gene_b):
         ''' returns coexpression z-score between two genes '''
@@ -226,13 +215,18 @@ class COB(Camoco):
     def bootstrap_density(self,gene_list,miniter=20,maxiter=200,trans_only=True,pos_limit=50000):
         ''' Returns the number of bootstrapped densities higher that the 
             empirical value '''
+        gene_list = list(filter(lambda x: x in self, gene_list))
+        if not gene_list:
+            return (np.nan,np.nan)
         emp_density = self.density(gene_list,trans_only=trans_only,pos_limit=pos_limit)
         bootstraps = []
         while True:
             bootstraps.append(emp_density < self.density(
-                itertools.chain.from_iterable([self.refgen.bootstrap_flanking_genes(gene,gene_filter=self) for gene in gene_list])
+                itertools.chain.from_iterable(
+                    [self.refgen.bootstrap_flanking_genes(gene,gene_filter=self) for gene in gene_list]
+                )
             ))
-            if len(bootstraps) % miniter == 0 and np.sum(bootstraps) > miniter:
+            if len(bootstraps) % miniter == 0 and np.sum(bootstraps) > 0.2*maxiter:
                 break
             if len(bootstraps) >= maxiter:
                 break
@@ -245,7 +239,7 @@ class COB(Camoco):
             return []
         neighbors = self.neighbors_score(gene_list)
         seed_set =  self.refgen.from_ids(
-            *set([x.id for x in gene_list]).union(neighbors.index[0:min(len(neighbors),limit)])
+            set([x.id for x in gene_list]).union(neighbors.index[0:min(len(neighbors),limit)])
         )
         return seed_set
 
@@ -390,7 +384,7 @@ class COB(Camoco):
         sout,serr = p.communicate(MCLstr.encode('utf-8'))
         p.wait()
         if p.returncode==0 and len(sout)>0:
-            return [ self.refgen.from_ids(*[gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
+            return [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
         else:
             self.log( "MCL return code: {}".format(p.returncode))
 
@@ -544,13 +538,11 @@ class COB(Camoco):
                 return False
         except Exception as e:
             pass
-
         self.log("object '{}' is not correct type to test for membership in {}",obj,self.name)
-
         
 
 class COBBuilder(Camoco):
-    def __init__(self,name,description,FPKM,refgen,organism,basedir="~/.camoco"):
+    def __init__(self, name, description, FPKM, refgen, organism, basedir="~/.camoco"):
         super().__init__(name,description,type="COB",basedir=basedir)
         self._global('FPKM',FPKM)
         self._global('refgen',refgen.name)
@@ -564,6 +556,17 @@ class COBBuilder(Camoco):
         self.db.cursor().execute(''' 
             INSERT OR UPDATE INTO accessions (name,type,description) VALUES (?,?,?)''',(name,type,description)
         )
+
+    def add_filter_refgen(self,refgen):
+        ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
+            has been populated!!'''
+        filtered_refgen = RefGenBuilder.import_from_RefGen("{}RefGen".format(self.name),
+            "RefGen for {} filtered from {}".format(self.name,refgen.name),
+            gene_filter = self,
+            basedir = self.basedir
+        )
+        # Remember for next time
+        self._global('refgen',filtered_refgen.name)
 
     def from_DataFrame(self, df, transform=np.arctanh, significance_thresh=3, min_expr=1, 
         min_missing_data=0.2, min_single_sample_expr=5, membership=None ):
