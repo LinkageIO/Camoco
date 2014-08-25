@@ -110,5 +110,3 @@ class SharedObject(object):
         self.options = self.manager.dict()
         self.networks = list()
 
-if __name__ == '__main__':
-    sys.exit(main(sys.argv[1:])) 
