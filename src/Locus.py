@@ -77,7 +77,10 @@ class Locus(object):
     def __repr__(self):
         return str(self)
     def __hash__(self):
-        return int("{}{}".format(self.chrom,self.start))
+        try:
+            return int("{}{}".format(self.chrom,self.start))
+        except ValueError as e:
+            return int("-1{}".format(self.start))
 
 class SNP(Locus):
     def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea'):
