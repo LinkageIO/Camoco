@@ -21,7 +21,6 @@ class RefGen(Camoco):
                 SELECT id,length FROM chromosomes
             ''')] 
         )
-
     @memoize
     def num_genes(self):
         ''' returns the number of genes in the dataset '''
@@ -54,9 +53,26 @@ class RefGen(Camoco):
             gene_filter = self
         return ( Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
-            '''.format("','".join(args))) if Gene(*x) in gene_filter
+            '''.format("','".join(gene_list))) if Gene(*x) in gene_filter
         )
 
+    @memoize
+    def __getitem__(self,item):
+        try:
+            gene_data = self.db.cursor().execute('''
+                SELECT chromosome,start,end,strand,id FROM genes WHERE id = ?
+            ''',(item,)).fetchone()
+            return Gene(*gene_data,build=self.build,organism=self.organism)
+        except Exception as e:
+            pass
+        try:
+            _ = (x for x in item)
+            return list(self.from_ids(list(_)))
+        except TypeError as e:
+            self.log('not iterable: {}',e)
+            pass
+        return None
+    
     def chromosome(self,id):
         ''' returns a chromosome object '''
         try:
@@ -148,7 +164,7 @@ class RefGen(Camoco):
                 locus,gene_limit,pos_limit,chain=chain,gene_filter=gene_filter
             )
         else:
-            return [within] # candidate genes as in plural, return iteratable
+            return [within] # candidate genes as in plural, return iterable
 
     def nearest_gene(self,locus,gene_filter=None):
         ''' return the gene nearest the locus '''
@@ -158,24 +174,16 @@ class RefGen(Camoco):
         val,idx  = min((val,idx) for (idx,val) in enumerate([abs(locus-candidate) for candidate in candidates]))
         return candidates[idx]
 
-    def bootstrap_genes(self, gene_list, gene_filter = None):
-        ''' returns a random set of non overlapping genes as larges as 
-            the gene list passed in '''
-        if not gene_filter:
-            gene_filter = self
-        bootstrap = [ self.nearest_gene(self.genome.rSNP(),gene_filter=gene_filter) for gene in gene_list ]
-        if non_overlapping(bootstrap):
-            return bootstrap
-        else:
-            return self.bootstrap_genes(gene_list,gene_filter=gene_filter)
-
     def bootstrap_flanking_genes(self,locus,gene_limit=4,pos_limit=50000,gene_filter=None):
         ''' Returns a randoms set of non overlapping flanking genes calculated from 
             SNPs flanking genes which is the same number of genes as would be calculated
             from the actual flanking genes from SNP list'''
         flanking_genes_index = self.flanking_genes_index(gene_limit=gene_limit,pos_limit=pos_limit)
         num_genes = len(self.flanking_genes(locus,gene_limit,pos_limit,gene_filter=gene_filter))
-        return random.choice(flanking_genes_index[num_genes] )
+        if num_genes == 0:
+            return []
+        else:
+            return random.choice(flanking_genes_index[num_genes] )
 
     @memoize
     def flanking_genes_index(self,pos_limit=50000,gene_limit=4):
@@ -200,6 +208,8 @@ class RefGen(Camoco):
 
     def __repr__(self):
         return 'Reference Genome: {} - {} - {}'.format(self.organism,self.build,self.name)
+
+        
 
     def __contains__(self,obj):
         ''' flexible on what you pass into the 'in' function '''
