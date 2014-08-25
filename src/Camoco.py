@@ -44,6 +44,7 @@ class Camoco(object):
                 ''')
         except Exception as e:
             self.log("Camoco Dataset {} does not exist, create one using the Builder Class",name)
+            raise e
 
     def log(self,msg,*args):
         print("[LOG]",time.ctime(), '-', self.name, '-', msg.format(*args),file=sys.stderr)
