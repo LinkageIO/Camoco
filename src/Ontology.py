@@ -3,11 +3,14 @@
 from Camoco import Camoco
 from RefGen import RefGen
 from Locus import SNP
+from Tools import log
 
 from collections import defaultdict
 from pandas import DataFrame
 from scipy.stats import hypergeom
+from itertools import chain
 import re
+import sys
 
 class Term(object):
     def __init__(self,id,name='',type='',desc='',gene_list=None,snp_list=None):
@@ -26,12 +29,49 @@ class Term(object):
 
     def summary(self):
         print("\n".join([self.id,self.name,self.type,self.desc]))
+        print("Num SNPs: {}".format(len(self.snp_list)))
+        print("Num Genes: {}".format(len(self.gene_list)))
 
     def add_gene(self,gene):
         self.gene_list.add(gene)
 
     def add_snp(self,snp):
         self.snp_list.add(snp) 
+
+    def flanking_genes(self,refgen,pos_limit=50000,gene_limit=4):
+        return set(chain(*[refgen.flanking_genes(x,gene_limit=gene_limit,pos_limit=pos_limit) for x in self.snp_list]))
+
+    def print_stats(self,cob_list,file=sys.stdout, pos_limit=50000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
+        for cob in cob_list:
+            # MAKE SURE WE ARE DEALING WITH A SET!!!!!!!!!! Lists will have duplicates in it!
+            flanks = self.flanking_genes(cob.refgen,pos_limit=pos_limit,gene_limit=gene_limit)
+            log("On Term {} with {}. {}/{} genes from {} SNPs",self.id,cob.name,len(flanks),len(self.gene_list),len(self.snp_list))
+            density  = cob.density(flanks,min_distance=2*pos_limit)
+            locality = cob.locality(flanks,min_distance=2*pos_limit)
+            len_LCC = len(cob.lcc(flanks,min_distance=2*pos_limit).vs)
+            print("{}\t{}_NumSNPS\t{}".format(self.id,cob.name,len(self.snp_list)),file=file)
+            print("{}\t{}_NumGenes\t{}".format(self.id,cob.name,len(flanks)),file=file)
+            print("{}\t{}_TransDensity\t{}".format(self.id,cob.name,density),file=file)
+            print("{}\t{}_Locality\t{}".format(self.id,cob.name,locality),file=file)
+            print("{}\t{}_LCC\t{}".format(self.id,cob.name,len_LCC),file=file)
+            if density > bootstrap_density:
+                log("Density > 2; Boostrapping!")
+                # Calculate BootStrap 
+                bs_density = []
+                bs_local = []
+                bs_lcc = []
+                for x in range(num_bootstrap):
+                    bs_flanks = list(chain.from_iterable(
+                        [cob.refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,pos_limit=pos_limit) for x in self.snp_list]
+                    ))
+                    bs_density.append(cob.density(bs_flanks,min_distance=2*pos_limit))           
+                    bs_local.append(cob.locality(bs_flanks,min_distance=2*pos_limit))
+                    bs_lcc.append(len(cob.lcc(bs_flanks,min_distance=2*pos_limit).vs))
+                print("{}\t{}_BS_TransDensity\t{}".format(self.id,cob.name,sum([x >= density for x in bs_density])),file=file)
+                print("{}\t{}_BS_Locality\t{}".format(self.id,cob.name,sum([x >= locality for x in bs_local])),file=file)
+                print("{}\t{}_BS_LCC\t{}".format(self.id,cob.name,sum([x >= len_LCC for x in bs_lcc])),file=file)
+                cob.heatmap(cob.gene_expression_vals(flanks),filename="{}_{}_Heatmap.png".format(self.id,cob.name)) 
+                cob.plot(flanks,filename="{}_{}_Network.png".format(self.id,cob.name),layout='kk',height=800,width=800)
 
     def __str__(self):
         return "Term: {}, {} genes, {} SNPs".format(self.id,len(self.gene_list),len(self.snp_list))
@@ -43,9 +83,13 @@ class Ontology(Camoco):
     ''' An Ontology is just a collection of terms. Each term is just a collection of genes. 
         Sometimes terms are related or nested within each other, sometimes not. Simple enough.  
     '''
-    def __init__(self,name,basedir="~/.camoco"):
-        super(self.__class__,self).__init__(name,type='Ontology',basedir=basedir)
-        self.refgen = RefGen(self.refgen)
+    def __init__(self,name,description=None,basedir="~/.camoco"):
+        super().__init__(name,description,type='Ontology',basedir=basedir)
+        if self.refgen:
+            self.refgen = RefGen(self.refgen)
+        else:
+            self.log("RefGen not Assigned")
+            
 
     def __getitem__(self,item):
         return self.term(item) 
@@ -125,19 +169,32 @@ class Ontology(Camoco):
             return DataFrame()
         return enrichment[enrichment.pval <= pval_cutoff]
 
+    def print_term_stats(self, cob_list, filename=None, pos_limit=50000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
+        for term in self.iter_terms():
+            term.print_stats(cob_list,filename,pos_limit,gene_limit,num_bootstraps,bootstrap_density)
+    
+
     def summary(self):
         return "Ontology: name:{} - desc: {} - contains {} terms".format(self.name,self.desc,len(self))
+   
+    @classmethod
+    def create(cls,name,description,refgen,basedir="~/.camoco"):
+        cls = cls(name,description=description,basedir=basedir)
+        cls._global('refgen',refgen.name)
+        cls._create_tables()
+        return cls
 
+    def del_term(self,term):
+        cur = self.db.cursor()
+        cur.execute('DELETE FROM terms WHERE id = ?',(term.id,))
+        cur.execute('DELETE FROM gene_terms WHERE term = ?',(term.id,))
+        cur.execute('DELETE FROM snp_terms WHERE term = ?',(term.id,))
 
-class OntologyBuilder(Camoco):
-    def __init__(self,name,description,refgen,basedir="~/.camoco"):
-        super().__init__(name,description=description,type="Ontology",basedir=basedir)
-        self._global('refgen',refgen.name)
-        self._create_tables()
-
-    def add_term(self,term):
+    def add_term(self,term,overwrite=True):
         ''' This will add a single term to the ontology '''
         cur = self.db.cursor()
+        if overwrite:
+            self.del_term(term)
         cur.execute('BEGIN TRANSACTION')
         # Add info to the terms tabls
         cur.execute('INSERT OR REPLACE INTO terms (id,name,type,desc) VALUES (?,?,?,?)',(term.id,term.name,term.type,term.desc))
