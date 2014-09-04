@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+import os
+import sys
+import pandas as pd 
+import numpy as np
+
+from Camoco import Camoco
+from RefGen import RefGen,RefGenBuilder
+from Ontology import Ontology,Term
+from Locus import *
+from Tools import log
+
+from optparse import OptionParser
+
+def main(args):
+    usage = 'importOntology name desc refgen_name [options]'
+    parser = OptionParser(usage=usage)
+    parser.add_option('--file', dest='files', action='append', help="path to trait csv. Must have three columns: 'trait','chr','position'")
+    parser.add_option('--sep',dest='sep',default="\t",type='string',help='Default delimiter for trait file. [default: \\t]')
+    # File type specifying what is being imported
+    parser.add_option('--file-type',dest='file_type',help='The filetype being passed in. One of: csv,mapmap,obo,etc.')
+    # -------------------------------------------------------------------------
+    # CSV File Type:
+    parser.add_option(  '--id-col', dest='id_col',   default=None, help='Header name of columns with Term Id')
+    parser.add_option('--name-col', dest='name_col', default=None, help='Header name of trait name column')
+    parser.add_option('--type-col', dest='type_col', default=None, help='Header name of trait type')
+    parser.add_option('--desc-col', dest='desc_col', default=None, help='Header name of trait description')
+    # Gene filetype options: each trait already has genes associated with it
+    parser.add_option('--gene-col', dest='gene_col', default=None, help='Header name of gene id column')
+    # GWAS SNP Filetype Options: Generate candidate genes based on reference genome
+    parser.add_option('--chr-col',  dest='chr_col', default=None, help='Name of locus chromosome column')
+    parser.add_option('--pos-col',  dest='pos_col', default=None, help='Name of locus position column')
+    parser.add_option('--flank-pos-limit',  dest='flank_pos_limit',  default=50000, type='int', help='The base pair limit in which to look for flanking genes around a SNP')
+    parser.add_option('--flank-gene-limit', dest='flank_gene_limit', default=4,     type='int', help='The maximum number of flanking genes allowed to be associated with SNP (half upstream, half downstream).')
+
+    options,args = parser.parse_args(args)
+    name,desc,refgen = args
+
+    try:
+        RG = RefGen(refgen)
+    except Exception as e:
+        log("{} isnt a valid RefGen name. Did you import that refgen yet?",refgen) 
+        return -1
+    ONT = Ontology.create(name,desc,RG)
+    # handle type case csv
+    for file in options.files:
+        if options.file_type == 'csv':
+            table = pd.read_table(file,sep=options.sep)
+            # Group each trait by its name
+            for term_id,df in table.groupby(options.id_col):
+                term = Term(id=term_id) 
+                # Determing trait information
+                if options.name_col:
+                    term.name = df[options.name_col].iloc[0]
+                if options.type_col:
+                    term.type = df[options.type_col].iloc[0]
+                if options.desc_col:
+                    term.desc = df[options.desc_col].iloc[0] 
+                # Determine if we are generating candidate genes or from SNPs
+                if options.gene_col:
+                    for id in df[options.gene_col]:
+                        if id in RG:
+                            term.add_gene(RG[id])
+                elif options.pos_col and options.chr_col:
+                    # Log how many SNPs there are
+                    # Extract flanking genes for each SNP
+                    for chr,pos in df[[options.chr_col,options.pos_col]].values:
+                        flanking_genes = RG.flanking_genes(
+                            SNP(chr,pos),
+                            gene_limit = options.flank_gene_limit,
+                            pos_limit  = options.flank_pos_limit
+                        )
+                        for gene in flanking_genes:
+                            term.add_gene(gene)
+                        term.add_snp(SNP(chr,pos))
+                else:
+                    raise Exception('You must specify --gene-col or --chr-col and --pos-col option. See Docs.') 
+
+                log("Importing {}",term)
+                ONT.add_term(term)
+        else:
+            sys.exit('You must specify a valid --file-type')
+    ONT._build_indices()
+    
+
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:])) 
+
