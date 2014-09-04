@@ -35,7 +35,7 @@ class RefGen(Camoco):
     def iter_chromosomes(self):
         ''' returns chrom object iterator '''
         return ( Chrom(*x) for x in self.db.cursor().execute(''' 
-            SELECT id,length FROM chromosomee
+            SELECT id,length FROM chromosomes
         '''))
 
     def iter_genes(self,gene_filter=None):
@@ -200,7 +200,7 @@ class RefGen(Camoco):
  
            
     def summary(self): 
-        return ("\n".join([
+        print ("\n".join([
             'Reference Genome: {} - {} - {}',
             '{} genes',
             'Genome:',
@@ -288,7 +288,7 @@ class RefGenBuilder(Camoco):
         for gene in refgen.iter_genes(gene_filter=gene_filter):
             self.add_gene(gene)
         self._build_indices()
-        return self.name
+        return self
        
     def _create_tables(self):
         cur = self.db.cursor()
@@ -300,7 +300,7 @@ class RefGenBuilder(Camoco):
                 length INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS genes (
-                id TEXT NOT NULL,
+                id TEXT NOT NULL UNIQUE,
                 chromosome TEXT NOT NULL,
                 start INTEGER,
                 end INTEGER,
