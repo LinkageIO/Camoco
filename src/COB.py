@@ -525,6 +525,20 @@ class COB(Camoco):
                 self.num_sig_edges/self.num_edges
         ))
 
+    def filter_refgen(self):
+        ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
+            has been populated!!'''
+        filtered_refgen = RefGenBuilder.import_from_RefGen(
+            "{}RefGen".format(self.name),
+            "RefGen for {} filtered from {}".format(self.name,self.refgen.name),
+            self.refgen,
+            gene_filter = self,
+            basedir = self.basedir
+        )
+        # Remember for next time
+        self._global('refgen',filtered_refgen.name)
+
+
 
     def __repr__(self):
         return '''
@@ -583,25 +597,14 @@ class COBBuilder(Camoco):
             INSERT OR UPDATE INTO accessions (name,type,description) VALUES (?,?,?)''',(name,type,description)
         )
 
-    def add_filter_refgen(self,refgen):
-        ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
-            has been populated!!'''
-        filtered_refgen = RefGenBuilder.import_from_RefGen("{}RefGen".format(self.name),
-            "RefGen for {} filtered from {}".format(self.name,refgen.name),
-            gene_filter = self,
-            basedir = self.basedir
-        )
-        # Remember for next time
-        self._global('refgen',filtered_refgen.name)
-
     def from_DataFrame(self, df, transform=np.arctanh, significance_thresh=3, min_expr=1, 
         max_gene_missing_data=0.2, min_single_sample_expr=5, 
         max_accession_missing_data=0.5,membership=None,dry_run=False):
         ''' Import a COB dataset from a pandas dataframe. Assumes genes/traits as rows and accessions/genotypes as columns.
             Options:
                 transform                   - a vectorizable (numpy) function used to normalize expression data. 
-                                            Default is inverse hyperbolic sin which transforms larger values more than smaller ones. 
-                                            see DOI:10.1371/journal.pone.0061005
+                                              Default is inverse hyperbolic sin which transforms larger values more than smaller ones. 
+                                              see DOI:10.1371/journal.pone.0061005
                 significance_threshold      - a Z-score threshold at which each interaction will be called significant.
                 min_expr                    - expr (usually FPKM) lower than this will be set as NaN and not used in correlation.
                 max_gene_missing_data       - The threshold of percent missing data for a gene/trait to be thrown out.
@@ -700,6 +703,8 @@ class COBBuilder(Camoco):
             self.log("Something bad happened:{}",e)
             cur.execute("ROLLBACK")
             raise e
+        # update the reference geneom
+        self.add_filter_refgen(self.refgen)
         
     def _coex(self,matrix):
         progress = progress_bar(multiprocessing.Manager())
