@@ -1,0 +1,19 @@
+body {
+    margin: 0;
+}
+#DatasetTables {
+    display: block;
+    width: 40%;
+    height: 100%;
+}
+#cy {
+    border: 2px solid #000000;
+    display: inline;
+    height: 99%;
+    left: 40%;
+    position: absolute;
+    top: 0;
+    width: 59%;
+}
+
+
