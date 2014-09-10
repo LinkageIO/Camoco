@@ -5,7 +5,7 @@ import re
 import functools
 
 from itertools import chain
-from Locus import *
+from camoco.Locus import *
 
 def memoize(obj):
     cache = obj.cache = {}

@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-from Camoco import Camoco
-from RefGen import RefGen
-from Locus import SNP
-from Tools import log
+from camoco.Camoco import Camoco
+from camoco.RefGen import RefGen
+from camoco.Locus import SNP
+from camoco.Tools import log
 
 from collections import defaultdict
 from pandas import DataFrame
@@ -70,8 +70,8 @@ class Term(object):
                 print("{}\t{}_BS_TransDensity\t{}".format(self.id,cob.name,sum([x >= density for x in bs_density])),file=file)
                 print("{}\t{}_BS_Locality\t{}".format(self.id,cob.name,sum([x >= locality for x in bs_local])),file=file)
                 print("{}\t{}_BS_LCC\t{}".format(self.id,cob.name,sum([x >= len_LCC for x in bs_lcc])),file=file)
-                cob.heatmap(cob.gene_expression_vals(flanks),filename="{}_{}_Heatmap.png".format(self.id,cob.name)) 
-                cob.plot(flanks,filename="{}_{}_Network.png".format(self.id,cob.name),layout='kk',height=800,width=800)
+                #cob.heatmap(cob.gene_expression_vals(flanks),filename="{}_{}_Heatmap.png".format(self.id,cob.name)) 
+                #cob.plot(flanks,filename="{}_{}_Network.png".format(self.id,cob.name),layout='kk',height=800,width=800)
 
     def __str__(self):
         return "Term: {}, {} genes, {} SNPs".format(self.id,len(self.gene_list),len(self.snp_list))

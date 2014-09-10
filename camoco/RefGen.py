@@ -2,11 +2,11 @@
 
 from collections import defaultdict
 
-from Camoco import Camoco
-from Locus import Gene,non_overlapping
-from Chrom import Chrom
-from Genome import Genome
-from Tools import memoize
+from camoco.Camoco import Camoco
+from camoco.Locus import Gene,non_overlapping
+from camoco.Chrom import Chrom
+from camoco.Genome import Genome
+from camoco.Tools import memoize
 
 import itertools
 import random

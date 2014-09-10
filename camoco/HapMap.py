@@ -6,10 +6,10 @@ import sys
 import numpy as np
 from scipy.stats import pearsonr
 
-from lowess import lowess
-from Camoco import Camoco
-from Locus import SNP
-from Chrom import Chrom
+from camoco.lowess import lowess
+from camoco.Camoco import Camoco
+from camoco.Locus import SNP
+from camoco.Chrom import Chrom
 
 from matplotlib import pylab
 

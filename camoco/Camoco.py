@@ -90,33 +90,3 @@ class Camoco(object):
     def __getattr__(self,name):
         return self._global(name)
 
-    @staticmethod
-    def available_datasets(type=None, basedir="~/.camoco"):
-        cur = Camoco("Camoco").db.cursor()
-        if type:
-            datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
-        else:
-            datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
-        if datasets:
-            return pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
-        else:
-            return pd.DataFrame(columns=["Type","Name","Description","Date Added"])
-    @staticmethod
-    def del_dataset(type,name,safe=True,basedir="~/.camoco"):
-        c = Camoco("Camoco")
-        if safe:
-            c.log("Are you sure you want to delete {}",name)
-            if input("[Y/n]:") == 'Y':
-                c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
-                os.remove(c._resource("databases",".".join([type,name])+".db"))
-            else:
-                c.log("Nothing Deleted")
-        else:
-            c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
-            os.remove(c._resource("databases",".".join([type,name])+".db"))
-    @staticmethod
-    def mv_dataset(type,name,new_name,basedir="~/.camoco"):
-        c = Camoco("Camoco")
-        c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
-        os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
- 

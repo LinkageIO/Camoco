@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import numpy as np
-from Locus import Locus
+from camoco.Locus import Locus
 
 class Chrom(object):
     def __init__(self,id,length):

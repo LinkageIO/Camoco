@@ -2,11 +2,11 @@
 
 import pandas as pd
 
-from Camoco import Camoco
-from RefGen import RefGen,RefGenBuilder
+from camoco.Camoco import Camoco
+from camoco.RefGen import RefGen,RefGenBuilder
+from camoco.Locus import Locus,Gene
+from camoco.Tools import memoize
 from numpy import matrix,arcsinh
-from Locus import Locus,Gene
-from Tools import memoize
 from scipy.stats import pearsonr
 from collections import defaultdict
 
