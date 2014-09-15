@@ -30,7 +30,7 @@ def COB_network(network_name,ontology,term):
     try:
         net = {}
         subnet = co.COB(network_name).subnetwork(co.Ontology(ontology)[term].gene_list)
-        net['nodes'] = [ {'data':{'id':str(x)}} for x in set(subnet.source).union(subnet.target) ]
+        net['nodes'] = [ {'data':{'id':str(x), 'index':i }} for i,x in enumerate(set(subnet.source).union(subnet.target)) ]
         net['edges'] = [
             {
                 'data':{
