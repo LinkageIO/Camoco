@@ -19,6 +19,9 @@
 <script src="static/js/datatables/jquery.dataTables.js"></script>
 
 
+<script src='static/js/cob.js'></script>
+
+
 <script type="text/javascript">
 <!--
 
@@ -39,7 +42,7 @@ arbor_options = {
     ungrabifyWhileSimulating: true, // so you can't drag nodes during layout
 
     // forces used by arbor (use arbor default on undefined)
-    repulsion: undefined,
+    repulsion: 50,
     stiffness: undefined,
     friction: undefined,
     gravity: true,
@@ -100,6 +103,8 @@ cose_options = {
 };
 
 
+
+
 $(document).ready(function(){
     // Initialize Cytoscape
     cy = cytoscape(options = {
@@ -114,7 +119,7 @@ $(document).ready(function(){
             'background-color': '#144566',
             'border-width': 1,
             'border-color': '#000',
-            'height':'mapData(degree,1,10,30,100)'
+            'content':'data(id)'
         })
         .selector(':selected')
         .css({
@@ -197,6 +202,10 @@ $(document).ready(function(){
 </div>
 
 <div id='cy'></div>
+<div id="GeneTable">
+
+</div>
+<div id='cob'></div>
 
 </body>
 </html>
