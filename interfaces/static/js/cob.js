@@ -1,5 +1,3 @@
-
-
     function Graph(params){
         defaults = {
             'div':$('<div>'),
@@ -21,6 +19,7 @@
                 'height' : 'data(degree)',
                 'width' : 'data(degree)',
                 'content':'data(id)',
+                'text-halign':'right',
                 'min-zoomed-font-size':1
             })
             .selector(':selected')
@@ -30,7 +29,7 @@
             })
             .selector('edge')
             .css({
-            'opacity': '0.25',
+                'opacity': '0.25',
                 'width': 'mapData(score, 3, 7, 1, 20)',
                 'curve-style': 'haystack' // fast edges!
             }),
@@ -44,6 +43,10 @@
                 console.log('Cytoscape Web, ready to rock!')
             }
         })
+        this.show = function(score){
+            this.cy.edges('edge[score < '+score+']').hide()
+            this.cy.edges('edge[score >= '+score+']').show()
+        }
     }
 
     function Tab(params){
@@ -72,9 +75,86 @@
             'div' : $('<div>',{'class':'menu'})
         }
         this.params = $.extend(true,defaults,params)
+        // Add the ontology and term table
         this.params.div
-            .append($('<div>',{class:'menu'}))
-        
+            .append(
+                $('<table>',{class:'OntologyTable display',cellspacing:'0',width:'100%'})
+                .html('<thead><th>Ontology</th><th>Description</th></thead>')
+            )
+            .append(
+                $('<table>',{class:'TermTable display',cellspacing:'0',width:'100%'})
+                .append($('<thead>')
+                    .append('<tr>')
+                        .append($('<tr>')
+                            .append($('<th>Name</th>'))
+                            .append($('<th>Desc</th>'))
+                            .append($('<th>Num SNPs</th>'))
+                            .append($('<th>Num Genes</th>'))
+                        )
+                )
+
+            )
+            .append(
+                $('<table>',{class:'LocusTable display',cellspacing:'0',width:'100%'})
+                .append($('<thead>')
+                    .append('<tr>')
+                        .append($('<tr>')
+                            .append($('<th>Locus</th>'))
+                            .append($('<th>Gene</th>'))
+                            .append($('<th>Expressed?</th>'))
+                            .append($('<th>Local Degree</th>'))
+                            .append($('<th>Global Degree</th>'))
+                        )
+                )
+            )
+        // Initialize Actions
+        this.ontologytable = $('#cob .menu .OntologyTable').DataTable({
+            "ajax":"Camoco/available_datasets/Ontology",
+            "processing" : true,
+            "paginate" : false,
+            'scrollCollapse': true,
+            'scrollY' : '300px'
+        });
+        this.termtable = $('#cob .TermTable').DataTable({
+            "processing" : true,
+            "paginate" : false,
+            'scrollCollapse': true,
+            'scrollY' : '300px'
+        })
+        this.locustable = $('#cob .LocusTable').DataTable({
+            "processing" : true,
+            "paginate" : false,
+            'scrollCollapse': true,
+            'scrollY' : '300px'
+        })
+        $('#cob .OntologyTable tbody').on('click','tr', function() {
+            var name = $('td',this).eq(0).text();
+            cob.menu.termtable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
+            cob.menu.LoadedOntology = name
+            $('#cob .OntologyTable .selected').toggleClass('selected')
+            $(this).toggleClass('selected')
+            cob.menu.ontologytable.loadedontolgy = name
+        });
+        $('#cob .TermTable tbody').on('click','tr', function(){
+            document.LoadedTerm = $('td',this).eq(0).text();
+            $('#cob .TermTable .selected').toggleClass('selected')
+            $(this).toggleClass('selected')
+            $.getJSON('api/COB/ROOT/'+cob.menu.LoadedOntology+'/'+document.LoadedTerm)
+                .done(function(data){
+                    a = data
+                    console.log('loading data')
+                    cob.graph.cy.load(data,
+                        function(){console.log('Loading Data')},
+                        function(){
+                            console.log('Fitting ');
+                        })
+                    .layout(arbor_options)
+                })
+                .fail(function(data){
+                    console.log("Nopers")
+                })
+        })
+
 
     } // End Menu
 
@@ -99,43 +179,14 @@
         this.graph = new Graph({
             'div' :$("#cob .graph")
         });
-        this.menu = new Menu({});
+        this.menu = new Menu({
+            'div' :$('#cob .menu')
+        });
         this.footer = new Footer({});
         this.header = new Header({});
 
-        $('#OntologyTable').DataTable({
-            "ajax":"Camoco/available_datasets/Ontology",
-            "processing" : true,
-            "paginate" : false,
-            'scrollCollapse': true,
-            'scrollY' : '100px'
-        });
-        $('#OntologyTable tbody').on('click','tr', function() {
-            var name = $('td',this).eq(0).text();
-            TermTable = $('#TermTable').DataTable()
-            TermTable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
-            document.LoadedOntology = name
-        });
-        $('#TermTable').DataTable({
-            "processing" : true,
-            "paginate" : false,
-            'scrollCollapse': true,
-            'scrollY' : '100px'
-        })
-    
-        $('#TermTable tbody').on('click','tr', function(){
-            document.LoadedTerm = $('td',this).eq(0).text();
-            $.getJSON('api/COB/ROOT/'+document.LoadedOntology+'/'+document.LoadedTerm)
-            .done(function(data){
-                a = data
-                console.log('loading data')
-                cob.graph.cy.load(data,function(){console.log('Loaded')},function(){console.log('Loaded2')})
-                cob.graph.cy.layout(arbor_options)
-            })
-            .fail(function(data){
-                console.log("Nopers")
-            })
-        })
-
+        this.load_base = function(data){
+            var hello = 'world'
+        }
 
     }

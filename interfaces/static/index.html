@@ -6,7 +6,7 @@
 <script type="text/javascript">
 
 </script>
-<title>Camoco - Cash - Money - Corn</title>
+<title>Camoco</title>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <link rel='stylesheet' type='text/css'  href="static/css/main.css">
 <!-- CDNS -->
@@ -36,9 +36,9 @@ arbor_options = {
     ready: undefined, // callback on layoutready 
     stop: undefined, // callback on layoutstop
     maxSimulationTime: 4000, // max length in ms to run the layout
-    fit: true, // reset viewport to fit default simulationBounds
     padding: [ 50, 50, 50, 50 ], // top, right, bottom, left
-    simulationBounds: undefined, // [x1, y1, x2, y2]; [0, 0, width, height] by default
+    simulationBounds: [0,0,5000,5000],//undefined, // [x1, y1, x2, y2]; [0, 0, width, height] by default
+    fit: true, // reset viewport to fit default simulationBounds
     ungrabifyWhileSimulating: true, // so you can't drag nodes during layout
 
     // forces used by arbor (use arbor default on undefined)
@@ -111,24 +111,6 @@ $(document).ready(function(){
 </script>
 </head>
 <body>
-
-<div id="DatasetTables">
-    <table id="OntologyTable" class='display' cellspacing='0' width='100%'>
-        <thead>
-            <th>Ontology</th>
-            <th>Description</th>
-        </thead>
-    </table>
-    <table id="TermTable" class='display' cellspacing='0' width='100%'>
-        <thead>
-            <th>Term ID</th>
-            <th>Term Name</th>
-            <th>Num Genes</th>
-        </thead> 
-    </table>
-</div>
-
-<div id='cob'></div>
-
+    <div id='cob'></div>
 </body>
 </html>
