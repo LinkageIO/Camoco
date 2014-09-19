@@ -17,12 +17,11 @@ def all_available_datasets():
 @app.route("/Camoco/available_datasets/<path:type>")
 def available_datasets(type=None,*args):
     return jsonify({ "data" : list(co.available_datasets(type)[['Name','Description']].itertuples(index=False))})
-
         
 @app.route("/Ontology/Terms/<path:term_name>")
 def Ontology_Terms(term_name):
     return jsonify({
-        "data": [ (term.id,term.name,len(term.gene_list)) for term in co.Ontology(term_name).iter_terms()]
+        "data": [ (term.id,term.name,len(term.snp_list),len(term.gene_list)) for term in co.Ontology(term_name).iter_terms()]
     })
 
 @app.route("/api/COB/<network_name>/<ontology>/<term>")
@@ -55,4 +54,4 @@ def fix_inf(val):
 
 if __name__ == "__main__":
     app.debug=True
-    app.run('0.0.0.0',9000)
+    app.run('0.0.0.0')
