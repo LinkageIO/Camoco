@@ -102,82 +102,9 @@ cose_options = {
     minTemp             : 1
 };
 
-
-
-
 $(document).ready(function(){
     // Initialize Cytoscape
-    cy = cytoscape(options = {
-        container : document.getElementById('cy'),    
-
-        hideEdgesOnViewport: true,
-        hideLabelsOnViewport: true,
-        // Style
-        style: cytoscape.stylesheet()
-        .selector('node')
-        .css({
-            'background-color': '#144566',
-            'border-width': 1,
-            'border-color': '#000',
-            'content':'data(id)'
-        })
-        .selector(':selected')
-        .css({
-            'border-width': 3,
-            'border-color': '#09BA00'
-        })
-        .selector('edge')
-        .css({
-            'opacity': '0.25',
-            'width': 'mapData(score, 3, 7, 1, 20)',
-            'curve-style': 'haystack' // fast edges!
-        }),
-        layout: {
-            name: 'concentric',
-            concentric: function(){ return this.data('score'); },
-            levelWidth: function( nodes ){ return 10; },
-            padding: 10
-        },
-        ready : function(){
-            console.log('Cytoscape Web, ready to rock!')
-        }
-    })
-    
-    // Initialize Tables
-    $('#OntologyTable').DataTable({
-       "ajax":"Camoco/available_datasets/Ontology",
-        "processing" : true,
-        "paginate" : false,
-        'scrollCollapse': true,
-        'scrollY' : '500px'
-    });
-    $('#OntologyTable tbody').on('click','tr', function() {
-        var name = $('td',this).eq(0).text();
-        TermTable = $('#TermTable').DataTable()
-        TermTable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
-        document.LoadedOntology = name
-    });
-    $('#TermTable').DataTable({
-        "processing" : true,
-        "paginate" : false,
-        'scrollCollapse': true,
-        'scrollY' : '500px'
-    })
-
-    $('#TermTable tbody').on('click','tr', function(){
-        document.LoadedTerm = $('td',this).eq(0).text();
-        $.getJSON('api/COB/ROOT/'+document.LoadedOntology+'/'+document.LoadedTerm)
-        .done(function(data){
-            a = data
-            console.log('loading data')
-            cy.load(data,function(){console.log('Loaded')},function(){console.log('Loaded2')})
-            cy.layout(arbor_options)
-        })
-        .fail(function(data){
-            console.log("Nopers")
-        })
-    })
-
+    window.cob = new COB({ 'div': $('#cob') })
 });
 
 -->
@@ -201,10 +128,6 @@ $(document).ready(function(){
     </table>
 </div>
 
-<div id='cy'></div>
-<div id="GeneTable">
-
-</div>
 <div id='cob'></div>
 
 </body>

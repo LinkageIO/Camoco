@@ -8,14 +8,18 @@ body {
     max-height: 70%;
     position: absolute;
 }
-#cy {
+#cob {
     border: 2px solid #000000;
     display: inline;
-    height: 70%;
+    height: 100%;
     left: 40%;
     position: absolute;
     top: 0;
     width: 59%;
+}
+#cob .graph {
+    width: 100%;
+    height: 100%;
 }
 
 #GeneTable {
@@ -27,3 +31,14 @@ body {
     width:100%;
     position: absolute;
 }
+
+
+div .tab .bar {
+    color: #ffffff;
+    left: 0;
+    margin-bottom: 2px;
+    overflow: hidden;
+    padding: 12px;
+    top: 0;
+    width: 350px;
+;}
