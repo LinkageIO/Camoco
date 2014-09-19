@@ -15,7 +15,7 @@ def all_available_datasets():
     return str(co.available_datasets())
  
 @app.route("/Camoco/available_datasets/<path:type>")
-def available_datasets(type=None):
+def available_datasets(type=None,*args):
     return jsonify({ "data" : list(co.available_datasets(type)[['Name','Description']].itertuples(index=False))})
 
         
@@ -47,10 +47,6 @@ def COB_network(network_name,ontology,term):
     except Exception as e:
         return 500 
 
-@app.errorhandler(500)
-def server_error(error):
-    return "Nopeers:{}".format(error),500
-
 def fix_inf(val):
     if isinf(val):
         return -1
@@ -59,4 +55,4 @@ def fix_inf(val):
 
 if __name__ == "__main__":
     app.debug=True
-    app.run('0.0.0.0')
+    app.run('0.0.0.0',9000)
