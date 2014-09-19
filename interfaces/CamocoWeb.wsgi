@@ -1,5 +1,5 @@
 #!/usr/bin/python3.4
-activate_this = '/home/schaefer/Envs/venv2/bin/activate_this.py'
+activate_this = '/home/schaefer/Envs/camoco/bin/activate_this.py'
 # This AINT PYTHON 2!!!
 #execfile(activate_this,dict(__file__=activate_this))
 with open(activate_this) as f:
