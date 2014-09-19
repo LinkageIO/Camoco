@@ -20,8 +20,6 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-
-
 from camoco.Camoco import Camoco
 from camoco.COB import COB
 from camoco.RefGen import RefGen
@@ -56,4 +54,7 @@ def mv_dataset(type,name,new_name,basedir="~/.camoco"):
     c = Camoco("Camoco")
     c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
     os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
- 
+
+def redescibe_dataset(type,name,new_desc,basedir="~/.camoco"):
+    c = Camoco("Camoco")
+    c.db.cursor().execute("UPDATE datasets SET description = ? WHERE name = ? and type = ?",(new_desc,name,type))
