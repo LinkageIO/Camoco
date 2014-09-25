@@ -24,6 +24,9 @@ from camoco.Camoco import Camoco
 from camoco.COB import COB
 from camoco.RefGen import RefGen
 from camoco.Ontology import Ontology
+from camoco.Locus import *
+from camoco.Tools import *
+from camoco.Annotation import *
 import pandas as pd
 import os
 

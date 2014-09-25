@@ -4,11 +4,7 @@ import sys
 import pandas as pd 
 import numpy as np
 
-from Camoco import Camoco
-from RefGen import RefGen,RefGenBuilder
-from Ontology import Ontology,Term
-from Locus import *
-from Tools import log
+import camoco as co
 
 from optparse import OptionParser
 
@@ -37,11 +33,11 @@ def main(args):
     name,desc,refgen = args
 
     try:
-        RG = RefGen(refgen)
+        RG = co.RefGen(refgen)
     except Exception as e:
-        log("{} isnt a valid RefGen name. Did you import that refgen yet?",refgen) 
+        co.log("{} isnt a valid RefGen name. Did you import that refgen yet?",refgen) 
         return -1
-    ONT = Ontology.create(name,desc,RG)
+    ONT = co.Ontology.create(name,desc,RG)
     # handle type case csv
     for file in options.files:
         if options.file_type == 'csv':
@@ -66,17 +62,17 @@ def main(args):
                     # Extract flanking genes for each SNP
                     for chr,pos in df[[options.chr_col,options.pos_col]].values:
                         flanking_genes = RG.flanking_genes(
-                            SNP(chr,pos),
+                            co.SNP(chr,pos),
                             gene_limit = options.flank_gene_limit,
                             pos_limit  = options.flank_pos_limit
                         )
                         for gene in flanking_genes:
                             term.add_gene(gene)
-                        term.add_snp(SNP(chr,pos))
+                        term.add_snp(co.SNP(chr,pos))
                 else:
                     raise Exception('You must specify --gene-col or --chr-col and --pos-col option. See Docs.') 
 
-                log("Importing {}",term)
+                co.log("Importing {}",term)
                 ONT.add_term(term)
         else:
             sys.exit('You must specify a valid --file-type')

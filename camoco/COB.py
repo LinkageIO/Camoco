@@ -227,24 +227,15 @@ class COB(Camoco):
             not within a certain distance of each other. This corrects for
             cis regulatory elements increasing noise in coexpression network '''
         # filter for only genes within network
-        gene_list = list(filter(lambda x: x in self, gene_list))
-        ids = "','".join([x.id for x in gene_list])
-        query = '''
-            SELECT gene_a,gene_b,score,distance FROM coex 
-            WHERE gene_a IN ('{}') AND gene_b IN ('{}')
-            '''
-        if min_distance:
-            query += ' AND distance > {}'.format(min_distance)
-        scores = self.db.cursor().execute(query.format(ids,ids)).fetchall()
-        if len(scores) == 0:
+        edges = self.subnetwork(gene_list,min_distance=min_distance,sig_only=False)
+        if len(edges) == 0:
             return np.nan
-        if len(scores) == 1:
-            return scores[0][2]
-        scores = pd.DataFrame(scores,columns=['gene_a','gene_b','score','distance'])
+        if len(edges) == 1:
+            return edges.score[0]
         if return_mean:
-            return (scores.score.mean()/((scores.score.std())/np.sqrt(len(scores))))
+            return (edges.score.mean()/((edges.score.std())/np.sqrt(len(edges))))
         else:
-            return scores
+            return edges
 
     def seed(self, gene_list, limit=65): 
         ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
