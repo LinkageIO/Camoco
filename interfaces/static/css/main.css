@@ -2,6 +2,9 @@ body {
     margin: 0;
     font-size: 8pt;
 }
+#datatable{
+    width: 100%;
+}
 #DatasetTables {
     display: block;
     width: 40%;
@@ -19,14 +22,20 @@ body {
 }
 #cob .graph {
     width: 70%;
-    height: 100%;
+    height: 70%;
     position: absolute;
     right: 0px;
 }
 #cob .menu {
     width: 30%;
-    height: 100%;
+    height: 70%;
     position: absolute;
+}
+#cob .loci {
+    width: 100%;
+    position: absolute;
+    bottom: 0px;
+    height: 30%;
 }
 
 #GeneTable {
@@ -38,7 +47,6 @@ body {
     width:100%;
     position: absolute;
 }
-
 
 div .tab .bar {
     color: #ffffff;

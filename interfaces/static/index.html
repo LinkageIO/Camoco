@@ -17,6 +17,8 @@
 
 <link rel='stylesheet' type='text/css'  href="static/css/jquery.dataTables.css">
 <script src="static/js/datatables/jquery.dataTables.js"></script>
+<script src="static/js/datatables/jquery.scrollTo.min.js"></script>
+
 
 
 <script src='static/js/cob.js'></script>
@@ -38,9 +40,10 @@ arbor_options = {
     maxSimulationTime: 4000, // max length in ms to run the layout
     padding: [ 50, 50, 50, 50 ], // top, right, bottom, left
     simulationBounds: [0,0,5000,5000],//undefined, // [x1, y1, x2, y2]; [0, 0, width, height] by default
-    fit: true, // reset viewport to fit default simulationBounds
+    stop : function(){
+        console.log('gonna fit')
+    },
     ungrabifyWhileSimulating: true, // so you can't drag nodes during layout
-
     // forces used by arbor (use arbor default on undefined)
     repulsion: 50,
     stiffness: undefined,
