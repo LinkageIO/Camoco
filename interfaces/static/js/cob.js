@@ -3,6 +3,7 @@
             'div':$('<div>'),
         }    
         this.params = $.extend(true,defaults,params)
+        this.selected = []
 
         this.cy = cytoscape(options = {
             container : this.params.div[0],    
@@ -65,98 +66,49 @@
                 .append($('<span>',{class:'title'}).html(params.title))
                 .append($('<span>',{class:'body'}).html(params.body))
     }
-   
 
     function Menu(params){
         // Initialize Tables
         this.tabs = []
         this.handle = []
+        this.tables = []
         defaults = {
             'div' : $('<div>',{'class':'menu'})
         }
         this.params = $.extend(true,defaults,params)
         // Add the ontology and term table
-        this.params.div
-            .append(
-                $('<table>',{class:'OntologyTable display',cellspacing:'0',width:'100%'})
-                .html('<thead><th>Ontology</th><th>Description</th></thead>')
-            )
-            .append(
-                $('<table>',{class:'TermTable display',cellspacing:'0',width:'100%'})
-                .append($('<thead>')
-                    .append('<tr>')
-                        .append($('<tr>')
-                            .append($('<th>Name</th>'))
-                            .append($('<th>Desc</th>'))
-                            .append($('<th>Num SNPs</th>'))
-                            .append($('<th>Num Genes</th>'))
-                        )
-                )
-
-            )
-            .append(
-                $('<table>',{class:'LocusTable display',cellspacing:'0',width:'100%'})
-                .append($('<thead>')
-                    .append('<tr>')
-                        .append($('<tr>')
-                            .append($('<th>Locus</th>'))
-                            .append($('<th>Gene</th>'))
-                            .append($('<th>Expressed?</th>'))
-                            .append($('<th>Local Degree</th>'))
-                            .append($('<th>Global Degree</th>'))
-                        )
-                )
-            )
         // Initialize Actions
-        this.ontologytable = $('#cob .menu .OntologyTable').DataTable({
-            "ajax":"Camoco/available_datasets/Ontology",
-            "processing" : true,
-            "paginate" : false,
-            'scrollCollapse': true,
-            'scrollY' : '300px'
-        });
-        this.termtable = $('#cob .TermTable').DataTable({
-            "processing" : true,
-            "paginate" : false,
-            'scrollCollapse': true,
-            'scrollY' : '300px'
-        })
-        this.locustable = $('#cob .LocusTable').DataTable({
-            "processing" : true,
-            "paginate" : false,
-            'scrollCollapse': true,
-            'scrollY' : '300px'
-        })
-        $('#cob .OntologyTable tbody').on('click','tr', function() {
-            var name = $('td',this).eq(0).text();
-            cob.menu.termtable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
-            cob.menu.LoadedOntology = name
-            $('#cob .OntologyTable .selected').toggleClass('selected')
-            $(this).toggleClass('selected')
-            cob.menu.ontologytable.loadedontolgy = name
-        });
-        $('#cob .TermTable tbody').on('click','tr', function(){
-            document.LoadedTerm = $('td',this).eq(0).text();
-            $('#cob .TermTable .selected').toggleClass('selected')
-            $(this).toggleClass('selected')
-            $.getJSON('api/COB/ROOT/'+cob.menu.LoadedOntology+'/'+document.LoadedTerm)
-                .done(function(data){
-                    a = data
-                    console.log('loading data')
-                    cob.graph.cy.load(data,
-                        function(){console.log('Loading Data')},
-                        function(){
-                            console.log('Fitting ');
-                        })
-                    .layout(arbor_options)
-                })
-                .fail(function(data){
-                    console.log("Nopers")
-                })
-        })
-
+        /*
+        */
 
     } // End Menu
+    Menu.prototype.add_table = function(name, headers, params){
+        this.params.div
+            .append(
+                $('<table>',{class: name+' display',cellspacing:'0',width:'100%'})
+                .append($('<thead>')
+                        .append($('<tr>')
+                        )
+                )
+            )
+        for (var i=0; i<headers.length; i++){
+            this.params.div.find('table.'+name+' thead tr')
+            .append($('<th>'+headers[i]+'</th>'))
+        }
+        this[name] = $('#cob .'+name).DataTable(
+            $.extend(true,{
+            "processing" : true,
+            "autoWidth": false, 
+            "sScrollY":  '300px',
+            "bPaginate": false,
+            "bJQueryUI": true,
+            "bScrollCollapse": true,
+            "bAutoWidth": false,
+            "sScrollXInner": "100%",
+            "sScrollX": true
+            },params)
+        )
+    }
 
     function Footer(params){
     }
@@ -174,6 +126,7 @@
         this.params.div
             .append($('<div>',{class:'graph'}))
             .append($('<div>',{class:'menu'}))
+            .append($('<div>',{class:'loci'}))
             .append($('<div>',{class:'footer'}))
             .append($('<div>',{class:'header'}))
         this.graph = new Graph({
@@ -182,11 +135,115 @@
         this.menu = new Menu({
             'div' :$('#cob .menu')
         });
+        this.menu.add_table('OntologyTable',['Ontology','Description'],{
+            "ajax":"Camoco/available_datasets/Ontology",
+        })
+        this.menu.add_table('TermTable',['Name','Desc','Num SNPs','Num Genes'])
+        // loci table
+        this.loci = new Menu({
+            'div' : $('#cob .loci')
+        })
+        this.loci.highlighted_rows = []
+        this.loci.add_table('LociTable',
+            [   'Locus',
+                'Transcript',
+                'Chr',
+                'Start',
+                'End',
+                'Strand',
+                'MaizeSeq.org Annot',
+                'BFGR Annot',
+                'PFAM Domain',
+                'Rice Orth',
+                'Rice Annot',
+                'Sorghum Orth',
+                'Sorghum Annot',
+                'Panicum Orth',
+                'Panicum Annot',
+                'Grassius TF',
+                'MapMan',
+                'classical',
+                'EFP Link',
+                'Functional Annot'
+            ],
+            {}
+        )
         this.footer = new Footer({});
         this.header = new Header({});
 
-        this.load_base = function(data){
-            var hello = 'world'
-        }
+        // Register top level events
+        $('#cob .OntologyTable tbody').on('click','tr', function() {
+            var name = $('td',this).eq(0).text();
+            cob.menu.TermTable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
+            cob.menu.LoadedOntology = name
+            $('#cob .OntologyTable .selected').toggleClass('selected')
+            $(this).toggleClass('selected')
+            cob.menu.OntologyTable.loadedontolgy = name
+        });
+        $('#cob .TermTable tbody').on('click','tr', function(){
+            document.LoadedTerm = $('td',this).eq(0).text();
+            $('#cob .TermTable .selected').toggleClass('selected')
+            $(this).toggleClass('selected')
+            $.getJSON('api/COB/ROOT/'+cob.menu.LoadedOntology+'/'+document.LoadedTerm)
+                .done(function(data){
+                    a = data
+                    console.log('loading data')
+                    cob.graph.cy.load(data,
+                        function(){
+                            console.log('Loading Data')
+                        },
+                        function(){
+                            console.log('Fitting ');
+                            cob.load_annotations()
+                        })
+                    .layout(arbor_options)
+                })
+                .fail(function(data){
+                    console.log("Nopers")
+                })
+        })
+        this.graph.cy.on('click','node',{},function(evt){
+            var node = evt.cyTarget
+            console.log("CLICKED "+node.id())
+            //unhighlight old rows
+            cob.loci.LociTable.rows(cob.loci.highlighted_rows)
+                .nodes()
+                .to$()
+                .toggleClass('selected')
+            cob.loci.highlighted_rows = cob.loci.LociTable.rows().flatten()
+                .filter(function(rowIdx){
+                    return cob.loci.LociTable.cell(rowIdx,0).data() == node.id() ? true : false;
+                })
+            $('.loci .dataTables_scrollBody').scrollTo(
+                cob.loci.LociTable.rows(cob.loci.highlighted_rows)
+                    .nodes()
+                    .to$()
+                    .toggleClass('selected')
+            )
+        })
+        var timeout;
+        this.graph.cy.on('select',{},function(evt){
+            cob.graph.selected = []
+            clearTimeout(timeout)
+            timeout = setTimeout(function(){
+                cob.graph.cy.elements(':selected')
+                .filter(function(){return this.isNode()})
+                .each(function(){
+                    cob.graph.selected.push(this.id()) 
+                })
+                cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
+            },100)
+        })
 
+        this.load_annotations = function(){
+            // get a list of loaded nodes
+            var nodes = this.graph.cy.nodes()
+            var node_ids = []
+            for(var i=0; i < nodes.length; i++){
+                node_ids.push(nodes[i].id())
+            }
+            this.loci.LociTable.clear()
+                .ajax.url("api/Annotations?genes="+node_ids.join(','))
+                .load().columns.adjust().draw()
+        }
     }
