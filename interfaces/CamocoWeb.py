@@ -1,4 +1,4 @@
-from flask import Flask, url_for, jsonify
+from flask import Flask, url_for, jsonify, request
 app = Flask(__name__)
 
 import camoco as co
@@ -22,6 +22,14 @@ def available_datasets(type=None,*args):
 def Ontology_Terms(term_name):
     return jsonify({
         "data": [ (term.id,term.name,len(term.snp_list),len(term.gene_list)) for term in co.Ontology(term_name).iter_terms()]
+    })
+
+@app.route('/api/Annotations/',methods=['GET','POST'])
+def Annotations():
+    genes = request.args.get('genes').split(',')
+    print( co.Annotation('Func')[genes])
+    return jsonify({
+        'data' : co.Annotation('Func')[genes]
     })
 
 @app.route("/api/COB/<network_name>/<ontology>/<term>")
