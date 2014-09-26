@@ -17,7 +17,8 @@ import time
 import math as math
 import multiprocessing as multiprocessing
 import itertools
-import matplotlib as plt
+import matplotlib.pylab as plt
+import matplotlib
 
 from scipy.stats import hypergeom
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -300,7 +301,7 @@ class COB(Camoco):
         D = np.array(dm) 
         row_labels = dm.index
         col_labels = dm.columns
-        f = plt.pylab.figure(figsize=figsize,facecolor='white')
+        f = plt.figure(figsize=figsize,facecolor='white')
         # add matrix plot
         axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
         def masked_corr(x,y):
@@ -332,7 +333,7 @@ class COB(Camoco):
             ax2.set_xticks([])
             ax2.set_yticks([])
         if title:
-            plt.pylab.title(title)
+            plt.title(title)
         vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
         vmin = vmax*-1
         self.log("Extremem Values: {}",vmax)
@@ -357,10 +358,10 @@ class COB(Camoco):
         f.colorbar(im,orientation='horizontal',cax=axColorBar,
             ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
         )
-        plt.pylab.title(heatmap_unit_label)
+        plt.title(heatmap_unit_label)
         if filename:
-            plt.pyplot.savefig(filename)
-            plt.pyplot.close()
+            plt.savefig(filename)
+            plt.close()
         return pd.DataFrame(
             data=D,
             index=row_labels,
@@ -420,7 +421,7 @@ class COB(Camoco):
             'blue': ((0.0, 0.0, 0.0),
                     (0.5, 1.0, 1.0),
                     (1.0, 1.0, 1.0))}
-        heatmap_cmap = plt.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
+        heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
         return heatmap_cmap
 
     def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
