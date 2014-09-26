@@ -51,10 +51,10 @@ class RefGen(Camoco):
         ''' returns gene object iterable from an iterable of id strings  '''
         if not gene_filter:
             gene_filter = self
-        return ( Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
+        return [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
             '''.format("','".join(gene_list))) if Gene(*x) in gene_filter
-        )
+        ]
 
     @memoize
     def __getitem__(self,item):
