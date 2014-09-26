@@ -2,8 +2,6 @@ body {
     margin: 0;
     font-size: 8pt;
 }
-#datatable{
-    width: 100%;
 }
 #DatasetTables {
     display: block;
@@ -21,10 +19,20 @@ body {
     width: 100%;
 }
 #cob .graph {
-    width: 70%;
-    height: 70%;
     position: absolute;
     right: 0px;
+    width: 70%;
+    height: 70%;
+}
+#cob .graph .cy {
+    width: 100%;
+    height: 100%;
+}
+#cob .graph .graph_controls {
+    position:absolute;
+    list-style: none outside none;
+    right: 0;
+    top: 0;
 }
 #cob .menu {
     width: 30%;

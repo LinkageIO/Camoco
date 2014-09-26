@@ -24,19 +24,22 @@ def Ontology_Terms(term_name):
         "data": [ (term.id,term.name,len(term.snp_list),len(term.gene_list)) for term in co.Ontology(term_name).iter_terms()]
     })
 
-@app.route('/api/Annotations/',methods=['GET','POST'])
-def Annotations():
-    genes = request.args.get('genes').split(',')
-    print( co.Annotation('Func')[genes])
+@app.route('/api/Annotations/<network_name>/<ontology_name>/<term_name>',methods=['GET','POST'])
+def Annotations(network_name,ontology_name,term_name):
+    # Retrieve SNPs from 
+    gene_annots = co.Annotation('Func')[request.args.get('genes').split(',')]
+    import pprint
+    pprint.pprint(list(gene_annots.itertuples(index=False)))
+     
     return jsonify({
-        'data' : co.Annotation('Func')[genes]
+        'data' : list(gene_annots.itertuples(index=False))
     })
 
 @app.route("/api/COB/<network_name>/<ontology>/<term>")
 def COB_network(network_name,ontology,term):
     try:
         net = {}
-        subnet = co.COB(network_name).subnetwork(co.Ontology(ontology)[term].gene_list)
+        subnet = co.COB(network_name).subnetwork(co.Ontology(ontology)[term].gene_list,min_distance=100000)
         net['nodes'] = [ {'data':{'id':str(x), 'index':i }} for i,x in enumerate(set(subnet.source).union(subnet.target)) ]
         net['edges'] = [
             {
@@ -49,7 +52,6 @@ def COB_network(network_name,ontology,term):
             } for source,target,score,distance in subnet.itertuples(index=False)
         ]
         return jsonify(net)
-        
         return(str(network_name)+str(ontology_term))
     except Exception as e:
         return 500 
@@ -62,4 +64,4 @@ def fix_inf(val):
 
 if __name__ == "__main__":
     app.debug=True
-    app.run('0.0.0.0')
+    app.run('0.0.0.0',8080)

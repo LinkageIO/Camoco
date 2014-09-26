@@ -4,9 +4,41 @@
         }    
         this.params = $.extend(true,defaults,params)
         this.selected = []
+        // set default filters
+        this.edge_filter = 3 // edge score
+        this.node_filter = 1 // degree
+        
+        this.params.div
+        .append($('<div>',{class:'cy'}))
+        .append($('<ul>',{class:'graph_controls'})
+            .append($('<li>')
+                .append($('<button>Fit</button>',{})
+                    .on({'click':function(){cob.graph.cy.fit()}})
+                )
+            )
+            .append($('<li>')
+                .append('<span>').html('Edge   Filter')
+                    .append($('<input>',{'value':3})
+                        .on({'change':function(){
+                            cob.graph.edge_filter = this.value
+                            cob.graph.filter()
+                        }})
+                    )
+            )
+            .append($('<li>')
+                .append('<span>').html('Degree Filter')
+                    .append($('<input>',{'value':1})
+                        .on({'change':function(){
+                            cob.graph.node_filter = this.value
+                            cob.graph.filter()
+                        }})
+                    )
+            )
+
+        )
 
         this.cy = cytoscape(options = {
-            container : this.params.div[0],    
+            container : this.params.div.find('.cy')[0],    
             // General Options 
             hideEdgesOnViewport: true,
             hideLabelsOnViewport: true,
@@ -44,9 +76,14 @@
                 console.log('Cytoscape Web, ready to rock!')
             }
         })
-        this.show = function(score){
-            this.cy.edges('edge[score < '+score+']').hide()
-            this.cy.edges('edge[score >= '+score+']').show()
+        this.filter = function(){
+            // filter values need to be stored in the graph object because
+            // interface programming sucks.
+            this.cy.edges('edge[score >= '+this.edge_filter+']').show()
+            this.cy.edges('edge[score < '+this.edge_filter+']').hide()
+
+            this.cy.nodes('node[[degree >= '+this.node_filter+']]').show()
+            this.cy.nodes('node[[degree < '+this.node_filter+']]').hide()
         }
     }
 
@@ -82,30 +119,30 @@
         */
 
     } // End Menu
-    Menu.prototype.add_table = function(name, headers, params){
+    Menu.prototype.add_table = function(params){
         this.params.div
             .append(
-                $('<table>',{class: name+' display',cellspacing:'0',width:'100%'})
+                $('<table>',{class: params.name+' display',cellspacing:'0',width:'100%'})
                 .append($('<thead>')
                         .append($('<tr>')
                         )
                 )
             )
-        for (var i=0; i<headers.length; i++){
-            this.params.div.find('table.'+name+' thead tr')
-            .append($('<th>'+headers[i]+'</th>'))
+        for (var i=0; i<params.header.length; i++){
+            this.params.div.find('table.'+params.name+' thead tr')
+            .append($('<th>'+params.header[i]+'</th>'))
         }
-        this[name] = $('#cob .'+name).DataTable(
+        this[params.name] = $('#cob .'+params.name).DataTable(
             $.extend(true,{
             "processing" : true,
             "autoWidth": false, 
-            "sScrollY":  '300px',
             "bPaginate": false,
             "bJQueryUI": true,
             "bScrollCollapse": true,
             "bAutoWidth": false,
             "sScrollXInner": "100%",
-            "sScrollX": true
+            "sScrollX": true,
+            "sScrollY":  '100%',
             },params)
         )
     }
@@ -135,39 +172,47 @@
         this.menu = new Menu({
             'div' :$('#cob .menu')
         });
-        this.menu.add_table('OntologyTable',['Ontology','Description'],{
+        this.menu.add_table({
+            "name" : 'OntologyTable',
+            "header" : ['Ontology','Description'],
             "ajax":"Camoco/available_datasets/Ontology",
+            'sScrollY': this.menu.params.div.innerHeight()/2
         })
-        this.menu.add_table('TermTable',['Name','Desc','Num SNPs','Num Genes'])
+        this.menu.add_table({
+            "name":'TermTable',
+            'header':['Name','Desc','Num SNPs','Num Genes'],
+            'sScrollY': this.menu.params.div.innerHeight()/2
+        })
         // loci table
         this.loci = new Menu({
             'div' : $('#cob .loci')
         })
         this.loci.highlighted_rows = []
-        this.loci.add_table('LociTable',
-            [   'Locus',
-                'Transcript',
-                'Chr',
-                'Start',
-                'End',
-                'Strand',
-                'MaizeSeq.org Annot',
-                'BFGR Annot',
-                'PFAM Domain',
-                'Rice Orth',
-                'Rice Annot',
-                'Sorghum Orth',
-                'Sorghum Annot',
-                'Panicum Orth',
-                'Panicum Annot',
-                'Grassius TF',
-                'MapMan',
-                'classical',
-                'EFP Link',
-                'Functional Annot'
-            ],
-            {}
-        )
+        this.loci.add_table({
+            'name': 'LociTable',
+            'header': ['Locus',
+                    'Transcript',
+                    'Chr',
+                    'Start',
+                    'End',
+                    'Strand',
+                    'MaizeSeq.org Annot',
+                    'BFGR Annot',
+                    'PFAM Domain',
+                    'Rice Orth',
+                    'Rice Annot',
+                    'Sorghum Orth',
+                    'Sorghum Annot',
+                    'Panicum Orth',
+                    'Panicum Annot',
+                    'Grassius TF',
+                    'MapMan',
+                    'classical',
+                    'EFP Link',
+                    'Functional Annot'
+                ],
+            'sScrollY':this.loci.params.div.innerHeight()
+        })
         this.footer = new Footer({});
         this.header = new Header({});
 
@@ -181,10 +226,10 @@
             cob.menu.OntologyTable.loadedontolgy = name
         });
         $('#cob .TermTable tbody').on('click','tr', function(){
-            document.LoadedTerm = $('td',this).eq(0).text();
+            cob.menu.LoadedTerm = $('td',this).eq(0).text();
             $('#cob .TermTable .selected').toggleClass('selected')
             $(this).toggleClass('selected')
-            $.getJSON('api/COB/ROOT/'+cob.menu.LoadedOntology+'/'+document.LoadedTerm)
+            $.getJSON('api/COB/ROOT/'+cob.menu.LoadedOntology+'/'+cob.menu.LoadedTerm)
                 .done(function(data){
                     a = data
                     console.log('loading data')
@@ -242,8 +287,9 @@
             for(var i=0; i < nodes.length; i++){
                 node_ids.push(nodes[i].id())
             }
+            var term = 
             this.loci.LociTable.clear()
-                .ajax.url("api/Annotations?genes="+node_ids.join(','))
+                .ajax.url("api/Annotations/ROOT/"+cob.menu.LoadedOntology+"/"+cob.menu.LoadedTerm+"?genes="+node_ids.join(','))
                 .load().columns.adjust().draw()
         }
     }
