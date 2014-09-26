@@ -14,13 +14,24 @@ class Annotation(Camoco):
 
     def __getitem__(self,item):
         if isinstance(item,list):
-            return self.db.cursor().execute('''
+            cur = self.db.cursor().execute('''
                 SELECT * from annotations WHERE gene IN ('{}')
-            '''.format("','".join(item))).fetchall()
+            '''.format("','".join(item)))
+            return pd.DataFrame(
+                columns = [x[0] for x in cur.getdescription()],
+                data=cur.fetchall(),
+                dtype=object
+            )
         else:
             # return a tuple of annotations
-            return self.db.cursor().execute('''
-                SELECT * from annotations WHERE gene = ?''',(item,)).fetchone()
+            cur = self.db.cursor().execute('''
+                SELECT * from annotations WHERE gene = ?''',(item,))
+            return pd.Series(
+                index = [x[0] for x in cur.getdescription()],
+                data=cur.fetchone(),
+                dtype=object
+            )
+
 
     @classmethod
     def from_csv(cls,name,description,refgen,filename,sep="\t"):
