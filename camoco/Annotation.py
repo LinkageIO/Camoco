@@ -15,7 +15,10 @@ class Annotation(Camoco):
     def __getitem__(self,item):
         if isinstance(item,list):
             cur = self.db.cursor().execute('''
-                SELECT * from annotations WHERE gene IN ('{}')
+                SELECT  
+                gene,chrom,start,end,strand,maizeseq,bfgr,pfam,rice_orth,rice_annot,sorghum_orth,
+                sorghum_annot,panicum_orth,panicum_annot,grassius_tf,mapman,classical,efp,functional_annot
+                from annotations WHERE gene IN ('{}')
             '''.format("','".join(item)))
             return pd.DataFrame(
                 columns = [x[0] for x in cur.getdescription()],
@@ -25,7 +28,11 @@ class Annotation(Camoco):
         else:
             # return a tuple of annotations
             cur = self.db.cursor().execute('''
-                SELECT * from annotations WHERE gene = ?''',(item,))
+                SELECT  
+                gene,chrom,start,end,strand,maizeseq,bfgr,pfam,rice_orth,rice_annot,sorghum_orth,
+                sorghum_annot,panicum_orth,panicum_annot,grassius_tf,mapman,classical,efp,functional_annot
+                from annotations WHERE gene IN ('{}')
+            ''',(item,))
             return pd.Series(
                 index = [x[0] for x in cur.getdescription()],
                 data=cur.fetchone(),
@@ -85,4 +92,5 @@ class Annotation(Camoco):
                 functional_annot TEXT
             )
         ''')
+
 
