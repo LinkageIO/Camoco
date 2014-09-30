@@ -57,7 +57,7 @@
             })
             .selector(':selected')
             .css({
-                'border-width': 3,
+                'border-width': 10,
                 'border-color': '#09BA00'
             })
             .selector('edge')
@@ -247,6 +247,12 @@
                     console.log("Nopers")
                 })
         })
+        $('#cob .LociTable tbody').on('click','tr',function(){
+            gene = $('td',this).eq(0).text();
+            cob.graph.cy.center(
+                cob.graph.cy.nodes('node[id="'+gene+'"]').select()
+            )
+        })
         this.graph.cy.on('click','node',{},function(evt){
             var node = evt.cyTarget
             console.log("CLICKED "+node.id())
@@ -255,10 +261,12 @@
                 .nodes()
                 .to$()
                 .toggleClass('selected')
+            // highlight new rows
             cob.loci.highlighted_rows = cob.loci.LociTable.rows().flatten()
                 .filter(function(rowIdx){
                     return cob.loci.LociTable.cell(rowIdx,0).data() == node.id() ? true : false;
                 })
+            // scroll to row
             $('.loci .dataTables_scrollBody').scrollTo(
                 cob.loci.LociTable.rows(cob.loci.highlighted_rows)
                     .nodes()

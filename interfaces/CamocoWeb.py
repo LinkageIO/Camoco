@@ -28,9 +28,6 @@ def Ontology_Terms(term_name):
 def Annotations(network_name,ontology_name,term_name):
     # Retrieve SNPs from 
     gene_annots = co.Annotation('Func')[request.args.get('genes').split(',')]
-    import pprint
-    pprint.pprint(list(gene_annots.itertuples(index=False)))
-     
     return jsonify({
         'data' : list(gene_annots.itertuples(index=False))
     })
