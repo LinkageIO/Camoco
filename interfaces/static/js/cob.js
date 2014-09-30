@@ -62,7 +62,7 @@
             })
             .selector('edge')
             .css({
-                'opacity': '0.25',
+                'opacity': '0.50',
                 'width': 'mapData(score, 3, 7, 1, 20)',
                 'curve-style': 'haystack' // fast edges!
             }),
@@ -191,7 +191,6 @@
         this.loci.add_table({
             'name': 'LociTable',
             'header': ['Locus',
-                    'Transcript',
                     'Chr',
                     'Start',
                     'End',
@@ -286,6 +285,15 @@
                 })
                 cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
             },100)
+        })
+        $.contextMenu({
+            selector : '.LociTable th',
+            callback : function(key,options){
+                a=1
+            },
+            items : {
+                "relabel" : {name:'ReLabel Genes'} 
+            }
         })
 
         this.load_annotations = function(){
