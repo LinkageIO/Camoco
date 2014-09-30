@@ -385,9 +385,10 @@ class COB(Camoco):
                 [(gene.id,layout[i][0],layout[i][1]) for i,gene in enumerate(gene_list)]
             )
 
-    def mcl(self,gene_list,I=2.0):
+    def mcl(self,gene_list,I=2.0,min_distance=100000):
         from subprocess import Popen, PIPE
-        MCLstr = "\n".join(["{}\t{}\t{}".format(a,b,c) for a,b,c in self.subnetwork(gene_list).itertuples(index=False)])
+        MCLstr = "\n".join(["{}\t{}\t{}".format(a,b,c) for a,b,c in \
+            self.subnetwork(gene_list,min_distance=min_distance)[['source','target','score']].itertuples(index=False)])
         cmd = "mcl - --abc -scheme 6 -I {} -o -".format(I)
         p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=self.log_file, shell=True)
         sout,serr = p.communicate(MCLstr.encode('utf-8'))
