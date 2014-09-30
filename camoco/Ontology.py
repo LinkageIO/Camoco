@@ -132,7 +132,7 @@ class Ontology(Camoco):
     def terms(self):
         return list(self.iter_terms())
 
-    def enrichment(self,gene_list,pval_cutoff=0.05,gene_filter=None):
+    def enrichment(self,gene_list,pval_cutoff=0.05,gene_filter=None,label=None):
         # extract possible terms for genes
         cur = self.db.cursor()
         terms = [ x[0] for x in cur.execute(
@@ -167,6 +167,8 @@ class Ontology(Camoco):
         except ValueError as e:
             self.log("No enrichment for {}",",".join([x.id for x in gene_list]))
             return DataFrame()
+        if label:
+            enrichment['Label'] = label
         return enrichment[enrichment.pval <= pval_cutoff]
 
     def print_term_stats(self, cob_list, filename=None, pos_limit=50000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
@@ -175,7 +177,7 @@ class Ontology(Camoco):
     
 
     def summary(self):
-        return "Ontology: name:{} - desc: {} - contains {} terms".format(self.name,self.desc,len(self))
+        return "Ontology: name:{} - desc: {} - contains {} terms for {}".format(self.name,self.desc,len(self),self.refgen)
    
     @classmethod
     def create(cls,name,description,refgen,basedir="~/.camoco"):
