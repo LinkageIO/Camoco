@@ -8,9 +8,11 @@ from camoco.Tools import log
 from collections import defaultdict
 from pandas import DataFrame
 from scipy.stats import hypergeom
-from itertools import chain
+import itertools
 import re
 import sys
+
+
 
 class Term(object):
     def __init__(self,id,name='',type='',desc='',gene_list=None,snp_list=None):
@@ -37,18 +39,33 @@ class Term(object):
 
     def add_snp(self,snp):
         self.snp_list.add(snp) 
+    
+    def flanking_genes(self,refgen,window_size=100000,gene_limit=4,chain=True):
+        ''' returns flanking genes based on some set of arbitrary rules from a refgen '''
+        if chain:
+            return set(itertools.chain(*[refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]))
+        else:
+            return [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
 
-    def flanking_genes(self,refgen,pos_limit=50000,gene_limit=4):
-        return set(chain(*[refgen.flanking_genes(x,gene_limit=gene_limit,pos_limit=pos_limit) for x in self.snp_list]))
+    def flanking_snps(self,gene,window_size=100000):
+        ''' returns any nearby Term SNPs to a gene '''
+        return [snp for snp in self.snp_list if abs(gene-snp) <= window_size]
 
-    def print_stats(self,cob_list,file=sys.stdout, pos_limit=50000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
+    def bootstrap_flanking_genes(self,refgen,window_size=100000,gene_limit=4,chain=True):
+        ''' returns random flanking genes, with similar properties, based on an arbitrary set of rules'''
+        if chain:
+            return set(itertools.chain(*[refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]))
+        else:   
+            return [refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
+
+    def print_stats(self,cob_list,file=sys.stdout, window_limit=100000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
         for cob in cob_list:
             # MAKE SURE WE ARE DEALING WITH A SET!!!!!!!!!! Lists will have duplicates in it!
-            flanks = self.flanking_genes(cob.refgen,pos_limit=pos_limit,gene_limit=gene_limit)
+            flanks = self.flanking_genes(cob.refgen,window_limit=window_limit,gene_limit=gene_limit)
             log("On Term {} with {}. {}/{} genes from {} SNPs",self.id,cob.name,len(flanks),len(self.gene_list),len(self.snp_list))
-            density  = cob.density(flanks,min_distance=2*pos_limit)
-            locality = cob.locality(flanks,min_distance=2*pos_limit)
-            len_LCC = len(cob.lcc(flanks,min_distance=2*pos_limit).vs)
+            density  = cob.density(flanks,min_distance=window_size)
+            locality = cob.locality(flanks,min_distance=window_size)
+            len_LCC = len(cob.lcc(flanks,min_distance=window_size).vs)
             print("{}\t{}_NumSNPS\t{}".format(self.id,cob.name,len(self.snp_list)),file=file)
             print("{}\t{}_NumGenes\t{}".format(self.id,cob.name,len(flanks)),file=file)
             print("{}\t{}_TransDensity\t{}".format(self.id,cob.name,density),file=file)
@@ -62,16 +79,14 @@ class Term(object):
                 bs_lcc = []
                 for x in range(num_bootstrap):
                     bs_flanks = list(chain.from_iterable(
-                        [cob.refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,pos_limit=pos_limit) for x in self.snp_list]
+                        [cob.refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
                     ))
-                    bs_density.append(cob.density(bs_flanks,min_distance=2*pos_limit))           
-                    bs_local.append(cob.locality(bs_flanks,min_distance=2*pos_limit))
-                    bs_lcc.append(len(cob.lcc(bs_flanks,min_distance=2*pos_limit).vs))
+                    bs_density.append(cob.density(bs_flanks,min_distance=window_size))           
+                    bs_local.append(cob.locality(bs_flanks,min_distance=window_size))
+                    bs_lcc.append(len(cob.lcc(bs_flanks,min_distance=window_size).vs))
                 print("{}\t{}_BS_TransDensity\t{}".format(self.id,cob.name,sum([x >= density for x in bs_density])),file=file)
                 print("{}\t{}_BS_Locality\t{}".format(self.id,cob.name,sum([x >= locality for x in bs_local])),file=file)
                 print("{}\t{}_BS_LCC\t{}".format(self.id,cob.name,sum([x >= len_LCC for x in bs_lcc])),file=file)
-                #cob.heatmap(cob.gene_expression_vals(flanks),filename="{}_{}_Heatmap.png".format(self.id,cob.name)) 
-                #cob.plot(flanks,filename="{}_{}_Network.png".format(self.id,cob.name),layout='kk',height=800,width=800)
 
     def __str__(self):
         return "Term: {}, {} genes, {} SNPs".format(self.id,len(self.gene_list),len(self.snp_list))
@@ -171,9 +186,9 @@ class Ontology(Camoco):
             enrichment['Label'] = label
         return enrichment[enrichment.pval <= pval_cutoff]
 
-    def print_term_stats(self, cob_list, filename=None, pos_limit=50000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
+    def print_term_stats(self, cob_list, filename=None, window_size=100000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
         for term in self.iter_terms():
-            term.print_stats(cob_list,filename,pos_limit,gene_limit,num_bootstraps,bootstrap_density)
+            term.print_stats(cob_list,filename,window_size=window_size,gene_limit=gene_limit,num_bootstraps=num_bootstraps,bootstrap_density=boostrap_density)
     
 
     def summary(self):
