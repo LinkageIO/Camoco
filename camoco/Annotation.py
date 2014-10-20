@@ -13,26 +13,26 @@ class Annotation(Camoco):
             self.log('Refgen not assigned')
 
     def __getitem__(self,item):
-        if isinstance(item,list):
+        if isinstance(item,(set,list)):
             cur = self.db.cursor().execute('''
                 SELECT  
                 gene,chrom,start,end,strand,maizeseq,bfgr,pfam,rice_orth,rice_annot,sorghum_orth,
                 sorghum_annot,panicum_orth,panicum_annot,grassius_tf,mapman,classical,efp,functional_annot
                 from annotations WHERE gene IN ('{}')
-            '''.format("','".join(item)))
-            return pd.DataFrame(
+            '''.format("','".join([gene.id for gene in item])))
+            return pd.DataFrame(data=[x.id for x in item],columns=['gene']).merge(pd.DataFrame(
                 columns = [x[0] for x in cur.getdescription()],
                 data=cur.fetchall(),
                 dtype=object
-            )
+            ),how='left',on='gene')
         else:
             # return a tuple of annotations
             cur = self.db.cursor().execute('''
                 SELECT  
                 gene,chrom,start,end,strand,maizeseq,bfgr,pfam,rice_orth,rice_annot,sorghum_orth,
                 sorghum_annot,panicum_orth,panicum_annot,grassius_tf,mapman,classical,efp,functional_annot
-                from annotations WHERE gene IN ('{}')
-            ''',(item,))
+                from annotations WHERE gene = ?)
+            ''',(item.id,))
             return pd.Series(
                 index = [x[0] for x in cur.getdescription()],
                 data=cur.fetchone(),
