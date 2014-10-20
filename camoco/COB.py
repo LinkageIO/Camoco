@@ -9,6 +9,7 @@ from camoco.Tools import memoize
 from numpy import matrix,arcsinh
 from scipy.stats import pearsonr
 from collections import defaultdict
+from itertools import chain
 
 import igraph as ig
 import numpy as np
@@ -175,7 +176,7 @@ class COB(Camoco):
         self.log("Found {} genes in subnetwork",len(local))
         return(local)
 
-    def subnetwork(self,gene_list,sig_only=True,min_distance=None):
+    def subnetwork(self,gene_list,sig_only=True,min_distance=100000):
         ''' Input: a gene list
             Output: a dataframe containing all edges EXCLUSIVELY between genes within list
         '''
@@ -385,11 +386,12 @@ class COB(Camoco):
                 [(gene.id,layout[i][0],layout[i][1]) for i,gene in enumerate(gene_list)]
             )
 
-    def mcl(self,gene_list,I=2.0,min_distance=100000):
+    def mcl(self,gene_list,I=2.0,scheme=7,min_distance=100000):
         from subprocess import Popen, PIPE
         MCLstr = "\n".join(["{}\t{}\t{}".format(a,b,c) for a,b,c in \
             self.subnetwork(gene_list,min_distance=min_distance)[['source','target','score']].itertuples(index=False)])
-        cmd = "mcl - --abc -scheme 6 -I {} -o -".format(I)
+        cmd = "mcl - --abc -scheme {} -I {} -o -".format(scheme,I)
+        self.log("running MCL: {}",cmd)
         p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=self.log_file, shell=True)
         sout,serr = p.communicate(MCLstr.encode('utf-8'))
         p.wait()
@@ -567,8 +569,7 @@ class COB(Camoco):
         self.log("object '{}' is not correct type to test for membership in {}",obj,self.name)
         
 
-class COBBuilder(Camoco):
-    def __init__(self, name, description, FPKM, refgen, organism, basedir="~/.camoco"):
+    def save(self, name, description, FPKM, refgen, organism, basedir="~/.camoco"):
         super().__init__(name,description,type="COB",basedir=basedir)
         self._global('FPKM',FPKM)
         self._global('refgen',refgen.name)
@@ -576,19 +577,13 @@ class COBBuilder(Camoco):
         self.refgen = RefGen(self.refgen)
         self._create_tables()
 
-    @memoize
-    def genes(self):
-        ''' returns a list of genes used to build COB '''
-        return self.refgen.from_ids([x[0] for x in 
-            self.db.cursor().execute('SELECT DISTINCT(gene) FROM expression').fetchall()
-        ])
-
     def add_accession(self,name,type="",description=""):
         ''' adds an accession to the database, useful for updating accessions with 
             details after importing them from a DataFrame '''
         self.db.cursor().execute(''' 
             INSERT OR UPDATE INTO accessions (name,type,description) VALUES (?,?,?)''',(name,type,description)
         )
+
 
     def from_DataFrame(self, df, transform=np.arctanh, significance_thresh=3, min_expr=1, 
         max_gene_missing_data=0.2, min_single_sample_expr=5, 
@@ -727,7 +722,18 @@ class COBBuilder(Camoco):
         df = pd.read_table(filename,sep=sep)
         cob = cls(name,description,FPKM,refgen,organism,basedir)
         cob.from_DataFrame(df,**kwargs)
-    
+   
+    def _build_degree(self):
+        degree = defaultdict(lambda : 0)
+        for gene_a,gene_b in self.db.cursor().execute('''
+                SELECT gene_a,gene_b FROM coex WHERE significant = 1;
+            ''').fetchall():
+            degree[gene_a] += 1
+            degree[gene_b] += 1
+        self.db.cursor().executemany(''' 
+            INSERT INTO degree (gene,degree) VALUES (?,?);
+        ''',degree.items())
+ 
     def _build_indices(self):
         self.db.cursor().execute(''' 
             CREATE INDEX IF NOT EXISTS coex_abs ON coex (gene_a); 
@@ -764,6 +770,10 @@ class COBBuilder(Camoco):
                 gene TEXT,
                 accession TEXT,
                 value REAL
+            );
+            CREATE TABLE IF NOT EXISTS degree (
+                gene TEXT,
+                degree INTEGER
             );
             CREATE TABLE IF NOT EXISTS coex (
                 gene_a TEXT,
