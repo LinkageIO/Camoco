@@ -2,8 +2,14 @@
 from collections import defaultdict
 import re
 
+class RepLoci(set):
+    ''' This class is a super representation of a set of loci '''
+    def __init__(self,iterable=None):
+        super().__init__(iterable)
+    
+
 class Locus(object):
-    def __init__(self, chrom, start, end, id=None ,gene_build='5b', organism='Zea'):
+    def __init__(self, chrom, start, end, id=None ,gene_build='5b', organism='Zea', window=100000):
         self.chrom = chrom
         try:
             self.start = int(start)
@@ -87,7 +93,7 @@ class SNP(Locus):
         self.pos = int(pos)
         super(self.__class__,self).__init__(str(chrom),int(pos),int(pos),id,gene_build,organism)
     def summary(self):
-        return "SNP-{}-{}:{}".format(self.id,self.chrom,self.start)
+        return "S{}:{}".format(self.chrom,self.start)
 
     @classmethod
     def from_str(cls,string,regex='.*(\d+)_(\d+).*'):
