@@ -142,18 +142,21 @@ class RefGen(Camoco):
         ) if Gene(*x) in gene_filter][0:int(gene_limit)]
 
 
-    def flanking_genes(self, locus, gene_limit=2, pos_limit=10e6,chain=True,gene_filter=None):
+    def flanking_genes(self, locus, gene_limit=4, window_size=100000,chain=True,gene_filter=None):
         ''' Returns genes upstream and downstream from a locus
             ** including genes locus is within **
         '''
-        up_genes = self.upstream_genes(locus, gene_limit=gene_limit/2, pos_limit=pos_limit, gene_filter=gene_filter )
-        down_genes = self.downstream_genes(locus, gene_limit=gene_limit/2, pos_limit=pos_limit, gene_filter=gene_filter )
+        import math
+        upstream_gene_limit = math.ceil(gene_limit/2)
+        downstream_gene_limit = math.floor(gene_limit/2)
+        up_genes = self.upstream_genes(locus, gene_limit=upstream_gene_limit, pos_limit=window_size/2, gene_filter=gene_filter )
+        down_genes = self.downstream_genes(locus, gene_limit=downstream_gene_limit, pos_limit=window_size/2, gene_filter=gene_filter )
         if chain:
             return list(itertools.chain.from_iterable((up_genes,down_genes)))
         else:
             return (up_genes,down_genes)
 
-    def candidate_genes(self, locus, gene_limit=2, pos_limit=10e6,chain=True,gene_filter=None):
+    def candidate_genes(self, locus, gene_limit=2, window_size=100000,chain=True,gene_filter=None):
         ''' if locus is within gene, returns that gene, 
             otherwise returns flanking genes '''
         if not gene_filter:
@@ -161,7 +164,7 @@ class RefGen(Camoco):
         within = self.within_gene(locus,gene_filter=gene_filter)
         if not within:
             return self.flanking_genes(
-                locus,gene_limit,pos_limit,chain=chain,gene_filter=gene_filter
+                locus,gene_limit,window_size=window_size,chain=chain,gene_filter=gene_filter
             )
         else:
             return [within] # candidate genes as in plural, return iterable
@@ -174,25 +177,25 @@ class RefGen(Camoco):
         val,idx  = min((val,idx) for (idx,val) in enumerate([abs(locus-candidate) for candidate in candidates]))
         return candidates[idx]
 
-    def bootstrap_flanking_genes(self,locus,gene_limit=4,pos_limit=50000,gene_filter=None):
+    def bootstrap_flanking_genes(self,locus,gene_limit=4,window_size=100000,gene_filter=None):
         ''' Returns a randoms set of non overlapping flanking genes calculated from 
             SNPs flanking genes which is the same number of genes as would be calculated
             from the actual flanking genes from SNP list'''
-        flanking_genes_index = self.flanking_genes_index(gene_limit=gene_limit,pos_limit=pos_limit)
-        num_genes = len(self.flanking_genes(locus,gene_limit,pos_limit,gene_filter=gene_filter))
+        flanking_genes_index = self.flanking_genes_index(gene_limit=gene_limit,window_size=window_size)
+        num_genes = len(self.flanking_genes(locus,gene_limit=gene_limit,window_size=window_size,gene_filter=gene_filter))
         if num_genes == 0:
             return []
         else:
             return random.choice(flanking_genes_index[num_genes] )
 
     @memoize
-    def flanking_genes_index(self,pos_limit=50000,gene_limit=4):
+    def flanking_genes_index(self,window_size=100000,gene_limit=4):
         ''' Generate an index of flanking genes useful for bootstrapping (i.e. we can get rid of while loop '''
         # iterate over genes keeping track of number of flanking genes 
         self.log("Generating flanking gene index...")
         index = defaultdict(list)
         for gene in self.iter_genes():
-            flanks = self.flanking_genes(gene,gene_limit=gene_limit,pos_limit=pos_limit)
+            flanks = self.flanking_genes(gene,gene_limit=gene_limit,window_size=window_size)
             index[len(flanks)].append(flanks)
         for num in index:
             self.log("Found {} genes with {} flanking genes",len(index[num]),num)
