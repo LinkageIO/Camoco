@@ -106,7 +106,14 @@ class COB(Camoco):
                 OR (gene_b = ? AND gene_a = ?)'''
             ,(gene_a.id,gene_b.id,gene_a.id,gene_b.id)
         ).fetchone()[0]
-        
+    
+    def global_degree(self,gene):
+        try:
+            return self.db.cursor().execute(''' 
+                SELECT degree FROM degree WHERE gene = ?
+            ''',(gene.id,)).fetchone()[0]
+        except TypeError as e:
+            return -1
 
     def neighbors(self,gene_list,min_distance=None,sig_only=True):
         ''' Input : a list of COBGene Objects
