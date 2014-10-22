@@ -1,3 +1,63 @@
+;(function($$){ 'use strict';
+
+  // default layout options
+  var defaults = {
+    ready: function(){}, // on layoutready
+    stop: function(){} // on layoutstop
+  };
+
+  // constructor
+  // options : object containing layout options
+  function SavedLayout( options ){
+    this.options = $$.util.extend(true, {}, defaults, options); 
+  }
+
+  // runs the layout
+  SavedLayout.prototype.run = function(){
+    var options = this.options;
+    var eles = options.eles; // elements to consider in the layout
+    var layout = this;
+
+    // cy is automatically populated for us in the constructor
+    var cy = options.cy; // jshint ignore:line
+
+    if (window.localStorage)
+
+    layout.trigger('layoutstart');
+
+    // puts all nodes at (0, 0)
+    eles.nodes().positions(function(){
+      return {
+        x: 0,
+        y: 0
+      };
+    });
+
+    // trigger layoutready when each node has had its position set at least once
+    layout.one('layoutready', options.ready);
+    layout.trigger('layoutready');
+
+    // trigger layoutstop when the layout stops (e.g. finishes)
+    layout.one('layoutstop', options.stop);
+    layout.trigger('layoutstop');
+
+    return this; // chaining
+  };
+
+  // called on continuous layouts to stop them before they finish
+  SavedLayout.prototype.stop = function(){
+    return this; // chaining
+  };
+
+  // register the layout
+  $$('layout', 'null', SavedLayout);
+
+})(cytoscape);
+
+    function SavedLayout(params){
+        
+    }
+
     function Graph(params){
         defaults = {
             'div':$('<div>'),
@@ -27,7 +87,7 @@
             )
             .append($('<li>')
                 .append('<span>').html('Degree Filter')
-                    .append($('<input>',{'value':1})
+                    .append($('<input>',{'value':0})
                         .on({'change':function(){
                             cob.graph.node_filter = this.value
                             cob.graph.filter()
@@ -49,8 +109,8 @@
                 'background-color': '#144566',
                 'border-width': 1,
                 'border-color': '#000',
-                'height' : 'data(degree)',
-                'width' : 'data(degree)',
+                'height' : 'mapData(gdegree,0,100,1,50)',
+                'width' : 'mapData(gdegree,0,100,1,50)',
                 'content':'data(id)',
                 'text-halign':'right',
                 'min-zoomed-font-size':1
@@ -60,10 +120,20 @@
                 'border-width': 10,
                 'border-color': '#09BA00'
             })
+            .selector('.neighbors')
+            .css({
+                'border-width': 10,
+                'border-color': '#BA0900'
+            })
+            .selector('.highlighted')
+            .css({
+                'border-width': 10,
+                'border-color': '#0900BA'
+            })
             .selector('edge')
             .css({
                 'opacity': '0.50',
-                'width': 'mapData(score, 3, 7, 1, 20)',
+                'width': 'mapData(score, 3, 7, 1, 50)',
                 'curve-style': 'haystack' // fast edges!
             }),
             layout: {
@@ -176,12 +246,12 @@
             "name" : 'OntologyTable',
             "header" : ['Ontology','Description'],
             "ajax":"Camoco/available_datasets/Ontology",
-            'sScrollY': this.menu.params.div.innerHeight()/2
+            'sScrollY': this.menu.params.div.innerHeight()/3
         })
         this.menu.add_table({
             "name":'TermTable',
-            'header':['Name','Desc','Num SNPs','Num Genes'],
-            'sScrollY': this.menu.params.div.innerHeight()/2
+            'header':['Name','Desc','Num SNPs','Num Genes','Root Genes'],
+            'sScrollY': this.menu.params.div.innerHeight()/3
         })
         // loci table
         this.loci = new Menu({
@@ -195,6 +265,11 @@
                     'Start',
                     'End',
                     'Strand',
+                    'Global Degree',
+                    'Term SNPs',
+                    'In Root?',
+                    'In SAM?',
+                    'In PAN?',
                     'MaizeSeq.org Annot',
                     'BFGR Annot',
                     'PFAM Domain',
@@ -252,9 +327,21 @@
                 cob.graph.cy.nodes('node[id="'+gene+'"]').select()
             )
         })
+        this.graph.cy.on('cxttap','node',{},function(evt){
+            var node = evt.cyTarget
+            node.toggleClass('highlighted')
+        })
+        this.graph.cy.on('click',function(evt){
+            if(evt.cyTarget == cob.graph.cy){
+                //remove all non-sticky decorators
+                cob.graph.cy.$('.neighbors').removeClass('neighbors')
+                cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
+            }
+        })
         this.graph.cy.on('click','node',{},function(evt){
             var node = evt.cyTarget
             console.log("CLICKED "+node.id())
+            // highlight neighbors
             //unhighlight old rows
             cob.loci.LociTable.rows(cob.loci.highlighted_rows)
                 .nodes()
@@ -272,6 +359,8 @@
                     .to$()
                     .toggleClass('selected')
             )
+            cob.graph.cy.$('.neighbors').removeClass('neighbors')
+            node.neighborhood().addClass('neighbors')
         })
         var timeout;
         this.graph.cy.on('select',{},function(evt){
