@@ -22,7 +22,7 @@ body {
     position: absolute;
     right: 0px;
     width: 70%;
-    height: 70%;
+    height: 100%;
 }
 #cob .graph .cy {
     width: 100%;
@@ -36,8 +36,10 @@ body {
 }
 #cob .menu {
     width: 30%;
-    height: 70%;
     position: absolute;
+    background: url('../../static/images/tilate.png') repeat;
+    height: 100%;
+    overflow-x: hidden;
 }
 #cob .loci {
     width: 100%;
@@ -56,6 +58,46 @@ body {
     position: absolute;
 }
 
+#cob .menu ul {
+    display: table;
+    list-style: outside none none;
+    margin: 0 auto;
+    max-height: 14pt;
+    overflow: hidden;
+    padding: 0;
+}
+#cob .menu ul li {
+    color: white;
+    display: inline;
+    font-size: 10pt;
+    height: 0.5em;
+    margin: 0 0.15em;
+    width: 100px;
+    cursor: pointer;
+    background: #555555;
+}
+#cob .menu ul li.selected {
+    background-color: black; 
+}
+#cob .menu div.tabs {
+    background: none no-repeat scroll 0 0 transparent;
+    margin-left: 5px;
+    position: relative;
+    height: 100%;
+}
+
+#cob .menu div.tab {
+    display: inline;
+    float: left;
+    margin-bottom: 10px;
+    margin-left: 5px;
+    margin-right: 5px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: relative;
+    height: 100%;
+}
+
 div .tab .bar {
     color: #ffffff;
     left: 0;
@@ -64,4 +106,4 @@ div .tab .bar {
     padding: 12px;
     top: 0;
     width: 350px;
-;}
+}

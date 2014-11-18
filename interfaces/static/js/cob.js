@@ -1,59 +1,3 @@
-;(function($$){ 'use strict';
-
-  // default layout options
-  var defaults = {
-    ready: function(){}, // on layoutready
-    stop: function(){} // on layoutstop
-  };
-
-  // constructor
-  // options : object containing layout options
-  function SavedLayout( options ){
-    this.options = $$.util.extend(true, {}, defaults, options); 
-  }
-
-  // runs the layout
-  SavedLayout.prototype.run = function(){
-    var options = this.options;
-    var eles = options.eles; // elements to consider in the layout
-    var layout = this;
-
-    // cy is automatically populated for us in the constructor
-    var cy = options.cy; // jshint ignore:line
-
-    if (window.localStorage)
-
-    layout.trigger('layoutstart');
-
-    // puts all nodes at (0, 0)
-    eles.nodes().positions(function(){
-      return {
-        x: 0,
-        y: 0
-      };
-    });
-
-    // trigger layoutready when each node has had its position set at least once
-    layout.one('layoutready', options.ready);
-    layout.trigger('layoutready');
-
-    // trigger layoutstop when the layout stops (e.g. finishes)
-    layout.one('layoutstop', options.stop);
-    layout.trigger('layoutstop');
-
-    return this; // chaining
-  };
-
-  // called on continuous layouts to stop them before they finish
-  SavedLayout.prototype.stop = function(){
-    return this; // chaining
-  };
-
-  // register the layout
-  $$('layout', 'null', SavedLayout);
-
-})(cytoscape);
-
     function SavedLayout(params){
         
     }
@@ -65,6 +9,8 @@
         this.params = $.extend(true,defaults,params)
         this.selected = []
         // set default filters
+        this.removed_edges = []
+        this.removed_nodes = []
         this.edge_filter = 3 // edge score
         this.node_filter = 1 // degree
         
@@ -109,8 +55,8 @@
                 'background-color': '#144566',
                 'border-width': 1,
                 'border-color': '#000',
-                'height' : 'mapData(gdegree,0,100,1,50)',
-                'width' : 'mapData(gdegree,0,100,1,50)',
+                'height' : 'mapData(gdegree,0,100,50,10)',
+                'width' : 'mapData(gdegree,0,100,50,10)',
                 'content':'data(id)',
                 'text-halign':'right',
                 'min-zoomed-font-size':1
@@ -149,72 +95,122 @@
         this.filter = function(){
             // filter values need to be stored in the graph object because
             // interface programming sucks.
-            this.cy.edges('edge[score >= '+this.edge_filter+']').show()
-            this.cy.edges('edge[score < '+this.edge_filter+']').hide()
-
-            this.cy.nodes('node[[degree >= '+this.node_filter+']]').show()
-            this.cy.nodes('node[[degree < '+this.node_filter+']]').hide()
+            //this.cy.edges('edge[score >= '+this.edge_filter+']').show()
+            try{
+                this.removed_edges.restore()
+            }
+                catch (e if e instanceof TypeError){
+            }
+            this.removed_edges = this.cy.edges('edge[score < '+this.edge_filter+']').remove()
+            //this.cy.nodes('node[[degree >= '+this.node_filter+']]').show()
+            try{
+                this.removed_nodes.restore()
+            }
+                catch( e if e instanceof TypeError){
+            }
+            this.removed_nodes = this.cy.nodes('node[[degree < '+this.node_filter+']]').remove()
         }
     }
 
     function Tab(params){
-        this.name = params.name
-        this.div = params.div || $('<div>')
-    }
-    
-    function Bar(params){
-        // expand with defaults
-        params = $.extend(true,{
-            'title': 'Hello',
-            'body' : 'World'
-        },params)
-        this.div = params.div || $('<div>');
-        this.div.append($('<a>',{class:'collapse'}))
-                .append($('<span>',{class:'title'}).html(params.title))
-                .append($('<span>',{class:'body'}).html(params.body))
-    }
+        defaults = {
+            'name' : 'nope',
+            'div' : $('<div>',{class:'tab'})
+        }
+        this.params = $.extend(true,defaults,params)
 
+        this.add_table = function(params){
+            this.params.div
+                .append(
+                    $('<table>',{class: params.name+' display',cellspacing:'0',width:'100%'})
+                    .append($('<thead>')
+                            .append($('<tr>')
+                            )
+                    )
+                )
+            for (var i=0; i<params.header.length; i++){
+                this.params.div.find('table.'+params.name+' thead tr')
+                .append($('<th>'+params.header[i]+'</th>'))
+            }
+            this[params.name] = $('#cob .'+params.name).DataTable(
+                $.extend(true,{
+                "processing" : true,
+                "autoWidth": true, 
+                "bPaginate": false,
+                "bJQueryUI": true,
+                "bScrollCollapse": true,
+                "bAutoWidth": false,
+                "sScrollXInner": "100%",
+                "sScrollX": true,
+                "sScrollY":  '100%',
+                },params)
+            )
+        }
+
+    } // End Tab
+    
     function Menu(params){
         // Initialize Tables
         this.tabs = []
         this.handle = []
-        this.tables = []
+        //this.tables = []
         defaults = {
-            'div' : $('<div>',{'class':'menu'})
+            'div' : $('<div>',{'class':'menu'}),
+            'header' : $('<ul>',{'class':'header'}),
+            'tabs' : $('<div>',{'class':'tabs'})
         }
         this.params = $.extend(true,defaults,params)
         // Add the ontology and term table
-        // Initialize Actions
-        /*
-        */
+        this.params.div.append(this.params.header)
+        this.params.div.append(this.params.tabs)
+        this.tabwidth = this.params.div.width()
+        var that = this
 
-    } // End Menu
-    Menu.prototype.add_table = function(params){
-        this.params.div
-            .append(
-                $('<table>',{class: params.name+' display',cellspacing:'0',width:'100%'})
-                .append($('<thead>')
-                        .append($('<tr>')
-                        )
-                )
-            )
-        for (var i=0; i<params.header.length; i++){
-            this.params.div.find('table.'+params.name+' thead tr')
-            .append($('<th>'+params.header[i]+'</th>'))
+        this.params.header.on('click','li',function(){
+            that.show_tab.call(that,$(this).index())
+        });
+
+        this.show_tab = function(tabname){
+            if (!isNaN(parseFloat(tabname)) && isFinite(tabname) && tabname < this.tabs.length){
+                // is tab index, return that index 
+                index = tabname
+                this.params.tabs.css('left','-'+(this.tabwidth*index)+'px')
+            }
+            for(var i=0; i< this.tabs.length;i++){
+                // check each tab for tabname
+                if (this.tabs[i].params.name == tabname)
+                    index = i
+                    this.params.tabs.css('left','-'+(this.tabwidth*index)+'px')
+            }
+            return undefined
         }
-        this[params.name] = $('#cob .'+params.name).DataTable(
-            $.extend(true,{
-            "processing" : true,
-            "autoWidth": false, 
-            "bPaginate": false,
-            "bJQueryUI": true,
-            "bScrollCollapse": true,
-            "bAutoWidth": false,
-            "sScrollXInner": "100%",
-            "sScrollX": true,
-            "sScrollY":  '100%',
-            },params)
-        )
+   
+        this.add_tab = function(tab){
+            /*  
+                This function adds a tab to the menu div.
+            */
+            // make the tab as wide as the tab section
+            tab.params.div.css('width',this.tabwidth+'px')
+            this.params.tabs.css('width',(this.tabs.length+1)*this.tabwidth+50+'px')
+            // Append the Tabs name to the header section
+            this.params.header.append($('<li>').html(tab.params.name))
+            this.params.tabs.append(tab.params.div)
+            this.tabs.push(tab)
+        }
+
+        this.get_tab = function(tabname){
+            ///
+            if (!isNaN(parseFloat(tabname)) && isFinite(tabname) && tabname < this.tabs.length)
+                // is tab index, return that index 
+                return this.tabs[tabname]
+            for(var i=0; i< this.tabs.length;i++){
+                // check each tab for tabname
+                if (this.tabs[i].params.name == tabname)
+                    return this.tabs[i]
+            }
+            return undefined
+        }
+
     }
 
     function Footer(params){
@@ -242,23 +238,34 @@
         this.menu = new Menu({
             'div' :$('#cob .menu')
         });
-        this.menu.add_table({
+
+
+        this.menu.add_tab(new Tab({'name':'Dataset'}))
+        this.menu.add_tab(new Tab({'name':'Network'}))
+
+        this.menu.get_tab("Dataset").add_table({
             "name" : 'OntologyTable',
             "header" : ['Ontology','Description'],
             "ajax":"Camoco/available_datasets/Ontology",
-            'sScrollY': this.menu.params.div.innerHeight()/3
+            'sScrollY': this.menu.params.div.innerHeight()/4
         })
-        this.menu.add_table({
+        this.menu.get_tab('Dataset').add_table({
             "name":'TermTable',
             'header':['Name','Desc','Num SNPs','Num Genes','Root Genes'],
-            'sScrollY': this.menu.params.div.innerHeight()/3
+            'sScrollY': this.menu.params.div.innerHeight()/4
+        })
+        this.menu.get_tab('Network').add_table({
+            "name":'NetworkTable',
+            "header":['Network','Description'],
+            "ajax":"Camoco/available_datasets/COB",
+            'sScrollY':this.menu.params.div.innerHeight()/4
         })
         // loci table
         this.loci = new Menu({
             'div' : $('#cob .loci')
         })
         this.loci.highlighted_rows = []
-        this.loci.add_table({
+        /*this.loci.add_table({
             'name': 'LociTable',
             'header': ['Locus',
                     'Chr',
@@ -286,24 +293,30 @@
                     'Functional Annot'
                 ],
             'sScrollY':this.loci.params.div.innerHeight()
-        })
+        })*/
+        
         this.footer = new Footer({});
         this.header = new Header({});
 
         // Register top level events
         $('#cob .OntologyTable tbody').on('click','tr', function() {
             var name = $('td',this).eq(0).text();
-            cob.menu.TermTable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
+            cob.menu.get_tab('Dataset').TermTable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
             cob.menu.LoadedOntology = name
             $('#cob .OntologyTable .selected').toggleClass('selected')
             $(this).toggleClass('selected')
-            cob.menu.OntologyTable.loadedontolgy = name
         });
         $('#cob .TermTable tbody').on('click','tr', function(){
+            // Load the available networks for the Term
             cob.menu.LoadedTerm = $('td',this).eq(0).text();
             $('#cob .TermTable .selected').toggleClass('selected')
             $(this).toggleClass('selected')
-            $.getJSON('api/COB/ROOT/'+cob.menu.LoadedOntology+'/'+cob.menu.LoadedTerm)
+        })
+        $('#cob .NetworkTable tbody').on('click','tr',function(){
+            $('#cob .NetworkTable .selected').toggleClass('selected')
+            $(this).toggleClass('selected')
+            cob.menu.LoadedNetwork = $('td',this).eq(0).text();
+            $.getJSON('api/COB/'+cob.menu.LoadedNetwork+'/'+cob.menu.LoadedOntology+'/'+cob.menu.LoadedTerm)
                 .done(function(data){
                     a = data
                     console.log('loading data')
