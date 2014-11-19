@@ -1,7 +1,7 @@
 body {
     margin: 0;
     font-size: 8pt;
-}
+    overflow: hidden;
 }
 #DatasetTables {
     display: block;
@@ -72,6 +72,7 @@ body {
     font-size: 10pt;
     height: 0.5em;
     margin: 0 0.15em;
+    padding: 0 1.15em;
     width: 100px;
     cursor: pointer;
     background: #555555;
@@ -81,17 +82,13 @@ body {
 }
 #cob .menu div.tabs {
     background: none no-repeat scroll 0 0 transparent;
-    margin-left: 5px;
     position: relative;
-    height: 100%;
 }
 
 #cob .menu div.tab {
     display: inline;
     float: left;
     margin-bottom: 10px;
-    margin-left: 5px;
-    margin-right: 5px;
     overflow-x: hidden;
     overflow-y: auto;
     position: relative;

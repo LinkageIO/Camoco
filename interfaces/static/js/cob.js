@@ -112,6 +112,14 @@
         }
     }
 
+    function Bar(params){
+        defaults = {
+            'name' : 'yuckyuck',
+            'div'  :  $('<div>',{class:'bar'})
+        }
+        this.params = $.extend(true,defaults,params)
+    }
+
     function Tab(params){
         defaults = {
             'name' : 'nope',
@@ -139,9 +147,9 @@
                 "bPaginate": false,
                 "bJQueryUI": true,
                 "bScrollCollapse": true,
-                "bAutoWidth": false,
+                "bAutoWidth": true,
                 "sScrollXInner": "100%",
-                "sScrollX": true,
+                "sScrollX": '100%',
                 "sScrollY":  '100%',
                 },params)
             )
@@ -171,6 +179,7 @@
         });
 
         this.show_tab = function(tabname){
+            var index = undefined
             if (!isNaN(parseFloat(tabname)) && isFinite(tabname) && tabname < this.tabs.length){
                 // is tab index, return that index 
                 index = tabname
@@ -178,10 +187,13 @@
             }
             for(var i=0; i< this.tabs.length;i++){
                 // check each tab for tabname
-                if (this.tabs[i].params.name == tabname)
+                if (this.tabs[i].params.name == tabname){
                     index = i
                     this.params.tabs.css('left','-'+(this.tabwidth*index)+'px')
+                }
             }
+            $('#cob .menu li.selected').toggleClass('selected')
+            $(this.params.header.children()[index]).toggleClass('selected')
             return undefined
         }
    
@@ -191,7 +203,7 @@
             */
             // make the tab as wide as the tab section
             tab.params.div.css('width',this.tabwidth+'px')
-            this.params.tabs.css('width',(this.tabs.length+1)*this.tabwidth+50+'px')
+            this.params.tabs.css('width',(this.tabs.length+1)*this.tabwidth+'px')
             // Append the Tabs name to the header section
             this.params.header.append($('<li>').html(tab.params.name))
             this.params.tabs.append(tab.params.div)
@@ -242,6 +254,9 @@
 
         this.menu.add_tab(new Tab({'name':'Dataset'}))
         this.menu.add_tab(new Tab({'name':'Network'}))
+        this.menu.add_tab(new Tab({'name':'Genes'}))
+        // Choose the first tab
+        this.menu.show_tab(0)
 
         this.menu.get_tab("Dataset").add_table({
             "name" : 'OntologyTable',
@@ -260,12 +275,9 @@
             "ajax":"Camoco/available_datasets/COB",
             'sScrollY':this.menu.params.div.innerHeight()/4
         })
-        // loci table
-        this.loci = new Menu({
-            'div' : $('#cob .loci')
-        })
-        this.loci.highlighted_rows = []
-        /*this.loci.add_table({
+
+        this.menu.get_tab('Genes').highlighted_rows = []
+        this.menu.get_tab('Genes').add_table({
             'name': 'LociTable',
             'header': ['Locus',
                     'Chr',
@@ -292,8 +304,11 @@
                     'EFP Link',
                     'Functional Annot'
                 ],
-            'sScrollY':this.loci.params.div.innerHeight()
-        })*/
+            'sScrollY': this.menu.params.div.innerHeight()/2,
+        })
+        // Fix the gene column in the table
+        this.menu.get_tab('Genes').FixedColumn = new $.fn.dataTable.FixedColumns(this.menu.get_tab('Genes').LociTable)
+
         
         this.footer = new Footer({});
         this.header = new Header({});
@@ -311,6 +326,7 @@
             cob.menu.LoadedTerm = $('td',this).eq(0).text();
             $('#cob .TermTable .selected').toggleClass('selected')
             $(this).toggleClass('selected')
+            cob.menu.show_tab('Network')
         })
         $('#cob .NetworkTable tbody').on('click','tr',function(){
             $('#cob .NetworkTable .selected').toggleClass('selected')
@@ -335,6 +351,7 @@
                 })
         })
         $('#cob .LociTable tbody').on('click','tr',function(){
+            $(this).toggleClass('selected')
             gene = $('td',this).eq(0).text();
             cob.graph.cy.center(
                 cob.graph.cy.nodes('node[id="'+gene+'"]').select()
@@ -347,8 +364,9 @@
         this.graph.cy.on('click',function(evt){
             if(evt.cyTarget == cob.graph.cy){
                 //remove all non-sticky decorators
+                $('#cob .LociTable .selected').toggleClass('selected')
                 cob.graph.cy.$('.neighbors').removeClass('neighbors')
-                cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
+                //cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
             }
         })
         this.graph.cy.on('click','node',{},function(evt){
@@ -385,7 +403,7 @@
                 .each(function(){
                     cob.graph.selected.push(this.id()) 
                 })
-                cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
+                //cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
             },100)
         })
         $.contextMenu({
@@ -405,9 +423,10 @@
             for(var i=0; i < nodes.length; i++){
                 node_ids.push(nodes[i].id())
             }
-            var term = 
-            this.loci.LociTable.clear()
+            this.menu.get_tab('Genes').LociTable.clear()
                 .ajax.url("api/Annotations/ROOT/"+cob.menu.LoadedOntology+"/"+cob.menu.LoadedTerm+"?genes="+node_ids.join(','))
-                .load().columns.adjust().draw()
+                .load().draw()
+            this.menu.get_tab('Genes').FixedColumn.fnRedrawLayout()
+
         }
     }
