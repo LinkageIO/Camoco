@@ -21,11 +21,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from camoco.Camoco import Camoco
+from camoco.Expr import Expr
 from camoco.COB import COB
 from camoco.RefGen import RefGen
-from camoco.Ontology import Ontology
+from camoco.Ontology import Ontology,Term
+from camoco.HapMap import HapMap
 from camoco.Locus import *
 from camoco.Tools import *
+from camoco.GEO import *
 from camoco.Annotation import *
 import pandas as pd
 import os
@@ -46,8 +49,14 @@ def del_dataset(type,name,safe=True,basedir="~/.camoco"):
     if safe:
         c.log("Are you sure you want to delete {}",name)
         if input("[Y/n]:") == 'Y':
-            c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
-            os.remove(c._resource("databases",".".join([type,name])+".db"))
+            try:
+                c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
+                os.remove(c._resource("databases",".".join([type,name])+".db"))
+                if type == 'Expr':
+                    # also have to remove the COB specific refgen
+                    del_dataset('RefGen',name+'RefGen')
+            except FileNotFoundError as e:
+                c.log('Database Not Found')
         else:
             c.log("Nothing Deleted")
     else:
