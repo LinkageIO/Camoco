@@ -8,5 +8,4 @@ sensitive/*
 *.swm
 *.swp
 *.swl
-interfaces/static/js/cytoscape/*
-interfaces/static/js/datatables}/*
+interfaces/static/js/lib/*
