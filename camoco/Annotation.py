@@ -5,33 +5,28 @@ import camoco as co
 import pandas as pd
 
 class Annotation(Camoco):
-    def __init__(self,name,description=None,basedir='~/.camoco'):
+    def __init__(self,name,description=None,refgen=None,basedir='~/.camoco'):
         super().__init__(name,description,type='Annotation',basedir=basedir)
-        if self.refgen:
+        self._create_tables()
+        try:
             self.refgen = co.RefGen(self.refgen)
-        else:
-            self.log('Refgen not assigned')
+        except NameError as e:
+            # no refgen has been assigned yet, check if it was passed in  
+            self._global('refgen',refgen.name)
+            self.refgen = co.RefGen(self.refgen)
 
     def __getitem__(self,item):
         if isinstance(item,(set,list)):
             cur = self.db.cursor().execute('''
-                SELECT  
-                gene,chrom,start,end,strand,maizeseq,bfgr,pfam,rice_orth,rice_annot,sorghum_orth,
-                sorghum_annot,panicum_orth,panicum_annot,grassius_tf,mapman,classical,efp,functional_annot
+                SELECT * 
                 from annotations WHERE gene IN ('{}')
             '''.format("','".join([gene.id for gene in item])))
-            return pd.DataFrame(data=[x.id for x in item],columns=['gene']).merge(pd.DataFrame(
-                columns = [x[0] for x in cur.getdescription()],
-                data=cur.fetchall(),
-                dtype=object
-            ),how='left',on='gene')
+            # need to check if the query was empty, if so return an empty data frame
+            return pd.DataFrame(cur.fetchall(),columns=['gene','name','desc']).pivot('gene','name','desc')
         else:
-            # return a tuple of annotations
             cur = self.db.cursor().execute('''
-                SELECT  
-                gene,chrom,start,end,strand,maizeseq,bfgr,pfam,rice_orth,rice_annot,sorghum_orth,
-                sorghum_annot,panicum_orth,panicum_annot,grassius_tf,mapman,classical,efp,functional_annot
-                from annotations WHERE gene = ?)
+                SELECT * 
+                from annotations WHERE gene = ?
             ''',(item.id,))
             return pd.Series(
                 index = [x[0] for x in cur.getdescription()],
@@ -39,21 +34,20 @@ class Annotation(Camoco):
                 dtype=object
             )
 
-
-    @classmethod
-    def from_csv(cls,name,description,refgen,filename,sep="\t"):
-        self = cls(name,description)
-        self._global('refgen',refgen.name)
-        self._create_tables()
+    def add_csv(self,filename,sep="\t",skip_cols=None,gene_col=0):
+        ''' Imports Annotation relationships from a csv file. By default will assume gene names 
+            are first column'''
         # import from file, assume right now that in correct order
         table = pd.read_table(filename,sep=sep,dtype=object).fillna('-') 
-        #table[['Start Position','End Position']] = table[['Start Position','End Position']].astype(int)
+        if skip_cols is not None:
+            # removing certain columns
+                table.drop(table.columns[skip_cols],axis=1,inplace=True)
         cur = self.db.cursor()
         try:
             cur.execute('BEGIN TRANSACTION')
             cur.executemany(''' 
-                INSERT INTO annotations VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ''',table.itertuples(index=False))
+                INSERT INTO annotations VALUES (?,?,?)
+            ''',pd.melt(table,id_vars=table.columns[gene_col]).itertuples(index=False))
             cur.execute('END TRANSACTION')
         except Exception as e:
             self.log("import failed: {}",e)
@@ -70,27 +64,12 @@ class Annotation(Camoco):
         cur.execute("PRAGMA cache_size = 100000;")
         cur.execute('''
             CREATE TABLE IF NOT EXISTS annotations (
-                gene TEXT UNIQUE,
-                model TEXT,
-                chrom TEXT,
-                start INTEGER,
-                end INTEGER,
-                strand TEXT,
-                maizeseq TEXT,
-                bfgr TEXT,
-                pfam TEXT,
-                rice_orth TEXT,
-                rice_annot TEXT,
-                sorghum_orth TEXT,
-                sorghum_annot TEXT,
-                panicum_orth TEXT,
-                panicum_annot TEXT,
-                grassius_tf TEXT,
-                mapman TEXT,
-                classical TEXT,
-                efp TEXT,
-                functional_annot TEXT
-            )
+                gene TEXT,
+                name TEXT,
+                desc TEXT,
+                UNIQUE(gene,name) ON CONFLICT REPLACE
+            );
         ''')
+        self._build_indices()
 
 
