@@ -26,11 +26,12 @@ class Term(object):
             self.gene_list = set(gene_list)
         if snp_list:
             self.snp_list = set(snp_list)
+
     def __len__(self):
         return len(self.gene_list)
 
     def summary(self):
-        print("\n".join([self.id,self.name,self.type,self.desc]))
+        print("\n".join([ x for x  in [self.id,self.name,self.type,self.desc] if x is not '']))
         print("Num SNPs: {}".format(len(self.snp_list)))
         print("Num Genes: {}".format(len(self.gene_list)))
 
@@ -40,10 +41,12 @@ class Term(object):
     def add_snp(self,snp):
         self.snp_list.add(snp) 
     
-    def flanking_genes(self,refgen,window_size=100000,gene_limit=4,chain=True):
+    def flanking_genes(self,refgen,gene_limit=4,chain=True):
         ''' returns flanking genes based on some set of arbitrary rules from a refgen '''
         if chain:
-            return set(itertools.chain(*[refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]))
+            return set(itertools.chain.from_iterable(
+                [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=x.window) for x in self.snp_list]
+            ))
         else:
             return [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
 
@@ -57,6 +60,30 @@ class Term(object):
             return set(itertools.chain(*[refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]))
         else:   
             return [refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
+
+    def effective_snps(self):
+        ''' Sometimes '''
+        snp_list = sorted(self.snp_list)
+        collapsed = [snp_list.pop(0)]
+        for snp in snp_list:
+            # if they have overlapping windows, collapse
+            if snp in collapsed[-1]:
+                collapsed[-1] = collapsed[-1].collapse(snp)
+            else:
+                collapsed.append(snp)
+        return collapsed
+
+    def bootstrap_effective_flanking_genes(self,refgen,chain=True,window_size=10000,gene_limit=4):
+        ''' Sometimes, especially with GWAS, SNPs will cluster and map to the same
+        flanking gene set. This method accounts for this by collapsing down SNPs
+        into meta-SNPs which have varying window sizes.'''
+        # bootstrap flanking genes with specific window sizes
+        if chain:
+            return set(itertools.chain(*[
+                refgen.bootstrap_flanking_genes(snp,gene_limit=gene_limit,window_size=snp.window) for snp in collapsed
+            ]))
+        else:   
+            return [refgen.bootstrap_flanking_genes(snp,gene_limit=gene_limit,window_size=snp.window) for snp in collapsed]
 
     def print_stats(self,cob_list,file=sys.stdout, window_limit=100000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
         for cob in cob_list:
@@ -102,9 +129,15 @@ class Ontology(Camoco):
         super().__init__(name,description,type='Ontology',basedir=basedir)
         if self.refgen:
             self.refgen = RefGen(self.refgen)
-        else:
-            self.log("RefGen not Assigned")
-            
+
+    @classmethod
+    def create(cls,name,description,refgen,basedir="~/.camoco"):
+        self = cls(name,description=description,basedir=basedir)
+        self._global('refgen',refgen.name)
+        self.refgen = RefGen(self.refgen)
+        self._create_tables()
+        self._build_indices()
+        return self
 
     def __getitem__(self,item):
         return self.term(item) 
@@ -112,7 +145,7 @@ class Ontology(Camoco):
     def __len__(self):
         return self.db.cursor().execute("SELECT COUNT(*) FROM terms;").fetchone()[0]
 
-    def term(self,term_id):
+    def term(self,term_id,window_size=100000):
         ''' retrieve a term by name '''
         try:
             id,name,type,desc = self.db.cursor().execute(
@@ -121,7 +154,7 @@ class Ontology(Camoco):
             term_genes = list(self.refgen.from_ids([ x[0] for x in self.db.cursor().execute(
                 'SELECT gene from gene_terms WHERE term = ?',(id,)).fetchall()
             ]))
-            term_snps = [SNP(*x) for x in self.db.cursor().execute(
+            term_snps = [SNP(*x,window=window_size) for x in self.db.cursor().execute(
                 'SELECT chrom,pos FROM snp_terms WHERE term = ?',(id,)
             ).fetchall()]
             return Term(id,name,type,desc,gene_list=term_genes,snp_list=term_snps)
@@ -149,6 +182,8 @@ class Ontology(Camoco):
 
     def enrichment(self,gene_list,pval_cutoff=0.05,gene_filter=None,label=None):
         # extract possible terms for genes
+        if label:
+            self.log("Caculating Enrichemnt for {}",label)
         cur = self.db.cursor()
         terms = [ x[0] for x in cur.execute(
             '''SELECT DISTINCT(term) FROM gene_terms 
@@ -192,14 +227,8 @@ class Ontology(Camoco):
     
 
     def summary(self):
-        return "Ontology: name:{} - desc: {} - contains {} terms for {}".format(self.name,self.desc,len(self),self.refgen)
+        return "Ontology: name:{} - desc: {} - contains {} terms for {}".format(self.name,self.description,len(self),self.refgen)
    
-    @classmethod
-    def create(cls,name,description,refgen,basedir="~/.camoco"):
-        cls = cls(name,description=description,basedir=basedir)
-        cls._global('refgen',refgen.name)
-        cls._create_tables()
-        return cls
 
     def del_term(self,term):
         cur = self.db.cursor()
@@ -219,43 +248,6 @@ class Ontology(Camoco):
             cur.execute('INSERT OR REPLACE INTO gene_terms (gene,term) VALUES (?,?)',(gene.id,term.id))
         for snp in term.snp_list:
             cur.execute('INSERT OR REPLACE INTO snp_terms (chrom,pos,term) VALUES (?,?,?)',(snp.chrom, snp.pos, term.id))
-        cur.execute('END TRANSACTION')
-
-    def import_gene_terms(self, filename, gene_col=1, term_col=2, term_filter=".*",
-        gene_filter=".*", skip=0, sep="\t"):
-        ''' import tool for gene terms ''' 
-        term_filter = re.compile(term_filter)
-        gene_filter = re.compile(gene_filter)
-        gene_terms = []
-        self.log("Reading in term file {}",filename)
-        with open(filename,'r') as IN:
-            for x in range(0,skip):
-                header = IN.readline()
-            for line in IN:
-                term = ''
-                gene = ''
-                cols = line.strip().split(sep)
-                tmatch = term_filter.match(cols[term_col - 1])
-                if tmatch is None:
-                    continue
-                elif len(tmatch.groups()) == 0:
-                    term =  tmatch.string
-                else:
-                    term = tmatch.group(1)
-                gmatch = gene_filter.match(cols[gene_col - 1])
-                if gmatch is None:
-                    continue
-                elif len(gmatch.groups()) == 0:
-                    gene =  gmatch.string
-                else:
-                    gene = gmatch.group(1)
-                gene_terms.append((gene,term))
-        self.log("Inserting {} gene term pairs",len(gene_terms))
-        cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
-        cur.executemany(''' 
-            INSERT INTO gene_terms VALUES (?,?)''', gene_terms
-        )
         cur.execute('END TRANSACTION')
 
     def import_obo(self,filename):
@@ -367,3 +359,5 @@ class Ontology(Camoco):
                 term TEXT
             );
         ''')
+        self._build_indices()
+    
