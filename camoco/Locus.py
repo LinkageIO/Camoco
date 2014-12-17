@@ -2,12 +2,6 @@
 from collections import defaultdict
 import re
 
-class RepLoci(set):
-    ''' This class is a super representation of a set of loci '''
-    def __init__(self,iterable=None):
-        super().__init__(iterable)
-    
-
 class Locus(object):
     def __init__(self, chrom, start, end, id=None ,gene_build='5b', organism='Zea', window=100000):
         self.chrom = chrom
@@ -27,6 +21,11 @@ class Locus(object):
     def stop(self):
         ''' because im an idiot ''' 
         return self.end
+
+    @property
+    def coor(self):
+        ''' returns a tuple with start and stop '''
+        return (self.start,self.stop)
 
     def __eq__(self,locus):
         if (self.chrom == locus.chrom and
@@ -89,9 +88,42 @@ class Locus(object):
             return int("-1{}".format(self.start))
 
 class SNP(Locus):
-    def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea'):
+    def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea',window=0):
+        super().__init__(
+            chrom=str(chrom),
+            start=int(pos)-int(window/2),
+            end=int(pos)+int(window/2),
+            id=id,
+            gene_build=gene_build,
+            organism=organism
+        )
         self.pos = int(pos)
-        super(self.__class__,self).__init__(str(chrom),int(pos),int(pos),id,gene_build,organism)
+        self.window = window
+        # This is the number of genes a snp tags
+        self.tag_genes = 4
+
+    def collapse(self,snp):
+        ''' collapse two snps into a new 'meta' SNP. The pos is half way
+        between the two snps and the window extends within as well as 1/2
+        upstream and downstream of the original window sizes '''
+        # must be on the same chromosome to collapse
+        assert(self-snp < float('Inf'))
+        new_pos = int((self.pos + snp.pos)/2)
+        new_window = max(self.end,snp.end) - min(self.start,snp.start)
+        new_id = str(self.id)+'-'+str(snp.id)
+        new_tag_genes = self.tag_genes + snp.tag_genes
+        return SNP(self.chrom,new_pos,window=new_window)
+
+    def __str__(self):
+        return '''
+            organism:{} 
+            type: {}
+            id: {}
+            chromosome: {}
+            pos: {}
+            window: {}'''.format(self.organism,self.__class__,self.id,self.chrom,self.pos,self.window)
+
+
     def summary(self):
         return "S{}:{}".format(self.chrom,self.start)
 
