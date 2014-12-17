@@ -1,101 +1,69 @@
 #!/usr/bin/python3
 
-import pandas as pd
 
 from camoco.Camoco import Camoco
-from camoco.RefGen import RefGen,RefGenBuilder
+from camoco.RefGen import RefGen
 from camoco.Locus import Locus,Gene
+from camoco.Expr import Expr
 from camoco.Tools import memoize
+
 from numpy import matrix,arcsinh
-from scipy.stats import pearsonr
 from collections import defaultdict
 from itertools import chain
+from subprocess import Popen, PIPE
 
+import pandas as pd
 import igraph as ig
 import numpy as np
-import pandas as pd
 import time
 import math as math
 import multiprocessing as multiprocessing
 import itertools
 import matplotlib.pylab as plt
 import matplotlib
+import io
+import base64
 
-from scipy.stats import hypergeom
+from scipy.stats import hypergeom,pearsonr
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform, euclidean
 
 import collections
 
-class COB(Camoco):
-    def __init__(self,name=None,basedir="~/.camoco"):
+class COB(Expr):
+    def __init__(self,name=None,description=None,basedir="~/.camoco"):
         if name is None:
             self.log('You must provide a name')
         else:
-            try:
-                super().__init__(name=name,type="COB",basedir=basedir)
-                self.refgen = RefGen(self.refgen) 
-            except Exception as e:
-                return None
+            super().__init__(name=name,description=description,basedir=basedir)
+            self._create_tables()
 
-    @property
-    @memoize
-    def num_genes(self):
-        return self.db.cursor().execute("SELECT COUNT(DISTINCT(gene)) FROM expression").fetchone()[0]
+    #@memoize
+    def num_edges(self,sig_only=True):
+        clause = ' WHERE significant =1;' if sig_only else ''
+        try:
+            return self.db.cursor().execute("SELECT COUNT(*) FROM coex"+clause+';').fetchone()[0]
+        except ValueError as e:
+            self.log('No edges in database!')
 
-    @property
-    @memoize
-    def num_sig_edges(self):
-        return self.db.cursor().execute("SELECT COUNT(*) FROM coex WHERE significant = 1;").fetchone()[0]
+  
+    def edges(self,min_distance=None,sig_only=False):
+        ''' returns edges '''
+        try:
+            query = '''SELECT gene_a,gene_b,score,distance
+                    FROM coex '''
+            if min_distance:
+                query += ' AND distance < {}'.format(min_distance)
+            if sig_only:
+                query += ' AND significant = 1'
+            return pd.DataFrame(self.db.cursor().execute(query).fetchall(),
+                columns=['gene_a','gene_b','score','distance'])
+        except ValueError as e:
+            self.log('Oops! there are no signficant edges in dataset...')
 
-    @property
-    @memoize
-    def num_edges(self):
-            return self.db.cursor().execute("SELECT COUNT(*) FROM coex").fetchone()[0]
-
-    @property
-    @memoize
-    def num_accessions(self):
-        return self.db.cursor().execute("SELECT COUNT(DISTINCT(accession)) FROM expression").fetchone()[0]
-   
-    @property
-    @memoize
-    def num_sig_interactions(self):
-        return self.db.cursor().execute("SELECT COUNT(*) FROM coex WHERE significant = 1;").fetchone()[0]
-
-    @memoize
-    def accessions(self):
-        ''' returns a list of accessions used to build COB '''
-        return self.db.cursor().execute("SELECT * FROM accessions").fetchall()
-
-    @memoize
-    def genes(self):
-        ''' returns a list of genes used to build COB '''
-        return self.refgen.from_ids([x[0] for x in 
-            self.db.cursor().execute('SELECT DISTINCT(gene) FROM expression').fetchall()
-        ])
-
-    @memoize
-    def sig_edges(self,limit=None,inc_dis=False):
-        ''' returns a dataframe containing significant edges '''
-        if not limit:
-            return pd.DataFrame(
-                self.db.cursor().execute(
-                '''SELECT gene_a,gene_b,score,distance
-                FROM coex WHERE significant = 1''').fetchall(),
-                columns = ['gene_a','gene_b','score','distance']
-            )
-        else:
-            return pd.DataFrame(
-                self.db.cursor().execute(
-                '''SELECT gene_a,gene_b,score,distance
-                FROM coex ORDER BY score DESC LIMIT ?''',(limit,)).fetchall(),
-                columns = ['gene_a','gene_b','score','distance']
-            )
-
-    @memoize
-    def sig_genes(self,limit=None):
-        sig_edges = self.sig_edges(limit=limit)
+    #@memoize
+    def sig_genes(self):
+        sig_edges = self.edges(sig_only=True)
         return list(self.refgen.from_ids(set(sig_edges.gene_a).union(sig_edges.gene_b)))
 
     def coexpression(self,gene_a,gene_b,trans_only=True):
@@ -115,6 +83,7 @@ class COB(Camoco):
         except TypeError as e:
             return -1
 
+            return len(self.neighbors([gene]))
     def neighbors(self,gene_list,min_distance=None,sig_only=True):
         ''' Input : a list of COBGene Objects
             Output: Returns the neighbors for a list of genes as a DataFrame
@@ -190,7 +159,7 @@ class COB(Camoco):
         if len(gene_list) == 0:
             return pd.DataFrame()
         # filter for only genes within network
-        gene_list = list(filter(lambda x: x in self, gene_list))
+        #gene_list = list(filter(lambda x: x in self, gene_list))
         ids = "','".join([x.id for x in gene_list])
         query = '''
             SELECT gene_a,gene_b,score,distance FROM coex 
@@ -231,8 +200,8 @@ class COB(Camoco):
             return np.nan
         return(sum(gene_degrees['local'])/sum(gene_degrees['global']))
 
-    def density(self,gene_list,return_mean=True,min_distance=None):
-        ''' calculates the denisty of the ENTIRE network amongst genes
+    def density(self,gene_list,return_mean=True,min_distance=50000):
+        ''' calculates the denisty of the non-thresholded network amongst genes
             not within a certain distance of each other. This corrects for
             cis regulatory elements increasing noise in coexpression network '''
         # filter for only genes within network
@@ -256,28 +225,6 @@ class COB(Camoco):
         ))
         return seed_set
 
-    def gene_expression_vals(self,gene_list,accession_list=None,zscore=True,transform=None):
-        ''' Input: A list of COBGenes
-            Output: A dataframe containing normalized expression values for gene_list
-        '''
-        try:
-            expr = pd.DataFrame(
-                data = self.db.cursor().execute(
-                '''SELECT gene,accession,value FROM expression WHERE gene in ('{}')
-                '''.format("','".join([x.id for x in gene_list])), 
-                ).fetchall(),columns=['gene','accession','value']
-            ).pivot(index="accession",columns="gene",values='value')
-        except ValueError as e:
-            self.log("No expression values present")
-            return
-        if accession_list:
-            expr = expr.ix[accession_list]
-        if transform:
-            expr = transform(expr)
-        if zscore:
-            expr = expr.apply(lambda x: (x-x.mean())/x.std(),axis=0)
-        return expr
-        
     def graph(self,gene_list,min_distance=None):
         ''' Input: a gene list
             Output: a iGraph object '''
@@ -303,80 +250,31 @@ class COB(Camoco):
         return graph 
 
 
-    def heatmap(self,dm,filename=None,figsize=(16,16), maskNaNs=True, cluster_x=True, cluster_y=True,
-        cluster_method="euclidian", title=None, heatmap_unit_label='Expression Z Score'):
-        ''' Draw clustered heatmaps of an expression matrix'''
-        D = np.array(dm) 
-        row_labels = dm.index
-        col_labels = dm.columns
-        f = plt.figure(figsize=figsize,facecolor='white')
-        # add matrix plot
-        axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
-        def masked_corr(x,y):
-            mask = np.logical_and(np.isfinite(x),np.isfinite(y)) 
-            if cluster_method == "euclidean":
-                return euclidean(x[mask],y[mask])
-            else:
-                return pearsonr(x[mask],y[mask])[1]
-        # add first dendrogram
-        if cluster_y and len(dm.index) > 1:
-            D1 = squareform(pdist(D, masked_corr))
-            ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
-            ax1.set_frame_on(False)
-            Y = linkage(D1, method='complete')
-            Z1 = dendrogram(Y, orientation='right')
-            row_labels = row_labels[Z1['leaves']]
-            D = D[Z1['leaves'], :]
-            ax1.set_xticks([])
-            ax1.set_yticks([])
-        # add second dendrogram
-        if cluster_x and len(dm.columns) > 1:
-            D2 = squareform(pdist(D.T, masked_corr))
-            ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
-            ax2.set_frame_on(False)
-            Y = linkage(D2, method='complete')
-            Z2 = dendrogram(Y)
-            D = D[:, Z2['leaves']]
-            col_labels = col_labels[Z2['leaves']]
-            ax2.set_xticks([])
-            ax2.set_yticks([])
-        if title:
-            plt.title(title)
-        vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
-        vmin = vmax*-1
-        self.log("Extremem Values: {}",vmax)
-        cmap = self.cmap
-        im = axmatrix.matshow(D, aspect='auto', cmap=cmap,vmax=vmax,vmin=vmin)
-        # Handle NaNs
-        if maskNaNs:
-            nan_mask = np.ma.array(D,mask=np.isnan(D))
-            cmap.set_bad('grey',1.0)
-            im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
-        # Handle Axis Labels
-        axmatrix.set_xticks(np.arange(D.shape[1]))
-        axmatrix.xaxis.tick_bottom()
-        axmatrix.tick_params(axis='x',labelsize='xx-small')
-        axmatrix.set_xticklabels(col_labels,rotation=90,ha='center')
-        axmatrix.yaxis.tick_right()
-        axmatrix.set_yticks(np.arange(D.shape[0]))
-        axmatrix.set_yticklabels(row_labels)
-        axmatrix.tick_params(axis='y',labelsize='x-small')
-        # Add color bar
-        axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
-        f.colorbar(im,orientation='horizontal',cax=axColorBar,
-            ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
-        )
-        plt.title(heatmap_unit_label)
-        if filename:
-            plt.savefig(filename)
-            plt.close()
-        return pd.DataFrame(
-            data=D,
-            index=row_labels,
-            columns=col_labels
-        )
+    def squaredist(self,gene_list=None):
+        ''' Returns a gene x gene square distance dataframe ''' 
+        if gene_list is None:
+            gene_list = self.sig_genes()
+        subnet = self.subnetwork(gene_list,sig_only=False,min_distance=None).sort(['source','target'])
+        # There are at least one gene in each column who doesnt have a corresponding entry in the 
+        # 
+        lone_source = set(subnet.source).difference(subnet.target).pop()
+        lone_target = set(subnet.target).difference(subnet.source).pop()
+        lone_mask = (subnet.source == lone_source)&(subnet.target == lone_target)
+        subnet.ix[lone_mask,'source'] = lone_target
+        subnet.ix[lone_mask,'target'] = lone_source
+        dat = pd.pivot(subnet.source,subnet.target,subnet.score) 
+        dat[dat.isnull()] = 0
+        return dat + dat.T
 
-  
+    def to_treeview(self, gene_list=None):
+        ''' outputs treeview files for dataset '''
+        if gene_list is None:
+            gene_list = self.sig_genes()
+        gene_expr_vals = self.expr(gene_list,zscore=True) 
+        
+    def pcc_heatmap(self,gene_list=None):
+        pass
+        
     def coordinates(self,gene_list,layout=None):
         ''' returns the static layout, you can change the stored layout by passing 
             in a new layout object. If no layout has been stored or a gene does not have
@@ -389,50 +287,69 @@ class COB(Camoco):
                     (gene.id,)).fetchone() or (0,0) for gene in gene_list
             ])
         else:
-            self.db.cursor().executemany('''INSERT OR REPLACE INTO coor (gene,x,y) VALUES (?,?,?)''',
+            self.db.cursor().executemany('''
+                INSERT OR REPLACE INTO coor (gene,x,y) VALUES (?,?,?)''',
                 [(gene.id,layout[i][0],layout[i][1]) for i,gene in enumerate(gene_list)]
             )
 
     def mcl(self,gene_list,I=2.0,scheme=7,min_distance=100000):
-        from subprocess import Popen, PIPE
+        ''' A *very* thin wrapper to the MCL program. The MCL program must
+            be accessible by a subprocess (i.e. by the shell).
+            Returns clusters (as list) as designated by MCL. 
+            Input: a gene list
+            Output: a list of lists of genes within each cluster
+        '''
         MCLstr = "\n".join(["{}\t{}\t{}".format(a,b,c) for a,b,c in \
             self.subnetwork(gene_list,min_distance=min_distance)[['source','target','score']].itertuples(index=False)])
         cmd = "mcl - --abc -scheme {} -I {} -o -".format(scheme,I)
         self.log("running MCL: {}",cmd)
-        p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=self.log_file, shell=True)
-        sout,serr = p.communicate(MCLstr.encode('utf-8'))
-        p.wait()
-        if p.returncode==0 and len(sout)>0:
-            return [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
-        else:
-            self.log( "MCL return code: {}".format(p.returncode))
+        try:
+            p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=self.log_file, shell=True)
+            sout,serr = p.communicate(MCLstr.encode('utf-8'))
+            p.wait()
+            if p.returncode==0 and len(sout)>0:
+                return [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
+            else:
+                self.log( "MCL return code: {}".format(p.returncode))
+        except FileNotFoundError as e:
+            self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
+
+    def cluster(self,raw=False):
+        # Convert to tsv
+        rawtype = 'raw' if raw else 'norm'
+        filename  = '{}_{}.tsv'.format(self.name, rawtype)
+        self.expr(raw=raw,zscore=True).to_csv(filename,sep='\t')
+        try: 
+            cmd = ['cluster', '-f', filename, '-g', '2', '-e', '2']
+            self.log("Executing {}",' '.join(cmd))
+            p = Popen(cmd, stderr=self.log_file, shell=True)
+            self.log('Waiting for {} cluster...'.format(filename))
+            p.wait()
+        except FileNotFoundError as e:
+            self.log('Could not find cluster command in PATH. Make sure its installed and shell accessible as "cluster".')
+
 
     def to_dat(self,gene_list,filename):
         with open(filename, 'w') as OUT:
             for a,b,c in self.subnetwork(gene_list).itertuples(index=False):
                 print("{}\t{}\t{}".format(a,b,c),file=OUT)
- 
+
+    def plot_pcc_hist(self,filename=None):
+        ''' Plot the histogram of PCCs. Right now this is HUGELY inefficient in memory.'''
+        if filename is None:
+            filename = self.name+'.png'
+        plt.clf()
+        plt.hist(np.tanh(self.edges(sig_only=False,min_distance=None).score),bins=50)
+        plt.xlabel('PCC')
+        plt.ylabel('Freq')
+        plt.savefig(filename) 
+        
     def plot(self,gene_list,filename=None,width=3000,height=3000,layout=None,**kwargs):
         if not filename:
             filename = "{}.png".format(self.name)
         if not layout:
             layout = self.coordinates(gene_list)
         ig.plot(self.graph(gene_list),layout=layout,target=filename,bbox=(width,height),**kwargs)
-
-    @property 
-    def cmap(self):
-        heatmapdict = {
-            'red': ((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'green':((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'blue': ((0.0, 0.0, 0.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 1.0, 1.0))}
-        heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
-        return heatmap_cmap
 
     def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
@@ -521,26 +438,11 @@ class COB(Camoco):
                 Sig./Total Interactions: {}
         '''.format(self.name, self.organism, self.build,
                 self.description,
-                self.FPKM == 'FPKM',
-                self.num_genes,
+                self.FPKM == 'RNASEQ',
+                self.num_genes(),
                 self.num_accessions,
-                self.num_sig_edges/self.num_edges
+                self.num_edges(sig_only=True)/self.num_edges(sig_only=False)
         ))
-
-    def filter_refgen(self):
-        ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
-            has been populated!!'''
-        filtered_refgen = RefGenBuilder.import_from_RefGen(
-            "{}RefGen".format(self.name),
-            "RefGen for {} filtered from {}".format(self.name,self.refgen.name),
-            self.refgen,
-            gene_filter = self,
-            basedir = self.basedir
-        )
-        # Remember for next time
-        self._global('refgen',filtered_refgen.name)
-
-
 
     def __repr__(self):
         return '''
@@ -555,136 +457,33 @@ class COB(Camoco):
     def __str__(self):
         return self.__repr__()
 
-    def __contains__(self,obj):
-        try:
-            if self.db.cursor().execute('''
-                SELECT COUNT(*) FROM expression WHERE gene = ?''',(obj.id,)).fetchone()[0] > 0:
-                return True
-            else:
-                return False
-        except Exception as e:
-            pass
-        try:
-            # Can be a string object
-            if self.db.cursor().execute('''
-                SELECT COUNT(*) FROM expression WHERE gene = ?''',(str(obj),)).fetchone()[0] > 0:
-                return True
-            else:
-                return False
-        except Exception as e:
-            pass
-        self.log("object '{}' is not correct type to test for membership in {}",obj,self.name)
-        
-
-    def save(self, name, description, FPKM, refgen, organism, basedir="~/.camoco"):
-        super().__init__(name,description,type="COB",basedir=basedir)
-        self._global('FPKM',FPKM)
-        self._global('refgen',refgen.name)
-        self.expr = matrix(0)
-        self.refgen = RefGen(self.refgen)
-        self._create_tables()
-
-    def add_accession(self,name,type="",description=""):
-        ''' adds an accession to the database, useful for updating accessions with 
-            details after importing them from a DataFrame '''
-        self.db.cursor().execute(''' 
-            INSERT OR UPDATE INTO accessions (name,type,description) VALUES (?,?,?)''',(name,type,description)
-        )
-
-
-    def from_DataFrame(self, df, transform=np.arctanh, significance_thresh=3, min_expr=1, 
-        max_gene_missing_data=0.2, min_single_sample_expr=5, 
-        max_accession_missing_data=0.5,membership=None,dry_run=False):
-        ''' Import a COB dataset from a pandas dataframe. Assumes genes/traits as rows and accessions/genotypes as columns.
-            Options:
-                transform                   - a vectorizable (numpy) function used to normalize expression data. 
-                                              Default is inverse hyperbolic sin which transforms larger values more than smaller ones. 
-                                              see DOI:10.1371/journal.pone.0061005
-                significance_threshold      - a Z-score threshold at which each interaction will be called significant.
-                min_expr                    - expr (usually FPKM) lower than this will be set as NaN and not used in correlation.
-                max_gene_missing_data       - The threshold of percent missing data for a gene/trait to be thrown out.
-                                              Genes with missing more missing data than this threshold will be removed.
-                min_single_sample_expr      - The minimum threshold a gene/trait needs to meet in a single sample
-                                              to be considered expressed and worth correlating.
-                max_accession_missing_data  - Accessions with more than this percent missing data will be removed.
-                membership                  - a class instance or object implementing the contains method
-                                              in which to filter out genes which the object does not
-                                              contain. Useful with RefGen objects to get rid of unmapped genes.
-            '''
-        # ----- Perform QC steps ----
-        # Remember build options for later
-        self._global('build_transform',transform.__name__)
-        self._global('build_significance_thresh',significance_thresh)
-        self._global('build_min_expr',min_expr)
-        self._global('build_max_gene_missing_data',max_gene_missing_data)
-        self._global('build_min_single_sample_expr',min_single_sample_expr)
-        self._global('build_membership',str(membership))
-        self._global('build_max_accession_missing_data',max_accession_missing_data)
-        # Filter out genes which are not in the membership object
-        self.log('Starting set: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        if membership:
-            self.log("Filtering out genes not in {}",membership)
-            df = df[[x in membership for x in df.index]]
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        # Set minimum FPKM threshold
-        self.log("Filtering out expression values lower than {}",min_expr)
-        df_flt = df.copy()
-        df_flt[df < min_expr] = np.nan
-        df = df_flt
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        # filter out genes with too much missing data
-        self.log("Filtering out genes with > {} missing data",max_gene_missing_data)
-        df = df.loc[df.apply(lambda x : ((sum(np.isnan(x))) < len(x)*max_gene_missing_data),axis=1),:] 
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        self.log("Filtering out accessions with > {} missing data",max_accession_missing_data)
-        df = df.loc[:,df.apply(lambda x : ((sum(np.isnan(x))) < len(x)*max_accession_missing_data),axis=0)] 
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        # filter out genes which do not meet a minimum expr threshold in at least one sample
-        self.log("Filtering out genes which do not have one sample above {}",min_single_sample_expr)
-        df = df[df.apply(lambda x: any(x >= min_single_sample_expr),axis=1)]
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        #
-
-        # ----- import into Database -----
-        genes = df.index 
-        accessions = df.columns
-        expr = df.as_matrix()
-        self.log("Imported {} genes and {} accession",len(genes),len(accessions))
-        if self.FPKM == 'FPKM':
-            self.log("Performing FPKM normalization using arcsinh")
-            expr = np.arcsinh(expr) 
-        else:
-            self.log("WARNING! Make sure you normalized according to best practices for {}",self.FPKM)
-        cur = self.db.cursor()
-        if dry_run:
-            return
+    ''' ------------------------------------------------------------------------------------------
+            Class Methods
+    '''
+    def _calculate_coexpression(self,significance_thresh=3):
+        cur = self.db.cursor() 
         try:
             cur.execute("BEGIN TRANSACTION")
             self._drop_indices()
-            self.log("Adding Accession Values")
-            cur.executemany("INSERT OR IGNORE INTO accessions (name) VALUES (?)",
-                [(a,) for a in accessions]) 
-            self.log("Adding Expression Values")
-            cur.executemany("INSERT OR IGNORE INTO expression (gene,accession,value) VALUES (?,?,?)",
-                # This comprehension iterates over matrix cells
-                [(gene,acc,val) for acc,genevals in df.iteritems() for gene,val in genevals.iteritems()] 
-            )
             tbl = pd.DataFrame(
-                list(itertools.combinations(genes,2)),
+                list(itertools.combinations([x.id for x in self.genes()],2)),
                 columns=['gene_a','gene_b']
             )
             # Now add coexpression data
             self.log("Calculating Coexpression")
-            tbl['score'] = self._coex(expr)
-            tbl['score'][tbl['score'] == 1] = 0.99999999 
-            tbl['score'] = transform(tbl['score'])
+            tbl['score'] = self._coex(self.expr().as_matrix())
+            # correlations of 1 dont transform well
+            tbl['score'][tbl['score'] == 1] = 0.99999999
+            # Perform fisher transform on PCCs
+            tbl['score'] = np.arctanh(tbl['score'])
             # Sometimes, with certain datasets, the NaN mask overlap completely for the
             # two genes expression data making its PCC a nan. This affects the mean and std fro the gene.
             valid_scores = np.ma.masked_array(tbl['score'],np.isnan(tbl['score']))
+            # Calculate Z Scores
             tbl['score'] = (valid_scores-valid_scores.mean())/valid_scores.std()
             tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
             self.log("Calculating Gene Distance")
-            tbl['distance'] = self._gene_distances()
+            tbl['distance'] = self._gene_distances(self.genes())
             self.log("Building Database")
             cur.executemany(
                 ''' INSERT INTO coex (gene_a,gene_b,score,significant,distance) VALUES (?,?,?,?,?)''',
@@ -698,8 +497,32 @@ class COB(Camoco):
             self.log("Something bad happened:{}",e)
             cur.execute("ROLLBACK")
             raise e
-        # update the reference geneom
-        self.add_filter_refgen(self.refgen)
+        # update the reference genome
+        self._filter_refgen()  
+        return self
+ 
+    @classmethod
+    def from_Expr(cls,expr):
+        ''' Create a coexpression object from an Expression object '''
+        # The Expr object already exists, just get a handle on it
+        self = cls(name=expr.name,description=expr.description,basedir=expr.basedir)
+        # Grab a coffee
+        self._calculate_coexpression()
+        self._build_degree()
+        return self
+
+    @classmethod
+    def from_DataFrame(cls,df,name,description,refgen,rawtype=None,basedir='~/.camoco',**kwargs):
+        # Create a
+        expr = super().from_DataFrame(
+            df,name,description,refgen,rawtype,basedir=basedir,**kwargs
+        )
+        return cls.from_Expr(expr)
+
+    @classmethod
+    def from_csv(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco',sep='\t',**kwargs):
+        ''' Build a COB Object from an FPKM or Micrarray CSV. '''
+        return cls.from_DataFrame(pd.read_table(filename),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
         
     def _coex(self,matrix):
         progress = progress_bar(multiprocessing.Manager())
@@ -711,10 +534,9 @@ class COB(Camoco):
         pool.join()
         return scores
 
-    def _gene_distances(self):
+    def _gene_distances(self,genes):
         progress = progress_bar(multiprocessing.Manager())
         pool = multiprocessing.Pool()
-        genes = list(self.genes())
         distances = np.array(list(itertools.chain(
             *pool.imap(_DISUp,[(i,genes,progress) for i in range(len(genes))])
         )))
@@ -723,13 +545,6 @@ class COB(Camoco):
         return distances
 
 
-    @classmethod
-    def from_csv(cls, name, description, FPKM, refgen, organism, filename, basedir="~/.camoco", sep="\t",**kwargs):
-        ''' assumes genes as rows and accessions as columns '''
-        df = pd.read_table(filename,sep=sep)
-        cob = cls(name,description,FPKM,refgen,organism,basedir)
-        cob.from_DataFrame(df,**kwargs)
-   
     def _build_degree(self):
         degree = defaultdict(lambda : 0)
         for gene_a,gene_b in self.db.cursor().execute('''
@@ -748,7 +563,6 @@ class COB(Camoco):
             CREATE INDEX IF NOT EXISTS coex_gen_ab ON coex (gene_a,gene_b); 
             CREATE INDEX IF NOT EXISTS coex_score ON coex (score); 
             CREATE INDEX IF NOT EXISTS coex_significant ON coex (significant); 
-            CREATE INDEX IF NOT EXISTS expression_gene_name ON expression (gene);
             CREATE INDEX IF NOT EXISTS coor_gene ON coor(gene);
             CREATE INDEX IF NOT EXISTS coor_x ON coor(x);
             CREATE INDEX IF NOT EXISTS coor_y ON coor(y);
@@ -764,20 +578,10 @@ class COB(Camoco):
         ''')
 
     def _create_tables(self):
+        # build the expr tables too
+        super()._create_tables()
         cur = self.db.cursor()
-        cur.execute('PRAGMA page_size = 1024;') 
-        cur.execute('PRAGMA cache_size = 100000;') 
         cur.execute(''' 
-            CREATE TABLE IF NOT EXISTS accessions (
-                name TEXT,
-                type TEXT,
-                description TEXT
-            );
-            CREATE TABLE IF NOT EXISTS expression (
-                gene TEXT,
-                accession TEXT,
-                value REAL
-            );
             CREATE TABLE IF NOT EXISTS degree (
                 gene TEXT,
                 degree INTEGER
