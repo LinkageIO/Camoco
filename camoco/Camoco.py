@@ -7,10 +7,13 @@ import sys
 import tempfile
 import pandas as pd
 
+from camoco.Tools import log
+
 class Camoco(object):
     def __init__(self,name="Camoco",description=None,type='Camoco',basedir="~/.camoco"):
         # Set up our base directory
         self.basedir = os.path.realpath(os.path.expanduser(basedir))
+        self.log = log()
         if not os.path.exists(self.basedir):
             # If it doesn't exists, set up first time directories
             try:    
@@ -24,9 +27,12 @@ class Camoco(object):
         self.log_file = open(os.path.join(self.basedir,"logs","logfile.txt"),'a')
         if description is not None:
             # create new sqlite file for dataset
-            self.database('Camoco.Camoco').cursor().execute('''
-                INSERT OR IGNORE INTO datasets (name,description,type)
-                VALUES (?,?,?)''',(name,description,type))
+            try:
+                self.database('Camoco.Camoco').cursor().execute('''
+                    INSERT OR FAIL INTO datasets (name,description,type)
+                    VALUES (?,?,?)''',(name,description,type))
+            except Exception as e:
+                self.log('CAUTION! {}.{} Database already exists',name,type)
         try:
             # A dataset already exists, return it
             self.db = self.database(".".join([type,name]))
@@ -35,7 +41,14 @@ class Camoco(object):
                 "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
                 (name,type)
             ).fetchone()
-            self.db.cursor().execute('''
+            cur = self.db.cursor()  
+            cur.execute('PRAGMA main.page_size = 4096;')
+            cur.execute('PRAGMA main.cache_size= 1000000;')
+            cur.execute('PRAGMA main.temp_store = MEMORY;')
+            #cur.execute('PRAGMA main.locking_mode=EXCLUSIVE;')
+            cur.execute('PRAGMA main.synchronous=NORMAL;')
+            cur.execute('PRAGMA main.journal_mode=WAL;')
+            cur.execute('''
                 CREATE TABLE IF NOT EXISTS globals (
                     key TEXT,
                     val TEXT
@@ -43,13 +56,8 @@ class Camoco(object):
                 CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
                 ''')
         except Exception as e:
-            self.log("Camoco Dataset {} does not exist, create one using the Builder Class",name)
-            raise e
+            raise NameError("Camoco dataset {} does not exist: {}".format(name,e))
 
-    def log(self,msg,*args):
-        print("[LOG]",time.ctime(), '-', self.name, '-', msg.format(*args),file=sys.stderr)
-        print("[LOG]",time.ctime(), '-', self.name, '-', msg.format(*args),file=self.log_file)
-           
     def _resource(self,type,filename):
         return os.path.expanduser(os.path.join(self.basedir,type,filename))
 
