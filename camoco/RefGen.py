@@ -12,15 +12,17 @@ import itertools
 import random
 
 class RefGen(Camoco):
-    def __init__(self,name,basedir="~/.camoco"):
+    def __init__(self,name,description=None,basedir="~/.camoco"):
         # initialize camoco instance
-        super().__init__(name,type="RefGen",basedir=basedir)
+        super().__init__(name,type="RefGen",description=description,basedir=basedir)
+        self._create_tables()
         self.genome = Genome(
             self.type+self.name,
             chroms = [Chrom(*x) for x in  self.db.cursor().execute(''' 
                 SELECT id,length FROM chromosomes
             ''')] 
         )
+
     @memoize
     def num_genes(self):
         ''' returns the number of genes in the dataset '''
@@ -47,14 +49,17 @@ class RefGen(Camoco):
             ''') if Gene(*x) in gene_filter
         )
 
-    def from_ids(self,gene_list,gene_filter=None):
+    def from_ids(self,gene_list,gene_filter=None,check_shape=False):
         ''' returns gene object iterable from an iterable of id strings  '''
         if not gene_filter:
             gene_filter = self
-        return [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
+        genes = [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
-            '''.format("','".join(gene_list))) if Gene(*x) in gene_filter
+            '''.format("','".join(map(str.upper,gene_list)))) if Gene(*x) in gene_filter
         ]
+        if check_shape and len(genes) != len(gene_list):
+            raise ValueError('Some input ids do not have genes in reference')
+        return genes
 
     @memoize
     def __getitem__(self,item):
@@ -192,7 +197,7 @@ class RefGen(Camoco):
     def flanking_genes_index(self,window_size=100000,gene_limit=4):
         ''' Generate an index of flanking genes useful for bootstrapping (i.e. we can get rid of while loop '''
         # iterate over genes keeping track of number of flanking genes 
-        self.log("Generating flanking gene index...")
+        self.log("Generating flanking gene index window size: {}, gene_limit {}",window_size,gene_limit)
         index = defaultdict(list)
         for gene in self.iter_genes():
             flanks = self.flanking_genes(gene,gene_limit=gene_limit,window_size=window_size)
@@ -220,7 +225,7 @@ class RefGen(Camoco):
             # you can pass in a gene object (this should ALWAYS be true if you 
             # created gene object from this RefGen)
             if self.db.cursor().execute('''
-                SELECT COUNT(*) FROM genes WHERE id = ?''',(obj.id,)).fetchone()[0] == 1:
+                SELECT COUNT(*) FROM genes WHERE id = ?''',(obj.id.upper(),)).fetchone()[0] == 1:
                 return True
             else:
                 return False
@@ -229,7 +234,7 @@ class RefGen(Camoco):
         try:
             # Can be a string object
             if self.db.cursor().execute('''
-                SELECT COUNT(*) FROM genes WHERE id = ?''',(str(obj),)).fetchone()[0] == 1:
+                SELECT COUNT(*) FROM genes WHERE id = ?''',(str(obj).upper(),)).fetchone()[0] == 1:
                 return True
             else:
                 return False
@@ -238,14 +243,6 @@ class RefGen(Camoco):
         self.log("object {} not correct type to test membership in {}",obj,self.name)
 
 
-class RefGenBuilder(Camoco):
-    def __init__(self,name,description,build,organism,basedir="~/.camoco"):
-        # Initiate CAmoco instance
-        super().__init__(name,description=description,type="RefGen",basedir=basedir)
-        self._create_tables()
-        # Set the table globals
-        self._global('build',build)
-        self._global('organism',organism)
 
     def _build_indices(self):
         cur = self.db.cursor()
@@ -277,13 +274,31 @@ class RefGenBuilder(Camoco):
             VALUES (?,?,?,?,?)''',genes)
         cur.execute('END TRANSACTION')
 
-    def import_from_gtf(self,filename):
-        pass
+    @classmethod
+    def from_gff(cls,filename,name,description,build,organism,basedir='~/.camoco'):
+        ''' imports refgen from gff file '''
+        self = cls(name,description,basedir=basedir)
+        self._global('build',build)
+        self._global('organism',organism)
+        with open(filename,'r') as IN:
+            for line in IN:
+                #skip comment lines
+                if line.startswith('#'):
+                    continue
+                chrom,source,feature,start,end,score,strand,frame,attributes = line.strip().split()
+                attributes = dict([(field.split('=')) for field in attributes.strip(';').split(';')])
+                if feature == 'chromosome':
+                    self.add_chromosome(Chrom(attributes['ID'],end))
+                if feature == 'gene':
+                    self.add_gene(Gene(chrom,start,end,strand,attributes['ID'],build,organism))
+        return self
 
     @classmethod
-    def import_from_RefGen(cls,name,description,refgen,gene_filter=None,basedir="~/.camoco"):
+    def from_RefGen(cls,name,description,refgen,gene_filter=None,basedir="~/.camoco"):
         ''' copies from a previous instance of refgen, making sure each gene is within gene filter '''
-        self = cls(name,description,refgen.build,refgen.organism,basedir)
+        self = cls(name,description,basedir)
+        self._global('build',refgen.build)
+        self._global('organism',refgen.organism)
         if not gene_filter:
             gene_filter = refgen
         for chrom in refgen.iter_chromosomes():
