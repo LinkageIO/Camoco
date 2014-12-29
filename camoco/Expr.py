@@ -56,6 +56,7 @@ class Expr(Camoco):
         return self.refgen.from_ids([
             x[0] for x in self.db.cursor().execute('SELECT DISTINCT(gene) FROM expression')
         ])
+
     @memoize
     def num_genes(self):
         return self.db.cursor().execute('SELECT COUNT(DISTINCT(gene)) FROM expression').fetchone()[0]
@@ -82,15 +83,14 @@ class Expr(Camoco):
         ''' Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)'''
         # we are all pandas on the inside O.O
         self = cls(name=name,description=description,basedir=basedir)
-        self._global("refgen",refgen.name)
-        self.refgen = refgen 
+        self.reset(raw=True)
+        self._set_refgen(refgen)
         if rawtype is None:
             self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
             rawtype = ''
         self._global('rawtype',rawtype)
         # put raw values into the database
         self.log('Importing Raw Expression Values')
-        self.reset()
         self.update_values(tbl,'Raw'+rawtype,raw=True)
         if quality_control:
             self.log('Performing Quality Control on genes')
@@ -104,11 +104,16 @@ class Expr(Camoco):
 
     def reset(self,raw=False):
         ''' resets the expression values to their raw state undoing any normalizations '''
-        self.db.cursor().execute('DELETE FROM expression;') 
+        cur = self.db.cursor()
+        cur.execute('BEGIN TRANSACTION')
         if raw:
             # kill the raw table too
-            self.db.cursor().execute('DELETE FROM raw_expression;') 
-        self._set_refgen(refgen=None)
+            self.log('Resetting raw expression data')
+            cur.execute('DELETE FROM raw_expression;') 
+        self.log('Resetting expression data')
+        cur.execute('DELETE FROM expression;') 
+        cur.execute('END TRANSACTION')
+        self._set_refgen(None)
         self.transformation_log('reset')
 
     def update_values(self,df,transform_name,raw=False):
@@ -121,10 +126,10 @@ class Expr(Camoco):
             # lets be safe about this
             cur.execute('BEGIN TRANSACTION')
             self.log('Removing old values from {}...',table)
-            self.db.cursor().execute('DELETE FROM {};'.format(table)) 
+            cur.execute('DELETE FROM {};'.format(table)) 
             cur.execute('END TRANSACTION')
             cur.execute('BEGIN TRANSACTION')
-            self.log('Importing values ...')
+            self.log('Importing values, shape: {} {}',)
             cur.executemany('''
                 INSERT OR REPLACE INTO {} (gene, accession, value) VALUES (?,?,?)'''.format(table),
                 [(accession,gene.upper(),float(value)) for (gene,accession),value in df.unstack().iteritems()] 
@@ -209,6 +214,11 @@ class Expr(Camoco):
         df = df.loc[df.apply(lambda x : ((sum(np.isnan(x))) < len(x)*max_gene_missing_data),axis=1),:] 
         self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         # -----------------------------------------
+        # filter out genes which do not meet a minimum expr threshold in at least one sample
+        self.log("Filtering out genes which do not have one sample above {}",min_single_sample_expr)
+        df = df[df.apply(lambda x: any(x >= min_single_sample_expr),axis=1)]
+        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
+        # -----------------------------------------
         # Filter out accession with too much missing data
         self.log("Filtering out accessions with > {} missing data",max_accession_missing_data)
         accession_mask = df.apply(lambda x : ((sum(np.isnan(x))) / len(x)),axis=0)
@@ -216,11 +226,6 @@ class Expr(Camoco):
             if percent > max_accession_missing_data:
                 self.log("\tRemoved: {}: missing {} data",df.columns[i],percent*100)
         df = df.loc[:,np.logical_not(accession_mask > max_accession_missing_data)] 
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        # -----------------------------------------
-        # filter out genes which do not meet a minimum expr threshold in at least one sample
-        self.log("Filtering out genes which do not have one sample above {}",min_single_sample_expr)
-        df = df[df.apply(lambda x: any(x >= min_single_sample_expr),axis=1)]
         self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         if dry_run:
             # If dry run, take first 100 rows of QC
@@ -232,7 +237,7 @@ class Expr(Camoco):
         ''' returns expression data '''
         # Set up dynamic query
         tbl = 'raw_expression' if raw else 'expression'
-        gene_filter = " WHERE gene in ('{}')".format("','".join(genes)) if genes is not None else ""
+        gene_filter = " WHERE gene in ('{}')".format("','".join([x.id for x in genes])) if genes is not None else ""
         accession_filter = " AND accession in ('{}')".format("','".join(accessions)) if accessions is not None else ""
         query = 'SELECT * FROM {} {} {};'.format(tbl,gene_filter,accession_filter)
         # pull and create data frame
@@ -401,7 +406,7 @@ class Expr(Camoco):
                 figsize=figsize
             )
 
-    def _set_refgen(self,refgen=None):
+    def _set_refgen(self,refgen):
         if refgen is not None:
             self._global('refgen',refgen.name)
         else:
@@ -430,12 +435,14 @@ class Expr(Camoco):
             CREATE TABLE IF NOT EXISTS raw_expression (
                 gene TEXT,
                 accession TEXT,
-                value REAL
+                value REAL,
+                UNIQUE (gene,accession) ON CONFLICT FAIL
             );
             CREATE TABLE IF NOT EXISTS expression (
                 gene TEXT,
                 accession TEXT,
-                value REAL
+                value REAL,
+                UNIQUE(gene,accession) ON CONFLICT FAIL
             );
         ''')
  
