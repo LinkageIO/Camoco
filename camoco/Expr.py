@@ -95,11 +95,14 @@ class Expr(Camoco):
         if quality_control:
             self.log('Performing Quality Control on genes')
             self.quality_control(**kwargs)
+        assert self.anynancol() == False
         if normalize:
             self.log('Performing Logarithmic Gene Normalization')
             self.normalize(**kwargs)
+            assert self.anynancol() == False
             self.log('Performing Quantile Normalization')
             self.quantile()
+            assert self.anynancol() == False
         return self
 
     def reset(self,raw=False):
@@ -113,6 +116,10 @@ class Expr(Camoco):
         self.log('Resetting expression data')
         cur.execute('DELETE FROM expression;') 
         cur.execute('END TRANSACTION')
+        if raw and cur.execute('SELECT COUNT(*) FROM raw_expression').fetchone()[0] != 0:
+            raise ValueError("Raw Expression Table NOT EMPTY!")
+        if cur.execute('SELECT COUNT(*) FROM expression').fetchone()[0] != 0:
+            raise ValueError("Expression Table NOT EMPTY!")
         self._set_refgen(None)
         self.transformation_log('reset')
 
@@ -129,7 +136,7 @@ class Expr(Camoco):
             cur.execute('DELETE FROM {};'.format(table)) 
             cur.execute('END TRANSACTION')
             cur.execute('BEGIN TRANSACTION')
-            self.log('Importing values, shape: {} {}',)
+            self.log('Importing values, shape: {} {}',df.shape[0],df.shape[1])
             cur.executemany('''
                 INSERT OR REPLACE INTO {} (gene, accession, value) VALUES (?,?,?)'''.format(table),
                 [(accession,gene.upper(),float(value)) for (gene,accession),value in df.unstack().iteritems()] 
@@ -156,6 +163,11 @@ class Expr(Camoco):
         elif self.rawtype.upper() == 'MICROARRAY':
             max_val = 100 
         return self.expr(raw=raw).apply(lambda col: np.nanmax(col.values) < max_val ,axis=0)
+    
+    def anynancol(self):
+        ''' A gut check method to make sure none of the expression columns
+            got turned into all nans. Because apparently that is a problem.'''
+        return any(self.expr().apply(lambda col: all(np.isnan(col)),axis=0))
 
     def normalize(self,method=None,is_raw=None,max_val=None,**kwargs):
         ''' evaluates qc expression data and re-enters 
