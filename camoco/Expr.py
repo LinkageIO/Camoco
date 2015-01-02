@@ -277,7 +277,7 @@ class Expr(Camoco):
         # assign ranks by accession
         expr_ranks = expr.rank(axis=0,method='dense')
         # normalize rank to be percentage
-        expr_ranks = expr_ranks.apply(lambda col: col/max(col), axis=0)
+        expr_ranks = expr_ranks.apply(lambda col: col/np.nanmax(col.values), axis=0)
         # we need to know the number of non-nans so we can correct for their ranks later
         self.log('Sorting ranked data')
         # assign accession values by order
