@@ -87,7 +87,7 @@ class Sample(Soft):
         if not self.is_raw():
             log.warn("Attempting to perform transormation of apparently non raw data")
         self.tbl.VALUE = func(list(map(float,self.tbl.VALUE.values)))
-        self.name = self.name + '(log2)'
+        self.name = self.name
         # make sure we didnt intriduce and -Inf values
         self.tbl.VALUE[self.tbl.VALUE == float('-Inf')] = np.nan
         return True
@@ -113,6 +113,12 @@ class Family(object):
         self.series = None
         self.platform = None
         self.samples = []
+
+    def filter_samples(self,id_list):
+        ''' Filters samples to only include those ids in the id_list '''
+        log("Started with {} samples",len(self.samples))
+        self.samples = [sample for sample in self.samples if sample.name in id_list]
+        log("Ended with {} samples",len(self.samples))
 
     @classmethod
     def from_file(cls,filename,normalize=True):
