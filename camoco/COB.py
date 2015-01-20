@@ -46,16 +46,16 @@ class COB(Expr):
         except ValueError as e:
             self.log('No edges in database!')
 
-  
+ 
     def edges(self,min_distance=None,sig_only=False):
         ''' returns edges '''
         try:
             query = '''SELECT gene_a,gene_b,score,distance
                     FROM coex '''
             if min_distance:
-                query += ' AND distance < {}'.format(min_distance)
+                query += ' WHERE distance < {}'.format(min_distance)
             if sig_only:
-                query += ' AND significant = 1'
+                query += ' WHERE significant = 1' if min_distance is None else 'AND significant = 1'
             return pd.DataFrame(self.db.cursor().execute(query).fetchall(),
                 columns=['gene_a','gene_b','score','distance'])
         except ValueError as e:
@@ -89,6 +89,7 @@ class COB(Expr):
             Output: Returns the neighbors for a list of genes as a DataFrame
             Columns returned: query_name, queryID, neighbor_name, neighbor, score
         '''
+        # Ids need to be extracted from gene list
         gene_list = "','".join([x.id for x in gene_list])
         cur = self.db.cursor()
         query = ''' 
@@ -96,12 +97,14 @@ class COB(Expr):
             WHERE 
             {} IN ('{}')  
             ''' 
+        # Tag on qualifiers for filtering 
         if min_distance:
             query += ' AND distance > {} '.format(min_distance)
         if sig_only:
-            query += ' AND significant = 1;'
-        else:
-            query += ';'
+            query += ' AND significant = 1'
+        query += ';'
+        # The way we do the queries makes sure that the genes in the gene_list are always
+        # in the first column. Neighbors are always in the second column. 
         data=(cur.execute(query.format('gene_a','gene_b','gene_a',gene_list)).fetchall() +
               cur.execute(query.format('gene_b','gene_a','gene_b',gene_list)).fetchall())
         if len(data) == 0:
@@ -351,6 +354,32 @@ class COB(Expr):
             layout = self.coordinates(gene_list)
         ig.plot(self.graph(gene_list),layout=layout,target=filename,bbox=(width,height),**kwargs)
 
+    def compare_to_COB(self,other_COB,filename=None,gridsize=100):
+        ''' Compare the edge weights in this COB to another COB. Prints out edge weights to file'''
+        if filename is None:
+            filename = "{}_to_{}".format(self.name,other_COB.name)
+        # Print out the edge comparisons for each common gene
+        self.log("Printing out common gene edges")
+        with open(filename+'.tsv','w') as OUT:
+            # Only compare the common genes
+            for i,common_gene in enumerate(set(self.genes()).intersection(other_COB.genes())):
+                x = self.neighbors([common_gene],sig_only=False)
+                y = other_COB.neighbors([common_gene],sig_only=False)
+                # Merge on the target column and print
+                x[['target','score']].merge(
+                    y[['target','score']], on='target'
+                ).to_csv(OUT, sep="\t", header=False, index=None)
+                if i % 1000 == 0:
+                    self.log("Done Processing {} genes",i)
+        # Read in the table
+        self.log("Reading in {}",filename+'.tsv')
+        tbl = pd.read_table(filename+".tsv",names=['target','x','y'])
+        from matplotlib import cm
+        self.log('Generating hexbin')
+        plt.hexbin(tbl['x'],tbl['y'],gridsize=gridsize,cmap=cm.afmhot)
+        plt.savefig(filename+'.png')
+            
+
     def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
         self.log("Reading in {}",filename)
@@ -466,11 +495,14 @@ class COB(Expr):
             cur.execute("BEGIN TRANSACTION")
             self._drop_indices()
             tbl = pd.DataFrame(
-                list(itertools.combinations([x.id for x in self.genes()],2)),
+                # The sorted call here is KEY! It means the columns in the database will be guaranteed
+                # to be sorted so we can access them faster
+                list(itertools.combinations([x.id for x in sorted(self.genes())],2)),
                 columns=['gene_a','gene_b']
             )
             # Now add coexpression data
             self.log("Calculating Coexpression")
+            # NOTE we have to call this outside _coex function because it parallizes things
             tbl['score'] = self._coex(self.expr().as_matrix())
             # correlations of 1 dont transform well
             tbl['score'][tbl['score'] == 1] = 0.99999999
@@ -524,7 +556,14 @@ class COB(Expr):
         ''' Build a COB Object from an FPKM or Micrarray CSV. '''
         return cls.from_DataFrame(pd.read_table(filename),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
         
-    def _coex(self,matrix):
+    def _coex(self,matrix,method='multiprocessing'):
+        ''' 
+            Coexpression abstraction method. If you want to try to make calculation faster,
+                optimize this method. 
+            Input: a numpy matrix
+            Output: a vector of PCC correlations among all rows of matrix 
+                    (matches itertools.combinations for all row labels)
+        '''
         progress = progress_bar(multiprocessing.Manager())
         pool = multiprocessing.Pool()
         scores = np.array(list(itertools.chain(
@@ -557,7 +596,9 @@ class COB(Expr):
         ''',degree.items())
  
     def _build_indices(self):
-        self.db.cursor().execute(''' 
+        cur = self.db.cursor()
+        cur.execute('BEGIN TRANSACTION')
+        cur.execute(''' 
             CREATE INDEX IF NOT EXISTS coex_abs ON coex (gene_a); 
             CREATE INDEX IF NOT EXISTS coex_gene_b ON coex (gene_b); 
             CREATE INDEX IF NOT EXISTS coex_gen_ab ON coex (gene_a,gene_b); 
@@ -568,6 +609,7 @@ class COB(Expr):
             CREATE INDEX IF NOT EXISTS coor_y ON coor(y);
             ANALYZE;
         ''')
+        cur.execute('END TRANSACTION')
 
     def _drop_indices(self):
         self.db.cursor().execute(''' 
