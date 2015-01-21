@@ -186,6 +186,19 @@ class Family(object):
                 mapping.append(probe)
         return mapping
 
+    @staticmethod
+    def _uniqify_columns(df_columns):
+        seen = set()
+        for item in df_columns:
+            fudge = 1
+            newitem = item
+            while newitem in seen:
+                fudge += 1
+                newitem = "{}_{}".format(item, fudge)
+            yield newitem
+            seen.add(newitem)
+
+
     def series_matrix(self):
         # If multiple samples, create SeriesMatrix
         organisms = set([sample.info['organism_ch1'] for sample in self.samples])
@@ -196,9 +209,11 @@ class Family(object):
                 data=[x.tbl.VALUE for x in self.samples],
                 index=[x.info['title'] for x in self.samples]
             ).transpose()
-            # Label the columns
+            # Label the rows
             old_index = series_matrix.index
             series_matrix.index = self.probe2gene(series_matrix.index.values)
+            # Uniqify the columns
+            series_matrix.columns = self._uniqify_columns(series_matrix.columns)
             # replace NANs or empty strings with old labels
             return series_matrix.astype('float')
         else:
