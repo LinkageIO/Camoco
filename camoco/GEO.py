@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import urllib
+import itertools
 import os
 from camoco.Tools import log
 import warnings
@@ -114,11 +115,28 @@ class Family(object):
         self.platform = None
         self.samples = []
 
-    def filter_samples(self,id_list):
-        ''' Filters samples to only include those ids in the id_list '''
-        log("Started with {} samples",len(self.samples))
-        self.samples = [sample for sample in self.samples if sample.name in id_list]
-        log("Ended with {} samples",len(self.samples))
+    def to_keepfile(self,filename,group_max_r2=0.99,keep_hint=None):
+        ''' Creates a tsv file for each sample containing sample information. Included are two columns 
+            used for further filtering of the aggregated samples. The 'Keep' columns is a hard filter
+            used to remove experiments (columns) completely. The "Group" column is for biological replicates.
+
+            See Also: GEO.Family.filter_from_keepfile()'''
+        # Extract info from samples
+        info = pd.DataFrame([sample.info for sample in self.samples])[['geo_accession','title','description','characteristics_ch1','series_id']]
+        info.sort("title") # Replicates most likely to have similar names
+        if keep_hint:
+            # This first join joins all the words together
+            info.insert(1,'Keep',[keep_hint in " ".join(
+                    # This second join is because when the comprehension comes to the string
+                    # it thinks its a list of chars. Just join everything together.
+                    ["".join(map(str.lower,str(x))) if isinstance(x,list) else str(x).lower() for x in row]
+                ) for i,row in info[['title','description','characteristics_ch1']].iterrows()
+            ])
+        else:
+            info.insert(1,'Keep',False)
+        info.insert(1,'Group',self._guess_groups(self.series_matrix(),group_max_r2))
+        info.to_csv(filename,sep='\t',index=False)
+
 
     @classmethod
     def from_file(cls,filename,normalize=True):
@@ -188,6 +206,8 @@ class Family(object):
 
     @staticmethod
     def _uniqify_columns(df_columns):
+        ''' Given a list of column names, returns a similar sized list with 
+            unique names '''
         seen = set()
         for item in df_columns:
             fudge = 1
@@ -198,8 +218,44 @@ class Family(object):
             yield newitem
             seen.add(newitem)
 
+    @staticmethod
+    def _guess_groups(dataframe,max_r2=0.99):
+        ''' Given a data frame, this method checks to see that each column has a correlation
+            below the max_r2. If it is above, a new column is created using the mean.'''
+        # Calculate correlation
+        cors = dataframe.corr()
+        # Each column starts in its own group
+        column_groups = list(range(0,len(cors)))
+        # Iterate over upper triangular, this guarantees that 
+        # we dont overwrite lower numbered groups
+        #
+        #   #OOOOOOOOOOO   <- group
+        #   i              <- row number (along d)
+        #  -------------   <- matrix
+        #  |d   x    x     <- row (x means r2 > max)
+        #  | d
+        #  |  d
+        #  |   d
+        #  |    d
+        for i,row in enumerate(np.triu(cors.as_matrix(),k=1)):
+            if any(row > max_r2):
+                # higher numbered columns are highly correlated with current column
+                which = np.where(row > max_r2)[0]
+                log("{} is correlated with {}",
+                    dataframe.columns[i],
+                    ",".join(dataframe.icol(which).columns)
+                )
+                # if column group is already assigned, keep assignment
+                if column_groups[i] != i:
+                    group = column_groups[i]
+                else:
+                    # Otherwise start your own group
+                    group = i
+                for x in which:
+                   column_groups[x] = group
+        return column_groups
 
-    def series_matrix(self):
+    def series_matrix(self,keepfile=None):
         # If multiple samples, create SeriesMatrix
         organisms = set([sample.info['organism_ch1'] for sample in self.samples])
         if len(organisms) > 1:
@@ -214,8 +270,22 @@ class Family(object):
             series_matrix.index = self.probe2gene(series_matrix.index.values)
             # Uniqify the columns
             series_matrix.columns = self._uniqify_columns(series_matrix.columns)
+            # Collpase down highly correlated columns (biological replicates)
+            series_matrix = series_matrix.astype('float')
+            #series_matrix = self._collapse_columns(series_matrix)
             # replace NANs or empty strings with old labels
-            return series_matrix.astype('float')
+            if keepfile is not None:
+                # Read in the keepfile
+                keepfile = pd.read_table(keepfile,sep='\t')
+                # Filter based on the keepfile
+                groups = series_matrix[series_matrix.columns[keepfile.Keep]].groupby(
+                    keepfile[keepfile.Keep].Group.values, axis=1
+                )
+                series_matrix = groups.apply(lambda group: group.mean(skipna=True,axis=1))
+                # Relabel the columns
+                series_matrix.columns = [group[0] if len(group) == 1 else group[0]+" (Group)" for group in groups.groups.values()]
+            return series_matrix
+
         else:
             raise ValueError("Not enough samples to build matrix")
 
