@@ -355,40 +355,41 @@ class COB(Expr):
             layout = self.coordinates(gene_list)
         ig.plot(self.graph(gene_list),layout=layout,target=filename,bbox=(width,height),**kwargs)
 
-    def compare_to_COB(self,other_COB,filename=None,gridsize=100,extent=[-10,10,-10,10]):
+    def compare_to_COB(self,list_of_other_COBs,filename=None,gridsize=100,extent=[-10,10,-10,10]):
         ''' Compare the edge weights in this COB to another COB. Prints out edge weights to file'''
-        if filename is None:
+        for other_COB in list_of_other_COBs:
+            self.log("Comparing {} to {}",self.name,other_COB.name)
             filename = "{}_to_{}".format(self.name,other_COB.name)
-        # Print out the edge comparisons for each common gene
-        self.log("Printing out common gene edges")
-        if not os.path.exists(filename+'.tsv'):
-            with open(filename+'.tsv','w') as OUT:
-                # Only compare the common genes
-                for i,common_gene in enumerate(set(self.genes()).intersection(other_COB.genes())):
-                    x = self.neighbors([common_gene],sig_only=False)
-                    y = other_COB.neighbors([common_gene],sig_only=False)
-                    # Merge on the target column and print
-                    x[['target','score']].merge(
-                        y[['target','score']], on='target'
-                    ).to_csv(OUT, sep="\t", header=False, index=None)
-                    if i % 1000 == 0:
-                        self.log("Done Processing {} genes",i)
-        # Read in the table
-        self.log("Reading in {}",filename+'.tsv')
-        tbl = pd.read_table(filename+".tsv",names=['target','x','y'])
-        from matplotlib import cm
-        self.log('Generating hexbin')
-        # http://matplotlib.org/examples/pylab_examples/hexbin_demo.html
-        plt.clf()
-        plt.figure(figsize=(8,8),dpi=200)
-        plt.hexbin(tbl['x'],tbl['y'],gridsize=gridsize,cmap=cm.afmhot,bins='log',extent=extent)
-        plt.xlabel('{} Edge Z Score'.format(self.name))
-        plt.ylabel('{} Edge Z Score'.format(other_COB.name))
-        plt.savefig(filename+'.png')
-        cb = plt.colorbar()
-        cb.set_label('log edge Z-score counts')
-        self.log("Done")
-            
+            # Print out the edge comparisons for each common gene
+            self.log("Printing out common gene edges")
+            if not os.path.exists(filename+'.tsv'):
+                with open(filename+'.tsv','w') as OUT:
+                    # Only compare the common genes
+                    for i,common_gene in enumerate(set(self.genes()).intersection(other_COB.genes())):
+                        x = self.neighbors([common_gene],sig_only=False)
+                        y = other_COB.neighbors([common_gene],sig_only=False)
+                        # Merge on the target column and print
+                        x[['target','score']].merge(
+                            y[['target','score']], on='target'
+                        ).to_csv(OUT, sep="\t", header=False, index=None)
+                        if i % 1000 == 0:
+                            self.log("Done Processing {} genes",i)
+            if not os.path.exists(filename+'.png'):
+                # Read in the table
+                self.log("Reading in {}",filename+'.tsv')
+                tbl = pd.read_table(filename+".tsv",names=['target','x','y'])
+                from matplotlib import cm
+                self.log('Generating hexbin')
+                # http://matplotlib.org/examples/pylab_examples/hexbin_demo.html
+                plt.clf()
+                plt.figure(figsize=(8,8),dpi=200)
+                plt.hexbin(tbl['x'],tbl['y'],gridsize=gridsize,cmap=cm.afmhot,bins='log',extent=extent)
+                plt.xlabel('{} Edge Z Score'.format(self.name))
+                plt.ylabel('{} Edge Z Score'.format(other_COB.name))
+                plt.savefig(filename+'.png')
+                cb = plt.colorbar()
+                cb.set_label('log edge Z-score counts')
+            self.log("Done")
 
     def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
