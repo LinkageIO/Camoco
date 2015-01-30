@@ -209,17 +209,19 @@ class Family(object):
         ''' Given a list of column names, returns a similar sized list with 
             unique names '''
         seen = set()
+        new = list()
         for item in df_columns:
             fudge = 1
             newitem = item
-            while newitem in seen:
+            while newitem in seen: # keep increasing fudge until not seen 
                 fudge += 1
                 newitem = "{}_{}".format(item, fudge)
-            yield newitem
+            new.append(newitem)
             seen.add(newitem)
+        return new
 
     @staticmethod
-    def _guess_groups(dataframe,max_r2=0.99):
+    def _guess_groups(dataframe,max_r2=0.99,max_namediff=0.8):
         ''' Given a data frame, this method checks to see that each column has a correlation
             below the max_r2. If it is above, a new column is created using the mean.'''
         # Calculate correlation
@@ -241,18 +243,23 @@ class Family(object):
             if any(row > max_r2):
                 # higher numbered columns are highly correlated with current column
                 which = np.where(row > max_r2)[0]
-                log("{} is correlated with {}",
-                    dataframe.columns[i],
-                    ",".join(dataframe.icol(which).columns)
-                )
-                # if column group is already assigned, keep assignment
-                if column_groups[i] != i:
-                    group = column_groups[i]
-                else:
-                    # Otherwise start your own group
-                    group = i
-                for x in which:
-                   column_groups[x] = group
+                from difflib import SequenceMatcher
+                for match in which:
+                    diffratio = SequenceMatcher(None,dataframe.columns[i],dataframe.columns[match]).ratio()
+                    # if column group is already assigned, keep assignment
+                    if column_groups[i] != i and diffratio > max_namediff:
+                        # Here, samples have high expression correlation AND similar names (i.e. rep1 vs rep2)
+                        group = column_groups[i]
+                        log("{} is {} correlated with {}",
+                            dataframe.columns[i],
+                            diffratio,
+                            dataframe.columns[match]
+                        )
+                    else:
+                        # Otherwise start your own group
+                        group = i
+                    for x in which:
+                        column_groups[x] = group
         return column_groups
 
     def series_matrix(self,keepfile=None):
@@ -277,13 +284,18 @@ class Family(object):
             if keepfile is not None:
                 # Read in the keepfile
                 keepfile = pd.read_table(keepfile,sep='\t')
+                keepfile.title = self._uniqify_columns(keepfile.title)
+                # Reorder the columns based on the keepfile
+                series_matrix = series_matrix.reindex_axis(keepfile.title,axis=1)
+                # Make sure the above worked
+                assert all(series_matrix.columns == keepfile.title)
                 # Filter based on the keepfile
                 groups = series_matrix[series_matrix.columns[keepfile.Keep]].groupby(
                     keepfile[keepfile.Keep].Group.values, axis=1
                 )
                 series_matrix = groups.apply(lambda group: group.mean(skipna=True,axis=1))
                 # Relabel the columns
-                series_matrix.columns = [group[0] if len(group) == 1 else group[0]+" (Group)" for group in groups.groups.values()]
+                series_matrix.columns = [group[0] if len(group) == 1 else "(BioRep) "+";".join(group) for group in groups.groups.values()]
             return series_matrix
 
         else:
