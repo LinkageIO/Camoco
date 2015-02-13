@@ -42,12 +42,12 @@ class Camoco(object):
                 (name,type)
             ).fetchone()
             cur = self.db.cursor()  
-            cur.execute('PRAGMA main.page_size = 4096;')
+            cur.execute('PRAGMA main.page_size = 8192;')
             cur.execute('PRAGMA main.cache_size= 1000000;')
             cur.execute('PRAGMA main.temp_store = MEMORY;')
             #cur.execute('PRAGMA main.locking_mode=EXCLUSIVE;')
-            cur.execute('PRAGMA main.synchronous=NORMAL;')
-            cur.execute('PRAGMA main.journal_mode=WAL;')
+            cur.execute('PRAGMA main.synchronous=OFF;')
+            cur.execute('PRAGMA main.journal_mode=MEMORY;')
             cur.execute('''
                 CREATE TABLE IF NOT EXISTS globals (
                     key TEXT,
