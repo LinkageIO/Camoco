@@ -36,7 +36,7 @@ def main(args):
         RG = co.RefGen(refgen)
     except Exception as e:
         co.log("{} isnt a valid RefGen name. Did you import that refgen yet?",refgen) 
-        return -1
+            raise
     ONT = co.Ontology.create(name,desc,RG)
     # handle type case csv
     for file in options.files:
@@ -44,7 +44,7 @@ def main(args):
             table = pd.read_table(file,sep=options.sep)
             # Group each trait by its name
             for term_id,df in table.groupby(options.id_col):
-                term = Term(id=term_id) 
+                term = co.Term(id=term_id) 
                 # Determing trait information
                 if options.name_col:
                     term.name = df[options.name_col].iloc[0]
