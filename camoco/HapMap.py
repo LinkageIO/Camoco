@@ -315,8 +315,6 @@ class HapMapBuilder(Camoco):
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute("PRAGMA page_size = 262144;")
-        cur.execute("PRAGMA cache_size = 100000;")
         cur.execute(''' 
             CREATE TABLE IF NOT EXISTS snps (
                 chromosome TEXT NOT NULL,
