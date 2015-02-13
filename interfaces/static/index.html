@@ -12,18 +12,20 @@
 <!-- CDNS -->
 <script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
 <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
-<script type='text/javascript' src='static/js/cytoscape/build/cytoscape.js'></script>
-<script type='text/javascript' src='static/js/cytoscape/lib/arbor.js'></script>
+<script type='text/javascript' src='static/js/lib/cytoscape/build/cytoscape.js'></script>
+<script type='text/javascript' src='static/js/lib/cytoscape/lib/arbor.js'></script>
+<script type='text/javascript' src='static/js/lib/cytoscape/lib/cola.v3.min.js'></script>
 
 <link rel='stylesheet' type='text/css'  href="static/css/jquery.dataTables.css">
-<script src="static/js/datatables/jquery.dataTables.js"></script>
-<script src="static/js/datatables/jquery.scrollTo.min.js"></script>
-<script src="static/js/datatables/dataTables.fixedColumns.js"></script>
+<script src="static/js/lib/datatables/jquery.dataTables.js"></script>
+<script src="static/js/lib/datatables/jquery.scrollTo.min.js"></script>
+<script src="static/js/lib/datatables/dataTables.fixedColumns.js"></script>
 
 <link rel='stylesheet' type='text/css' href="static/js/jQuery-contextMenu/src/jquery.contextMenu.css">
-<script src="static/js/jQuery-contextMenu/src/jquery.contextMenu.js"</script>
-<script src="static/js/jQuery-contextMenu/src/jquery.ui.position.js"</script>
+<script src="static/js/lib/jQuery-contextMenu/src/jquery.contextMenu.js"</script>
+<script src="static/js/lib/jQuery-contextMenu/src/jquery.ui.position.js"</script>
 
+<script src='static/js/heatmap.js/build/heatmap.js'></script>
 
 <script src='static/js/cob.js'></script>
 
@@ -71,6 +73,43 @@ arbor_options = {
     }
 };
 
+var cola_options = {
+       name: 'cola',
+
+       animate: true, // whether to show the layout as it's running
+       refresh: 1, // number of ticks per frame; higher is faster but more jerky
+       maxSimulationTime: 4000, // max length in ms to run the layout
+       ungrabifyWhileSimulating: true, // so you can't drag nodes during layout
+       fit: true, // on every layout reposition of nodes, fit the viewport
+       padding: 30, // padding around the simulation
+       boundingBox: undefined, // constrain layout bounds; { x1, y1, x2, y2 } or { x1, y1, w, h }
+
+       // layout event callbacks
+       ready: function(){}, // on layoutready
+       stop: function(){}, // on layoutstop
+       // positioning options
+       randomize: false, // use random node positions at beginning of layout
+       avoidOverlap: false, // if true, prevents overlap of node bounding boxes
+       handleDisconnected: true, // if true, avoids disconnected components from overlapping
+       nodeSpacing: function( node ){ return 10; }, // extra spacing around nodes
+       flow: undefined, // use DAG/tree flow layout if specified, e.g. { axis: 'y', minSeparation: 30 }
+       alignment: undefined, // relative alignment constraints on nodes, e.g. function( node ){ return { x: 0, y: 1 } }
+
+       // different methods of specifying edge length
+       // each can be a constant numerical value or a function like `function( edge ){ return 2; }`
+       edgeLength: undefined, // sets edge length directly in simulation
+       edgeSymDiffLength: undefined, // symmetric diff edge length in simulation
+       edgeJaccardLength: undefined, // jaccard edge length in simulation
+
+       // iterations of cola algorithm; uses default values on undefined
+       unconstrIter: undefined, // unconstrained initial layout iterations
+       userConstIter: undefined, // initial layout iterations with user-specified constraints
+       allConstIter: undefined, // initial layout iterations with all constraints including non-overlap
+
+       // infinite layout options
+       infinite: false // overrides all other options for a forces-all-the-time mode
+};
+
 cose_options = {
     name: 'cose',
     // Called on `layoutready`
@@ -112,6 +151,19 @@ cose_options = {
 $(document).ready(function(){
     // Initialize Cytoscape
     window.cob = new COB({ 'div': $('#cob') })
+
+    /*
+    window.x = undefined
+    $.getJSON(
+        'api/Expression/ZmRoot/ZmIonome/Fe'
+    ).done(
+        function(data){
+            window.x = data
+        }
+    ).fail(function(data,textStatus,status){
+        alert('nope:'+textStatus+status)
+    })
+    */
 });
 
 -->
@@ -119,5 +171,6 @@ $(document).ready(function(){
 </head>
 <body>
     <div id='cob'></div>
+    <div id='expr_heatmap'></div>
 </body>
 </html>

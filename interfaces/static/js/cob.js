@@ -9,8 +9,6 @@
         this.params = $.extend(true,defaults,params)
         this.selected = []
         // set default filters
-        this.removed_edges = []
-        this.removed_nodes = []
         this.edge_filter = 3 // edge score
         this.node_filter = 1 // degree
         
@@ -23,7 +21,7 @@
                 )
             )
             .append($('<li>')
-                .append('<span>').html('Edge   Filter')
+                .append('<span>').html('Edge Filter')
                     .append($('<input>',{'value':3})
                         .on({'change':function(){
                             cob.graph.edge_filter = this.value
@@ -48,6 +46,13 @@
             // General Options 
             hideEdgesOnViewport: true,
             hideLabelsOnViewport: true,
+            minZoom: 1e-50,
+            maxZoom: 1e50,
+            zoomingEnabled: true,
+            userZoomingEnabled: true,
+            panningEnabled: true,
+            userPanningEnabled: true,
+            boxSelectionEnabled: true,
             // Style
             style: cytoscape.stylesheet()
             .selector('node')
@@ -59,6 +64,7 @@
                 'width' : 'mapData(gdegree,0,100,50,10)',
                 'content':'data(id)',
                 'text-halign':'right',
+                'font-size' : '12pt',
                 'min-zoomed-font-size':1
             })
             .selector(':selected')
@@ -79,7 +85,7 @@
             .selector('edge')
             .css({
                 'opacity': '0.50',
-                'width': 'mapData(score, 3, 7, 1, 50)',
+                'width': 'mapData(score, 3, 7, 1, 20)',
                 'curve-style': 'haystack' // fast edges!
             }),
             layout: {
@@ -95,20 +101,19 @@
         this.filter = function(){
             // filter values need to be stored in the graph object because
             // interface programming sucks.
-            //this.cy.edges('edge[score >= '+this.edge_filter+']').show()
             try{
-                this.removed_edges.restore()
+                this.rem_edges.restore() 
+                this.rem_nodes.restore()
+                this.rem_con_edges.restore()
             }
-                catch (e if e instanceof TypeError){
+            catch(e){
+                if(e instanceof TypeError){}
             }
-            this.removed_edges = this.cy.edges('edge[score < '+this.edge_filter+']').remove()
-            //this.cy.nodes('node[[degree >= '+this.node_filter+']]').show()
-            try{
-                this.removed_nodes.restore()
-            }
-                catch( e if e instanceof TypeError){
-            }
-            this.removed_nodes = this.cy.nodes('node[[degree < '+this.node_filter+']]').remove()
+            // Get the edges under the filter
+            this.rem_edges = this.cy.collection('edge[score <  '+this.edge_filter+']').remove()
+            var nodes = this.cy.collection('node[[degree < '+this.node_filter+']]')
+            this.rem_con_edges = nodes.connectedEdges().remove()
+            this.rem_nodes = nodes.remove()
         }
     }
 
@@ -126,7 +131,32 @@
             'div' : $('<div>',{class:'tab'})
         }
         this.params = $.extend(true,defaults,params)
-
+    
+        this.update_table = function(params){
+            // delete oldtable
+            this[params.name].destroy()
+            $('#cob .'+params.name).empty().append(
+                $('<thead>').append($('<tr>'))
+            )
+            a=1
+            for (var i=0; i<params.header.length; i++){
+                $('#cob table.'+params.name+' thead tr')
+                .append($('<th>'+params.header[i]+'</th>'))
+            }
+            this[params.name] = $('#cob .'+params.name).DataTable(
+                $.extend(true,{
+                "processing" : true,
+                "autoWidth": true, 
+                "bPaginate": false,
+                "bJQueryUI": true,
+                "bScrollCollapse": true,
+                "bAutoWidth": true,
+                "sScrollXInner": "100%",
+                "sScrollX": '100%',
+                "sScrollY":  '100%',
+                },params)
+            )
+        }
         this.add_table = function(params){
             this.params.div
                 .append(
@@ -241,7 +271,6 @@
         this.params.div
             .append($('<div>',{class:'graph'}))
             .append($('<div>',{class:'menu'}))
-            .append($('<div>',{class:'loci'}))
             .append($('<div>',{class:'footer'}))
             .append($('<div>',{class:'header'}))
         this.graph = new Graph({
@@ -266,13 +295,13 @@
         })
         this.menu.get_tab('Dataset').add_table({
             "name":'TermTable',
-            'header':['Name','Desc','Num SNPs','Num Genes','Root Genes'],
+            'header':['Name','Desc','Num SNPs','Num Genes'],//,'Root Genes'],
             'sScrollY': this.menu.params.div.innerHeight()/4
         })
         this.menu.get_tab('Network').add_table({
             "name":'NetworkTable',
             "header":['Network','Description'],
-            "ajax":"Camoco/available_datasets/COB",
+            "ajax":"Camoco/available_datasets/Expr",
             'sScrollY':this.menu.params.div.innerHeight()/4
         })
 
@@ -285,24 +314,7 @@
                     'End',
                     'Strand',
                     'Global Degree',
-                    'Term SNPs',
-                    'In Root?',
-                    'In SAM?',
-                    'In PAN?',
-                    'MaizeSeq.org Annot',
-                    'BFGR Annot',
-                    'PFAM Domain',
-                    'Rice Orth',
-                    'Rice Annot',
-                    'Sorghum Orth',
-                    'Sorghum Annot',
-                    'Panicum Orth',
-                    'Panicum Annot',
-                    'Grassius TF',
-                    'MapMan',
-                    'classical',
-                    'EFP Link',
-                    'Functional Annot'
+                    'Term SNPs'
                 ],
             'sScrollY': this.menu.params.div.innerHeight()/2,
         })
@@ -344,7 +356,7 @@
                             console.log('Fitting ');
                             cob.load_annotations()
                         })
-                    .layout(arbor_options)
+                    .layout(cola_options)
                 })
                 .fail(function(data){
                     console.log("Nopers")
@@ -374,18 +386,20 @@
             console.log("CLICKED "+node.id())
             // highlight neighbors
             //unhighlight old rows
-            cob.loci.LociTable.rows(cob.loci.highlighted_rows)
+            a =1 
+            cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
                 .nodes()
                 .to$()
                 .toggleClass('selected')
             // highlight new rows
-            cob.loci.highlighted_rows = cob.loci.LociTable.rows().flatten()
+            cob.menu.get_tab('Genes').highlighted_rows = cob.menu.get_tab('Genes')
+                .LociTable.rows().flatten()
                 .filter(function(rowIdx){
-                    return cob.loci.LociTable.cell(rowIdx,0).data() == node.id() ? true : false;
+                    return cob.menu.get_tab('Genes').LociTable.cell(rowIdx,0).data() == node.id() ? true : false;
                 })
             // scroll to row
-            $('.loci .dataTables_scrollBody').scrollTo(
-                cob.loci.LociTable.rows(cob.loci.highlighted_rows)
+            $('#cob .dataTables_scrollBody .LociTable').scrollTo(
+                cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
                     .nodes()
                     .to$()
                     .toggleClass('selected')
@@ -423,10 +437,23 @@
             for(var i=0; i < nodes.length; i++){
                 node_ids.push(nodes[i].id())
             }
-            this.menu.get_tab('Genes').LociTable.clear()
-                .ajax.url("api/Annotations/ROOT/"+cob.menu.LoadedOntology+"/"+cob.menu.LoadedTerm+"?genes="+node_ids.join(','))
-                .load().draw()
-            this.menu.get_tab('Genes').FixedColumn.fnRedrawLayout()
-
+            try{
+                // Fetch ajax
+                $.getJSON("api/Annotations/"
+                    +cob.menu.LoadedNetwork
+                    +"/"+cob.menu.LoadedOntology
+                    +"/"+cob.menu.LoadedTerm+"?genes="
+                    +node_ids.join(','))
+                .success(
+                    function(data){
+                        data.name = 'LociTable'
+                        data['sScrollY'] = cob.menu.params.div.innerHeight()-200
+                        cob.menu.get_tab('Genes').update_table(data)
+                    }
+                )
+            }
+            catch(err){
+                
+            }
         }
     }
