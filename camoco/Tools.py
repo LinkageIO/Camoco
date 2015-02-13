@@ -19,13 +19,11 @@ def memoize(obj):
     def memoizer(*args, **kwargs):
         # Give us a way to clear the cache
         if 'clear_cache' in kwargs:
-            cache = obj.cache = {}
+            cache.clear()
         # This wraps the calling of the memoized object
         key = str(args) + str(kwargs)
         if key not in cache:
             cache[key] = obj(*args, **kwargs)
-        else:
-            # is in cache, 
         return cache[key]
     return memoizer
 
