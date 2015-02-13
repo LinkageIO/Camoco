@@ -26,8 +26,6 @@ import base64
 import os
 
 from scipy.stats import hypergeom,pearsonr
-from scipy.cluster.hierarchy import linkage, dendrogram
-from scipy.spatial.distance import pdist, squareform, euclidean
 
 import collections
 
@@ -296,7 +294,7 @@ class COB(Expr):
                 [(gene.id,layout[i][0],layout[i][1]) for i,gene in enumerate(gene_list)]
             )
 
-    def mcl(self,gene_list,I=2.0,scheme=7,min_distance=100000):
+    def mcl(self,gene_list,I=2.0,scheme=7,min_distance=100000,min_size=0,max_size=10e10):
         ''' A *very* thin wrapper to the MCL program. The MCL program must
             be accessible by a subprocess (i.e. by the shell).
             Returns clusters (as list) as designated by MCL. 
@@ -312,7 +310,11 @@ class COB(Expr):
             sout,serr = p.communicate(MCLstr.encode('utf-8'))
             p.wait()
             if p.returncode==0 and len(sout)>0:
-                return [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
+                # Filter out cluters who are smaller than the min size
+                return list(filter(lambda x: len(x) > min_size and len(x) < max_size,
+                    # Generate ids from the refgen
+                    [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
+                ))
             else:
                 self.log( "MCL return code: {}".format(p.returncode))
         except FileNotFoundError as e:
