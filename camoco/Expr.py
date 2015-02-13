@@ -3,7 +3,11 @@
 from camoco.Camoco import Camoco
 from camoco.RefGen import RefGen
 from camoco.Tools import memoize
+from scipy.spatial.distance import pdist, squareform, euclidean
+from scipy.stats import hypergeom,pearsonr
+from scipy.cluster.hierarchy import linkage, dendrogram
 
+import matplotlib
 import pandas as pd
 import numpy as np
 import matplotlib.pylab as plt
@@ -124,7 +128,10 @@ class Expr(Camoco):
         self.transformation_log('reset')
 
     def update_values(self,df,transform_name,raw=False):
-        ''' updates the expression values with values from df '''
+        ''' updates the 'expression' table values with values from df.
+            Requires a transformation name for the logs. 
+            Option to overwrite raw table or working table.
+            '''
         # update the transformation log
         self.transformation_log(transform_name)
         table = 'raw_expression' if raw else 'expression'
@@ -139,14 +146,14 @@ class Expr(Camoco):
             self.log('Importing values, shape: {} {}',df.shape[0],df.shape[1])
             cur.executemany('''
                 INSERT OR REPLACE INTO {} (gene, accession, value) VALUES (?,?,?)'''.format(table),
-                [(accession,gene.upper(),float(value)) for (gene,accession),value in df.unstack().iteritems()] 
-                #              ^ All genes are uppercase in database 
+                [(gene.upper(),accession, float(value)) for (accession,gene),value in df.unstack().iteritems()] 
+                #          ^             ^ All indices are uppercase in database 
             )
             self.log('Imported {} values',df.shape[0]*df.shape[1])
             cur.execute('END TRANSACTION')
         except Exception as e:
             cur.execute('ROLLBACK') 
-            self.log('Something bad happened:{}',e)
+            self.log('Unable to update expression table values: {}',e)
             raise
 
     def max_values(self,group_by='accession',raw=False):
@@ -249,7 +256,7 @@ class Expr(Camoco):
         ''' returns expression data '''
         # Set up dynamic query
         tbl = 'raw_expression' if raw else 'expression'
-        gene_filter = " WHERE gene in ('{}')".format("','".join([x.id for x in genes])) if genes is not None else ""
+        gene_filter = " WHERE gene in ('{}')".format("','".join([x.id.upper() for x in genes])) if genes is not None else ""
         accession_filter = " AND accession in ('{}')".format("','".join(accessions)) if accessions is not None else ""
         query = 'SELECT * FROM {} {} {};'.format(tbl,gene_filter,accession_filter)
         # pull and create data frame
@@ -304,10 +311,12 @@ class Expr(Camoco):
             self.log('Transformation Log: {}',self._global('transformation_log'))
         
     def heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
-        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, 
+        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True, 
         heatmap_unit_label='Expression Z Score',png_encode=False):
         ''' Draw clustered heatmaps of an expression matrix'''
-        dm = self.expr(genes=genes,accessions=accessions)
+        from matplotlib import rcParams
+        rcParams.update({'figure.autolayout': True})
+        dm = self.expr(genes=genes,accessions=accessions,zscore=zscore).T
         D = np.array(dm)
         row_labels = dm.index
         col_labels = dm.columns
@@ -364,6 +373,7 @@ class Expr(Camoco):
         axmatrix.set_yticks(np.arange(D.shape[0]))
         axmatrix.set_yticklabels(row_labels)
         axmatrix.tick_params(axis='y',labelsize='x-small')
+        plt.gcf().subplots_adjust(right=0.15)
         # Add color bar
         axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
         f.colorbar(im,orientation='horizontal',cax=axColorBar,
@@ -419,10 +429,12 @@ class Expr(Camoco):
             )
 
     def _set_refgen(self,refgen):
+        # update database for future
         if refgen is not None:
             self._global('refgen',refgen.name)
         else:
             self._global('refgen',None)
+        # remember to set for current instance
         self.refgen = refgen
 
     def _filter_refgen(self):
@@ -433,12 +445,10 @@ class Expr(Camoco):
             "{}RefGen".format(self.name),
             "RefGen for {} filtered from {}".format(self.name,self.refgen.name),
             self.refgen,
+            gene_filter=self,
             basedir = self.basedir
         )
-        # Remember for next time
-        self._global('refgen',filtered_refgen.name)
-        # Dont forget to reset for current instance
-        self.refgen = filtered_refgen
+        self._set_refgen(filtered_refgen)
 
 
     def _create_tables(self):
