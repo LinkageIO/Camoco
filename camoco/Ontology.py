@@ -8,7 +8,9 @@ from camoco.Tools import log
 from collections import defaultdict
 from pandas import DataFrame
 from scipy.stats import hypergeom
+import matplotlib.pylab as plt
 import itertools
+import pandas as pd
 import re
 import sys
 
@@ -145,6 +147,7 @@ class Ontology(Camoco):
     def __len__(self):
         return self.db.cursor().execute("SELECT COUNT(*) FROM terms;").fetchone()[0]
 
+
     def term(self,term_id,window_size=100000):
         ''' retrieve a term by name '''
         try:
@@ -180,7 +183,26 @@ class Ontology(Camoco):
     def terms(self):
         return list(self.iter_terms())
 
-    def enrichment(self,gene_list,pval_cutoff=0.05,gene_filter=None,label=None):
+    def compare_COBs(self,COB1,COB2,min_term_size=10,max_term_size=300,plot=True):
+        # get pairwise densities for terms
+        self.log("Extracting Densities")
+        densities = pd.DataFrame([
+            (COB1.density(term.gene_list),COB2.density(term.gene_list)) for term in self.iter_terms() if len(term) > min_term_size and len(term) < max_term_size
+        ],columns=['x','y'])
+        if plot:
+            self.log('Plotting')
+            plt.clf()
+            plt.figure(figsize=(8,8),dpi=200)
+            plt.scatter(densities.x,densities.y)
+            plt.xlim([0,150])
+            plt.ylim([0,150])
+            plt.xlabel(COB1.name + " Densities")
+            plt.ylabel(COB2.name + " Densities")
+            plt.savefig("{}_vs_{}_{}.png".format(COB1.name,COB2.name,self.name))
+        self.log("Done")
+        return densities
+
+    def enrichment(self,gene_list,pval_cutoff=0.05,gene_filter=None,label=None,max_term_size=300):
         # extract possible terms for genes
         if label:
             self.log("Caculating Enrichemnt for {}",label)
@@ -199,6 +221,9 @@ class Ontology(Camoco):
             genes_in_term = [x[0] for x in cur.execute(
                 '''SELECT gene FROM gene_terms WHERE term = ?''',(id,))
             ]
+            if len(genes_in_term) > max_term_size:
+                self.log("Skipping {} due to size ({})",name,len(genes_in_term))
+                continue
             if gene_filter:
                 genes_in_term = [gene for gene in genes_in_term if gene in gene_filter]
             num_genes_in_term = len(genes_in_term)
@@ -329,8 +354,6 @@ class Ontology(Camoco):
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute("PRAGMA page_size = 1024;")
-        cur.execute("PRAGMA cache_size = 100000;")
         cur.execute(''' 
             CREATE TABLE IF NOT EXISTS terms (
                 id TEXT UNIQUE,
