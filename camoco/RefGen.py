@@ -46,7 +46,7 @@ class RefGen(Camoco):
             gene_filter = self
         return ( Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute('''
             SELECT chromosome,start,end,strand,id FROM genes
-            ''') if Gene(*x) in gene_filter
+            ''') if Gene(*x,build=self.build,organism=self.organism) in gene_filter
         )
 
     def from_ids(self,gene_list,gene_filter=None,check_shape=False):
@@ -217,12 +217,14 @@ class RefGen(Camoco):
     def __repr__(self):
         return 'Reference Genome: {} - {} - {}'.format(self.organism,self.build,self.name)
 
-        
+
+    def __len__(self):
+        return self.num_genes()        
 
     def __contains__(self,obj):
         ''' flexible on what you pass into the 'in' function '''
         try:
-            # you can pass in a gene object (this should ALWAYS be true if you 
+            # you can pass in a gene object (this expression should ALWAYS be true if you 
             # created gene object from this RefGen)
             if self.db.cursor().execute('''
                 SELECT COUNT(*) FROM genes WHERE id = ?''',(obj.id.upper(),)).fetchone()[0] == 1:
@@ -303,15 +305,14 @@ class RefGen(Camoco):
             gene_filter = refgen
         for chrom in refgen.iter_chromosomes():
             self.add_chromosome(chrom)
-        for gene in refgen.iter_genes(gene_filter=gene_filter):
+        x = list(refgen.iter_genes(gene_filter=gene_filter))
+        for gene in x:
             self.add_gene(gene)
         self._build_indices()
         return self
        
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute("PRAGMA page_size = 1024;")
-        cur.execute("PRAGMA cache_size = 100000;")
         cur.execute(''' 
             CREATE TABLE IF NOT EXISTS chromosomes (
                 id TEXT NOT NULL UNIQUE,
