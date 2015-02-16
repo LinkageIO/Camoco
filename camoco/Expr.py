@@ -15,7 +15,7 @@ import io
 
 class Expr(Camoco):
     ''' A representation of gene expression. '''
-    def __init__(self,name,description=None,basedir='~/.camoco'):
+    def __init__(self,name,description=None,basedir='~/.camoco',refgen=None):
         super().__init__(name=name,description=description,type='Expr',basedir=basedir) 
         self._create_tables()
         try:
@@ -86,9 +86,12 @@ class Expr(Camoco):
         normalize=True,quality_control=True,**kwargs):
         ''' Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)'''
         # we are all pandas on the inside O.O
-        self = cls(name=name,description=description,basedir=basedir)
-        self.reset(raw=True)
-        self._set_refgen(refgen)
+        try:
+            self = cls(name=name,description=description,basedir=basedir)
+            self.reset(raw=True)
+        except NameError as e:
+            # the refgen has not been set yet.
+            self._set_refgen(refgen)
         if rawtype is None:
             self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
             rawtype = ''
@@ -101,10 +104,10 @@ class Expr(Camoco):
             self.quality_control(**kwargs)
         assert self.anynancol() == False
         if normalize:
-            self.log('Performing Logarithmic Gene Normalization')
+            self.log('Performing Raw Expression Normalization')
             self.normalize(**kwargs)
             assert self.anynancol() == False
-            self.log('Performing Quantile Normalization')
+            self.log('Performing Quantile Gene Normalization')
             self.quantile()
             assert self.anynancol() == False
         return self
@@ -183,9 +186,9 @@ class Expr(Camoco):
         if all(self.is_normalized(max_val=max_val)):
             self.log("Dataset already normalized")
             self.transformation_log('DetectedPreNormalized')
-        elif any(self.is_normalized()):
+        elif any(self.is_normalized(max_val=max_val)):
             # Something fucked up is happending
-            raise TypeError('Attempting normalization on already normalized dataset. Consider passing in max_val if Im wrong.')
+            raise TypeError('Attempting normalization on already normalized dataset. Consider passing a max_val < {} if Im wrong.'.format(min(self.max_values())))
         else:
             df = self.expr(raw=False,long=False)
             if method is not None:
@@ -248,7 +251,7 @@ class Expr(Camoco):
         self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         if dry_run:
             # If dry run, take first 100 rows of QC
-            self.log("Keeping only firt 500 genes since Dry Run")
+            self.log.warn("Keeping only first 500 genes since Dry Run")
             df = df.iloc[0:500,:]
         self.update_values(df,'quality_control')
 
