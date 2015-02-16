@@ -551,7 +551,7 @@ class COB(Expr):
     def from_Expr(cls,expr):
         ''' Create a coexpression object from an Expression object '''
         # The Expr object already exists, just get a handle on it
-        self = cls(name=expr.name,description=expr.description,basedir=expr.basedir)
+        self = expr #cls(name=expr.name,description=expr.description,basedir=expr.basedir)
         # Grab a coffee
         self._calculate_coexpression()
         self._build_degree()
@@ -559,7 +559,7 @@ class COB(Expr):
 
     @classmethod
     def from_DataFrame(cls,df,name,description,refgen,rawtype=None,basedir='~/.camoco',**kwargs):
-        # Create a
+        # Create a new Expr object from a data frame
         expr = super().from_DataFrame(
             df,name,description,refgen,rawtype,basedir=basedir,**kwargs
         )
@@ -622,6 +622,8 @@ class COB(Expr):
             DROP TABLE IF EXISTS degree;
         ''')
         cur.execute('END TRANSACTION')
+        self._create_tables()
+
     def _build_indices(self):
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
