@@ -505,6 +505,7 @@ class COB(Expr):
     def _calculate_coexpression(self,significance_thresh=3):
         cur = self.db.cursor() 
         try:
+            self._drop_coex()
             cur.execute("BEGIN TRANSACTION")
             self._drop_indices()
             tbl = pd.DataFrame(
@@ -607,7 +608,20 @@ class COB(Expr):
         self.db.cursor().executemany(''' 
             INSERT INTO degree (gene,degree) VALUES (?,?);
         ''',degree.items())
- 
+
+    def _drop_coex(self):
+        cur = self.db.cursor()
+        cur.execute('BEGIN TRANSACTION')
+        cur.execute(''' 
+            DROP INDEX IF EXISTS coex_abs;
+            DROP INDEX IF EXISTS coex_gene_b;
+            DROP INDEX IF EXISTS coex_gen_ab;
+            DROP INDEX IF EXISTS coex_score;
+            DROP INDEX IF EXISTS coex_significant;
+            DROP TABLE IF EXISTS coex;
+            DROP TABLE IF EXISTS degree;
+        ''')
+        cur.execute('END TRANSACTION')
     def _build_indices(self):
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
@@ -641,7 +655,7 @@ class COB(Expr):
                 gene TEXT,
                 degree INTEGER
             );
-            CREATE TABLE IF NOT EXISTS coex (
+            CREATE TABLE IF NOT EXISTS coex ( 
                 gene_a TEXT,
                 gene_b TEXT,
                 score REAL,
@@ -680,7 +694,10 @@ def _PCCUp(tpl):
     vals = list()
     for j in range(i+1,len(m)): 
         mask = np.logical_and(np.isfinite(m[i,:]),np.isfinite(m[j,:]))
-        vals.append(pearsonr(m[i,mask],m[j,mask])[0] )
+        if all(mask == False):
+            vals.append(np.nan)
+        else:
+            vals.append(pearsonr(m[i,mask],m[j,mask])[0] )
     return vals
 
 def _DISUp(tpl):
