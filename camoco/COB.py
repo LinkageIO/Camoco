@@ -518,8 +518,9 @@ class COB(Expr):
             self.log("Calculating Coexpression")
             # NOTE we have to call this outside _coex function because it parallizes things
             tbl['score'] = self._coex(self.expr().as_matrix())
-            # correlations of 1 dont transform well
+            # correlations of 1 dont transform well, they cause infinities
             tbl['score'][tbl['score'] == 1] = 0.99999999
+            tbl['score'][tbl['score'] == -1] = -0.99999999
             # Perform fisher transform on PCCs
             tbl['score'] = np.arctanh(tbl['score'])
             # Sometimes, with certain datasets, the NaN mask overlap completely for the
