@@ -341,12 +341,19 @@ class COB(Expr):
                 print("{}\t{}\t{}".format(a,b,c),file=OUT)
 
     def plot_pcc_hist(self,filename=None):
-        ''' Plot the histogram of PCCs. Right now this is HUGELY inefficient in memory.'''
+        ''' Plot the histogram of PCCs.'''
+        from collections import Counter
         if filename is None:
             filename = self.name+'.png'
         plt.clf()
-        plt.hist(np.tanh(self.edges(sig_only=False,min_distance=None).score),bins=50)
-        plt.xlabel('PCC')
+        # grab the scores only and put in a np array to save space (pandas DF was HUGE)
+        self.log('Grabbing scores')
+        scores = np.tanh(np.array(self.db.cursor().execute("SELECT score from coex;").fetchall()))
+        self.log('Counting PCCs')
+        counts = Counter(map(int,scores[np.logical_not(np.isnan(scores))]*100))
+        self.log('Plotting')
+        plt.bar(counts.keys(),counts.values())
+        plt.xlabel('PCC * 100')
         plt.ylabel('Freq')
         plt.savefig(filename) 
         
@@ -474,13 +481,15 @@ class COB(Expr):
         print( '''
             COB Dataset: {} - {} - {}
                 Desc: {}
-                FPKM: {}
+                RawType: {}
+                TransformationLog: {}
                 Num Genes: {}
                 Num Accessions: {}
                 Sig./Total Interactions: {}
         '''.format(self.name, self.organism, self.build,
                 self.description,
-                self.FPKM == 'RNASEQ',
+                self.rawtype,
+                self.transformation_log(),
                 self.num_genes(),
                 self.num_accessions,
                 self.num_edges(sig_only=True)/self.num_edges(sig_only=False)
@@ -490,10 +499,10 @@ class COB(Expr):
         return '''
             COB Dataset: {} - {} - {}
                 Desc: {}
-                FPKM: {}
+                RawType: {}
         '''.format(self.name, self.organism, self.build,
                 self.description,
-                self.FPKM == 'FPKM',
+                self.rawtype,
         )
 
     def __str__(self):
