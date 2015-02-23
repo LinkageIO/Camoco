@@ -37,17 +37,20 @@ class Term(object):
         print("Num SNPs: {}".format(len(self.snp_list)))
         print("Num Genes: {}".format(len(self.gene_list)))
 
+    def snps(self,effective=True,window=50000):
+        pass
+
     def add_gene(self,gene):
         self.gene_list.add(gene)
 
     def add_snp(self,snp):
         self.snp_list.add(snp) 
     
-    def flanking_genes(self,refgen,gene_limit=4,chain=True):
+    def flanking_genes(self,refgen,gene_limit=4,chain=True,window_size=None):
         ''' returns flanking genes based on some set of arbitrary rules from a refgen '''
         if chain:
             return set(itertools.chain.from_iterable(
-                [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=x.window) for x in self.snp_list]
+                [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size if window_size is not None else x.window) for x in self.snp_list]
             ))
         else:
             return [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
@@ -64,7 +67,7 @@ class Term(object):
             return [refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
 
     def effective_snps(self):
-        ''' Sometimes '''
+        ''' Collapse down snps that have overlapping windows'''
         snp_list = sorted(self.snp_list)
         collapsed = [snp_list.pop(0)]
         for snp in snp_list:
@@ -171,14 +174,8 @@ class Ontology(Camoco):
         return [self.term(x[0]) for x in self.db.cursor().execute('SELECT id FROM terms WHERE name LIKE ?',(like,)).fetchall()]
 
     def iter_terms(self):
-        for id,name,type,desc in self.db.cursor().execute("SELECT id,name,type,desc FROM terms"):
-            term_genes = list(self.refgen.from_ids([ x[0] for x in self.db.cursor().execute(
-                'SELECT gene from gene_terms WHERE term = ?',(id,)).fetchall()
-            ]))
-            term_snps = [SNP(*x) for x in self.db.cursor().execute(
-                'SELECT chrom,pos FROM snp_terms WHERE term = ?',(id,)
-            ).fetchall()]
-            yield Term(id,name,type,desc,term_genes,term_snps)
+        for id, in self.db.cursor().execute("SELECT id FROM terms"):
+            yield self.term(id)
 
     def terms(self):
         return list(self.iter_terms())

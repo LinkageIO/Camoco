@@ -3,7 +3,10 @@ from collections import defaultdict
 import re
 
 class Locus(object):
-    def __init__(self, chrom, start, end, id=None ,gene_build='5b', organism='Zea', window=100000):
+    def __init__(self, chrom, start, end, id=None ,gene_build=None, organism=None, window=100000):
+        self.id = id
+        self.gene_build = gene_build
+        self.organism = organism
         self.chrom = chrom
         try:
             # Sometimes we have underflows, so choose 0 in that case
@@ -14,9 +17,10 @@ class Locus(object):
             self.end = int(end)
         except TypeError as e:
             self.end = None
-        self.id = id
-        self.gene_build = gene_build
-        self.organism = organism
+        # Warn us if something seems off
+        if self.start > self.end:
+            raise ValueError("Wonky start and stop positions for: {}".format(self))
+
 
     @property
     def stop(self):

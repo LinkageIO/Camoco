@@ -30,7 +30,7 @@ def pair_correlation(double[:, ::1] x):
                     sum_uv += u*v
                     count += 1
             if count == 0:
-                res[i, j] = res[j, i] = -9999
+                res[i, j] = res[j, i] = np.nan
                 continue
 
             um = sum_u / count
@@ -40,6 +40,7 @@ def pair_correlation(double[:, ::1] x):
             dv = sqrt(sum_v2 - 2 * sum_v * vm + vm * vm * count)
             r = 1 - n / (du * dv)
             res[i, j] = res[j, i] = r
+    # Return the base of the memory view
     return res.base
 
 
