@@ -216,8 +216,7 @@ class COB(Expr):
         if len(edges) == 1:
             return edges.score[0]
         if return_mean:
-            scores = np.ma.array(edges.score,mask=np.isnan(edges.score))
-            return (scores.mean()/((scores.std())/np.sqrt(sum(scores))))
+            return (np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges))))
         else:
             return edges
 
@@ -351,7 +350,10 @@ class COB(Expr):
         plt.clf()
         # grab the scores only and put in a np array to save space (pandas DF was HUGE)
         self.log('Grabbing scores')
-        scores = np.array(chain(*self.db.cursor().execute("SELECT score from coex;").fetchall()),dtype=np.float)
+        scores = np.array(list(
+           chain(*self.db.cursor().execute("SELECT score from coex;").fetchall())),
+           dtype=np.float
+        )
         return scores
         if pcc:
             self.log('Transforming scores')
@@ -520,23 +522,31 @@ class COB(Expr):
             Class Methods
     '''
     def _calculate_coexpression(self,significance_thresh=3):
+        ''' Generates pairwise PCCs for gene expression profiles in self.expr().
+            Also calculates pairwise gene distance.
+        '''
         cur = self.db.cursor() 
         try:
             self._drop_coex()
-            cur.execute("BEGIN TRANSACTION")
             self._drop_indices()
+            cur.execute("BEGIN TRANSACTION")
+            # Start off with a fresh set of genes we can pass to functions
+            expr = self.expr()
             tbl = pd.DataFrame(
-                # The sorted call here is KEY! It means the columns in the database will be guaranteed
-                # to be sorted so we can access them faster
-                list(itertools.combinations([x.id for x in sorted(self.genes())],2)),
+                list(itertools.combinations([x.id for x in self.refgen.from_ids(expr.index)],2)),
                 columns=['gene_a','gene_b']
             )
             # Now add coexpression data
             self.log("Calculating Coexpression")
-            # NOTE we have to call this outside _coex function because it parallizes things
-            score = self._coex(self.expr().as_matrix())
-            assert len(score) == len(tbl)
-            tbl['score'] = score
+            # Calculate the PCCs
+            pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(expr.as_matrix()))
+            # Set the diagonal to zero (corrects for floating point errors)
+            assert np.allclose(np.diagonal(pccs),1)
+            np.fill_diagonal(pccs,0)
+            # return the long form of the 
+            pccs = squareform(pccs)
+            assert len(pccs) == len(tbl)
+            tbl['score'] = pccs
             # correlations of 1 dont transform well, they cause infinities
             tbl['score'][tbl['score'] == 1] = 0.99999999
             tbl['score'][tbl['score'] == -1] = -0.99999999
@@ -546,10 +556,18 @@ class COB(Expr):
             # two genes expression data making its PCC a nan. This affects the mean and std fro the gene.
             valid_scores = np.ma.masked_array(tbl['score'],np.isnan(tbl['score']))
             # Calculate Z Scores
-            tbl['score'] = (valid_scores-valid_scores.mean())/valid_scores.std()
+            pcc_mean = valid_scores.mean()
+            pcc_std = valid_scores.std()
+            # Remember these so we can go back to PCCs
+            self._global('pcc_mean',pcc_mean)
+            self._global('pcc_std',pcc_std)
+            tbl['score'] = (valid_scores-pcc_mean)/pcc_std
+            # Assign significance
             tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
             self.log("Calculating Gene Distance")
-            tbl['distance'] = self._gene_distances(self.genes())
+            distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(expr.index))
+            assert len(distances) == len(tbl)
+            tbl['distance'] = distances
             self.log("Building Database")
             cur.executemany(
                 ''' INSERT INTO coex (gene_a,gene_b,score,significant,distance) VALUES (?,?,?,?,?)''',
@@ -566,7 +584,7 @@ class COB(Expr):
         # update the reference genome
         self._filter_refgen()  
         return self
- 
+
     @classmethod
     def from_Expr(cls,expr):
         ''' Create a coexpression object from an Expression object '''
@@ -590,50 +608,6 @@ class COB(Expr):
         ''' Build a COB Object from an FPKM or Micrarray CSV. '''
         return cls.from_DataFrame(pd.read_table(filename),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
         
-    def _coex(self,matrix,method='cython'):
-        ''' 
-            Coexpression abstraction method.
-            Input: a numpy matrix
-            Output: a vector of PCC correlations among all rows of matrix 
-                    (matches itertools.combinations for all row labels)
-        '''
-        if method == 'cython':
-            # Calculate the PCCs
-            pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(matrix))
-            # Set the diagonal to zero (corrects for floating point errors)
-            assert np.allclose(np.diagonal(pccs),1)
-            np.fill_diagonal(pccs,0)
-            # return the long form of the 
-            scores = squareform(pccs)
-        elif method == 'multiprocessing':
-            progress = progress_bar(multiprocessing.Manager())
-            pool = multiprocessing.Pool()
-            scores = np.array(list(itertools.chain(
-                *pool.imap(_PCCUp,[(i,matrix,progress) for i in range(len(matrix))])
-            )))
-            pool.close()
-            pool.join()
-        elif method == 'serial':
-            progress = progress_bar(multiprocessing.Manager())
-            scores = np.array(list(itertools.chain(
-                map(_PCCUp,[(i,matrix,progress) for i in range(len(matrix))])
-            )))
-        return scores
-
-    def _gene_distances(self,genes,method='cython'):
-        if method == 'cython':
-            distances = PCCUP.gene_distances()
-        elif method == 'myltiprocessing':
-            progress = progress_bar(multiprocessing.Manager())
-            pool = multiprocessing.Pool()
-            distances = np.array(list(itertools.chain(
-                *pool.imap(_DISUp,[(i,genes,progress) for i in range(len(genes))])
-            )))
-            pool.close()
-            pool.join()
-        return distances
-
-
     def _build_degree(self):
         degree = defaultdict(lambda : 0)
         for gene_a,gene_b in self.db.cursor().execute('''
@@ -707,48 +681,17 @@ class COB(Expr):
             );
         ''') 
 
-
-class progress_bar(object):
-    def __init__(self,manager,interval=10): 
-        self.interval = interval
-        self.lock = manager.Lock()
-        self.old_per = manager.Value(float,0.0)
-    def update(self,cur_per):
-        cur_per = math.floor(cur_per)
-        if cur_per > self.old_per.value and cur_per % self.interval == 0:
-            self.lock.acquire()
-            print("\t\t{} {}% Complete".format(time.ctime(),cur_per))
-            self.old_per.set(cur_per)
-            self.lock.release()
-
-
-def _PCCUp(tpl):
-    ''' Returns a tuple containing indices i,j and their Pearson Correlation Coef '''
-    i,m,pb = (tpl) # values are index, exprMatrix, and lock
-    total = ((m.shape[0]**2)-m.shape[0])/2 # total number of calculations we need to do
-    left = ((m.shape[0]-i)**2-(m.shape[0]-i))/2 # How many we have left
-    percent_done = (1-left/total)*100 # percent complete based on i and m
-    pb.update(percent_done)
-    vals = list()
-    for j in range(i+1,len(m)): 
-        mask = np.logical_and(np.isfinite(m[i,:]),np.isfinite(m[j,:]))
-        if all(mask == False):
-            import pdb; pdb.set_trace()
-            vals.append(np.nan)
-        else:
-            vals.append(pearsonr(m[i,mask],m[j,mask])[0] )
-    return vals
-
-def _DISUp(tpl):
-    ''' Returns a tuple containing the indices i,j and their distance '''
-    i,genes,pb = (tpl) # values are index, gene_list, and lock
-    total = ((len(genes)**2)-len(genes))/2 # total number of calculations we need to do
-    left = ((len(genes)-i)**2-(len(genes)-i))/2 # How many we have left
-    percent_done = (1-left/total)*100 # percent complete based on i and m
-    pb.update(percent_done)
-    vals = list()
-    for j in range(i+1,len(genes)): 
-        vals.append(abs(genes[i]-genes[j]))
-    return vals
-
-   
+    def _coex_concordance(self,gene_a,gene_b):
+        ''' This is a sanity method to ensure that the pcc calculated
+            directly from the expr profiles matches the one stored in 
+            the database
+        '''
+        expr_a = self.expr([gene_a]).irow(0).values
+        expr_b = self.expr([gene_b]).irow(0).values
+        mask = np.logical_and(np.isfinite(expr_a),np.isfinite(expr_b))
+        r = pearsonr(expr_a[mask],expr_b[mask])[0]
+        # fisher transform it
+        z = np.arctanh(r)
+        # standard normalize it
+        z = (z - float(self._global('pcc_mean')))/float(self._global('pcc_std'))
+        return z
