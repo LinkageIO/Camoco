@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+import pyximport; pyximport.install() 
+import camoco.RefGenDist as RefGenDist
 
 from collections import defaultdict
 
@@ -10,6 +12,7 @@ from camoco.Tools import memoize
 
 import itertools
 import random
+import pandas as pd
 
 class RefGen(Camoco):
     def __init__(self,name,description=None,basedir="~/.camoco"):
@@ -49,8 +52,8 @@ class RefGen(Camoco):
             ''') if Gene(*x,build=self.build,organism=self.organism) in gene_filter
         )
 
-    def from_ids(self,gene_list,gene_filter=None,check_shape=False):
-        ''' returns gene object iterable from an iterable of id strings  '''
+    def from_ids(self,gene_list,gene_filter=None,check_shape=False,enumerated=False):
+        ''' returns gene object list from an iterable of id strings '''
         if not gene_filter:
             gene_filter = self
         genes = [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
@@ -193,6 +196,30 @@ class RefGen(Camoco):
         else:
             return random.choice(flanking_genes_index[num_genes] )
 
+    def pairwise_distance(self, gene_list=None):
+        ''' returns a vector containing the pairwise distances between genes 
+            in gene_list in vector form. See np.squareform for matrix conversion.
+        '''
+        if gene_list is None:
+            gene_list = list(self.iter_genes())
+        query = ''' 
+                SELECT genes.id, chrom.rowid, start FROM genes 
+                LEFT JOIN chromosomes chrom ON genes.chromosome = chrom.id      
+                WHERE genes.id in ("{}")
+                ORDER BY genes.id
+        '''.format('","'.join([g.id for g in gene_list]))
+        # extract chromosome row ids and gene start positions for each gene
+        positions = pd.DataFrame(
+            # Grab the chromosomes rowid because its numeric
+            self.db.cursor().execute(query).fetchall(),
+            columns=['gene','chrom','pos']
+        ).sort('gene')
+        assert len(positions) == len(gene_list), 'Some genes in dataset not if RefGen'
+        assert all(positions.gene == [g.id for g in gene_list]), 'Genes are not in the correct order!'
+        distances = RefGenDist.gene_distances(positions.chrom.values,positions.pos.values) 
+        return distances
+
+
     @memoize
     def flanking_genes_index(self,window_size=100000,gene_limit=4):
         ''' Generate an index of flanking genes useful for bootstrapping (i.e. we can get rid of while loop '''
@@ -226,8 +253,8 @@ class RefGen(Camoco):
         try:
             # you can pass in a gene object (this expression should ALWAYS be true if you 
             # created gene object from this RefGen)
-            if self.db.cursor().execute('''
-                SELECT COUNT(*) FROM genes WHERE id = ?''',(obj.id.upper(),)).fetchone()[0] == 1:
+            if self.db.cursor().execute(
+                '''SELECT COUNT(*) FROM genes WHERE id = ?''',(obj.id.upper(),)).fetchone()[0] == 1:
                 return True
             else:
                 return False
@@ -305,9 +332,9 @@ class RefGen(Camoco):
             gene_filter = refgen
         for chrom in refgen.iter_chromosomes():
             self.add_chromosome(chrom)
-        x = list(refgen.iter_genes(gene_filter=gene_filter))
-        for gene in x:
-            self.add_gene(gene)
+        for gene in refgen.iter_genes():
+            if gene in gene_filter:
+                self.add_gene(gene)
         self._build_indices()
         return self
        
