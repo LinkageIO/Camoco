@@ -57,7 +57,10 @@ def Annotations(network_name,ontology_name,term_name):
         genes = term.flanking_genes(cob.refgen,gene_limit=4,window_size=100000)
     else:
         genes = term.gene_list
-    gene_annots = co.Annotation('ZMFunc')[genes]
+    try:
+        gene_annots = co.Annotation('ZMFunc')[genes]
+    except ValueError as e:
+        return jsonify({})
     for net in networks.values():
         gene_annots.insert(5,'In {}'.format(net.name), ['true' if gene in net else 'false' for gene in genes])
     gene_annots.insert(5,'Term SNPs',["\n".join([snp.summary() for snp in sorted(term.flanking_snps(gene))]) for gene in genes])
