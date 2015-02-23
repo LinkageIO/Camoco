@@ -69,17 +69,17 @@
             })
             .selector(':selected')
             .css({
-                'border-width': 10,
+                'border-width': 7,
                 'border-color': '#09BA00'
             })
             .selector('.neighbors')
             .css({
-                'border-width': 10,
+                'border-width': 7,
                 'border-color': '#BA0900'
             })
             .selector('.highlighted')
             .css({
-                'border-width': 10,
+                'border-width': 7,
                 'border-color': '#0900BA'
             })
             .selector('edge')
@@ -384,9 +384,14 @@
         this.graph.cy.on('click','node',{},function(evt){
             var node = evt.cyTarget
             console.log("CLICKED "+node.id())
+            // If already highlighted, also highlight neighbos
+            if(node.selected()){
+                console.log("Already CLICKED "+node.id())
+                //cob.graph.cy.$('.neighbors').removeClass('neighbors')
+                //cob.graph.cy.$('.neighbors').toggleClass('selected')
+            } 
             // highlight neighbors
             //unhighlight old rows
-            a =1 
             cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
                 .nodes()
                 .to$()
@@ -397,13 +402,14 @@
                 .filter(function(rowIdx){
                     return cob.menu.get_tab('Genes').LociTable.cell(rowIdx,0).data() == node.id() ? true : false;
                 })
+            
             // scroll to row
-            $('#cob .dataTables_scrollBody .LociTable').scrollTo(
-                cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
+            //$('#cob .dataTables_scrollBody .LociTable').scrollTo(
+                    cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
                     .nodes()
                     .to$()
                     .toggleClass('selected')
-            )
+            //)
             cob.graph.cy.$('.neighbors').removeClass('neighbors')
             node.neighborhood().addClass('neighbors')
         })
