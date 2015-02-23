@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-
 from camoco.Camoco import Camoco
 from camoco.RefGen import RefGen
 from camoco.Tools import memoize
@@ -15,13 +14,13 @@ import io
 
 class Expr(Camoco):
     ''' A representation of gene expression. '''
-    def __init__(self,name,description=None,basedir='~/.camoco',refgen=None):
+    def __init__(self,name,description=None,basedir='~/.camoco'):
         super().__init__(name=name,description=description,type='Expr',basedir=basedir) 
         self._create_tables()
         try:
             self.refgen = RefGen(self.refgen)
         except NameError as e:
-            self.log.warn('RefGen: {} not available, must be reset!',self.refgen)
+            self.log.warn('Refgen for {} not available, must be reset!',self.name)
 
     def __repr__(self):
         return ""
@@ -56,10 +55,12 @@ class Expr(Camoco):
 
     # Dont remove this! it is required for filter_refgen and is rather slow if not memoized
     @memoize
-    def genes(self):
+    def genes(self,enumerated=True,raw=False):
+        # Returns a list of distinct genes 
+        table = 'raw_expression' if raw else 'expression'
         return self.refgen.from_ids([
-            x[0] for x in self.db.cursor().execute('SELECT DISTINCT(gene) FROM expression')
-        ])
+            x[0] for x in self.db.cursor().execute('SELECT DISTINCT(gene) FROM {}'.format(table))
+        ],enumerated=enumerated)
 
     @memoize
     def num_genes(self):
@@ -83,15 +84,12 @@ class Expr(Camoco):
 
     @classmethod
     def from_DataFrame(cls,tbl,name,description,refgen,rawtype=None,basedir='~/.camoco',
-        normalize=True,quality_control=True,**kwargs):
+        normalize=True,quantile=True,quality_control=True,**kwargs):
         ''' Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)'''
         # we are all pandas on the inside O.O
-        try:
-            self = cls(name=name,description=description,basedir=basedir)
-            self.reset(raw=True)
-        except NameError as e:
-            # the refgen has not been set yet.
-            self._set_refgen(refgen)
+        self = cls(name=name,description=description,basedir=basedir)
+        self.reset(raw=True)
+        self._set_refgen(refgen)
         if rawtype is None:
             self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
             rawtype = ''
@@ -107,6 +105,7 @@ class Expr(Camoco):
             self.log('Performing Raw Expression Normalization')
             self.normalize(**kwargs)
             assert self.anynancol() == False
+        if quantile:
             self.log('Performing Quantile Gene Normalization')
             self.quantile()
             assert self.anynancol() == False
@@ -139,6 +138,8 @@ class Expr(Camoco):
         self.transformation_log(transform_name)
         table = 'raw_expression' if raw else 'expression'
         cur = self.db.cursor()
+        # Sort the table by genes
+        df = df.sort()
         try:
             # lets be safe about this
             cur.execute('BEGIN TRANSACTION')
@@ -241,7 +242,7 @@ class Expr(Camoco):
         df = df[df.apply(lambda x: any(x >= min_single_sample_expr),axis=1)]
         self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         # -----------------------------------------
-        # Filter out accession with too much missing data
+        # Filter out ACCESSIONS with too much missing data
         self.log("Filtering out accessions with > {} missing data",max_accession_missing_data)
         accession_mask = df.apply(lambda x : ((sum(np.isnan(x))) / len(x)),axis=0)
         for i,percent in enumerate(accession_mask):
@@ -251,8 +252,8 @@ class Expr(Camoco):
         self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         if dry_run:
             # If dry run, take first 100 rows of QC
-            self.log.warn("Keeping only first 500 genes since Dry Run")
-            df = df.iloc[0:500,:]
+            self.log.warn("Dry Run")
+            df = df.iloc[0:5000,:]
         self.update_values(df,'quality_control')
 
     def expr(self,genes=None,accessions=None,long=False,raw=False,zscore=False):
@@ -287,21 +288,25 @@ class Expr(Camoco):
         # assign ranks by accession
         expr_ranks = expr.rank(axis=0,method='dense')
         # normalize rank to be percentage
+        import pdb; pdb.set_trace()
         expr_ranks = expr_ranks.apply(lambda col: col/np.nanmax(col.values), axis=0)
         # we need to know the number of non-nans so we can correct for their ranks later
         self.log('Sorting ranked data')
         # assign accession values by order
+        # NOTE all NANs get sorted here ...
         expr_sort = expr.apply(np.sort,axis=0)
         # calculate ranked averages
         self.log('Calculating averages')
-        rank_average = expr_sort.apply(np.mean,axis=1)
+        rank_average = expr_sort.apply(lambda row: np.mean(row[np.logical_not(np.isnan(row))]),axis=1)
         rankmax = len(rank_average)
         self.log('Range of normalized values:{}..{}'.format(min(rank_average),max(rank_average)))
         self.log('Applying non-floating normalization')
+        self.log('{}',expr.ix['GRMZM2G057823'])
         expr = expr_ranks.applymap(
             lambda x : rank_average[int(x*rankmax)-1] if not np.isnan(x) else np.nan
         )
         self.log('Updating values')
+        self.log('{}',expr.ix['GRMZM2G057823'])
         self.update_values(expr,'quantile')
 
     def transformation_log(self,transform=None):
@@ -314,12 +319,12 @@ class Expr(Camoco):
             self.log('Transformation Log: {}',self._global('transformation_log'))
         
     def heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
-        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True, 
+        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
         heatmap_unit_label='Expression Z Score',png_encode=False):
         ''' Draw clustered heatmaps of an expression matrix'''
         from matplotlib import rcParams
         rcParams.update({'figure.autolayout': True})
-        dm = self.expr(genes=genes,accessions=accessions,zscore=zscore).T
+        dm = self.expr(genes=genes,accessions=accessions,zscore=zscore,raw=raw).T
         D = np.array(dm)
         row_labels = dm.index
         col_labels = dm.columns
@@ -360,13 +365,14 @@ class Expr(Camoco):
         vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
         vmin = vmax*-1
         self.log("Extremem Values: {}",vmax)
-        cmap = self.cmap
-        im = axmatrix.matshow(D, aspect='auto', cmap=cmap,vmax=vmax,vmin=vmin)
         # Handle NaNs
         if maskNaNs:
             nan_mask = np.ma.array(D,mask=np.isnan(D))
+            cmap = self.cmap
             cmap.set_bad('grey',1.0)
-            im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
+        else:
+            cmap = self.cmap
+        im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
         # Handle Axis Labels
         axmatrix.set_xticks(np.arange(D.shape[1]))
         axmatrix.xaxis.tick_bottom()
@@ -443,7 +449,7 @@ class Expr(Camoco):
     def _filter_refgen(self):
         ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
             has been populated!!'''
-        self.log("Filtering custom refgen for {} genes in {}",len(self.genes()),self.name)
+        self.log("Filtering custom refgen for {} genes in {}",self.num_genes(),self.name)
         filtered_refgen = RefGen.from_RefGen(
             "{}RefGen".format(self.name),
             "RefGen for {} filtered from {}".format(self.name,self.refgen.name),
@@ -469,11 +475,6 @@ class Expr(Camoco):
                 value REAL,
                 UNIQUE(gene,accession) ON CONFLICT FAIL
             );
-        ''')
- 
-    def _build_indices(self):
-        cur = self.db.cursor()
-        cur.execute(''' 
             CREATE INDEX IF NOT EXISTS genes_ind ON expression(gene);
             CREATE INDEX IF NOT EXISTS accessions_ind ON expression(accession);
         ''')
