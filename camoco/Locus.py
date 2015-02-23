@@ -6,7 +6,8 @@ class Locus(object):
     def __init__(self, chrom, start, end, id=None ,gene_build='5b', organism='Zea', window=100000):
         self.chrom = chrom
         try:
-            self.start = int(start)
+            # Sometimes we have underflows, so choose 0 in that case
+            self.start = max(0,int(start))
         except TypeError as e:
             self.start = None
         try:
@@ -85,7 +86,7 @@ class Locus(object):
         try:
             return int("{}{}".format(self.chrom,self.start))
         except ValueError as e:
-            return int("-1{}".format(self.start))
+            return int("-1{}".format(abs(self.start)))
 
 class SNP(Locus):
     def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea',window=0):
