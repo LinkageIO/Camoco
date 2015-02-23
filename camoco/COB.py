@@ -1,16 +1,19 @@
 #!/usr/bin/python3
 
+import pyximport; pyximport.install()
 
 from camoco.Camoco import Camoco
 from camoco.RefGen import RefGen
 from camoco.Locus import Locus,Gene
 from camoco.Expr import Expr
 from camoco.Tools import memoize
+import camoco.PCCUP as PCCUP
 
-from numpy import matrix,arcsinh
+from numpy import matrix,arcsinh,tanh
 from collections import defaultdict
 from itertools import chain
 from subprocess import Popen, PIPE
+from scipy.spatial.distance import squareform
 
 import pandas as pd
 import igraph as ig
@@ -213,7 +216,8 @@ class COB(Expr):
         if len(edges) == 1:
             return edges.score[0]
         if return_mean:
-            return (edges.score.mean()/((edges.score.std())/np.sqrt(len(edges))))
+            scores = np.ma.array(edges.score,mask=np.isnan(edges.score))
+            return (scores.mean()/((scores.std())/np.sqrt(sum(scores))))
         else:
             return edges
 
@@ -334,13 +338,12 @@ class COB(Expr):
         except FileNotFoundError as e:
             self.log('Could not find cluster command in PATH. Make sure its installed and shell accessible as "cluster".')
 
-
     def to_dat(self,gene_list,filename):
         with open(filename, 'w') as OUT:
             for a,b,c in self.subnetwork(gene_list).itertuples(index=False):
                 print("{}\t{}\t{}".format(a,b,c),file=OUT)
 
-    def plot_pcc_hist(self,filename=None):
+    def plot_scores(self,filename=None,pcc=True):
         ''' Plot the histogram of PCCs.'''
         from collections import Counter
         if filename is None:
@@ -348,8 +351,13 @@ class COB(Expr):
         plt.clf()
         # grab the scores only and put in a np array to save space (pandas DF was HUGE)
         self.log('Grabbing scores')
-        scores = np.tanh(np.array(self.db.cursor().execute("SELECT score from coex;").fetchall()))
-        self.log('Counting PCCs')
+        scores = np.array(chain(*self.db.cursor().execute("SELECT score from coex;").fetchall()),dtype=np.float)
+        return scores
+        if pcc:
+            self.log('Transforming scores')
+            # Transform Z-scores to pcc scores (inverse fisher transform)
+            scores = tanh(scores)
+        self.log('Counting scores')
         counts = Counter(map(int,scores[np.logical_not(np.isnan(scores))]*100))
         self.log('Plotting')
         plt.bar(counts.keys(),counts.values())
@@ -526,7 +534,9 @@ class COB(Expr):
             # Now add coexpression data
             self.log("Calculating Coexpression")
             # NOTE we have to call this outside _coex function because it parallizes things
-            tbl['score'] = self._coex(self.expr().as_matrix())
+            score = self._coex(self.expr().as_matrix())
+            assert len(score) == len(tbl)
+            tbl['score'] = score
             # correlations of 1 dont transform well, they cause infinities
             tbl['score'][tbl['score'] == 1] = 0.99999999
             tbl['score'][tbl['score'] == -1] = -0.99999999
@@ -580,31 +590,47 @@ class COB(Expr):
         ''' Build a COB Object from an FPKM or Micrarray CSV. '''
         return cls.from_DataFrame(pd.read_table(filename),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
         
-    def _coex(self,matrix,method='multiprocessing'):
+    def _coex(self,matrix,method='cython'):
         ''' 
-            Coexpression abstraction method. If you want to try to make calculation faster,
-                optimize this method. 
+            Coexpression abstraction method.
             Input: a numpy matrix
             Output: a vector of PCC correlations among all rows of matrix 
                     (matches itertools.combinations for all row labels)
         '''
-        progress = progress_bar(multiprocessing.Manager())
-        pool = multiprocessing.Pool()
-        scores = np.array(list(itertools.chain(
-            *pool.imap(_PCCUp,[(i,matrix,progress) for i in range(len(matrix))])
-        )))
-        pool.close()
-        pool.join()
+        if method == 'cython':
+            # Calculate the PCCs
+            pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(matrix))
+            # Set the diagonal to zero (corrects for floating point errors)
+            assert np.allclose(np.diagonal(pccs),1)
+            np.fill_diagonal(pccs,0)
+            # return the long form of the 
+            scores = squareform(pccs)
+        elif method == 'multiprocessing':
+            progress = progress_bar(multiprocessing.Manager())
+            pool = multiprocessing.Pool()
+            scores = np.array(list(itertools.chain(
+                *pool.imap(_PCCUp,[(i,matrix,progress) for i in range(len(matrix))])
+            )))
+            pool.close()
+            pool.join()
+        elif method == 'serial':
+            progress = progress_bar(multiprocessing.Manager())
+            scores = np.array(list(itertools.chain(
+                map(_PCCUp,[(i,matrix,progress) for i in range(len(matrix))])
+            )))
         return scores
 
-    def _gene_distances(self,genes):
-        progress = progress_bar(multiprocessing.Manager())
-        pool = multiprocessing.Pool()
-        distances = np.array(list(itertools.chain(
-            *pool.imap(_DISUp,[(i,genes,progress) for i in range(len(genes))])
-        )))
-        pool.close()
-        pool.join()
+    def _gene_distances(self,genes,method='cython'):
+        if method == 'cython':
+            distances = PCCUP.gene_distances()
+        elif method == 'myltiprocessing':
+            progress = progress_bar(multiprocessing.Manager())
+            pool = multiprocessing.Pool()
+            distances = np.array(list(itertools.chain(
+                *pool.imap(_DISUp,[(i,genes,progress) for i in range(len(genes))])
+            )))
+            pool.close()
+            pool.join()
         return distances
 
 
@@ -707,6 +733,7 @@ def _PCCUp(tpl):
     for j in range(i+1,len(m)): 
         mask = np.logical_and(np.isfinite(m[i,:]),np.isfinite(m[j,:]))
         if all(mask == False):
+            import pdb; pdb.set_trace()
             vals.append(np.nan)
         else:
             vals.append(pearsonr(m[i,mask],m[j,mask])[0] )
