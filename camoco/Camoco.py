@@ -32,7 +32,7 @@ class Camoco(object):
                     INSERT OR FAIL INTO datasets (name,description,type)
                     VALUES (?,?,?)''',(name,description,type))
             except Exception as e:
-                self.log('CAUTION! {}.{} Database already exists',name,type)
+                self.log.warn('CAUTION! {}.{} Database already exists. Dont do anything rash.',name,type)
         try:
             # A dataset already exists, return it
             self.db = self.database(".".join([type,name]))
