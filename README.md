@@ -1,4 +1,4 @@
-pyCOB
-=====
+Camoco
+======
 
-Python implementation of the COB tools
+Co-Analysis of Molecular Components
