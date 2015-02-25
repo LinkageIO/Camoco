@@ -65,7 +65,7 @@ class Camoco(object):
         # return a connection if exists
         return lite.Connection(self._resource("databases",str(dbname)+".db"))
 
-    def tmp_file(self):
+    def _tmp_file(self):
         # returns a handle to a tmp file
         return tempfile.NamedTemporaryFile(dir=os.path.join(self.basedir,"tmp"))
 
