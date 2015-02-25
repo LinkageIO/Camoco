@@ -255,22 +255,6 @@ class COB(Expr):
         return graph 
 
 
-    def squaredist(self,gene_list=None):
-        ''' Returns a gene x gene square distance dataframe ''' 
-        if gene_list is None:
-            gene_list = self.sig_genes()
-        subnet = self.subnetwork(gene_list,sig_only=False,min_distance=None).sort(['source','target'])
-        # There are at least one gene in each column who doesnt have a corresponding entry in the 
-        # 
-        lone_source = set(subnet.source).difference(subnet.target).pop()
-        lone_target = set(subnet.target).difference(subnet.source).pop()
-        lone_mask = (subnet.source == lone_source)&(subnet.target == lone_target)
-        subnet.ix[lone_mask,'source'] = lone_target
-        subnet.ix[lone_mask,'target'] = lone_source
-        dat = pd.pivot(subnet.source,subnet.target,subnet.score) 
-        dat[dat.isnull()] = 0
-        return dat + dat.T
-
     def to_treeview(self, gene_list=None):
         ''' outputs treeview files for dataset '''
         if gene_list is None:
@@ -342,7 +326,7 @@ class COB(Expr):
             for a,b,c in self.subnetwork(gene_list).itertuples(index=False):
                 print("{}\t{}\t{}".format(a,b,c),file=OUT)
 
-    def plot_scores(self,filename=None,pcc=True):
+    def plot_scores(self,filename=None,pcc=True,bins=50):
         ''' Plot the histogram of PCCs.'''
         from collections import Counter
         if filename is None:
@@ -354,16 +338,12 @@ class COB(Expr):
            chain(*self.db.cursor().execute("SELECT score from coex;").fetchall())),
            dtype=np.float
         )
-        return scores
         if pcc:
             self.log('Transforming scores')
             # Transform Z-scores to pcc scores (inverse fisher transform)
             scores = tanh(scores)
-        self.log('Counting scores')
-        counts = Counter(map(int,scores[np.logical_not(np.isnan(scores))]*100))
-        self.log('Plotting')
-        plt.bar(counts.keys(),counts.values())
-        plt.xlabel('PCC * 100')
+        plt.hist(scores,bins=bins)
+        plt.xlabel('PCC')
         plt.ylabel('Freq')
         plt.savefig(filename) 
         
@@ -585,6 +565,7 @@ class COB(Expr):
         self._filter_refgen()  
         return self
 
+
     @classmethod
     def from_Expr(cls,expr):
         ''' Create a coexpression object from an Expression object '''
@@ -681,7 +662,7 @@ class COB(Expr):
             );
         ''') 
 
-    def _coex_concordance(self,gene_a,gene_b):
+    def _coex_concordance(self,gene_a,gene_b,maxnan=10):
         ''' This is a sanity method to ensure that the pcc calculated
             directly from the expr profiles matches the one stored in 
             the database
@@ -689,6 +670,9 @@ class COB(Expr):
         expr_a = self.expr([gene_a]).irow(0).values
         expr_b = self.expr([gene_b]).irow(0).values
         mask = np.logical_and(np.isfinite(expr_a),np.isfinite(expr_b))
+        if sum(mask) < maxnan:
+            # too many nans to reliably calculate pcc 
+            return np.nan
         r = pearsonr(expr_a[mask],expr_b[mask])[0]
         # fisher transform it
         z = np.arctanh(r)
