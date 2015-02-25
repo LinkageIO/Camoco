@@ -29,7 +29,7 @@ def pair_correlation(double[:, ::1] x):
                     sum_v2 += v*v
                     sum_uv += u*v
                     count += 1
-            if count == 0:
+            if count < 10:
                 res[i, j] = res[j, i] = np.nan
                 continue
 
