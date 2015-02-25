@@ -301,12 +301,10 @@ class Expr(Camoco):
         rankmax = len(rank_average)
         self.log('Range of normalized values:{}..{}'.format(min(rank_average),max(rank_average)))
         self.log('Applying non-floating normalization')
-        self.log('{}',expr.ix['GRMZM2G057823'])
         expr = expr_ranks.applymap(
             lambda x : rank_average[int(x*rankmax)-1] if not np.isnan(x) else np.nan
         )
         self.log('Updating values')
-        self.log('{}',expr.ix['GRMZM2G057823'])
         self.update_values(expr,'quantile')
 
     def transformation_log(self,transform=None):
