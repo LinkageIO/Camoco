@@ -13,6 +13,7 @@ class Camoco(object):
     def __init__(self,name="Camoco",description=None,type='Camoco',basedir="~/.camoco"):
         # Set up our base directory
         self.basedir = os.path.realpath(os.path.expanduser(basedir))
+        self._create_base_tables()
         self.log = log()
         if not os.path.exists(self.basedir):
             # If it doesn't exists, set up first time directories
@@ -47,6 +48,7 @@ class Camoco(object):
             cur.execute('PRAGMA main.temp_store = MEMORY;')
             #cur.execute('PRAGMA main.locking_mode=EXCLUSIVE;')
             cur.execute('PRAGMA main.synchronous=OFF;')
+            cur.execute('PRAGMA count_changes=OFF')
             cur.execute('PRAGMA main.journal_mode=MEMORY;')
             cur.execute('''
                 CREATE TABLE IF NOT EXISTS globals (
@@ -83,9 +85,9 @@ class Camoco(object):
             except Exception as e:
                 return None
             
-    def _create_tables(self):
+    def _create_base_tables(self):
         camocodb = self.database("camoco")
-        camocodb.execute(''' 
+        camocodb.cursor().execute(''' 
             CREATE TABLE IF NOT EXISTS datasets (
                 name TEXT NOT NULL,
                 description TEXT,
