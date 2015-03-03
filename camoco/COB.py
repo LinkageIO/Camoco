@@ -1,13 +1,12 @@
 #!/usr/bin/python3
-
 import pyximport; pyximport.install()
+import camoco.PCCUP as PCCUP
 
 from camoco.Camoco import Camoco
 from camoco.RefGen import RefGen
 from camoco.Locus import Locus,Gene
 from camoco.Expr import Expr
 from camoco.Tools import memoize
-import camoco.PCCUP as PCCUP
 
 from numpy import matrix,arcsinh,tanh
 from collections import defaultdict
@@ -38,6 +37,8 @@ class COB(Expr):
             self.log('You must provide a name')
         else:
             super().__init__(name=name,description=description,basedir=basedir)
+            self.hdf5 = super().hdf5(name)
+            self.coex = self.hdf5['coex']
             self._create_tables()
 
     #@memoize
@@ -165,26 +166,15 @@ class COB(Expr):
             return pd.DataFrame()
         # filter for only genes within network
         #gene_list = list(filter(lambda x: x in self, gene_list))
-        ids = "','".join([x.id for x in gene_list])
-        query = '''
-            SELECT gene_a,gene_b,score,distance FROM coex 
-            WHERE gene_a IN ('{}') AND gene_b IN ('{}')
-            '''
+        ids = [self._expr_index[x.id] for x in gene_list]
+        cmbs = list(itertools.combinations(ids,2))
+        indices = [self._coex_index(a,b) for a,b in cmbs]
+        df = self.coex.iloc[indices]
         if min_distance:
-            query += ' AND distance > {} '.format(min_distance)
+            df = df[df.distance >= min_distance]
         if sig_only:
-            query += ' AND significant = 1;'
-        else:
-            query += ';'
-        data = self.db.cursor().execute(query.format(ids,ids)).fetchall()
-        if len(data) == 0:
-            return pd.DataFrame(columns=['source','target','score','distance'])
-        else:
-            return pd.DataFrame(
-                data = data,
-                columns = ['source','target','score','distance']
-            )   
-        return subnet
+            df = df[df.significant == 1]
+        return df
 
     def lcc(self,gene_list,min_distance=None):
         ''' returns an igraph of the largest connected component in graph '''
@@ -501,69 +491,92 @@ class COB(Expr):
     ''' ------------------------------------------------------------------------------------------
             Class Methods
     '''
+    def _coex_index(self,i,j):
+        # i is row index, j is column index
+        i,j = sorted([i,j]) 
+        # get the dimensions of our gene x gene matrix
+        mi = 15385 
+        # Calculate what the index would be if it were a square matrix
+        k = ((i * mi) + j) 
+        # Calculate the number of cells in the lower diagonal
+        ld = (((i+1)**2) - (i+1))/2
+        # Calculate the number of items on diagonal
+        d = i + 1
+        return int(k-ld-d)
+
     def _calculate_coexpression(self,significance_thresh=3):
         ''' Generates pairwise PCCs for gene expression profiles in self.expr().
             Also calculates pairwise gene distance.
         '''
-        cur = self.db.cursor() 
-        try:
-            self._drop_coex()
-            self._drop_indices()
-            cur.execute("BEGIN TRANSACTION")
-            # Start off with a fresh set of genes we can pass to functions
-            expr = self.expr()
-            tbl = pd.DataFrame(
-                list(itertools.combinations([x.id for x in self.refgen.from_ids(expr.index)],2)),
-                columns=['gene_a','gene_b']
-            )
-            # Now add coexpression data
-            self.log("Calculating Coexpression")
-            # Calculate the PCCs
-            pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(expr.as_matrix()))
-            # Set the diagonal to zero (corrects for floating point errors)
-            assert np.allclose(np.diagonal(pccs),1)
-            np.fill_diagonal(pccs,0)
-            # return the long form of the 
-            pccs = squareform(pccs)
-            assert len(pccs) == len(tbl)
-            tbl['score'] = pccs
-            # correlations of 1 dont transform well, they cause infinities
-            tbl['score'][tbl['score'] == 1] = 0.99999999
-            tbl['score'][tbl['score'] == -1] = -0.99999999
-            # Perform fisher transform on PCCs
-            tbl['score'] = np.arctanh(tbl['score'])
-            # Sometimes, with certain datasets, the NaN mask overlap completely for the
-            # two genes expression data making its PCC a nan. This affects the mean and std fro the gene.
-            valid_scores = np.ma.masked_array(tbl['score'],np.isnan(tbl['score']))
-            # Calculate Z Scores
-            pcc_mean = valid_scores.mean()
-            pcc_std = valid_scores.std()
-            # Remember these so we can go back to PCCs
-            self._global('pcc_mean',pcc_mean)
-            self._global('pcc_std',pcc_std)
-            tbl['score'] = (valid_scores-pcc_mean)/pcc_std
-            # Assign significance
-            tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
-            self.log("Calculating Gene Distance")
-            distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(expr.index))
-            assert len(distances) == len(tbl)
-            tbl['distance'] = distances
-            self.log("Building Database")
-            cur.executemany(
-                ''' INSERT INTO coex (gene_a,gene_b,score,significant,distance) VALUES (?,?,?,?,?)''',
-                map(lambda x: (x[0],x[1],float(x[2]),int(x[3]),x[4]), tbl.itertuples(index=False))
-            )
-            cur.execute("END TRANSACTION")
-            self.log("Building indices")
-            self._build_indices()
-            self.log("Done")
-        except Exception as e:
-            self.log("Something bad happened:{}",e)
-            cur.execute("ROLLBACK")
-            raise e
+        # Start off with a fresh set of genes we can pass to functions
+        expr = self.expr()
+        tbl = pd.DataFrame(
+            list(itertools.combinations(expr.index.values,2)),
+            columns=['gene_a','gene_b']
+        )
+        # Now add coexpression data
+        self.log("Calculating Coexpression")
+        # Calculate the PCCs
+        pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(expr.as_matrix()))
+        # Set the diagonal to zero (corrects for floating point errors)
+        assert np.allclose(np.diagonal(pccs),1)
+        np.fill_diagonal(pccs,0)
+        # return the long form of the 
+        pccs = squareform(pccs)
+        assert len(pccs) == len(tbl)
+        tbl['score'] = pccs
+        # correlations of 1 dont transform well, they cause infinities
+        tbl[tbl['score'] == 1].score = 0.99999999
+        tbl[tbl['score'] == -1].score = -0.99999999
+        # Perform fisher transform on PCCs
+        tbl['score'] = np.arctanh(tbl['score'])
+        # Sometimes, with certain datasets, the NaN mask overlap completely for the
+        # two genes expression data making its PCC a nan. This affects the mean and std fro the gene.
+        valid_scores = np.ma.masked_array(tbl['score'],np.isnan(tbl['score']))
+        # Calculate Z Scores
+        pcc_mean = valid_scores.mean()
+        pcc_std = valid_scores.std()
+        # Remember these so we can go back to PCCs
+        self._global('pcc_mean',pcc_mean)
+        self._global('pcc_std',pcc_std)
+        tbl['score'] = (valid_scores-pcc_mean)/pcc_std
+        # Assign significance
+        tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
+        self.log("Calculating Gene Distance")
+        distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(expr.index))
+        assert len(distances) == len(tbl)
+        tbl['distance'] = distances
+        # Reindex the table to match genes
+        self.log('Indexing coex table')
+        tbl.set_index(['gene_a','gene_b'],inplace=True)
+        # put in the hdf5 store
+        self._build_tables(tbl)
+        self.log("Done")
         # update the reference genome
         self._filter_refgen()  
         return self
+
+    def _build_tables(self,tbl):
+        try:
+            self.log("Building Database")
+            ## HDF5 Store
+            self.hdf5['coex'] = tbl
+            ## SQLITE Version
+            #cur = self.db.cursor() 
+            #self._drop_coex()
+            #self._drop_indices()
+            #cur.execute("BEGIN TRANSACTION")
+            #cur.executemany(
+            #    ''' INSERT INTO coex (gene_a,gene_b,score,significant,distance) VALUES (?,?,?,?,?)''',
+            #    map(lambda x: (x[0],x[1],float(x[2]),int(x[3]),x[4]), tbl.itertuples(index=False))
+            #)
+            #cur.execute("END TRANSACTION")
+            #self.log("Building indices")
+        except Exception as e:
+            self.log("Something bad happened:{}",e)
+            #cur.execute("ROLLBACK")
+            raise e
+            #self._build_indices()
 
 
     @classmethod
