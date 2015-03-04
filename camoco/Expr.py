@@ -5,6 +5,7 @@ from camoco.Tools import memoize
 from scipy.spatial.distance import pdist, squareform, euclidean
 from scipy.stats import hypergeom,pearsonr
 from scipy.cluster.hierarchy import linkage, dendrogram
+from collections import defaultdict
 
 import matplotlib
 import pandas as pd
@@ -18,7 +19,12 @@ class Expr(Camoco):
         super().__init__(name=name,description=description,type='Expr',basedir=basedir) 
         self._create_tables()
         try:
+            self.log('Loading RefGen')
             self.refgen = RefGen(self.refgen)
+            self.log('Loading Expr table')
+            self.hdf5 = self._hdf5(name)
+            self.log('Building Expr Index')
+            self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self.expr().index)}) 
         except NameError as e:
             self.log.warn('Refgen for {} not available, must be reset!',self.name)
 
@@ -44,8 +50,8 @@ class Expr(Camoco):
     def summary(self):
         pass
 
-    @memoize
     def accessions(self):
+        return self.expr().columns()
         return [x[0] for x in self.db.cursor().execute('SELECT DISTINCT(accession) FROM expression')]
 
     @property
@@ -137,10 +143,10 @@ class Expr(Camoco):
         # update the transformation log
         self.transformation_log(transform_name)
         table = 'raw_expression' if raw else 'expression'
-        cur = self.db.cursor()
         # Sort the table by genes
         df = df.sort()
         try:
+            cur = self.db.cursor()
             # lets be safe about this
             cur.execute('BEGIN TRANSACTION')
             self.log('Removing old values from {}...',table)
@@ -264,10 +270,16 @@ class Expr(Camoco):
         accession_filter = " AND accession in ('{}')".format("','".join(accessions)) if accessions is not None else ""
         query = 'SELECT * FROM {} {} {};'.format(tbl,gene_filter,accession_filter)
         # pull and create data frame
-        df = pd.DataFrame(
-            self.db.cursor().execute(query).fetchall(),
-            columns = ['gene','accession','value']
-        )
+        try:
+            df = pd.DataFrame(
+                self.db.cursor().execute(query).fetchall(),
+                columns = ['gene','accession','value']
+            )
+        except ValueError as e:
+            # Nothing is there pass back empty DF
+            df = pd.DataFrame(
+                columns = ['gene','accession','value']
+            )
         if long is False:
             df = df.pivot('gene','accession','value')
         if zscore is True:
