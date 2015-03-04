@@ -19,7 +19,6 @@ import igraph as ig
 import numpy as np
 import time
 import math as math
-import multiprocessing as multiprocessing
 import itertools
 import matplotlib.pylab as plt
 import matplotlib
@@ -37,46 +36,21 @@ class COB(Expr):
             self.log('You must provide a name')
         else:
             super().__init__(name=name,description=description,basedir=basedir)
-            self.hdf5 = super().hdf5(name)
-            self.coex = self.hdf5['coex']
+            self.hdf5 = self._hdf5(name)
+            try:
+                self.coex = self.hdf5['coex']
+            except KeyError as e:
+                self.log("{} is empty",name)
+                self.coex = pd.DataFrame()
             self._create_tables()
-
-    #@memoize
-    def num_edges(self,sig_only=True):
-        clause = ' WHERE significant =1;' if sig_only else ''
-        try:
-            return self.db.cursor().execute("SELECT COUNT(*) FROM coex"+clause+';').fetchone()[0]
-        except ValueError as e:
-            self.log('No edges in database!')
-
- 
-    def edges(self,min_distance=None,sig_only=False):
-        ''' returns edges '''
-        try:
-            query = '''SELECT gene_a,gene_b,score,distance
-                    FROM coex '''
-            if min_distance:
-                query += ' WHERE distance < {}'.format(min_distance)
-            if sig_only:
-                query += ' WHERE significant = 1' if min_distance is None else 'AND significant = 1'
-            return pd.DataFrame(self.db.cursor().execute(query).fetchall(),
-                columns=['gene_a','gene_b','score','distance'])
-        except ValueError as e:
-            self.log('Oops! there are no signficant edges in dataset...')
-
-    #@memoize
-    def sig_genes(self):
-        sig_edges = self.edges(sig_only=True)
-        return list(self.refgen.from_ids(set(sig_edges.gene_a).union(sig_edges.gene_b)))
 
     def coexpression(self,gene_a,gene_b,trans_only=True):
         ''' returns coexpression z-score between two genes '''
-        return self.db.cursor().execute(
-            ''' SELECT score FROM coex WHERE 
-                (gene_a = ? AND gene_b = ?) 
-                OR (gene_b = ? AND gene_a = ?)'''
-            ,(gene_a.id,gene_b.id,gene_a.id,gene_b.id)
-        ).fetchone()[0]
+        ids = np.array([self._expr_index[gene_a.id],self._expr_index[gene_b.id]])
+        num_genes = self.num_genes()
+        indices = PCCUP.coex_index(ids,num_genes)
+        df = self.coex.iloc[indices]
+        return df 
     
     def global_degree(self,gene):
         try:
@@ -86,7 +60,6 @@ class COB(Expr):
         except TypeError as e:
             return -1
 
-            return len(self.neighbors([gene]))
     def neighbors(self,gene_list,min_distance=None,sig_only=True):
         ''' Input : a list of COBGene Objects
             Output: Returns the neighbors for a list of genes as a DataFrame
@@ -158,17 +131,18 @@ class COB(Expr):
         self.log("Found {} genes in subnetwork",len(local))
         return(local)
 
-    def subnetwork(self,gene_list,sig_only=True,min_distance=100000):
+    def subnetwork(self,gene_list,sig_only=True,min_distance=100000,fly_by_the_seat_of_your_pants=True):
         ''' Input: a gene list
             Output: a dataframe containing all edges EXCLUSIVELY between genes within list
         '''
         if len(gene_list) == 0:
             return pd.DataFrame()
-        # filter for only genes within network
-        #gene_list = list(filter(lambda x: x in self, gene_list))
-        ids = [self._expr_index[x.id] for x in gene_list]
-        cmbs = list(itertools.combinations(ids,2))
-        indices = [self._coex_index(a,b) for a,b in cmbs]
+        ids = np.array([self._expr_index[x.id] for x in gene_list])
+        if fly_by_the_seat_of_your_pants:
+            # filter out the Nones 
+            ids = np.array(list(filter(None,ids)))
+        num_genes = self.num_genes()
+        indices = PCCUP.coex_index(ids,num_genes)
         df = self.coex.iloc[indices]
         if min_distance:
             df = df[df.distance >= min_distance]
@@ -472,7 +446,6 @@ class COB(Expr):
                 self.transformation_log(),
                 self.num_genes(),
                 self.num_accessions,
-                self.num_edges(sig_only=True)/self.num_edges(sig_only=False)
         ))
 
     def __repr__(self):
@@ -491,19 +464,6 @@ class COB(Expr):
     ''' ------------------------------------------------------------------------------------------
             Class Methods
     '''
-    def _coex_index(self,i,j):
-        # i is row index, j is column index
-        i,j = sorted([i,j]) 
-        # get the dimensions of our gene x gene matrix
-        mi = 15385 
-        # Calculate what the index would be if it were a square matrix
-        k = ((i * mi) + j) 
-        # Calculate the number of cells in the lower diagonal
-        ld = (((i+1)**2) - (i+1))/2
-        # Calculate the number of items on diagonal
-        d = i + 1
-        return int(k-ld-d)
-
     def _calculate_coexpression(self,significance_thresh=3):
         ''' Generates pairwise PCCs for gene expression profiles in self.expr().
             Also calculates pairwise gene distance.
@@ -562,22 +522,8 @@ class COB(Expr):
             ## HDF5 Store
             self.hdf5['coex'] = tbl
             ## SQLITE Version
-            #cur = self.db.cursor() 
-            #self._drop_coex()
-            #self._drop_indices()
-            #cur.execute("BEGIN TRANSACTION")
-            #cur.executemany(
-            #    ''' INSERT INTO coex (gene_a,gene_b,score,significant,distance) VALUES (?,?,?,?,?)''',
-            #    map(lambda x: (x[0],x[1],float(x[2]),int(x[3]),x[4]), tbl.itertuples(index=False))
-            #)
-            #cur.execute("END TRANSACTION")
-            #self.log("Building indices")
         except Exception as e:
             self.log("Something bad happened:{}",e)
-            #cur.execute("ROLLBACK")
-            raise e
-            #self._build_indices()
-
 
     @classmethod
     def from_Expr(cls,expr):
@@ -586,7 +532,6 @@ class COB(Expr):
         self = expr #cls(name=expr.name,description=expr.description,basedir=expr.basedir)
         # Grab a coffee
         self._calculate_coexpression()
-        self._build_degree()
         return self
 
     @classmethod
@@ -601,79 +546,6 @@ class COB(Expr):
     def from_csv(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco',sep='\t',**kwargs):
         ''' Build a COB Object from an FPKM or Micrarray CSV. '''
         return cls.from_DataFrame(pd.read_table(filename),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
-        
-    def _build_degree(self):
-        degree = defaultdict(lambda : 0)
-        for gene_a,gene_b in self.db.cursor().execute('''
-                SELECT gene_a,gene_b FROM coex WHERE significant = 1;
-            ''').fetchall():
-            degree[gene_a] += 1
-            degree[gene_b] += 1
-        self.db.cursor().executemany(''' 
-            INSERT INTO degree (gene,degree) VALUES (?,?);
-        ''',degree.items())
-
-    def _drop_coex(self):
-        cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
-        cur.execute(''' 
-            DROP INDEX IF EXISTS coex_abs;
-            DROP INDEX IF EXISTS coex_gene_b;
-            DROP INDEX IF EXISTS coex_gen_ab;
-            DROP INDEX IF EXISTS coex_score;
-            DROP INDEX IF EXISTS coex_significant;
-            DROP TABLE IF EXISTS coex;
-            DROP TABLE IF EXISTS degree;
-        ''')
-        cur.execute('END TRANSACTION')
-        self._create_tables()
-
-    def _build_indices(self):
-        cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
-        cur.execute(''' 
-            CREATE INDEX IF NOT EXISTS coex_abs ON coex (gene_a); 
-            CREATE INDEX IF NOT EXISTS coex_gene_b ON coex (gene_b); 
-            CREATE INDEX IF NOT EXISTS coex_gen_ab ON coex (gene_a,gene_b); 
-            CREATE INDEX IF NOT EXISTS coex_score ON coex (score); 
-            CREATE INDEX IF NOT EXISTS coex_significant ON coex (significant); 
-            CREATE INDEX IF NOT EXISTS coor_gene ON coor(gene);
-            CREATE INDEX IF NOT EXISTS coor_x ON coor(x);
-            CREATE INDEX IF NOT EXISTS coor_y ON coor(y);
-            ANALYZE;
-        ''')
-        cur.execute('END TRANSACTION')
-
-    def _drop_indices(self):
-        self.db.cursor().execute(''' 
-            DROP INDEX IF EXISTS coex_gene_a;
-            DROP INDEX IF EXISTS coex_gene_b;
-            DROP INDEX IF EXISTS coex_score;
-            DROP INDEX IF EXISTS coex_significant;
-        ''')
-
-    def _create_tables(self):
-        # build the expr tables too
-        super()._create_tables()
-        cur = self.db.cursor()
-        cur.execute(''' 
-            CREATE TABLE IF NOT EXISTS degree (
-                gene TEXT,
-                degree INTEGER
-            );
-            CREATE TABLE IF NOT EXISTS coex ( 
-                gene_a TEXT,
-                gene_b TEXT,
-                score REAL,
-                significant INTEGER,
-                distance INTEGER
-            );
-            CREATE TABLE IF NOT EXISTS coor (
-                gene TEXT,
-                x REAL,
-                y REAL
-            );
-        ''') 
 
     def _coex_concordance(self,gene_a,gene_b,maxnan=10):
         ''' This is a sanity method to ensure that the pcc calculated
