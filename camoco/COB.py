@@ -33,7 +33,7 @@ class COB(Expr):
             try:
                 self.coex = self.hdf5['coex']
             except KeyError as e:
-                self.log("{} is empty",name)
+                self.log("{} is empty ({})",name,e)
                 self.coex = pd.DataFrame()
 
     def __repr__(self):
@@ -75,20 +75,21 @@ class COB(Expr):
         index = PCCUP.coex_index(ids,num_genes)[0]
         return self.coex.iloc[index]
 
-    def subnetwork(self,gene_list,sig_only=True,min_distance=100000,fly_by_the_seat_of_your_pants=True):
+    def subnetwork(self,gene_list=None,sig_only=True,min_distance=100000,fly_by_the_seat_of_your_pants=True):
         '''
-            Input: a gene list
+            Input: a gene list (passing None gives you all genes)
             Output: a dataframe containing all edges EXCLUSIVELY between genes within list
         '''
-        if len(gene_list) == 0:
-            return pd.DataFrame()
-        ids = np.array([self._expr_index[x.id] for x in gene_list])
-        if fly_by_the_seat_of_your_pants:
-            # filter out the Nones 
-            ids = np.array(list(filter(None,ids)))
-        num_genes = self.num_genes()
-        indices = PCCUP.coex_index(ids,num_genes)
-        df = self.coex.iloc[indices]
+        if gene_list is None:
+            df = self.coex
+        else:
+            ids = np.array([self._expr_index[x.id] for x in gene_list])
+            if fly_by_the_seat_of_your_pants:
+                # filter out the Nones 
+                ids = np.array(list(filter(None,ids)))
+            num_genes = self.num_genes()
+            indices = PCCUP.coex_index(ids,num_genes)
+            df = self.coex.iloc[indices]
         if min_distance:
             df = df[df.distance >= min_distance]
         if sig_only:
@@ -138,13 +139,9 @@ class COB(Expr):
             filename = self.name + '.dat'
         with open(filename, 'w') as OUT:
             self.log("Creating .dat file")
-            if gene_list is None:
-                # write out the whole table
-                self.coex.score.to_csv(OUT,sep='\t')
-            else:
-                self.subnetwork(
-                    gene_list,sig_only=sig_only,min_distance=min_distance
-                )['score'].to_csv(OUT,sep='\t')
+            self.subnetwork(
+                gene_list,sig_only=sig_only,min_distance=min_distance
+            )['score'].to_csv(OUT,sep='\t')
             self.log('Done')
 
     def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=100000,min_size=0,max_size=10e10):
@@ -157,22 +154,24 @@ class COB(Expr):
         '''
         # output dat to tmpfile
         tmp = self._tmpfile()
-        self.to_dat(filename=tmp.name,gene_list=gene_list,min_distance=min_distance)
+        self.to_dat(filename=tmp.name,gene_list=gene_list,min_distance=min_distance,sig_only=True)
         # build the mcl command 
         cmd = "mcl {} --abc -scheme {} -I {} -o -".format(tmp.name,scheme,I)
         self.log("running MCL: {}",cmd)
         try:
-            p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=self.log_file, shell=True)
-            sout,serr = p.communicate(MCLstr.encode('utf-8'))
+            p = Popen(cmd, stdout=PIPE, stderr=self.log_file, shell=True)
+            self.log('waiting for MCL to finish...')
+            sout = p.communicate()[0]
             p.wait()
-            if p.returncode==0 and len(sout)>0:
+            self.log('...Done')
+            if p.returncode==0:
                 # Filter out cluters who are smaller than the min size
                 return list(filter(lambda x: len(x) > min_size and len(x) < max_size,
                     # Generate ids from the refgen
                     [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
                 ))
             else:
-                self.log( "MCL return code: {}".format(p.returncode))
+                self.log( "MCL failed: return code: {}".format(p.returncode))
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
@@ -181,19 +180,18 @@ class COB(Expr):
     '''
     def _calculate_coexpression(self,significance_thresh=3):
         ''' 
-            Generates pairwise PCCs for gene expression profiles in self.expr().
+            Generates pairwise PCCs for gene expression profiles in self.expr.
             Also calculates pairwise gene distance.
         '''
         # Start off with a fresh set of genes we can pass to functions
-        expr = self.expr()
         tbl = pd.DataFrame(
-            list(itertools.combinations(expr.index.values,2)),
+            list(itertools.combinations(self.expr.index.values,2)),
             columns=['gene_a','gene_b']
         )
         # Now add coexpression data
         self.log("Calculating Coexpression")
         # Calculate the PCCs
-        pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(expr.as_matrix()))
+        pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(self.expr.as_matrix()))
         # Set the diagonal to zero (corrects for floating point errors)
         assert np.allclose(np.diagonal(pccs),1)
         np.fill_diagonal(pccs,0)
@@ -219,7 +217,7 @@ class COB(Expr):
         # Assign significance
         tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
         self.log("Calculating Gene Distance")
-        distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(expr.index))
+        distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(self.expr.index))
         assert len(distances) == len(tbl)
         tbl['distance'] = distances
         # Reindex the table to match genes
@@ -237,7 +235,9 @@ class COB(Expr):
             self.log("Building Database")
             ## HDF5 Store
             self.hdf5['coex'] = tbl
-            ## SQLITE Version
+            self.log("Flushing Database")
+            self.hdf5.flush(fsync=True)
+            self.log("Done")
         except Exception as e:
             self.log("Something bad happened:{}",e)
 
@@ -292,14 +292,16 @@ class COB(Expr):
             Run Test Suite
         '''
         self.log("Staring Tests for {}",self.name)
-        # The length of the coex table should be num_genes choose 2
+        self.log('The length of the coex table should be num_genes choose 2')
         assert len(self.coex) == comb(self.num_genes(),2)
+        self.log('PASS')
 
-        # The PCCs for 100 randomly selected gene edges should be the same as what was
-        # calculated in the fast Cython version
+        self.log('''
+        The PCCs for 100 randomly selected gene edges should be the same as what was
+        calculated in the fast Cython version ''')
         for a,b in itertools.combinations([self.refgen.random_gene() for x in range(50)],2):
             assert abs(self.coexpression(a,b).score - self._coex_concordance(a,b)) < 0.001
-
+        self.log('PASS')
         self.log("All Passed")
 
     '''
@@ -376,9 +378,17 @@ class COB(Expr):
     def plot(self,gene_list,filename=None,width=3000,height=3000,layout=None,**kwargs):
         pass
 
-    def compare_to_COB(self,list_of_other_COBs,filename=None,gridsize=100,extent=[-10,10,-10,10]):
+    def compare_to_COB(self,COB_list,filename=None,gridsize=100,extent=[-10,10,-10,10]):
         ''' Compare the edge weights in this COB to another COB. Prints out edge weights to file'''
-        pass
+        for oCOB in COB_list:
+            self.log("Comparing {} to {}",self.name,oCOB.name)
+            filename = "{}_to_{}".format(self.name,oCOB.name)
+            # Print out the edge comparisons for each common gene
+            self.log("Printing out common gene edges")
+            if not os.path.exists(filename+'.tsv'):
+                with open(filename+'.tsv','w') as OUT:
+                # merge the tables of edges on common genes
+                    common_edges = self.coex.join(oCOB.coex, how='inner')
 
     def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
