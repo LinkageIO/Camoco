@@ -13,6 +13,7 @@ from camoco.Tools import memoize
 import itertools
 import random
 import pandas as pd
+import numpy as np
 
 class RefGen(Camoco):
     def __init__(self,name,description=None,basedir="~/.camoco"):
@@ -214,6 +215,8 @@ class RefGen(Camoco):
             self.db.cursor().execute(query).fetchall(),
             columns=['gene','chrom','pos']
         ).sort('gene')
+        # chromosome needs to be floats
+        positions.chrom = positions.chrom.astype('float')
         assert len(positions) == len(gene_list), 'Some genes in dataset not if RefGen'
         assert all(positions.gene == [g.id for g in gene_list]), 'Genes are not in the correct order!'
         distances = RefGenDist.gene_distances(positions.chrom.values,positions.pos.values) 
@@ -323,18 +326,19 @@ class RefGen(Camoco):
         return self
 
     @classmethod
-    def from_RefGen(cls,name,description,refgen,gene_filter=None,basedir="~/.camoco"):
-        ''' copies from a previous instance of refgen, making sure each gene is within gene filter '''
+    def filtered_refgen(cls,name,description,refgen,gene_list,basedir="~/.camoco"):
+        ''' 
+            Copies from a previous instance of refgen, making sure each gene is within gene list 
+        '''
         self = cls(name,description,basedir)
         self._global('build',refgen.build)
         self._global('organism',refgen.organism)
-        if not gene_filter:
-            gene_filter = refgen
+        # Should have the same chromosomes
         for chrom in refgen.iter_chromosomes():
             self.add_chromosome(chrom)
-        for gene in refgen.iter_genes():
-            if gene in gene_filter:
-                self.add_gene(gene)
+        # Add the genes from genelist
+        for gene in gene_list:
+            self.add_gene(gene)
         self._build_indices()
         return self
        
