@@ -19,7 +19,6 @@ class Expr(Camoco):
         super().__init__(name=name,description=description,type='Expr',basedir=basedir) 
         try:
             self.log('Loading RefGen')
-            self.refgen = RefGen(self.refgen)
             self.log('Loading Expr table')
             self.hdf5 = self._hdf5(name)
             try:
@@ -29,8 +28,21 @@ class Expr(Camoco):
                 self.expr = pd.DataFrame()
             self.log('Building Expr Index')
             self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self.expr.index)}) 
+            self.refgen = RefGen(self.refgen)
         except NameError as e:
             self.log.warn('Refgen for {} not available, must be reset!',self.name)
+
+    def __contains__(self,obj):
+        if obj in self.expr.index:
+            return True
+        if obj in self.expr.columns:
+            return True
+        try:
+            if obj.id in self.expr.index:
+                return True
+        except AttributeError as e:
+            pass
+        return False
 
     def __repr__(self):
         return ""
@@ -53,13 +65,18 @@ class Expr(Camoco):
     def accessions(self):
         return self.expr().columns
 
-    @memoize
     def genes(self,enumerated=True,raw=False):
         # Returns a list of distinct genes 
-        table = 'raw_expression' if raw else 'expression'
-        return self.refgen.from_ids([
-            x[0] for x in self.db.cursor().execute('SELECT DISTINCT(gene) FROM {}'.format(table))
-        ],enumerated=enumerated)
+        if raw is False:
+            return self.refgen.from_ids(self.expr.index,enumerated=enumerated)
+        else:
+            return self.refgen.from_ids(self.hdf5['raw_expr'].index,enumerated=enumerated)
+
+    def expr_profile(self,gene):
+        '''
+            return the expression profile for a gene
+        '''
+        return self.expr.loc[gene.id]
 
     def is_normalized(self,max_val=None,raw=False):
         if max_val is not None:
@@ -74,8 +91,6 @@ class Expr(Camoco):
         ''' A gut check method to make sure none of the expression columns
             got turned into all nans. Because apparently that is a problem.'''
         return any(self.expr.apply(lambda col: all(np.isnan(col)),axis=0))
-
-
 
     '''
         Internal Methods --------------------------------------------------------------------------------
@@ -99,7 +114,6 @@ class Expr(Camoco):
             self.log('Unable to update expression table values: {}',e)
             raise
 
-
     def _transformation_log(self,transform=None):
         if transform is None:
             return self._global('transformation_log')
@@ -117,8 +131,8 @@ class Expr(Camoco):
             self.hdf5['raw_expr'] = pd.DataFrame()
         self.log('Resetting expression data')
         self.hdf5['expr'] = self.expr = pd.DataFrame()
-        self._set_refgen(None)
         self._transformation_log('reset')
+
 
     def _normalize(self,method=None,is_raw=None,max_val=None,**kwargs):
         ''' evaluates qc expression data and re-enters 
@@ -226,29 +240,27 @@ class Expr(Camoco):
         self.log('Updating values')
         self._update_values(expr,'quantile')
 
-    def _set_refgen(self,refgen):
-        # update database for future
-        if refgen is not None:
-            self._global('refgen',refgen.name)
-        else:
-            self._global('refgen',None)
+    @property
+    def _parent_refgen(self):
+        return co.RefGen(self._global['parent_refgen'])
+
+    def _set_refgen(self,refgen,filter=True):
+        '''
+            Sets the current refgen. Its complicated.
+        '''
+        # Keep a record of parent refgen
+        self._global('parent_refgen',refgen.name)
+        # Filter down to only genes in 
+        if filter:
+            refgen = refgen.filtered_refgen(
+                'Filtered{}'.format(self.name),
+                'Filtered Refgen',
+                refgen,
+                self.genes(),
+            )
         # remember to set for current instance
+        self._global('refgen',refgen.name)
         self.refgen = refgen
-
-    def _filter_refgen(self):
-        ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
-            has been populated!!'''
-        self.log("Filtering custom refgen for {} genes in {}",self.num_genes(),self.name)
-        filtered_refgen = RefGen.from_RefGen(
-            "{}RefGen".format(self.name),
-            "RefGen for {} filtered from {}".format(self.name,self.refgen.name),
-            self.refgen,
-            gene_filter=self,
-            basedir = self.basedir
-        )
-        self._set_refgen(filtered_refgen)
-
-
 
 
     ''' ------------------------------------------------------------------------------------------
@@ -267,8 +279,8 @@ class Expr(Camoco):
         ''' Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)'''
         # we are all pandas on the inside O.O
         self = cls(name=name,description=description,basedir=basedir)
+        self._set_refgen(refgen,filter=False)
         self._reset(raw=True)
-        self._set_refgen(refgen)
         if rawtype is None:
             self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
             rawtype = ''
@@ -288,6 +300,8 @@ class Expr(Camoco):
             self.log('Performing Quantile Gene Normalization')
             self._quantile()
             assert self.anynancol() == False
+        self.log('Filtering refgen: {}',refgen.name)
+        self._set_refgen(refgen,filter=True)
         return self
 
     @property 
@@ -310,21 +324,9 @@ class Expr(Camoco):
 
 
 
-
     '''
         Unimplemented ---------------------------------------------------------------------------------
     '''
-
-    def __contains__(self,obj):
-        if obj in self.refgen:
-            return True
-        elif obj in self.expr.index:
-            return True
-        elif obj in self.expr.columns:
-            return True
-        else:
-            return False
-
        
     def heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
         cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
