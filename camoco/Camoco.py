@@ -67,7 +67,10 @@ class Camoco(object):
         # return a connection if exists
         return lite.Connection(self._resource("databases",str(dbname)+".db"))
 
-    def _tmp_file(self):
+    def _hdf5(self,dbname):
+        return pd.HDFStore(self._resource("databases",str(dbname)+'.hd5'))
+
+    def _tmpfile(self):
         # returns a handle to a tmp file
         return tempfile.NamedTemporaryFile(dir=os.path.join(self.basedir,"tmp"))
 
