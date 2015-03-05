@@ -1,5 +1,5 @@
-#cython: boundscheck=False, wraparound=False, cdivision=True
 import numpy as np
+from scipy.misc import comb 
 
 cdef extern from "math.h":
     bint isnan(double x)
@@ -42,5 +42,24 @@ def pair_correlation(double[:, ::1] x):
             res[i, j] = res[j, i] = r
     # Return the base of the memory view
     return res.base
+
+def coex_index(long[:] ids, int mi):
+
+    cdef long[::] indices = np.empty(comb(ids.shape[0],2,exact=True),dtype=np.long)
+    cdef long count = 0
+   
+    for ix in range(ids.shape[0]):
+        for jx in range(ix+1,ids.shape[0]):
+            i = min(ids[ix],ids[jx])
+            j = max(ids[ix],ids[jx])
+            # Calculate what the index would be if it were a square matrix
+            k = ((i * mi) + j) 
+            # Calculate the number of cells in the lower diagonal
+            ld = (((i+1)**2) - (i+1))/2
+            # Calculate the number of items on diagonal
+            d = i + 1
+            indices[count] = k-ld-d
+            count += 1
+    return indices.base 
 
 

@@ -16,7 +16,7 @@ def gene_distances(double[:] chr, long[:] position):
     for i in range(chr.shape[0]):
         for j in range(i+1,chr.shape[0]):
             if chr[i] == chr[j]:
-                distances[index] = np.nan 
+                distances[index] = np.inf 
             else:
                 distances[index] = abs(position[i] - position[j])
             index += 1
