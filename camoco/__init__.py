@@ -37,15 +37,19 @@ def del_dataset(type,name,safe=True,basedir="~/.camoco"):
         if input("[Y/n]:") != 'Y':
             c.log("Nothing Deleted")
             return
+    c.log("Deleting {}",name)
+    c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
     try:
-        c.log("Deleting {}",name)
-        c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
         os.remove(c._resource("databases",".".join([type,name])+".db"))
-        if type == 'Expr':
-            # also have to remove the COB specific refgen
-            del_dataset('RefGen',name+'RefGen')
     except FileNotFoundError as e:
-        c.log('Database Not Found')
+        c.log('Database Not Found: {}'.format(e))
+    try:
+        os.remove(c._resource("databases",".".join([name])+".hd5"))
+    except FileNotFoundError as e:
+        c.log('Database Not Found: {}'.format(e))
+    if type == 'Expr':
+        # also have to remove the COB specific refgen
+        del_dataset('RefGen','Filtered'+name)
 
 def mv_dataset(type,name,new_name,basedir="~/.camoco"):
     c = Camoco("Camoco")

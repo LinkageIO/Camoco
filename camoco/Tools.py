@@ -84,4 +84,4 @@ def plot_local_vs_cc(term,filename=None,bootstraps=1):
     if filename is None:
         filename = "{}_cc.png".format(term.id)
     pylab.savefig(filename)
-   
+
