@@ -31,6 +31,7 @@ class COB(Expr):
             super().__init__(name=name,description=description,basedir=basedir)
             self.hdf5 = self._hdf5(name)
             try:
+                self.log('Loading coex table')
                 self.coex = self.hdf5['coex']
             except KeyError as e:
                 self.log("{} is empty ({})",name,e)
@@ -226,8 +227,6 @@ class COB(Expr):
         # put in the hdf5 store
         self._build_tables(tbl)
         self.log("Done")
-        # update the reference genome
-        self._filter_refgen()  
         return self
 
     def _build_tables(self,tbl):
@@ -274,8 +273,8 @@ class COB(Expr):
             directly from the expr profiles matches the one stored in 
             the database
         '''
-        expr_a = self.expr([gene_a]).irow(0).values
-        expr_b = self.expr([gene_b]).irow(0).values
+        expr_a = self.expr_profile(gene_a).values
+        expr_b = self.expr_profile(gene_b).values
         mask = np.logical_and(np.isfinite(expr_a),np.isfinite(expr_b))
         if sum(mask) < maxnan:
             # too many nans to reliably calculate pcc 
@@ -292,7 +291,9 @@ class COB(Expr):
             Run Test Suite
         '''
         self.log("Staring Tests for {}",self.name)
-        self.log('The length of the coex table should be num_genes choose 2')
+        self.log('''
+            The length of the coex table should be num_genes choose 2
+        ''')
         assert len(self.coex) == comb(self.num_genes(),2)
         self.log('PASS')
 
@@ -301,7 +302,10 @@ class COB(Expr):
         calculated in the fast Cython version ''')
         for a,b in itertools.combinations([self.refgen.random_gene() for x in range(50)],2):
             assert abs(self.coexpression(a,b).score - self._coex_concordance(a,b)) < 0.001
+            dis_dif = abs(self.coexpression(a,b).distance - abs(a-b)) 
+            assert np.isnan(dis_dif) or dis_dif < 0.001
         self.log('PASS')
+        
         self.log("All Passed")
 
     '''
@@ -397,5 +401,4 @@ class COB(Expr):
     def compare_degree(self,obj,score_cutoff=3):
         ''' Compares the degree of one COB to another '''
         pass
-
 
