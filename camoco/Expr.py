@@ -17,14 +17,18 @@ class Expr(Camoco):
     ''' A representation of gene expression. '''
     def __init__(self,name,description=None,basedir='~/.camoco'):
         super().__init__(name=name,description=description,type='Expr',basedir=basedir) 
-        self._create_tables()
         try:
             self.log('Loading RefGen')
             self.refgen = RefGen(self.refgen)
             self.log('Loading Expr table')
             self.hdf5 = self._hdf5(name)
+            try:
+                self.expr = self.hdf5['expr']
+            except KeyError as e:
+                self.log('{} is empty: ({})',name,e)
+                self.expr = pd.DataFrame()
             self.log('Building Expr Index')
-            self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self.expr().index)}) 
+            self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self.expr.index)}) 
         except NameError as e:
             self.log.warn('Refgen for {} not available, must be reset!',self.name)
 
@@ -34,32 +38,21 @@ class Expr(Camoco):
     def __str__(self):
         pass
 
-    def __contains__(self,obj):
-        try:
-            # Object is a gene
-            return True if obj in self.genes() else False
-        except Exception as e:
-            pass
-        try:
-            # Can be a string object
-            return True if obj in (x.id for x in self.genes()) else False
-        except Exception as e:
-            pass
-        self.log("object '{}' is not correct type to test for membership in {}",obj,self.name)
+    def num_genes(self):
+        return len(self.expr.index)
 
-    def summary(self):
+    def num_accessions(self):
+        return len(self.expr.columns)
+
+    def shape(self):
+        return self.expr.shape
+
+    def zscore(self):
         pass
 
     def accessions(self):
-        return self.expr().columns()
-        return [x[0] for x in self.db.cursor().execute('SELECT DISTINCT(accession) FROM expression')]
+        return self.expr().columns
 
-    @property
-    @memoize
-    def num_accessions(self):
-        return self.db.cursor().execute("SELECT COUNT(DISTINCT(accession)) FROM expression").fetchone()[0]
-
-    # Dont remove this! it is required for filter_refgen and is rather slow if not memoized
     @memoize
     def genes(self,enumerated=True,raw=False):
         # Returns a list of distinct genes 
@@ -68,110 +61,6 @@ class Expr(Camoco):
             x[0] for x in self.db.cursor().execute('SELECT DISTINCT(gene) FROM {}'.format(table))
         ],enumerated=enumerated)
 
-    @memoize
-    def num_genes(self):
-        return self.db.cursor().execute('SELECT COUNT(DISTINCT(gene)) FROM expression').fetchone()[0]
-
-    def del_accession(self,name):
-        cur = self.db.cursor()
-        try:
-            cur.exectue('START TRANSACTION') 
-            cur.execute('DELETE FROM expression WHERE accession = ?',(name))
-            cur.exectue('END TRANSACTION') 
-        except Exception as e:
-            cur.execute('ROLLBACK') 
-
-    @classmethod
-    def from_table(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco'
-        ,sep='\t',normalize=True,quality_control=True,**kwargs):
-        ''' Returns a Expr instance read in from a table file '''
-        tbl = pd.read_table(filename,sep=sep)
-        return cls.from_DataFrame(tbl,name,description,refgen,rawtype=rawtype,**kwargs)
-
-    @classmethod
-    def from_DataFrame(cls,tbl,name,description,refgen,rawtype=None,basedir='~/.camoco',
-        normalize=True,quantile=True,quality_control=True,**kwargs):
-        ''' Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)'''
-        # we are all pandas on the inside O.O
-        self = cls(name=name,description=description,basedir=basedir)
-        self.reset(raw=True)
-        self._set_refgen(refgen)
-        if rawtype is None:
-            self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
-            rawtype = ''
-        self._global('rawtype',rawtype)
-        # put raw values into the database
-        self.log('Importing Raw Expression Values')
-        self.update_values(tbl,'Raw'+rawtype,raw=True)
-        if quality_control:
-            self.log('Performing Quality Control on genes')
-            self.quality_control(**kwargs)
-        assert self.anynancol() == False
-        if normalize:
-            self.log('Performing Raw Expression Normalization')
-            self.normalize(**kwargs)
-            assert self.anynancol() == False
-        if quantile:
-            self.log('Performing Quantile Gene Normalization')
-            self.quantile()
-            assert self.anynancol() == False
-        return self
-
-    def reset(self,raw=False):
-        ''' resets the expression values to their raw state undoing any normalizations '''
-        cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
-        if raw:
-            # kill the raw table too
-            self.log('Resetting raw expression data')
-            cur.execute('DELETE FROM raw_expression;') 
-        self.log('Resetting expression data')
-        cur.execute('DELETE FROM expression;') 
-        cur.execute('END TRANSACTION')
-        if raw and cur.execute('SELECT COUNT(*) FROM raw_expression').fetchone()[0] != 0:
-            raise ValueError("Raw Expression Table NOT EMPTY!")
-        if cur.execute('SELECT COUNT(*) FROM expression').fetchone()[0] != 0:
-            raise ValueError("Expression Table NOT EMPTY!")
-        self._set_refgen(None)
-        self.transformation_log('reset')
-
-    def update_values(self,df,transform_name,raw=False):
-        ''' updates the 'expression' table values with values from df.
-            Requires a transformation name for the logs. 
-            Option to overwrite raw table or working table.
-            '''
-        # update the transformation log
-        self.transformation_log(transform_name)
-        table = 'raw_expression' if raw else 'expression'
-        # Sort the table by genes
-        df = df.sort()
-        try:
-            cur = self.db.cursor()
-            # lets be safe about this
-            cur.execute('BEGIN TRANSACTION')
-            self.log('Removing old values from {}...',table)
-            cur.execute('DELETE FROM {};'.format(table)) 
-            cur.execute('END TRANSACTION')
-            cur.execute('BEGIN TRANSACTION')
-            self.log('Importing values, shape: {} {}',df.shape[0],df.shape[1])
-            cur.executemany('''
-                INSERT OR REPLACE INTO {} (gene, accession, value) VALUES (?,?,?)'''.format(table),
-                [(gene.upper(),accession, float(value)) for (accession,gene),value in df.unstack().iteritems()] 
-                #          ^             ^ All indices are uppercase in database 
-            )
-            self.log('Imported {} values',df.shape[0]*df.shape[1])
-            cur.execute('END TRANSACTION')
-        except Exception as e:
-            cur.execute('ROLLBACK') 
-            self.log('Unable to update expression table values: {}',e)
-            raise
-
-    def max_values(self,group_by='accession',raw=False):
-        return self.expr(raw=raw,long=True).groupby(group_by).apply(
-            lambda x: np.nanmax(x.value.values # I named my column value just like pandas ....
-        ))
-
-
     def is_normalized(self,max_val=None,raw=False):
         if max_val is not None:
             max_val = max_val # Use the user defined max val
@@ -179,25 +68,70 @@ class Expr(Camoco):
             max_val = 1100 
         elif self.rawtype.upper() == 'MICROARRAY':
             max_val = 100 
-        return self.expr(raw=raw).apply(lambda col: np.nanmax(col.values) < max_val ,axis=0)
+        return self.expr.apply(lambda col: np.nanmax(col.values) < max_val ,axis=0)
     
     def anynancol(self):
         ''' A gut check method to make sure none of the expression columns
             got turned into all nans. Because apparently that is a problem.'''
-        return any(self.expr().apply(lambda col: all(np.isnan(col)),axis=0))
+        return any(self.expr.apply(lambda col: all(np.isnan(col)),axis=0))
 
-    def normalize(self,method=None,is_raw=None,max_val=None,**kwargs):
+
+
+    '''
+        Internal Methods --------------------------------------------------------------------------------
+    '''
+
+    def _update_values(self,df,transform_name,raw=False):
+        '''
+            updates the 'expression' table values with values from df.
+            Requires a transformation name for the log. 
+            Option to overwrite raw table or working table.
+        '''
+        # update the transformation log
+        self._transformation_log(transform_name)
+        table = 'raw_expr' if raw else 'expr'
+        # Sort the table by genes
+        df = df.sort()
+        try:
+            self.hdf5[table] = self.expr = df
+            self.hdf5.flush(fsync=True)
+        except Exception as e:
+            self.log('Unable to update expression table values: {}',e)
+            raise
+
+
+    def _transformation_log(self,transform=None):
+        if transform is None:
+            return self._global('transformation_log')
+        elif transform == 'reset' or self._global('transformation_log') is None:
+            self._global('transformation_log','raw')
+        else:
+            self._global('transformation_log',self._global('transformation_log') + '->' + str(transform))
+            self.log('Transformation Log: {}',self._global('transformation_log'))
+ 
+    def _reset(self,raw=False):
+        ''' resets the expression values to their raw state undoing any normalizations '''
+        if raw:
+            # kill the raw table too
+            self.log('Resetting raw expression data')
+            self.hdf5['raw_expr'] = pd.DataFrame()
+        self.log('Resetting expression data')
+        self.hdf5['expr'] = self.expr = pd.DataFrame()
+        self._set_refgen(None)
+        self._transformation_log('reset')
+
+    def _normalize(self,method=None,is_raw=None,max_val=None,**kwargs):
         ''' evaluates qc expression data and re-enters 
             normaized data into database '''
         self.log('------------ Normalizing')
         if all(self.is_normalized(max_val=max_val)):
             self.log("Dataset already normalized")
-            self.transformation_log('DetectedPreNormalized')
+            self._transformation_log('DetectedPreNormalized')
         elif any(self.is_normalized(max_val=max_val)):
             # Something fucked up is happending
             raise TypeError('Attempting normalization on already normalized dataset. Consider passing a max_val < {} if Im wrong.'.format(min(self.max_values())))
         else:
-            df = self.expr(raw=False,long=False)
+            df = self.expr
             if method is not None:
                 method = method
             elif self.rawtype.upper() == 'RNASEQ':
@@ -209,13 +143,13 @@ class Expr(Camoco):
             # apply the normalization to each column (accession)
             df = df.apply(lambda col: method(col),axis=0)
             # update values
-            self.update_values(df,method.__name__)
+            self._update_values(df,method.__name__)
 
-    def quality_control(self,min_expr=1,max_gene_missing_data=0.2,min_single_sample_expr=5, \
+    def _quality_control(self,min_expr=1,max_gene_missing_data=0.2,min_single_sample_expr=5, \
         max_accession_missing_data=0.5,membership=None,dry_run=False,**kwargs):
         ''' Sets quality control flag for all values in expression table '''        
         self.log('------------Quality Control')
-        df = self.expr(raw=True,long=False)
+        df = self.hdf5['raw_expr']
         # remember how we set the flags
         self._global('qc_min_expr',min_expr)
         self._global('qc_max_gene_missing_data',max_gene_missing_data)
@@ -260,42 +194,15 @@ class Expr(Camoco):
             # If dry run, take first 100 rows of QC
             self.log.warn("Dry Run")
             df = df.iloc[0:5000,:]
-        self.update_values(df,'quality_control')
+        self._update_values(df,'quality_control')
 
-    def expr(self,genes=None,accessions=None,long=False,raw=False,zscore=False):
-        ''' returns expression data '''
-        # Set up dynamic query
-        tbl = 'raw_expression' if raw else 'expression'
-        gene_filter = " WHERE gene in ('{}')".format("','".join([x.id.upper() for x in genes])) if genes is not None else ""
-        accession_filter = " AND accession in ('{}')".format("','".join(accessions)) if accessions is not None else ""
-        query = 'SELECT * FROM {} {} {};'.format(tbl,gene_filter,accession_filter)
-        # pull and create data frame
-        try:
-            df = pd.DataFrame(
-                self.db.cursor().execute(query).fetchall(),
-                columns = ['gene','accession','value']
-            )
-        except ValueError as e:
-            # Nothing is there pass back empty DF
-            df = pd.DataFrame(
-                columns = ['gene','accession','value']
-            )
-        if long is False:
-            df = df.pivot('gene','accession','value')
-        if zscore is True:
-            if long is True:
-                raise ValueError('If zscore is true, long must be false')
-            else:
-                df = df.apply(lambda x: (x-x.mean())/(x.std()),axis=1)
-        return df
-
-    def quantile(self):
+    def _quantile(self):
         ''' Perform quantile normalization across each accession. 
             Each accessions gene expression values are replaced with 
             ranked gene averages.'''
         # get gene by accession matrix
         self.log('------------Quantile')
-        expr = self.expr()
+        expr = self.expr
         self.log('Ranking data')
         # assign ranks by accession
         expr_ranks = expr.rank(axis=0,method='dense')
@@ -317,17 +224,108 @@ class Expr(Camoco):
             lambda x : rank_average[int(x*rankmax)-1] if not np.isnan(x) else np.nan
         )
         self.log('Updating values')
-        self.update_values(expr,'quantile')
+        self._update_values(expr,'quantile')
 
-    def transformation_log(self,transform=None):
-        if transform is None:
-            return self._global('transformation_log')
-        elif transform == 'reset' or self._global('transformation_log') is None:
-            self._global('transformation_log','raw')
+    def _set_refgen(self,refgen):
+        # update database for future
+        if refgen is not None:
+            self._global('refgen',refgen.name)
         else:
-            self._global('transformation_log',self._global('transformation_log') + '->' + str(transform))
-            self.log('Transformation Log: {}',self._global('transformation_log'))
-        
+            self._global('refgen',None)
+        # remember to set for current instance
+        self.refgen = refgen
+
+    def _filter_refgen(self):
+        ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
+            has been populated!!'''
+        self.log("Filtering custom refgen for {} genes in {}",self.num_genes(),self.name)
+        filtered_refgen = RefGen.from_RefGen(
+            "{}RefGen".format(self.name),
+            "RefGen for {} filtered from {}".format(self.name,self.refgen.name),
+            self.refgen,
+            gene_filter=self,
+            basedir = self.basedir
+        )
+        self._set_refgen(filtered_refgen)
+
+
+
+
+    ''' ------------------------------------------------------------------------------------------
+            Class Methods
+    '''
+    @classmethod
+    def from_table(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco'
+        ,sep='\t',normalize=True,quality_control=True,**kwargs):
+        ''' Returns a Expr instance read in from a table file '''
+        tbl = pd.read_table(filename,sep=sep)
+        return cls.from_DataFrame(tbl,name,description,refgen,rawtype=rawtype,**kwargs)
+
+    @classmethod
+    def from_DataFrame(cls,tbl,name,description,refgen,rawtype=None,basedir='~/.camoco',
+        normalize=True,quantile=True,quality_control=True,**kwargs):
+        ''' Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)'''
+        # we are all pandas on the inside O.O
+        self = cls(name=name,description=description,basedir=basedir)
+        self._reset(raw=True)
+        self._set_refgen(refgen)
+        if rawtype is None:
+            self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
+            rawtype = ''
+        self._global('rawtype',rawtype)
+        # put raw values into the database
+        self.log('Importing Raw Expression Values')
+        self._update_values(tbl,'Raw'+rawtype,raw=True)
+        if quality_control:
+            self.log('Performing Quality Control on genes')
+            self._quality_control(**kwargs)
+        assert self.anynancol() == False
+        if normalize:
+            self.log('Performing Raw Expression Normalization')
+            self._normalize(**kwargs)
+            assert self.anynancol() == False
+        if quantile:
+            self.log('Performing Quantile Gene Normalization')
+            self._quantile()
+            assert self.anynancol() == False
+        return self
+
+    @property 
+    def cmap(self):
+        '''
+            Used for the heatmap function. Retruns a cmap which is yellow/blue
+        '''
+        heatmapdict = {
+            'red': ((0.0, 1.0, 1.0),
+                    (0.5, 1.0, 1.0),
+                    (1.0, 0.0, 0.0)),
+            'green':((0.0, 1.0, 1.0),
+                    (0.5, 1.0, 1.0),
+                    (1.0, 0.0, 0.0)),
+            'blue': ((0.0, 0.0, 0.0),
+                    (0.5, 1.0, 1.0),
+                    (1.0, 1.0, 1.0))}
+        heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
+        return heatmap_cmap
+
+
+
+
+    '''
+        Unimplemented ---------------------------------------------------------------------------------
+    '''
+
+    def __contains__(self,obj):
+        if obj in self.refgen:
+            return True
+        elif obj in self.expr.index:
+            return True
+        elif obj in self.expr.columns:
+            return True
+        else:
+            return False
+
+       
     def heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
         cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
         heatmap_unit_label='Expression Z Score',png_encode=False):
@@ -413,21 +411,6 @@ class Expr(Camoco):
             columns=col_labels
         )
 
-    @property 
-    def cmap(self):
-        heatmapdict = {
-            'red': ((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'green':((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'blue': ((0.0, 0.0, 0.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 1.0, 1.0))}
-        heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
-        return heatmap_cmap
-
 
     def plot_value_hist(self,groupby='accession',raw=False,bins=50,figsize=(16,16),title='',log=False):
         ''' Plots Value histograms on one of the expression matrix axis'''
@@ -447,44 +430,4 @@ class Expr(Camoco):
                 figsize=figsize
             )
 
-    def _set_refgen(self,refgen):
-        # update database for future
-        if refgen is not None:
-            self._global('refgen',refgen.name)
-        else:
-            self._global('refgen',None)
-        # remember to set for current instance
-        self.refgen = refgen
 
-    def _filter_refgen(self):
-        ''' Filter the refgen to only contain genes available in COB. Only do this after the expression table
-            has been populated!!'''
-        self.log("Filtering custom refgen for {} genes in {}",self.num_genes(),self.name)
-        filtered_refgen = RefGen.from_RefGen(
-            "{}RefGen".format(self.name),
-            "RefGen for {} filtered from {}".format(self.name,self.refgen.name),
-            self.refgen,
-            gene_filter=self,
-            basedir = self.basedir
-        )
-        self._set_refgen(filtered_refgen)
-
-
-    def _create_tables(self):
-        cur = self.db.cursor()
-        cur.execute(''' 
-            CREATE TABLE IF NOT EXISTS raw_expression (
-                gene TEXT,
-                accession TEXT,
-                value REAL,
-                UNIQUE (gene,accession) ON CONFLICT FAIL
-            );
-            CREATE TABLE IF NOT EXISTS expression (
-                gene TEXT,
-                accession TEXT,
-                value REAL,
-                UNIQUE(gene,accession) ON CONFLICT FAIL
-            );
-            CREATE INDEX IF NOT EXISTS genes_ind ON expression(gene);
-            CREATE INDEX IF NOT EXISTS accessions_ind ON expression(accession);
-        ''')
