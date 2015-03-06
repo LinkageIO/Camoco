@@ -3,24 +3,32 @@ from collections import defaultdict
 import re
 
 class Locus(object):
-    def __init__(self, chrom, start, end, id=None ,gene_build=None, organism=None, window=100000):
+    def __init__(self, chrom, start, end, id=None ,gene_build=None, organism=None, window=50000):
         self.id = id
         self.gene_build = gene_build
         self.organism = organism
         self.chrom = chrom
-        try:
-            # Sometimes we have underflows, so choose 0 in that case
-            self.start = max(0,int(start))
-        except TypeError as e:
-            self.start = None
-        try:
-            self.end = int(end)
-        except TypeError as e:
-            self.end = None
-        # Warn us if something seems off
-        if self.start > self.end:
+        self._start = start
+        self._end = end
+        #  Warn us if something seems off
+        if self._start > self._end:
             raise ValueError("Wonky start and stop positions for: {}".format(self))
 
+    def as_dict(self):
+        return {
+            'id'    : self.id,
+            'chrom' : self.chrom,
+            'start' : self.start,
+            'end'   : self.end
+        }
+
+    @property
+    def start(self):
+        return max(0,int(self._start))
+
+    @property
+    def end(self):
+        return int(self._end)
 
     @property
     def stop(self):
@@ -31,6 +39,14 @@ class Locus(object):
     def coor(self):
         ''' returns a tuple with start and stop '''
         return (self.start,self.stop)
+
+    @property
+    def upstream(self):
+        return self.start - self.window
+
+    @property
+    def downstream(self):
+        return self.end + self.window
 
     def __eq__(self,locus):
         if (self.chrom == locus.chrom and
@@ -93,7 +109,7 @@ class Locus(object):
             return int("-1{}".format(abs(self.start)))
 
 class SNP(Locus):
-    def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea',window=0):
+    def __init__(self, chrom, pos, id=None ,gene_build='5b', organism='Zea',window=50000,sub_snps=None):
         super().__init__(
             chrom=str(chrom),
             start=int(pos)-int(window/2),
@@ -104,8 +120,37 @@ class SNP(Locus):
         )
         self.pos = int(pos)
         self.window = window
-        # This is the number of genes a snp tags
-        self.tag_genes = 4
+        self.sub_snps = set([int(pos)])
+        if sub_snps is not None:
+            self.sub_snps = self.sub_snps ^ sub_snps
+
+    def __contains__(self,locus):
+        if (locus.chrom == self.chrom and
+               # The locus has as 'start' position within the SNP window
+               (( locus.upstream >= self.upstream and locus.upstream <= self.downstream)
+               # The locus has an 'end' position within the SNP window
+               or(locus.downstream <= self.downstream and locus.downstream >= self.upstream)
+            )):
+            return True
+        else:
+            return False
+
+    def as_dict(self):
+        dict = super().as_dict()
+        dict['start'] = self.start
+        dict['end'] = self.end
+        dict['window'] = self.window
+        dict['pos'] = self.pos
+        return dict
+
+    @property
+    def start(self):
+        # this returns 0 if there are negative positions
+        return max(0,min(self.sub_snps))
+
+    @property
+    def end(self):
+        return max(self.sub_snps)
 
     def collapse(self,snp):
         ''' collapse two snps into a new 'meta' SNP. The pos is half way
@@ -114,10 +159,10 @@ class SNP(Locus):
         # must be on the same chromosome to collapse
         assert(self-snp < float('Inf'))
         new_pos = int((self.pos + snp.pos)/2)
-        new_window = max(self.end,snp.end) - min(self.start,snp.start)
+        new_window = self.window
         new_id = str(self.id)+'-'+str(snp.id)
-        new_tag_genes = self.tag_genes + snp.tag_genes
-        return SNP(self.chrom,new_pos,window=new_window)
+        new_sub_snps = self.sub_snps ^ snp.sub_snps
+        return SNP(self.chrom,new_pos,window=new_window,sub_snps=new_sub_snps)
 
     def __str__(self):
         return '''
@@ -126,7 +171,8 @@ class SNP(Locus):
             id: {}
             chromosome: {}
             pos: {}
-            window: {}'''.format(self.organism,self.__class__,self.id,self.chrom,self.pos,self.window)
+            window: {}
+            num_sub_snps: {}'''.format(self.organism,self.__class__,self.id,self.chrom,self.pos,self.window,len(self.sub_snps))
 
 
     def summary(self):
