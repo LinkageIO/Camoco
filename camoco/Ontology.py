@@ -5,6 +5,7 @@ from camoco.RefGen import RefGen
 from camoco.Locus import SNP
 from camoco.Tools import log
 
+
 from collections import defaultdict
 from pandas import DataFrame
 from scipy.stats import hypergeom
@@ -37,38 +38,22 @@ class Term(object):
         print("Num SNPs: {}".format(len(self.snp_list)))
         print("Num Genes: {}".format(len(self.gene_list)))
 
-    def snps(self,effective=True,window=50000):
-        pass
-
     def add_gene(self,gene):
         self.gene_list.add(gene)
 
     def add_snp(self,snp):
         self.snp_list.add(snp) 
     
-    def flanking_genes(self,refgen,gene_limit=4,chain=True,window_size=None):
-        ''' returns flanking genes based on some set of arbitrary rules from a refgen '''
-        if chain:
-            return set(itertools.chain.from_iterable(
-                [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size if window_size is not None else x.window) for x in self.snp_list]
-            ))
-        else:
-            return [refgen.flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
-
     def flanking_snps(self,gene,window_size=100000):
         ''' returns any nearby Term SNPs to a gene '''
         return [snp for snp in self.snp_list if abs(gene-snp) <= window_size]
 
-    def bootstrap_flanking_genes(self,refgen,window_size=100000,gene_limit=4,chain=True):
-        ''' returns random flanking genes, with similar properties, based on an arbitrary set of rules'''
-        if chain:
-            return set(itertools.chain(*[refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]))
-        else:   
-            return [refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
-
-    def effective_snps(self):
+    def effective_snps(self,window_size=None):
         ''' Collapse down snps that have overlapping windows'''
         snp_list = sorted(self.snp_list)
+        if window_size is not None:
+            for snp in snp_list:
+                snp.window = window_size
         collapsed = [snp_list.pop(0)]
         for snp in snp_list:
             # if they have overlapping windows, collapse
@@ -77,19 +62,7 @@ class Term(object):
             else:
                 collapsed.append(snp)
         return collapsed
-
-    def bootstrap_effective_flanking_genes(self,refgen,chain=True,window_size=10000,gene_limit=4):
-        ''' Sometimes, especially with GWAS, SNPs will cluster and map to the same
-        flanking gene set. This method accounts for this by collapsing down SNPs
-        into meta-SNPs which have varying window sizes.'''
-        # bootstrap flanking genes with specific window sizes
-        if chain:
-            return set(itertools.chain(*[
-                refgen.bootstrap_flanking_genes(snp,gene_limit=gene_limit,window_size=snp.window) for snp in collapsed
-            ]))
-        else:   
-            return [refgen.bootstrap_flanking_genes(snp,gene_limit=gene_limit,window_size=snp.window) for snp in collapsed]
-
+        
     def print_stats(self,cob_list,file=sys.stdout, window_limit=100000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
         for cob in cob_list:
             # MAKE SURE WE ARE DEALING WITH A SET!!!!!!!!!! Lists will have duplicates in it!
@@ -165,7 +138,7 @@ class Ontology(Camoco):
             ).fetchall()]
             return Term(id,name,type,desc,gene_list=term_genes,snp_list=term_snps)
         except TypeError as e: # Not in database
-            return None
+            raise
 
     def term_ids(self,like="%"):
         return [self.term(x[0]) for x in self.db.cursor().execute('SELECT id FROM terms WHERE id LIKE ?',(like,)).fetchall()]
