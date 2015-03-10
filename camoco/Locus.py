@@ -10,6 +10,7 @@ class Locus(object):
         self.chrom = chrom
         self._start = start
         self._end = end
+        self.window = window
         #  Warn us if something seems off
         if self._start > self._end:
             raise ValueError("Wonky start and stop positions for: {}".format(self))
@@ -121,6 +122,8 @@ class SNP(Locus):
         self.pos = int(pos)
         self.window = window
         self.sub_snps = set([int(pos)])
+        if id is None:
+            self.id = self.summary()
         if sub_snps is not None:
             self.sub_snps = self.sub_snps ^ sub_snps
 
@@ -176,7 +179,7 @@ class SNP(Locus):
 
 
     def summary(self):
-        return "S{}:{}".format(self.chrom,self.start)
+        return "S{}:{}".format(self.chrom,','.join([str(x) for x in self.sub_snps]))
 
     @classmethod
     def from_str(cls,string,regex='.*(\d+)_(\d+).*'):
