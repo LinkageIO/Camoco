@@ -161,6 +161,55 @@ class RefGen(Camoco):
                 return list(itertools.chain(up_genes,down_genes))
             return (up_genes,down_genes)
 
+    def bootstrap_candidate_genes(self,loci,gene_limit=4,chain=True):
+        '''
+            Returns candidate genes which are random, but conserves 
+            vital structure like flanking regions.
+        '''
+        try:
+            # Handle case where we pass in an iterable list of loci
+            iterator = iter(loci)
+            genes = [self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
+            if chain:
+                genes = list(set(itertools.chain(*genes)))
+            return genes
+        except TypeError as e:
+            # We now have a single locus
+            locus = loci
+            # grab the actual candidate genes
+            num_candidates = len(self.candidate_genes(locus,gene_limit=gene_limit,chain=True))
+            # Snps a random genes from the genome
+            random_gene = self.random_gene()
+            # Extend the window to something crazy
+            random_gene.window = 10e10
+            # Snag the same number of candidates
+            random_candidates = self.upstream_genes(random_gene,gene_limit=num_candidates)
+            if len(random_candidates) != num_candidates:
+                # somehow we hit the end of a chromosome or something, just recurse
+                return self.bootstrap_candidate_genes(locus,gene_limit=num_candidates,chain=chain)
+            return random_candidates
+
+    def candidate_genes(self, loci, gene_limit=4,chain=True):
+        ''' 
+            Return Genes between locus start and stop, plus additional 
+            flanking genes (up to gene_limit)
+        '''
+        try:
+            iterator = iter(loci)   
+            genes = [self.candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
+            if chain:
+                genes = list(set(itertools.chain(*genes)))
+            return genes
+        except TypeError as e:
+            # If not an iterator, its a single locus
+            locus = loci
+            genes_within = self.genes_within(locus)
+            up_genes,down_genes = self.flanking_genes(locus,gene_limit=gene_limit,chain=False)
+            if chain:
+                return list(itertools.chain(up_genes,genes_within,down_genes))
+            return (up_genes,genes_within,down_genes)
+ 
+
     def pairwise_distance(self, gene_list=None):
         ''' 
             returns a vector containing the pairwise distances between genes 
@@ -199,22 +248,18 @@ class RefGen(Camoco):
             Plots the snps and windows for each chromosome
         '''
         plt.clf()
-        f, (ax1,ax2,ax3) = plt.subplots(3,figsize=(10,10))
+        f, (ax1,ax2) = plt.subplots(2,figsize=(10,10))
         # Loci Locations
         loci = pd.DataFrame([x.as_dict() for x in snp_list])
         ax1.barh(bottom=loci.chrom.astype('int').values,width=loci.window.values,left=loci.start.values)
         ax1.set_xlabel('Position (bp)')
         ax1.set_ylabel('Chromosome')
-        # Plot window sizes
-        ax2.hist(loci.window.values)
-        ax2.set_xlabel('Window Size')
-        ax2.set_ylabel('Frequency')
         # Plot inter loci distance
         distances = RefGenDist.gene_distances(loci.chrom.astype('float').values,loci.pos.values).astype('float')
         distances = distances[np.isfinite(distances)]
-        ax3.hist(distances)
-        ax3.set_xlabel('Inter Window Distance')
-        ax3.set_ylabel('Frequency')
+        ax2.hist(distances)
+        ax2.set_xlabel('Inter Window Distance')
+        ax2.set_ylabel('Frequency')
         plt.savefig(filename)
         del f
         return distances
@@ -353,27 +398,6 @@ class RefGen(Camoco):
         except Exception as e:
             return None
 
-    def candidate_genes(self, loci, gene_limit=4,chain=True):
-        ''' 
-            Return Genes between locus start and stop, plus additional 
-            flanking genes (up to gene_limit)
-        '''
-        try:
-            iterator = iter(loci)   
-            genes = [self.candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
-            if chain:
-                genes = list(itertools.chain(*genes))
-            return genes
-        except TypeError as e:
-            # If not an iterator, its a single locus
-            locus = loci
-            genes_within = self.genes_within(locus)
-            up_genes,down_genes = self.flanking_genes(locus,gene_limit=gene_limit,chain=False)
-            if chain:
-                return list(itertools.chain(up_genes,genes_within,down_genes))
-            return (up_genes,genes_within,down_genes)
-            
-
 
     def nearest_gene(self,locus):
         ''' return the gene nearest the locus '''
@@ -381,25 +405,15 @@ class RefGen(Camoco):
         val,idx  = min((val,idx) for (idx,val) in enumerate([abs(locus-candidate) for candidate in candidates]))
         return candidates[idx]
 
-    def bootstrap_flanking_genes(self,locus,gene_limit=4,window_size=100000):
-        ''' Returns a randoms set of non overlapping flanking genes calculated from 
-            SNPs flanking genes which is the same number of genes as would be calculated
-            from the actual flanking genes from SNP list'''
-        flanking_genes_index = self.flanking_genes_index(gene_limit=gene_limit,window_size=window_size)
-        num_genes = len(self.flanking_genes(locus,gene_limit=gene_limit,window_size=window_size))
-        if num_genes == 0:
-            return []
-        else:
-            return random.choice(flanking_genes_index[num_genes] )
-
     @memoize
-    def flanking_genes_index(self,window_size=100000,gene_limit=4):
+    def flanking_genes_index(self,gene_limit=4,window=50000):
         ''' Generate an index of flanking genes useful for bootstrapping (i.e. we can get rid of while loop '''
         # iterate over genes keeping track of number of flanking genes 
-        self.log("Generating flanking gene index window size: {}, gene_limit {}",window_size,gene_limit)
+        self.log("Generating flanking gene index gene_limit {}",gene_limit)
         index = defaultdict(list)
         for gene in self.iter_genes():
-            flanks = self.flanking_genes(gene,gene_limit=gene_limit,window_size=window_size)
+            gene.window = window
+            flanks = self.flanking_genes(gene,gene_limit=gene_limit)
             index[len(flanks)].append(flanks)
         for num in index:
             self.log("Found {} genes with {} flanking genes",len(index[num]),num)
