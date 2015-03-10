@@ -19,6 +19,9 @@
                 .append($('<button>Fit</button>',{})
                     .on({'click':function(){cob.graph.cy.fit()}})
                 )
+                .append($('<button>Layout</button>',{})
+                    .on({'click':function(){cob.graph.cy.layout(cola_options)}})
+                )
             )
             .append($('<li>')
                 .append('<span>').html('Edge Filter')
@@ -31,7 +34,7 @@
             )
             .append($('<li>')
                 .append('<span>').html('Degree Filter')
-                    .append($('<input>',{'value':0})
+                    .append($('<input>',{'value':1})
                         .on({'change':function(){
                             cob.graph.node_filter = this.value
                             cob.graph.filter()
@@ -53,6 +56,7 @@
             panningEnabled: true,
             userPanningEnabled: true,
             boxSelectionEnabled: true,
+            desktopTapThreshold: 2,
             // Style
             style: cytoscape.stylesheet()
             .selector('node')
@@ -60,8 +64,8 @@
                 'background-color': '#144566',
                 'border-width': 1,
                 'border-color': '#000',
-                'height' : 'mapData(gdegree,0,100,50,10)',
-                'width' : 'mapData(gdegree,0,100,50,10)',
+                'height' : 'mapData(locality,0,1,1,10)',
+                'width' : 'mapData(locality,0,1,1,10)',
                 'content':'data(id)',
                 'text-halign':'right',
                 'font-size' : '12pt',
@@ -156,6 +160,15 @@
                 "sScrollY":  '100%',
                 },params)
             )
+            $('#cob .LociTable tbody').on('click','tr',function(){
+                $(this).toggleClass('selected')
+                $('#cob .LociTable .selected').toggleClass('selected')
+                gene = $('td',this).eq(0).text();
+                cob.graph.cy.center(
+                    cob.graph.cy.nodes('node[id="'+gene+'"]').select()
+             )
+        })
+
         }
         this.add_table = function(params){
             this.params.div
@@ -318,9 +331,6 @@
                 ],
             'sScrollY': this.menu.params.div.innerHeight()/2,
         })
-        // Fix the gene column in the table
-        this.menu.get_tab('Genes').FixedColumn = new $.fn.dataTable.FixedColumns(this.menu.get_tab('Genes').LociTable)
-
         
         this.footer = new Footer({});
         this.header = new Header({});
@@ -351,6 +361,7 @@
                     cob.graph.cy.load(data,
                         function(){
                             console.log('Loading Data')
+                            cob.graph.filter()
                         },
                         function(){
                             console.log('Fitting ');
@@ -362,13 +373,7 @@
                     console.log("Nopers")
                 })
         })
-        $('#cob .LociTable tbody').on('click','tr',function(){
-            $(this).toggleClass('selected')
-            gene = $('td',this).eq(0).text();
-            cob.graph.cy.center(
-                cob.graph.cy.nodes('node[id="'+gene+'"]').select()
-            )
-        })
+
         this.graph.cy.on('cxttap','node',{},function(evt){
             var node = evt.cyTarget
             node.toggleClass('highlighted')
@@ -423,6 +428,7 @@
                 .each(function(){
                     cob.graph.selected.push(this.id()) 
                 })
+            
                 //cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
             },100)
         })
@@ -441,7 +447,10 @@
             var nodes = this.graph.cy.nodes()
             var node_ids = []
             for(var i=0; i < nodes.length; i++){
-                node_ids.push(nodes[i].id())
+                // Push if the id 
+                if(nodes[i].degree() >= cob.graph.node_filter){
+                    node_ids.push(nodes[i].id())
+                }
             }
             try{
                 // Fetch ajax

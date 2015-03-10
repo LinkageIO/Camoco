@@ -6,8 +6,8 @@ import sys
 import json
 from math import isinf
 import numpy as np
-
-networks = {x:co.COB(x) for x in ['ZmRoot','ZmSAM','ZmPAN']}
+ 
+networks = {x:co.COB(x) for x in ['ZmRoot']}
 ZM = co.RefGen('Zm5bFGS')
 
 @app.route('/')
@@ -24,7 +24,8 @@ def available_datasets(type=None,*args):
 
 @app.route("/api/Expression/<network_name>/<ontology_name>/<term_name>",methods=['GET','POST'])
 def expression(network_name,ontology_name,term_name):
-    expr = co.COB(network_name).heatmap(co.COB(network_name).gene_expression_vals(co.Ontology(ontology_name)[term_name].gene_list,zscore=True),cluster_x=True,cluster_y=False,png_encode=True)
+    pass
+    expr = networks[network_name].heatmap(network[network_name].gene_expression_vals(co.Ontology(ontology_name)[term_name].gene_list,zscore=True),cluster_x=True,cluster_y=False,png_encode=True)
     return """<html><body>
         <img src="data:image/png;base64,{}"/>
         </body></html>""".format(expr)
@@ -51,12 +52,9 @@ def Ontology_Terms(term_name):
 @app.route('/api/Annotations/<network_name>/<ontology_name>/<term_name>',methods=['GET','POST'])
 def Annotations(network_name,ontology_name,term_name):
     # Retrieve SNPs from 
-    cob = co.COB(network_name)
+    cob = networks[network_name]
     term = co.Ontology(ontology_name)[term_name]
-    if len(term.gene_list) == 0:
-        genes = term.flanking_genes(cob.refgen,gene_limit=4,window_size=100000)
-    else:
-        genes = term.gene_list
+    genes = cob.refgen.from_ids(request.args.get('genes').split(','))
     try:
         gene_annots = co.Annotation('ZMFunc')[genes]
     except ValueError as e:
@@ -72,29 +70,42 @@ def Annotations(network_name,ontology_name,term_name):
 
 @app.route("/api/COB/<network_name>/<ontology>/<term>")
 def COB_network(network_name,ontology,term):
-    try:
-        net = {}
-        cob = co.COB(network_name)
-        term = co.Ontology(ontology)[term]
-        if len(term.gene_list) == 0:
-            genes = term.flanking_genes(cob.refgen,gene_limit=4,window_size=100000)
-        else:
-            genes = term.gene_list
-        subnet = cob.subnetwork(genes,min_distance=100000)
-        net['nodes'] = [ {'data':{'id':str(x.id), 'index':i, 'gdegree':cob.global_degree(x) }} for i,x in enumerate(genes) ]
-        net['edges'] = [
-            {
-                'data':{
-                    'source': source,
-                    'target' : target,
-                    'score' : score,
-                    'distance' : fix_val(distance)
-                }
-            } for source,target,score,distance in subnet.itertuples(index=False)
-        ]
-        return jsonify(net)
-    except Exception as e:
-        return 500 
+    net = {}
+    cob = networks[network_name]
+    term = co.Ontology(ontology)[term]
+    nodes = []
+    seen = set()
+    effective_snps = term.effective_snps(window_size=50000)
+    candidate_genes = cob.refgen.candidate_genes(effective_snps,gene_limit=10,chain=False)
+    local_degree = cob.local_degree([item for sublist in candidate_genes for item in sublist])
+    for snp,genes in zip(effective_snps,candidate_genes):
+        # Put the SNP in there 
+        nodes.append({'data':{'id':str(snp.summary())}})
+        # append 
+        for gene in genes:
+            if gene.id not in seen:
+                global_degree = cob.global_degree(gene)
+                local_degree = local_degree.ix[gene]
+                locality = local_degree / global_degree
+                nodes.append(
+                        {'data':{'id':str(gene.id), 'locality':locality,'degree':int(local_degree), 'gdegree':int(global_degree) }}  
+                )
+            seen.add(gene.id)
+    # Now do the edges
+    subnet = cob.subnetwork(cob.refgen.candidate_genes(term.effective_snps(window_size=50000),gene_limit=10))
+    subnet.reset_index(inplace=True)
+    net['nodes'] = nodes
+    net['edges'] = [
+        {
+            'data':{
+                'source': source,
+                'target' : target,
+                'score' : score,
+                'distance' : fix_val(distance)
+            }
+        } for source,target,score,significant,distance in subnet.itertuples(index=False)
+    ]
+    return jsonify(net)
 
 def fix_val(val):
     if isinf(val):
