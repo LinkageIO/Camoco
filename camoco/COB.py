@@ -9,7 +9,7 @@ from camoco.Expr import Expr
 from camoco.Tools import memoize
 
 from numpy import matrix,arcsinh,tanh
-from collections import defaultdict
+from collections import defaultdict,Counter
 from itertools import chain
 from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
@@ -33,6 +33,8 @@ class COB(Expr):
             try:
                 self.log('Loading coex table')
                 self.coex = self.hdf5['coex']
+                self.log('Loading Global Degree')
+                self.degree = self.hdf5['degree']
             except KeyError as e:
                 self.log("{} is empty ({})",name,e)
                 self.coex = pd.DataFrame()
@@ -110,7 +112,9 @@ class COB(Expr):
         if len(edges) == 1:
             return edges.score[0]
         if return_mean:
-            return (np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges))))
+            return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
+                    (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
+                    (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
         else:
             return edges
 
@@ -176,6 +180,64 @@ class COB(Expr):
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
+    def local_degree(self,genes):
+        '''
+            Returns the local degree of a list of genes
+        '''
+        local_degree = pd.DataFrame(
+            list(Counter(chain(*self.subnetwork(genes,sig_only=True).index.get_values())).items()),
+            columns=['Gene','Degree']
+        ).set_index('Gene')
+        return local_degree
+
+    def global_degree(self,genes):
+        '''
+            Returns the global degree of a list of genes
+        '''
+        try:
+            try:
+                return self.degree.ix[[x.id for x in genes]]
+            except TypeError as e:
+                return self.degree.ix[genes.id].Degree
+        except KeyError as e:
+            return 0
+
+    def locality(self,gene_list):
+        '''
+            Computes the merged local vs global degree table
+        '''
+        degree = self.local_degree(gene_list).merge(
+            self.global_degree(gene_list),
+            left_index=True,
+            right_index=True
+        )
+        return degree
+
+    def plot_locality(self,gene_list,bootstraps=None,filename=None):
+        plt.clf()
+        if bootstraps is not None:
+            for gene_list in bootstraps:
+                degree = self.local_degree(gene_list).merge(
+                    self.global_degree(gene_list),
+                    left_index=True,
+                    right_index=True
+                )
+                plt.scatter(degree.Degree_x,degree.Degree_y,alpha=0.05,color='red')
+        degree = self.local_degree(gene_list).merge(
+            self.global_degree(gene_list),
+            left_index=True,
+            right_index=True
+        )
+        plt.scatter(degree.Degree_x,degree.Degree_y,color='blue')
+        plt.xlabel('Local Degree')
+        plt.ylabel('Global Degree')
+        if filename is None:
+            filename = '{}_Locality.png'.format(self.name)
+        plt.savefig(filename)
+        return plt
+
+
+
     ''' ------------------------------------------------------------------------------------------
             Internal Methods
     '''
@@ -229,6 +291,17 @@ class COB(Expr):
         self.log("Done")
         return self
 
+    def _build_degree(self):
+        try:
+            self.log('Building Degree')
+            self.hdf5['degree'] = pd.DataFrame(
+                list(Counter(chain(*self.subnetwork(sig_only=True).index.get_values())).items()),
+                columns=['Gene','Degree']
+            ).set_index('Gene')
+            self.hdf5.flush(fsync=True)
+        except Exception as e:
+            self.log("Something bad happened:{}",e)
+            raise
     def _build_tables(self,tbl):
         try:
             self.log("Building Database")
@@ -239,6 +312,7 @@ class COB(Expr):
             self.log("Done")
         except Exception as e:
             self.log("Something bad happened:{}",e)
+            raise
 
     ''' ------------------------------------------------------------------------------------------
             Class Methods
@@ -247,8 +321,7 @@ class COB(Expr):
     def from_Expr(cls,expr):
         ''' Create a coexpression object from an Expression object '''
         # The Expr object already exists, just get a handle on it
-        self = expr #cls(name=expr.name,description=expr.description,basedir=expr.basedir)
-        # Grab a coffee
+        self = expr
         self._calculate_coexpression()
         return self
 
@@ -311,21 +384,11 @@ class COB(Expr):
     '''
         Unimplemented ---------------------------------------------------------------------------------
     '''
-    def global_degree(self,gene):
-        pass
 
     def neighbors(self,gene_list,min_distance=None,sig_only=True):
         ''' Input : a list of COBGene Objects
             Output: Returns the neighbors for a list of genes as a DataFrame
             Columns returned: query_name, queryID, neighbor_name, neighbor, score
-        '''
-        pass
-
-    def degree(self,gene_list,min_distance=None):
-        ''' 
-            Input: a list of Gene Objects
-            Output: Dataframe containing the number of significant global
-                    and local neighbors for each gene in list
         '''
         pass
 
@@ -342,12 +405,6 @@ class COB(Expr):
 
     def lcc(self,gene_list,min_distance=None):
         ''' returns an igraph of the largest connected component in graph '''
-        pass
-
-    def locality(self,gene_list,min_distance=None):
-        ''' Returns the log ratio of median local degree to meadian global degree. 
-            This gives you an idea of a group of genes affinity towards one another,
-            or if you just happened to stumble into a high degree set.'''
         pass
 
     def seed(self, gene_list, limit=65): 
