@@ -49,6 +49,41 @@ def B73_eq_Mo17(snp,HM):
     else:
         return False
 
+
+def plot_flanking_vs_inter(cob):
+    import numpy as np
+    from scipy import stats
+    import statsmodels.api as sm
+    import matplotlib.pyplot as plt
+    from statsmodels.distributions.mixture_rvs import mixture_rvs
+    log('Getting genes')
+    genes = sorted(list(cob.refgen.iter_genes()))
+    flanking = np.array([cob.coexpression(genes[i],genes[i-1]).score for i in  range(1,len(genes))])
+    inter = cob.coex[~np.isfinite(cob.coex.distance)].score.values
+    log('Getting flanking KDE')
+    # get the KDEs
+    flanking_kde = sm.nonparametric.KDEUnivariate(flanking)
+    flanking_kde.fit()
+    log('Getting Inter KDE')
+    inter_kde = sm.nonparametric.KDEUnivariate(inter)
+    inter_kde.fit()
+    log('Plotting')
+    fig = plt.figure(figsize=(12,4))
+    ax1 = fig.add_subplot(2,1,1)
+    ax1.set_xlim([-4,4])
+    ax1.set_ylim([0,0.5])
+    ax1.plot(flanking_kde.support,flanking_kde.density,lw=2,color='black')
+    ax1.scatter(np.median(flanking),0.05,marker='D',color='red')
+    # 
+    ax2 = fig.add_subplot(2,1,2)
+    ax2.set_xlim([-4,4])
+    ax2.set_ylim([0,0.5])
+    ax2.invert_yaxis()
+    ax2.plot(inter_kde.support,inter_kde.density,lw=2,color='black')
+    ax2.scatter(np.median(inter),0.05,marker='D',color='red')
+    fig.savefig("{}_flank_inter.png".format(cob.name))
+
+
 def plot_local_global_degree(term,filename=None,bootstraps=1):
     ROOT = co.COB("ROOT")
     RZM = ROOT.refgen # use root specific for bootstraps

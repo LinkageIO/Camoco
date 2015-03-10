@@ -63,36 +63,6 @@ class Term(object):
                 collapsed.append(snp)
         return collapsed
         
-    def print_stats(self,cob_list,file=sys.stdout, window_limit=100000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
-        for cob in cob_list:
-            # MAKE SURE WE ARE DEALING WITH A SET!!!!!!!!!! Lists will have duplicates in it!
-            flanks = self.flanking_genes(cob.refgen,window_limit=window_limit,gene_limit=gene_limit)
-            log("On Term {} with {}. {}/{} genes from {} SNPs",self.id,cob.name,len(flanks),len(self.gene_list),len(self.snp_list))
-            density  = cob.density(flanks,min_distance=window_size)
-            locality = cob.locality(flanks,min_distance=window_size)
-            len_LCC = len(cob.lcc(flanks,min_distance=window_size).vs)
-            print("{}\t{}_NumSNPS\t{}".format(self.id,cob.name,len(self.snp_list)),file=file)
-            print("{}\t{}_NumGenes\t{}".format(self.id,cob.name,len(flanks)),file=file)
-            print("{}\t{}_TransDensity\t{}".format(self.id,cob.name,density),file=file)
-            print("{}\t{}_Locality\t{}".format(self.id,cob.name,locality),file=file)
-            print("{}\t{}_LCC\t{}".format(self.id,cob.name,len_LCC),file=file)
-            if density > bootstrap_density:
-                log("Density > 2; Boostrapping!")
-                # Calculate BootStrap 
-                bs_density = []
-                bs_local = []
-                bs_lcc = []
-                for x in range(num_bootstrap):
-                    bs_flanks = list(chain.from_iterable(
-                        [cob.refgen.bootstrap_flanking_genes(x,gene_limit=gene_limit,window_size=window_size) for x in self.snp_list]
-                    ))
-                    bs_density.append(cob.density(bs_flanks,min_distance=window_size))           
-                    bs_local.append(cob.locality(bs_flanks,min_distance=window_size))
-                    bs_lcc.append(len(cob.lcc(bs_flanks,min_distance=window_size).vs))
-                print("{}\t{}_BS_TransDensity\t{}".format(self.id,cob.name,sum([x >= density for x in bs_density])),file=file)
-                print("{}\t{}_BS_Locality\t{}".format(self.id,cob.name,sum([x >= locality for x in bs_local])),file=file)
-                print("{}\t{}_BS_LCC\t{}".format(self.id,cob.name,sum([x >= len_LCC for x in bs_lcc])),file=file)
-
     def __str__(self):
         return "Term: {}, {} genes, {} SNPs".format(self.id,len(self.gene_list),len(self.snp_list))
 
@@ -124,7 +94,7 @@ class Ontology(Camoco):
         return self.db.cursor().execute("SELECT COUNT(*) FROM terms;").fetchone()[0]
 
 
-    def term(self,term_id,window_size=100000):
+    def term(self,term_id,window_size=50000):
         ''' retrieve a term by name '''
         try:
             id,name,type,desc = self.db.cursor().execute(
