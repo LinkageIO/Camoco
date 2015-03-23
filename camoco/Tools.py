@@ -12,6 +12,8 @@ import camoco as co
 import matplotlib.pylab as pylab
 import numpy as np
 import pandas as pd
+import statsmodels.api as sm
+from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 def memoize(obj):
     cache = obj.cache = {}
@@ -49,6 +51,36 @@ def B73_eq_Mo17(snp,HM):
     else:
         return False
 
+def plot_locality_regression(snps,cob,gene_limit=10):
+    # Get degree and bootstrap degree
+    log('Fetching Empirical Degree')
+    degree = cob.locality(cob.refgen.candidate_genes(snps,gene_limit=gene_limit,chain=True)).sort('local')
+    log('Fetching BS Degree')
+    #bsdegree = pd.concat([cob.locality(cob.refgen.bootstrap_candidate_genes(snps,gene_limit=gene_limit,chain=True)) for x in range(50)]).sort('local')
+    # get OLS for the bootstrapped degree 
+    log('Fitting models')
+    model = sm.OLS(degree['global'],degree.local)
+    res = model.fit()
+    std, iv_l, iv_u = wls_prediction_std(res)
+    # plot the bootstrapped data
+    fig,ax = pylab.subplots(figsize=(8,6)) 
+    fig.hold(True)
+    ax.set_xlim(0,max(degree.local))
+    ax.set_ylim(0,max(degree['global']))
+    # plot the bootstraps std
+    # plot the true data
+    log('Plotting Empirical')
+    ax.plot(degree.local,degree['global'],'o',label='Empirical')
+    log('Plotting Residuals')
+    ax.plot(degree.local,res.fittedvalues,'--')
+    ax.plot(degree.local,res.fittedvalues+2.5*std,'r--')
+    ax.plot(degree.local,res.fittedvalues-2.5*std,'r--')
+    ax.set_xlabel('Number Local Interactions')
+    ax.set_ylabel('Number Global Interactions')
+    log('Saving Figure')
+    fig.savefig('{}_locality.png'.format(cob.name))
+
+
 
 def plot_flanking_vs_inter(cob):
     import numpy as np
@@ -68,19 +100,23 @@ def plot_flanking_vs_inter(cob):
     inter_kde = sm.nonparametric.KDEUnivariate(inter)
     inter_kde.fit()
     log('Plotting')
-    fig = plt.figure(figsize=(12,4))
-    ax1 = fig.add_subplot(2,1,1)
-    ax1.set_xlim([-4,4])
-    ax1.set_ylim([0,0.5])
-    ax1.plot(flanking_kde.support,flanking_kde.density,lw=2,color='black')
-    ax1.scatter(np.median(flanking),0.05,marker='D',color='red')
-    # 
-    ax2 = fig.add_subplot(2,1,2)
-    ax2.set_xlim([-4,4])
-    ax2.set_ylim([0,0.5])
-    ax2.invert_yaxis()
-    ax2.plot(inter_kde.support,inter_kde.density,lw=2,color='black')
-    ax2.scatter(np.median(inter),0.05,marker='D',color='red')
+    plt.clf()
+    fig = plt.figure(figsize=(8,4))
+    fig.hold(True)
+    ax = fig.add_subplot(1,1,1)
+    ax.set_xlim([-4,4])
+    ax.set_ylim([0,0.5])
+    ax.plot(flanking_kde.support,flanking_kde.density,lw=2,color='black',alpha=1)
+    ax.fill(flanking_kde.support,flanking_kde.density,color='red',alpha=0.3,label='Cis Interactions')
+    ax.scatter(np.median(flanking),-0.05,marker='D',color='red')
+    ax.set_xlim([-4,4])
+    ax.set_ylim([0,0.5])
+    ax.plot(inter_kde.support,inter_kde.density,lw=2,color='black')
+    ax.fill(inter_kde.support,inter_kde.density,color='blue',alpha=0.3,label='Trans Interactions')
+    ax.scatter(np.median(inter),-0.05,marker='D',color='blue')
+    ax.set_xlabel('CoExpression Interaction (Z-Score)')
+    ax.set_ylabel('Distribution Density')
+    fig.tight_layout()
     fig.savefig("{}_flank_inter.png".format(cob.name))
 
 
