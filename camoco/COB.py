@@ -14,6 +14,9 @@ from itertools import chain
 from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
 from scipy.misc import comb
+import statsmodels.api as sm
+from statsmodels.sandbox.regression.predstd import wls_prediction_std
+
 
 import pandas as pd
 import igraph as ig
@@ -188,6 +191,9 @@ class COB(Expr):
             list(Counter(chain(*self.subnetwork(genes,sig_only=True).index.get_values())).items()),
             columns=['Gene','Degree']
         ).set_index('Gene')
+        for gene in genes:
+            if gene.id not in local_degree.index:
+                local_degree.ix[gene.id] = 0
         return local_degree
 
     def global_degree(self,genes):
@@ -196,7 +202,7 @@ class COB(Expr):
         '''
         try:
             try:
-                return self.degree.ix[[x.id for x in genes]]
+                return self.degree.ix[[x.id for x in genes]].fillna(0)
             except TypeError as e:
                 return self.degree.ix[genes.id].Degree
         except KeyError as e:
@@ -208,9 +214,13 @@ class COB(Expr):
         '''
         degree = self.local_degree(gene_list).merge(
             self.global_degree(gene_list),
+            how='inner',
             left_index=True,
             right_index=True
         )
+        degree.columns = ['local','global']
+        # Add the regression lines
+        degree['resid'] = sm.OLS(degree['global'],degree['local']).fit().resid
         return degree
 
     def plot_locality(self,gene_list,bootstraps=None,filename=None):
