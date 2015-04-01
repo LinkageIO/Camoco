@@ -63,7 +63,7 @@ class Expr(Camoco):
         pass
 
     def accessions(self):
-        return self.expr().columns
+        return self.expr.columns
 
     def genes(self,enumerated=True,raw=False):
         # Returns a list of distinct genes 
@@ -211,23 +211,27 @@ class Expr(Camoco):
         self._update_values(df,'quality_control')
 
     def _quantile(self):
-        ''' Perform quantile normalization across each accession. 
+        ''' 
+            Perform quantile normalization across each accession. 
             Each accessions gene expression values are replaced with 
-            ranked gene averages.'''
+            ranked gene averages.
+        '''
         # get gene by accession matrix
-        self.log('------------Quantile')
+        self.log('------------ Quantile ')
         expr = self.expr
         self.log('Ranking data')
-        # assign ranks by accession
-        expr_ranks = expr.rank(axis=0,method='dense')
+        # assign ranks by accession (column)
+        expr_ranks = expr.rank(axis=0,method='dense',na_option='keep')
         # normalize rank to be percentage
-        import pdb; pdb.set_trace()
         expr_ranks = expr_ranks.apply(lambda col: col/np.nanmax(col.values), axis=0)
         # we need to know the number of non-nans so we can correct for their ranks later
         self.log('Sorting ranked data')
         # assign accession values by order
-        # NOTE all NANs get sorted here ...
-        expr_sort = expr.apply(np.sort,axis=0)
+        # NOTE this currently keeps nans where they are. It COULD change with newer versions of pandas. 
+        expr_sort = expr.sort(axis=0)
+        # make sure the nans weren't included in the sort or the rank
+        assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
+        assert np.all(np.isnan(expr) == np.isnan(expr_sort))
         # calculate ranked averages
         self.log('Calculating averages')
         rank_average = expr_sort.apply(lambda row: np.mean(row[np.logical_not(np.isnan(row))]),axis=1)
