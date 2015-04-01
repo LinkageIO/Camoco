@@ -8,7 +8,6 @@ from scipy.stats import pearsonr
 
 from camoco.lowess import lowess
 from camoco.Camoco import Camoco
-from camoco.Locus import SNP
 from camoco.Chrom import Chrom
 
 from matplotlib import pylab
