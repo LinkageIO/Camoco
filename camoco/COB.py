@@ -17,7 +17,6 @@ from scipy.misc import comb
 import statsmodels.api as sm
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
-
 import pandas as pd
 import igraph as ig
 import numpy as np
@@ -36,11 +35,14 @@ class COB(Expr):
             try:
                 self.log('Loading coex table')
                 self.coex = self.hdf5['coex']
+            except KeyError as e:
+                self.log("{} is empty ({})",name,e)
+            try:
                 self.log('Loading Global Degree')
                 self.degree = self.hdf5['degree']
             except KeyError as e:
                 self.log("{} is empty ({})",name,e)
-                self.coex = pd.DataFrame()
+
 
     def __repr__(self):
         return '''
@@ -67,9 +69,9 @@ class COB(Expr):
         '''.format(self.name, self.organism, self.build,
                 self.description,
                 self.rawtype,
-                self.transformation_log(),
+                self._transformation_log(),
                 self.num_genes(),
-                self.num_accessions,
+                self.num_accessions(),
         ))
 
     def coexpression(self,gene_a,gene_b):
@@ -301,7 +303,7 @@ class COB(Expr):
         self.log("Done")
         return self
 
-    def _build_degree(self):
+    def _calculate_degree(self):
         try:
             self.log('Building Degree')
             self.hdf5['degree'] = pd.DataFrame(
@@ -309,6 +311,7 @@ class COB(Expr):
                 columns=['Gene','Degree']
             ).set_index('Gene')
             self.hdf5.flush(fsync=True)
+            self.degree = self.hdf5['degree']
         except Exception as e:
             self.log("Something bad happened:{}",e)
             raise
@@ -319,6 +322,7 @@ class COB(Expr):
             self.hdf5['coex'] = tbl
             self.log("Flushing Database")
             self.hdf5.flush(fsync=True)
+            self.coex = self.hdf5['coex']
             self.log("Done")
         except Exception as e:
             self.log("Something bad happened:{}",e)
@@ -333,6 +337,7 @@ class COB(Expr):
         # The Expr object already exists, just get a handle on it
         self = expr
         self._calculate_coexpression()
+        self._calculate_degree()
         return self
 
     @classmethod
@@ -369,27 +374,8 @@ class COB(Expr):
         z = (z - float(self._global('pcc_mean')))/float(self._global('pcc_std'))
         return z
 
-    def _run_tests(self):
-        '''
-            Run Test Suite
-        '''
-        self.log("Staring Tests for {}",self.name)
-        self.log('''
-            The length of the coex table should be num_genes choose 2
-        ''')
-        assert len(self.coex) == comb(self.num_genes(),2)
-        self.log('PASS')
 
-        self.log('''
-        The PCCs for 100 randomly selected gene edges should be the same as what was
-        calculated in the fast Cython version ''')
-        for a,b in itertools.combinations([self.refgen.random_gene() for x in range(50)],2):
-            assert abs(self.coexpression(a,b).score - self._coex_concordance(a,b)) < 0.001
-            dis_dif = abs(self.coexpression(a,b).distance - abs(a-b)) 
-            assert np.isnan(dis_dif) or dis_dif < 0.001
-        self.log('PASS')
-        
-        self.log("All Passed")
+       
 
     '''
         Unimplemented ---------------------------------------------------------------------------------
@@ -468,4 +454,3 @@ class COB(Expr):
     def compare_degree(self,obj,score_cutoff=3):
         ''' Compares the degree of one COB to another '''
         pass
-
