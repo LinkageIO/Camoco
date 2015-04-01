@@ -5,7 +5,7 @@ import camoco as co
 import pandas as pd
 
 class Annotation(Camoco):
-    def __init__(self,name,description=None,refgen=None,basedir='~/.camoco'):
+    def __init__(self, name, description=None, refgen=None, basedir='~/.camoco'):
         super().__init__(name,description,type='Annotation',basedir=basedir)
         self._create_tables()
         try:
@@ -34,7 +34,7 @@ class Annotation(Camoco):
                 dtype=object
             )
 
-    def add_csv(self,filename,sep="\t",skip_cols=None,gene_col=0):
+    def add_csv(self, filename, sep="\t", skip_cols=None, gene_col=0):
         ''' Imports Annotation relationships from a csv file. By default will assume gene names 
             are first column'''
         # import from file, assume right now that in correct order
