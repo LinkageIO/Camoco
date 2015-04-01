@@ -14,7 +14,7 @@ setup(
         'igraph>=0.1.5',
         'matplotlib>=1.4.3',
         'numpy>=1.9.1',
-        'pandas>=0.15',
+        'pandas>=0.16',
         'scipy>=0.15',
         'termcolor>=1.1.0'
     ],
