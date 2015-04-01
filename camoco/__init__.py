@@ -1,4 +1,7 @@
-""" Camoco Library
+""" 
+
+Camoco Library - CoAnalysis of Molecular Components
+
 """
 
 __license__ = """ 
@@ -20,8 +23,8 @@ import pandas as pd
 import os
 
 
-def available_datasets(type=None, basedir="~/.camoco"):
-    cur = Camoco("Camoco").db.cursor()
+def available_datasets(type=None):
+    cur = Camoco("Camoco",type='Camoco').db.cursor()
     if type:
         datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
     else:
@@ -30,7 +33,8 @@ def available_datasets(type=None, basedir="~/.camoco"):
         return pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
     else:
         return pd.DataFrame(columns=["Type","Name","Description","Date Added"])
-def del_dataset(type,name,safe=True,basedir="~/.camoco"):
+
+def del_dataset(type,name,safe=True):
     c = Camoco("Camoco")
     if safe:
         c.log("Are you sure you want to delete {}",name)
@@ -51,11 +55,11 @@ def del_dataset(type,name,safe=True,basedir="~/.camoco"):
         # also have to remove the COB specific refgen
         del_dataset('RefGen','Filtered'+name)
 
-def mv_dataset(type,name,new_name,basedir="~/.camoco"):
+def mv_dataset(type,name,new_name):
     c = Camoco("Camoco")
     c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
     os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
 
-def redescibe_dataset(type,name,new_desc,basedir="~/.camoco"):
+def redescibe_dataset(type,name,new_desc):
     c = Camoco("Camoco")
     c.db.cursor().execute("UPDATE datasets SET description = ? WHERE name = ? and type = ?",(new_desc,name,type))
