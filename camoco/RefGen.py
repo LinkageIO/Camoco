@@ -6,7 +6,7 @@ from collections import defaultdict
 import matplotlib.pylab as plt
 
 from camoco.Camoco import Camoco
-from camoco.Locus import Gene,non_overlapping
+from camoco.Locus import Gene
 from camoco.Chrom import Chrom
 from camoco.Genome import Genome
 from camoco.Tools import memoize
@@ -18,12 +18,15 @@ import numpy as np
 import math
 
 class RefGen(Camoco):
-    def __init__(self,name,description=None,basedir="~/.camoco"):
+    def __init__(self,name):
         # initialize camoco instance
-        super().__init__(name,type="RefGen",description=description,basedir=basedir)
+        super().__init__(name,type="RefGen")
         self._create_tables()
-        self.genome = Genome(
-            self.type+self.name,
+
+    @property
+    def genome(self):
+        return Genome(
+            self.type + self.name,
             chroms = [Chrom(*x) for x in  self.db.cursor().execute(''' 
                 SELECT id,length FROM chromosomes
             ''')] 
@@ -36,7 +39,7 @@ class RefGen(Camoco):
 
     def random_gene(self):
         return Gene(*self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,strand,id from genes WHERE rowid = ?
+            SELECT chromosome,start,end,id from genes WHERE rowid = ?
             ''',(random.randint(1,self.num_genes()),)).fetchone()
         )
 
@@ -49,14 +52,14 @@ class RefGen(Camoco):
     def iter_genes(self):
         ''' iterates over genes in refgen, only returns genes within gene filter '''
         return ( Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute('''
-            SELECT chromosome,start,end,strand,id FROM genes
+            SELECT chromosome,start,end,id FROM genes
             ''')
         )
 
     def from_ids(self,gene_list,check_shape=False,enumerated=False):
         ''' returns gene object list from an iterable of id strings '''
         genes = [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,strand,id FROM genes WHERE id IN ('{}')
+            SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
             '''.format("','".join(map(str.upper,gene_list))))
         ]
         if check_shape and len(genes) != len(gene_list):
@@ -67,7 +70,7 @@ class RefGen(Camoco):
     def __getitem__(self,item):
         try:
             gene_data = self.db.cursor().execute('''
-                SELECT chromosome,start,end,strand,id FROM genes WHERE id = ?
+                SELECT chromosome,start,end,id FROM genes WHERE id = ?
             ''',(item,)).fetchone()
             return Gene(*gene_data,build=self.build,organism=self.organism)
         except Exception as e:
@@ -103,7 +106,7 @@ class RefGen(Camoco):
             return genes
         except TypeError as e:
             return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-                SELECT chromosome,start,end,strand,id FROM genes
+                SELECT chromosome,start,end,id FROM genes
                 WHERE chromosome = ?
                 AND start > ?
                 AND end < ?
@@ -115,7 +118,7 @@ class RefGen(Camoco):
             nearest genes are at the beginning of the list.
         '''
         return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,strand,id FROM genes
+            SELECT chromosome,start,end,id FROM genes
             WHERE chromosome = ?
             AND start <= ?
             AND start >= ?
@@ -130,7 +133,7 @@ class RefGen(Camoco):
             nearest genes are at the beginning of the list. 
         '''
         return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,strand,id FROM genes
+            SELECT chromosome,start,end,id FROM genes
             WHERE chromosome = ?
             AND start > ?
             AND start < ?
@@ -302,9 +305,17 @@ class RefGen(Camoco):
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
         ''')
     def add_gene(self,gene):
-        self.db.cursor().execute(''' 
-            INSERT OR IGNORE INTO genes VALUES (?,?,?,?,?)
-        ''',(gene.id,gene.chrom,gene.start,gene.end,gene.strand))
+        try:
+            # support adding lists of genes
+            genes = iter(gene)
+            self.db.cursor().executemany('''
+            INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
+            ''',((gene.id,gene.chrom,gene.start,gene.end) for gene in genes))
+        except TypeError as e:
+            self.db.cursor().execute(''' 
+            INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
+            ''',(gene.id,gene.chrom,gene.start,gene.end))
+        
 
     def add_chromosome(self,chrom):
         ''' adds a chromosome object to the class '''
@@ -312,25 +323,13 @@ class RefGen(Camoco):
             INSERT OR REPLACE INTO chromosomes VALUES (?,?)
         ''',(chrom.id,chrom.length))
 
-    def import_from_txt(self,filename,sep="\t"):
-        ''' assumes columns are in the order: id, chromosome, start, end, strand ''' 
-        genes = []
-        with open(filename,'r') as TXT:
-            for line in TXT:
-                fields = line.strip().split("\t")
-                genes.append(fields)
-        cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
-        cur.executemany('''INSERT INTO genes (id,chromosome,start,end,strand) 
-            VALUES (?,?,?,?,?)''',genes)
-        cur.execute('END TRANSACTION')
-
     @classmethod
-    def from_gff(cls,filename,name,description,build,organism,basedir='~/.camoco'):
+    def from_gff(cls,filename,name,description,build,organism):
         ''' imports refgen from gff file '''
-        self = cls(name,description,basedir=basedir)
+        self = cls.create(name,description,type='RefGen')
         self._global('build',build)
         self._global('organism',organism)
+        genes = list()
         with open(filename,'r') as IN:
             for line in IN:
                 #skip comment lines
@@ -339,17 +338,21 @@ class RefGen(Camoco):
                 chrom,source,feature,start,end,score,strand,frame,attributes = line.strip().split()
                 attributes = dict([(field.split('=')) for field in attributes.strip(';').split(';')])
                 if feature == 'chromosome':
+                    self.log('Found a chromosome: {}',attributes['ID'])
                     self.add_chromosome(Chrom(attributes['ID'],end))
                 if feature == 'gene':
-                    self.add_gene(Gene(chrom,start,end,strand,attributes['ID'],build,organism))
+                    genes.append(
+                        Gene(chrom,int(start),int(end),attributes['ID'],strand=strand,build=build,organism=organism)
+                    )
+        self.add_gene(genes)
         return self
 
     @classmethod
-    def filtered_refgen(cls,name,description,refgen,gene_list,basedir="~/.camoco"):
+    def filtered_refgen(cls,name,description,refgen,gene_list):
         ''' 
             Copies from a previous instance of refgen, making sure each gene is within gene list 
         '''
-        self = cls(name,description,basedir)
+        self = cls(name,description,type='RefGen')
         self._global('build',refgen.build)
         self._global('organism',refgen.organism)
         # Should have the same chromosomes
@@ -372,9 +375,13 @@ class RefGen(Camoco):
                 id TEXT NOT NULL UNIQUE,
                 chromosome TEXT NOT NULL,
                 start INTEGER,
-                end INTEGER,
-                strand INTEGER
+                end INTEGER
             );
+            CREATE TABLE IF NOT EXISTS gene_attrs (
+                id TEXT NOT NULL,
+                key TEXT,
+                val TEXT
+            )
         ''');
 
 
@@ -389,7 +396,7 @@ class RefGen(Camoco):
         '''
         try:
             x = [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-                SELECT chromosome,start,end,strand,id FROM genes 
+                SELECT chromosome,start,end,id FROM genes 
                 WHERE chromosome = ?
                 AND start < ?
                 AND end > ?
