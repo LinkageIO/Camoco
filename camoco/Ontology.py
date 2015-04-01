@@ -2,8 +2,8 @@
 
 from camoco.Camoco import Camoco
 from camoco.RefGen import RefGen
-from camoco.Locus import SNP
 from camoco.Tools import log
+from camoco.Locus import Locus
 
 
 from collections import defaultdict
@@ -15,77 +15,69 @@ import pandas as pd
 import re
 import sys
 
-
-
 class Term(object):
-    def __init__(self,id,name='',type='',desc='',gene_list=None,snp_list=None):
-        self.id = id
+    '''
+        A Term is a just group of loci that are related.
+    '''
+    def __init__(self,name,desc='',locus_list=None,**kwargs):
         self.name = name
-        self.type = type
         self.desc = desc
-        self.gene_list = set()
-        self.snp_list = set()
-        if gene_list:
-            self.gene_list = set(gene_list)
-        if snp_list:
-            self.snp_list = set(snp_list)
+        self.locus_list = set()
+        self.attr = {}
+        if locus_list:
+            self.locus_list = set(locus_list)
+        for key,val in kwargs.items():
+            self.attrs[key] = val
 
     def __len__(self):
-        return len(self.gene_list)
+        ''' 
+            Returns the number of loci in the term.
+        '''
+        return len(self.locus_list)
 
-    def summary(self):
-        print("\n".join([ x for x  in [self.id,self.name,self.type,self.desc] if x is not '']))
-        print("Num SNPs: {}".format(len(self.snp_list)))
-        print("Num Genes: {}".format(len(self.gene_list)))
-
-    def add_gene(self,gene):
-        self.gene_list.add(gene)
-
-    def add_snp(self,snp):
-        self.snp_list.add(snp) 
+    def add_locus(self,locus):
+        '''
+            Adds a locus to the Term.
+        '''
+        self.locus_list.add(locus) 
     
     def flanking_snps(self,gene,window_size=100000):
-        ''' returns any nearby Term SNPs to a gene '''
-        return [snp for snp in self.snp_list if abs(gene-snp) <= window_size]
+        ''' 
+            returns any nearby Term SNPs to a gene 
+        '''
+        return [locus for locus in self.locus_list if abs(gene-locus) <= window_size]
 
     def effective_snps(self,window_size=None):
-        ''' Collapse down snps that have overlapping windows'''
-        snp_list = sorted(self.snp_list)
+        ''' 
+            Collapse down loci that have overlapping windows
+        '''
+        locus_list = sorted(self.locus_list)
         if window_size is not None:
-            for snp in snp_list:
-                snp.window = window_size
-        collapsed = [snp_list.pop(0)]
-        for snp in snp_list:
+            for locus in locus_list:
+                locus.window = window_size
+        collapsed = [locus_list.pop(0)]
+        for locus in locus_list:
             # if they have overlapping windows, collapse
-            if snp in collapsed[-1]:
-                collapsed[-1] = collapsed[-1].collapse(snp)
+            if locus in collapsed[-1]:
+                collapsed[-1] = collapsed[-1].collapse(locus)
             else:
-                collapsed.append(snp)
+                collapsed.append(locus)
         return collapsed
         
     def __str__(self):
-        return "Term: {}, {} genes, {} SNPs".format(self.id,len(self.gene_list),len(self.snp_list))
+        return "Term: {}, Desc: {}, {} Loci".format(self.name,self.desc,len(self))
 
     def __repr__(self):
-        return str(self.id)
+        return str(self.name)
 
 class Ontology(Camoco):
     ''' An Ontology is just a collection of terms. Each term is just a collection of genes. 
         Sometimes terms are related or nested within each other, sometimes not. Simple enough.  
     '''
-    def __init__(self,name,description=None,basedir="~/.camoco"):
-        super().__init__(name,description,type='Ontology',basedir=basedir)
+    def __init__(self,name):
+        super().__init__(name,type='Ontology')
         if self.refgen:
             self.refgen = RefGen(self.refgen)
-
-    @classmethod
-    def create(cls,name,description,refgen,basedir="~/.camoco"):
-        self = cls(name,description=description,basedir=basedir)
-        self._global('refgen',refgen.name)
-        self.refgen = RefGen(self.refgen)
-        self._create_tables()
-        self._build_indices()
-        return self
 
     def __getitem__(self,item):
         return self.term(item) 
@@ -93,27 +85,20 @@ class Ontology(Camoco):
     def __len__(self):
         return self.db.cursor().execute("SELECT COUNT(*) FROM terms;").fetchone()[0]
 
-
-    def term(self,term_id,window_size=50000):
+    def term(self,name):
         ''' retrieve a term by name '''
         try:
-            id,name,type,desc = self.db.cursor().execute(
-                'SELECT id,name,type,desc from terms WHERE id = ?',(term_id,)
+            name,desc = self.db.cursor().execute(
+                'SELECT name,desc from terms WHERE name = ?',(name,)
             ).fetchone()
-            term_genes = list(self.refgen.from_ids([ x[0] for x in self.db.cursor().execute(
-                'SELECT gene from gene_terms WHERE term = ?',(id,)).fetchall()
-            ]))
-            term_snps = [SNP(*x,window=window_size) for x in self.db.cursor().execute(
-                'SELECT chrom,pos FROM snp_terms WHERE term = ?',(id,)
+            term_snps = [Loci.from_record(record) for x in self.db.cursor().execute(
+                'SELECT chrom,start,end,window, FROM term_loci WHERE term = ?',(id,)
             ).fetchall()]
             return Term(id,name,type,desc,gene_list=term_genes,snp_list=term_snps)
         except TypeError as e: # Not in database
             raise
 
-    def term_ids(self,like="%"):
-        return [self.term(x[0]) for x in self.db.cursor().execute('SELECT id FROM terms WHERE id LIKE ?',(like,)).fetchall()]
-
-    def term_names(self,like="%"):
+    def term_like(self,like="%"):
         return [self.term(x[0]) for x in self.db.cursor().execute('SELECT id FROM terms WHERE name LIKE ?',(like,)).fetchall()]
 
     def iter_terms(self):
@@ -122,25 +107,6 @@ class Ontology(Camoco):
 
     def terms(self):
         return list(self.iter_terms())
-
-    def compare_COBs(self,COB1,COB2,min_term_size=10,max_term_size=300,plot=True):
-        # get pairwise densities for terms
-        self.log("Extracting Densities")
-        densities = pd.DataFrame([
-            (COB1.density(term.gene_list),COB2.density(term.gene_list)) for term in self.iter_terms() if len(term) > min_term_size and len(term) < max_term_size
-        ],columns=['x','y'])
-        if plot:
-            self.log('Plotting')
-            plt.clf()
-            plt.figure(figsize=(8,8),dpi=200)
-            plt.scatter(densities.x,densities.y)
-            plt.xlim([0,150])
-            plt.ylim([0,150])
-            plt.xlabel(COB1.name + " Densities")
-            plt.ylabel(COB2.name + " Densities")
-            plt.savefig("{}_vs_{}_{}.png".format(COB1.name,COB2.name,self.name))
-        self.log("Done")
-        return densities
 
     def enrichment(self,gene_list,pval_cutoff=0.05,gene_filter=None,label=None,max_term_size=300):
         # extract possible terms for genes
@@ -189,17 +155,12 @@ class Ontology(Camoco):
     def print_term_stats(self, cob_list, filename=None, window_size=100000, gene_limit=4,num_bootstrap=50,bootstrap_density=2):
         for term in self.iter_terms():
             term.print_stats(cob_list,filename,window_size=window_size,gene_limit=gene_limit,num_bootstraps=num_bootstraps,bootstrap_density=boostrap_density)
-    
 
     def summary(self):
-        return "Ontology: name:{} - desc: {} - contains {} terms for {}".format(self.name,self.description,len(self),self.refgen)
-   
+        return "Ontology:{} - desc: {} - contains {} terms for {}".format(self.name,self.description,len(self),self.refgen)
 
     def del_term(self,term):
-        cur = self.db.cursor()
-        cur.execute('DELETE FROM terms WHERE id = ?',(term.id,))
-        cur.execute('DELETE FROM gene_terms WHERE term = ?',(term.id,))
-        cur.execute('DELETE FROM snp_terms WHERE term = ?',(term.id,))
+        pass
 
     def add_term(self,term,overwrite=True):
         ''' This will add a single term to the ontology '''
@@ -207,15 +168,71 @@ class Ontology(Camoco):
         if overwrite:
             self.del_term(term)
         cur.execute('BEGIN TRANSACTION')
-        # Add info to the terms tabls
-        cur.execute('INSERT OR REPLACE INTO terms (id,name,type,desc) VALUES (?,?,?,?)',(term.id,term.name,term.type,term.desc))
-        for gene in term.gene_list:
-            cur.execute('INSERT OR REPLACE INTO gene_terms (gene,term) VALUES (?,?)',(gene.id,term.id))
-        for snp in term.snp_list:
-            cur.execute('INSERT OR REPLACE INTO snp_terms (chrom,pos,term) VALUES (?,?,?)',(snp.chrom, snp.pos, term.id))
+        # Add the term name and description
+        cur.execute('''
+            INSERT OR REPLACE INTO terms (name,desc) 
+            VALUES (?,?)''',(term.name,term.desc)
+        )
+        # Add the term loci
+        for locus in term.locus_list:
+            cur.execute('''
+                INSERT OR REPLACE INTO term_loci (term,chrom,start,end,name,window,id)
+                VALUES (?,?,?,?,?,?,?)
+                ''',(term.name,) + locus.as_record()
+            )
+            # Add the loci attrs
+            cur.executemany('''
+                INSERT OR REPLACE INTO loci_attr (loci_id,key,val)
+                VALUES (?,?,?)
+            ''',[(locus.id,key,val) for key,val in locus.attr.items()])
+
         cur.execute('END TRANSACTION')
 
-    def import_obo(self,filename):
+    @classmethod
+    def create(cls,name,description,refgen):
+        ''' 
+            This method creates a fresh Ontology with nothing it it. 
+        '''
+        # run the inherited create method from Camoco
+        self = super(Ontology,cls).create(name,description,type='Ontology')
+        # add the global refgen
+        self._global('refgen',refgen.name)
+        # set the refgen for the current instance
+        self.refgen = RefGen(self.refgen)
+        # build the tables
+        self._create_tables()
+        # create indices
+        self._build_indices()
+        return self
+
+    @classmethod
+    def from_DataFrame(cls,df,name,description,refgen,
+            term_col='Term', chr_col=None, pos_col=None,
+            start_col=None, end_col=None, id_col=None
+            ):
+        '''
+            Import an ontology from a pandas dataframe. 
+            Groups by term_col, then iterates over the rows in the group.
+            It adds each row as a locus to the term.
+        '''
+        self = cls.create(name,description,refgen)
+        # group each trait by its name
+        for term_name,df in df.groupby(term_col):
+            term = Term(term_name)
+            # we have a SNP
+            if pos_col is not None:
+                for i,row in df.iterrows():
+                    # make sure there are no collisions with the SNP init func names
+                    # this is hackey and I dont like it
+                    kwargs = {key:val for key,val in dict(row).items() if key not in Locus.__init__.__code__.co_varnames}
+                    snp = Locus(row[chr_col],int(row[pos_col]),int(row[pos_col]),gene_build=self.refgen.build,**kwargs)
+                    term.locus_list.add(snp) 
+            self.log("Importing {}",term)
+            self.add_term(term)
+            
+
+    @classmethod
+    def from_obo(self,filename,name,description,refgen):
         ''' Convenience function for importing GO obo files '''
         self.log('importing OBO: {}',filename)
         terms= defaultdict(dict)
@@ -253,7 +270,8 @@ class Ontology(Camoco):
         cur.execute('END TRANSACTION')
         self._build_indices()
 
-    def import_mapman(self,filename):
+    @classmethod
+    def from_mapman(self,filename):
         ''' Convenience function for files provided by MapMan, columns are 
             CODE,NAME,Gene,DESC,TYPE seperated by space and enclosed in single quotes'''
         self.log('Importing MAPMAN text file: {}',filename)
@@ -284,42 +302,34 @@ class Ontology(Camoco):
         
 
     def _build_indices(self):
-        cur = self.db.cursor()
-        cur.execute('''CREATE INDEX IF NOT EXISTS termid ON terms (id)''')
-        cur.execute('''CREATE INDEX IF NOT EXISTS termtype ON terms (type)''')
-        cur.execute('''CREATE INDEX IF NOT EXISTS relsource ON relationships (term)''')
-        cur.execute('''CREATE INDEX IF NOT EXISTS reltarget ON relationships (is_a)''')
-        cur.execute('''CREATE INDEX IF NOT EXISTS gene_terms_gene ON gene_terms (gene)''')
-        cur.execute('''CREATE INDEX IF NOT EXISTS gene_terms_term ON gene_terms (term)''')
+        pass
 
     def _create_tables(self):
         cur = self.db.cursor()
         cur.execute(''' 
             CREATE TABLE IF NOT EXISTS terms (
-                id TEXT UNIQUE,
-                name TEXT,
-                type TEXT,
+                name TEXT UNIQUE,
                 desc TEXT   
             ); 
         ''')
         cur.execute(''' 
-            CREATE TABLE IF NOT EXISTS relationships (
-                term TEXT,
-                is_a TEXT
-            ) 
-        ''')
-        cur.execute(''' 
-            CREATE TABLE IF NOT EXISTS gene_terms (
-                gene TEXT,
-                term TEXT
-            );            
+            CREATE TABLE IF NOT EXISTS loci_attr (
+                loci_id TEXT,
+                key TEXT,
+                val TEXT,
+                PRIMARY KEY(loci_id,key)
+            );
         ''')
         cur.execute('''
-            CREATE TABLE IF NOT EXISTS snp_terms (
+            CREATE TABLE IF NOT EXISTS term_loci (
+                term TEXT,
                 chrom TEXT,
-                pos TEXT,
+                start INT,
+                end INT,
+                name TEXT,
+                window INT,
                 id TEXT,
-                term TEXT
+                PRIMARY KEY(term,id)
             );
         ''')
         self._build_indices()
