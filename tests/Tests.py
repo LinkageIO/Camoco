@@ -4,6 +4,7 @@ import unittest
 import os
 
 import camoco as co
+import pandas as pd
 from camoco.Config import cf
 
 # Set the basedir to the testdir
@@ -32,7 +33,11 @@ class RefGenBaseTestCase(unittest.TestCase):
 
 class OntologyCreationTestCase(unittest.TestCase):
     def test_Ionome_import(self):
-        pass
+        csv = os.path.join(cf.get('options','testdir'),'raw','sigGWASsnpsCombinedIterations.longhorn.allLoc.csv')
+        ZM = co.RefGen('Zm5bFGS')
+        df = pd.DataFrame.from_csv(csv,index_col=None)
+        IONS  = co.Ontology.from_DataFrame(df,'ZmIonome','Maize Ionome',ZM,term_col='el',chr_col='chr',pos_col='pos');
+
 
 class COBCreationTestCase(unittest.TestCase):
     def setUp(self):

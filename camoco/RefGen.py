@@ -296,14 +296,13 @@ class RefGen(Camoco):
             pass
         self.log("object {} not correct type to test membership in {}",obj,self.name)
 
-
-
     def _build_indices(self):
         cur = self.db.cursor()
         cur.execute('''
             CREATE INDEX IF NOT EXISTS genepos ON genes (chromosome,start);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
         ''')
+
     def add_gene(self,gene):
         try:
             # support adding lists of genes
@@ -383,7 +382,6 @@ class RefGen(Camoco):
                 val TEXT
             )
         ''');
-
 
     ''' ----------------------------------------------------------------------------------------
             Unimplemented

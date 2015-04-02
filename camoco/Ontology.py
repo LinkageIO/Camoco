@@ -198,7 +198,7 @@ class Ontology(Camoco):
         # add the global refgen
         self._global('refgen',refgen.name)
         # set the refgen for the current instance
-        self.refgen = RefGen(self.refgen)
+        self.refgen = refgen
         # build the tables
         self._create_tables()
         # create indices
