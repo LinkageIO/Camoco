@@ -26,23 +26,19 @@ import matplotlib.pylab as plt
 from scipy.stats import pearsonr
 
 class COB(Expr):
-    def __init__(self,name=None,description=None,basedir="~/.camoco"):
-        if name is None:
-            self.log('You must provide a name')
-        else:
-            super().__init__(name=name,description=description,basedir=basedir)
-            self.hdf5 = self._hdf5(name)
-            try:
-                self.log('Loading coex table')
-                self.coex = self.hdf5['coex']
-            except KeyError as e:
-                self.log("{} is empty ({})",name,e)
-            try:
-                self.log('Loading Global Degree')
-                self.degree = self.hdf5['degree']
-            except KeyError as e:
-                self.log("{} is empty ({})",name,e)
-
+    def __init__(self,name):
+        super().__init__(name=name)
+        self.hdf5 = self._hdf5(name)
+        try:
+            self.log('Loading coex table')
+            self.coex = self.hdf5['coex']
+        except KeyError as e:
+            self.log("{} is empty ({})",name,e)
+        try:
+            self.log('Loading Global Degree')
+            self.degree = self.hdf5['degree']
+        except KeyError as e:
+            self.log("{} is empty ({})",name,e)
 
     def __repr__(self):
         return '''
@@ -349,11 +345,11 @@ class COB(Expr):
         return cls.from_Expr(expr)
 
     @classmethod
-    def from_csv(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco',sep='\t',**kwargs):
+    def from_table(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco',sep='\t',**kwargs):
         '''
             Build a COB Object from an FPKM or Micrarray CSV. 
         '''
-        return cls.from_DataFrame(pd.read_table(filename),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
+        return cls.from_DataFrame(pd.read_table(filename,sep=sep),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
 
     def _coex_concordance(self,gene_a,gene_b,maxnan=10):
         '''
