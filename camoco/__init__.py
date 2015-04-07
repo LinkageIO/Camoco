@@ -23,16 +23,21 @@ import pandas as pd
 import os
 
 
-def available_datasets(type=None):
+def available_datasets(type=None,name=None):
     cur = Camoco("Camoco",type='Camoco').db.cursor()
     if type:
         datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
     else:
         datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
     if datasets:
-        return pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
+        datasets = pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
     else:
-        return pd.DataFrame(columns=["Type","Name","Description","Date Added"])
+        datasets = pd.DataFrame(columns=["Type","Name","Description","Date Added"])
+    # Check to see if we are looking for a specific dataset
+    if name is not None:
+        return True if name in datasets['Name'].values else False
+    else:
+        return datasets
 
 def del_dataset(type,name,safe=True):
     c = Camoco("Camoco")
