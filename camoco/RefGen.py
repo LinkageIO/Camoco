@@ -314,7 +314,6 @@ class RefGen(Camoco):
             self.db.cursor().execute(''' 
             INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
             ''',(gene.id,gene.chrom,gene.start,gene.end))
-        
 
     def add_chromosome(self,chrom):
         ''' adds a chromosome object to the class '''
@@ -341,7 +340,7 @@ class RefGen(Camoco):
                     self.add_chromosome(Chrom(attributes['ID'],end))
                 if feature == 'gene':
                     genes.append(
-                        Gene(chrom,int(start),int(end),attributes['ID'],strand=strand,build=build,organism=organism)
+                        Gene(chrom,int(start),int(end),attributes['ID'].upper(),strand=strand,build=build,organism=organism)
                     )
         self.add_gene(genes)
         return self
@@ -351,15 +350,14 @@ class RefGen(Camoco):
         ''' 
             Copies from a previous instance of refgen, making sure each gene is within gene list 
         '''
-        self = cls(name,description,type='RefGen')
+        self = cls.create(name,description,'RefGen')
         self._global('build',refgen.build)
         self._global('organism',refgen.organism)
         # Should have the same chromosomes
         for chrom in refgen.iter_chromosomes():
             self.add_chromosome(chrom)
         # Add the genes from genelist
-        for gene in gene_list:
-            self.add_gene(gene)
+        self.add_gene(gene_list)
         self._build_indices()
         return self
        
