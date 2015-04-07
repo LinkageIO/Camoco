@@ -59,7 +59,9 @@ class Locus(object):
 
     @property
     def id(self):
-        return "{}:{}:{}:{}".format(self.name,self.chrom,self.start,self.end)
+        return self.name
+        # Make sure this doesn't break anything
+        # return "{}:{}:{}:{}".format(self.name,self.chrom,self.start,self.end)
 
     def __add__(self,locus):
         ''' collapse two loci into a new 'meta' locus. The start is the min
