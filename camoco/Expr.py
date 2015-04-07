@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+
 from camoco.Camoco import Camoco
 from camoco.RefGen import RefGen
 from camoco.Tools import memoize
@@ -14,21 +15,25 @@ import matplotlib.pylab as plt
 import io               
 
 class Expr(Camoco):
-    ''' A representation of gene expression. '''
-    def __init__(self,name,description=None,basedir='~/.camoco'):
-        super().__init__(name=name,description=description,type='Expr',basedir=basedir) 
+    ''' 
+        A representation of gene expression. 
+    '''
+    def __init__(self,name):
+        super().__init__(name=name,type='Expr') 
         try:
-            self.log('Loading RefGen')
             self.log('Loading Expr table')
             self.hdf5 = self._hdf5(name)
-            try:
-                self.expr = self.hdf5['expr']
-            except KeyError as e:
-                self.log('{} is empty: ({})',name,e)
-                self.expr = pd.DataFrame()
-            self.log('Building Expr Index')
-            self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self.expr.index)}) 
+            self.expr = self.hdf5['expr']
+        except KeyError as e:
+            self.log('{} is empty: ({})',name,e)
+            self.expr = pd.DataFrame()
+        self.log('Building Expr Index')
+        self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self.expr.index)}) 
+        try:
+            self.log('Loading RefGen')
             self.refgen = RefGen(self.refgen)
+        except TypeError as e:
+            self.log.warn('RefGen for {} not set!',self.name)
         except NameError as e:
             self.log.warn('Refgen for {} not available, must be reset!',self.name)
 
@@ -246,7 +251,7 @@ class Expr(Camoco):
 
     @property
     def _parent_refgen(self):
-        return co.RefGen(self._global['parent_refgen'])
+        return RefGen(self._global['parent_refgen'])
 
     def _set_refgen(self,refgen,filter=True):
         '''
@@ -270,20 +275,31 @@ class Expr(Camoco):
     ''' ------------------------------------------------------------------------------------------
             Class Methods
     '''
+
     @classmethod
-    def from_table(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco'
-        ,sep='\t',normalize=True,quality_control=True,**kwargs):
-        ''' Returns a Expr instance read in from a table file '''
+    def create(cls,name,description,refgen):
+        # Piggy back on the super create method
+        self = super(Expr,cls).create(name,description,type='Expr')
+        self._set_refgen(refgen,filter=False)
+        return self
+
+    @classmethod
+    def from_table(cls,filename,name,description,refgen,rawtype=None,
+            sep='\t',normalize=True,quality_control=True,**kwargs):
+        ''' 
+            Returns a Expr instance read in from a table file 
+        '''
         tbl = pd.read_table(filename,sep=sep)
         return cls.from_DataFrame(tbl,name,description,refgen,rawtype=rawtype,**kwargs)
 
     @classmethod
     def from_DataFrame(cls,tbl,name,description,refgen,rawtype=None,basedir='~/.camoco',
         normalize=True,quantile=True,quality_control=True,**kwargs):
-        ''' Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)'''
+        ''' 
+            Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)
+        '''
         # we are all pandas on the inside O.O
-        self = cls(name=name,description=description,basedir=basedir)
-        self._set_refgen(refgen,filter=False)
+        self = cls.create(name,description,refgen)
         self._reset(raw=True)
         if rawtype is None:
             self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
@@ -325,7 +341,6 @@ class Expr(Camoco):
                     (1.0, 1.0, 1.0))}
         heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
         return heatmap_cmap
-
 
 
     '''
@@ -417,7 +432,6 @@ class Expr(Camoco):
             columns=col_labels
         )
 
-
     def plot_value_hist(self,groupby='accession',raw=False,bins=50,figsize=(16,16),title='',log=False):
         ''' Plots Value histograms on one of the expression matrix axis'''
         for group,df in self.expr(long=True,raw=raw).groupby(groupby):
@@ -435,5 +449,3 @@ class Expr(Camoco):
                 filename="{}{}_VALUES.png".format(group,title),
                 figsize=figsize
             )
-
-
