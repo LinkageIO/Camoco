@@ -11,7 +11,7 @@ through something like iPython or normal scripting. All it takes to get started
 is an import:
 
 ```python
-    import camoco as co
+import camoco as co
 ```
 
 This will expose many of the cool classes camoco implements. Most of the classes
@@ -34,11 +34,11 @@ The other methods which are exposed when you import camoco are housekeeping meth
 move, and rename camoco datasets using the following methods:
 
 ```python
-    # See docstrings for more information
-    co.available_datasets()
-    co.del_dataset()
-    co.mv_dataset()
-    co.redescribe_dataset() 
+# See docstrings for more information
+co.available_datasets()
+co.del_dataset()
+co.mv_dataset()
+co.redescribe_dataset() 
 ```
 
 Other than that, Camoco has three main classes which each have some companion classes.
