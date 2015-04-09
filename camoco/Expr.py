@@ -192,8 +192,38 @@ class Expr(Camoco):
             self._update_values(df,method.__name__)
 
     def _quality_control(self,min_expr=1,max_gene_missing_data=0.2,min_single_sample_expr=5, \
-        max_accession_missing_data=0.5,membership=None,dry_run=False,**kwargs):
-        ''' Sets quality control flag for all values in expression table '''        
+        max_accession_missing_data=0.5,membership=None,dry_run=False):
+        ''' 
+            Perform Quality Control on raw expression data. This method filters genes based on
+            membership to some RefGen instance, filters based on a minimum FPKM or equivalent 
+            expression value, filters out genes and accessions with too much missing data,
+            filters out genes which are lowly expressed (do not have at least one accession
+            that meets an FPKM threshold, i.e. likely presence absense). See parameters for more
+            details.
+
+            Parameters
+            ----------
+            min_expr : int (default: 1)
+                FPKM (or equivalent) values under this threshold will be set to NaN and
+                not used during correlation calculations.
+            max_gene_missing_data : float (default: 0.2)
+                Maximum percentage missing data a gene can have. Genes under this are removed
+                from dataset.
+            min_single_sample_expr : int (default: 5)
+                Genes that do not have a single accession having an expression value above this
+                threshold are removed from analysis. These are likely presence/absence and will
+                not have a strong coexpression pattern.
+            max_accession_missing_data : float (default: 0.5)
+                maximum percentage missing data an accession (experiment) can have before
+                it is removed.
+            membership : RefGen 
+                Genes which are not contained within this RefGen will be removed. Note: this could
+                also be another object that will implement an interface that will check to see if 
+                gene ids are contained within it i.e. a set of gene ids.
+            dry_run : bool (default: False)
+                Used in testing to speed up calculations. Limits the QC dataframe to only have
+                5000 genes.
+        '''        
         self.log('------------Quality Control')
         df = self.hdf5['raw_expr']
         # remember how we set the flags
