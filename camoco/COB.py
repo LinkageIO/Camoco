@@ -41,14 +41,7 @@ class COB(Expr):
             self.log("{} is empty ({})",name,e)
 
     def __repr__(self):
-        return '''
-            COB Dataset: {} - {} - {}
-                Desc: {}
-                RawType: {}
-        '''.format(self.name, self.organism, self.build,
-                self.description,
-                self.rawtype,
-        )
+        return '<COB: {}>'.format(self.name)
 
     def __str__(self):
         return self.__repr__()
@@ -61,8 +54,8 @@ class COB(Expr):
                 TransformationLog: {}
                 Num Genes: {}
                 Num Accessions: {}
-                Sig./Total Interactions: {}
-        '''.format(self.name, self.organism, self.build,
+        '''.format(
+                self.name, self.organism, self.build,
                 self.description,
                 self.rawtype,
                 self._transformation_log(),
@@ -251,18 +244,18 @@ class COB(Expr):
     '''
     def _calculate_coexpression(self,significance_thresh=3):
         ''' 
-            Generates pairwise PCCs for gene expression profiles in self.expr.
+            Generates pairwise PCCs for gene expression profiles in self._expr.
             Also calculates pairwise gene distance.
         '''
         # Start off with a fresh set of genes we can pass to functions
         tbl = pd.DataFrame(
-            list(itertools.combinations(self.expr.index.values,2)),
+            list(itertools.combinations(self._expr.index.values,2)),
             columns=['gene_a','gene_b']
         )
         # Now add coexpression data
         self.log("Calculating Coexpression")
         # Calculate the PCCs
-        pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(self.expr.as_matrix()))
+        pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(self._expr.as_matrix()))
         # Set the diagonal to zero (corrects for floating point errors)
         assert np.allclose(np.diagonal(pccs),1)
         np.fill_diagonal(pccs,0)
@@ -288,7 +281,7 @@ class COB(Expr):
         # Assign significance
         tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
         self.log("Calculating Gene Distance")
-        distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(self.expr.index))
+        distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(self._expr.index))
         assert len(distances) == len(tbl)
         tbl['distance'] = distances
         # Reindex the table to match genes
@@ -311,6 +304,7 @@ class COB(Expr):
         except Exception as e:
             self.log("Something bad happened:{}",e)
             raise
+
     def _build_tables(self,tbl):
         try:
             self.log("Building Database")
@@ -323,33 +317,6 @@ class COB(Expr):
         except Exception as e:
             self.log("Something bad happened:{}",e)
             raise
-
-    ''' ------------------------------------------------------------------------------------------
-            Class Methods
-    '''
-    @classmethod
-    def from_Expr(cls,expr):
-        ''' Create a coexpression object from an Expression object '''
-        # The Expr object already exists, just get a handle on it
-        self = expr
-        self._calculate_coexpression()
-        self._calculate_degree()
-        return self
-
-    @classmethod
-    def from_DataFrame(cls,df,name,description,refgen,rawtype=None,basedir='~/.camoco',**kwargs):
-        # Create a new Expr object from a data frame
-        expr = super().from_DataFrame(
-            df,name,description,refgen,rawtype,basedir=basedir,**kwargs
-        )
-        return cls.from_Expr(expr)
-
-    @classmethod
-    def from_table(cls,filename,name,description,refgen,rawtype=None,basedir='~/.camoco',sep='\t',**kwargs):
-        '''
-            Build a COB Object from an FPKM or Micrarray CSV. 
-        '''
-        return cls.from_DataFrame(pd.read_table(filename,sep=sep),name,description,refgen,rawtype=rawtype,basedir=basedir,**kwargs)
 
     def _coex_concordance(self,gene_a,gene_b,maxnan=10):
         '''
@@ -369,9 +336,108 @@ class COB(Expr):
         # standard normalize it
         z = (z - float(self._global('pcc_mean')))/float(self._global('pcc_std'))
         return z
+ 
 
+    ''' ------------------------------------------------------------------------------------------
+            Class Methods -- Factory Methods
+    '''
+    @classmethod
+    def from_Expr(cls,expr):
+        ''' 
+            Create a COB instance from an camoco.Expr (Expression) instance.
+            A COB inherits all the methods of a Expr instance and implements additional
+            coexpression specific methods. This method accepts an already build Expr
+            instance and then performs the additional computations needed to build a 
+            full fledged COB instance.
 
-       
+            Parameters
+            ----------
+            expr : camoco.Expr
+                
+            Returns
+            -------
+            camoco.COB instance
+            
+        '''
+        # The Expr object already exists, just get a handle on it
+        self = expr
+        self._calculate_coexpression()
+        self._calculate_degree()
+        return self
+
+    @classmethod
+    def from_DataFrame(cls,df,name,description,refgen,rawtype=None,**kwargs):
+        '''
+            The method will read the table in (as a pandas dataframe), 
+            build the Expr object passing all keyword arguments in **kwargs
+            to the classmethod Expr.from_DataFrame(...). See additional 
+            **kwargs in COB.from_Expr(...)
+
+            Parameters
+            ----------
+            df : pandas.DataFrame
+                A Pandas dataframe containing the expression information.
+                Assumes gene names are in the index while accessions (experiments)
+                are stored in the columns.
+            name : str
+                Name of the dataset stored in camoco database
+            description : str
+                Short string describing the dataset
+            refgen : camoco.RefGen
+                A Camoco refgen object which describes the reference
+                genome referred to by the genes in the dataset. This 
+                is cross references during import so we can pull information
+                about genes we are interested in during analysis. 
+            rawtype : str (default: None)
+                This is noted here to reinforce the impotance of the rawtype passed to 
+                camoco.Expr.from_DataFrame. See docs there for more information.
+            **kwargs : key value pairs
+                additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
+
+        '''
+        # Create a new Expr object from a data frame
+        expr = super().from_DataFrame(
+            df,name,description,refgen,rawtype,**kwargs
+        )
+        return cls.from_Expr(expr)
+
+    @classmethod
+    def from_table(cls,filename,name,description,refgen,rawtype=None,sep='\t',**kwargs):
+        '''
+            Build a COB Object from an FPKM or Micrarray CSV. This is a
+            convenience method which handles reading in of tables.
+            Files need to have gene names as the first column and 
+            accession (i.e. experiment) names as the first row. All
+            kwargs will be passed to COB.from_DataFrame(...). See
+            docstring there for option descriptions.
+
+            Parameters
+            ----------
+            filename : str (path)
+                the path to the FPKM table in csv or tsv
+            name : str
+                Name of the dataset stored in camoco database
+            description : str
+                Short string describing the dataset
+            refgen : camoco.RefGen
+                A Camoco refgen object which describes the reference
+                genome referred to by the genes in the dataset. This 
+                is cross references during import so we can pull information
+                about genes we are interested in during analysis. 
+            rawtype : str (default: None)
+                This is noted here to reinforce the impotance of the rawtype passed to 
+                camoco.Expr.from_DataFrame. See docs there for more information.
+            sep : str (default: \t)
+                Specifies the delimiter of the file referenced by the filename parameter.
+            **kwargs : key value pairs
+                additional parameters passed to subsequent methods.
+
+            Returns
+            -------
+                a COB object
+        '''
+        return cls.from_DataFrame(pd.read_table(filename,sep=sep),name,description,refgen,rawtype=rawtype,**kwargs)
+
 
     '''
         Unimplemented ---------------------------------------------------------------------------------
