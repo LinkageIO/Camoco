@@ -23,12 +23,12 @@ class Expr(Camoco):
         try:
             self.log('Loading Expr table')
             self.hdf5 = self._hdf5(name)
-            self.expr = self.hdf5['expr']
+            self._expr = self.hdf5['expr']
         except KeyError as e:
             self.log('{} is empty: ({})',name,e)
-            self.expr = pd.DataFrame()
+            self._expr = pd.DataFrame()
         self.log('Building Expr Index')
-        self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self.expr.index)}) 
+        self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self._expr.index)}) 
         try:
             self.log('Loading RefGen')
             self.refgen = RefGen(self.refgen)
@@ -38,12 +38,12 @@ class Expr(Camoco):
             self.log.warn('Refgen for {} not available, must be reset!',self.name)
 
     def __contains__(self,obj):
-        if obj in self.expr.index:
+        if obj in self._expr.index:
             return True
-        if obj in self.expr.columns:
+        if obj in self._expr.columns:
             return True
         try:
-            if obj.id in self.expr.index:
+            if obj.id in self._expr.index:
                 return True
         except AttributeError as e:
             pass
@@ -56,24 +56,24 @@ class Expr(Camoco):
         pass
 
     def num_genes(self):
-        return len(self.expr.index)
+        return len(self._expr.index)
 
     def num_accessions(self):
-        return len(self.expr.columns)
+        return len(self._expr.columns)
 
     def shape(self):
-        return self.expr.shape
+        return self._expr.shape
 
     def zscore(self):
         pass
 
     def accessions(self):
-        return self.expr.columns
+        return self._expr.columns
 
     def genes(self,enumerated=True,raw=False):
         # Returns a list of distinct genes 
         if raw is False:
-            return self.refgen.from_ids(self.expr.index,enumerated=enumerated)
+            return self.refgen.from_ids(self._expr.index,enumerated=enumerated)
         else:
             return self.refgen.from_ids(self.hdf5['raw_expr'].index,enumerated=enumerated)
 
@@ -81,7 +81,7 @@ class Expr(Camoco):
         '''
             return the expression profile for a gene
         '''
-        return self.expr.loc[gene.id]
+        return self._expr.loc[gene.id]
 
     def is_normalized(self,max_val=None,raw=False):
         if max_val is not None:
@@ -90,12 +90,23 @@ class Expr(Camoco):
             max_val = 1100 
         elif self.rawtype.upper() == 'MICROARRAY':
             max_val = 100 
-        return self.expr.apply(lambda col: np.nanmax(col.values) < max_val ,axis=0)
+        return self._expr.apply(lambda col: np.nanmax(col.values) < max_val ,axis=0)
     
     def anynancol(self):
         ''' A gut check method to make sure none of the expression columns
             got turned into all nans. Because apparently that is a problem.'''
-        return any(self.expr.apply(lambda col: all(np.isnan(col)),axis=0))
+        return any(self._expr.apply(lambda col: all(np.isnan(col)),axis=0))
+
+    def expr(self,genes=None,accessions=None,long=False,raw=False,zscore=False):
+        '''
+            Access raw and QC'd expression data. 
+        '''
+        df = self.hdf5['raw_expr'] if raw is True else self._expr
+        if genes is not None:
+            df = df.loc[genes,:]
+        if accessions is not None:
+            df = df[accessions]
+        return df
 
     '''
         Internal Methods --------------------------------------------------------------------------------
@@ -106,6 +117,19 @@ class Expr(Camoco):
             updates the 'expression' table values with values from df.
             Requires a transformation name for the log. 
             Option to overwrite raw table or working table.
+
+            Parameters
+            ----------
+            df : DataFrame
+                Updates the internal values for the Expr object
+                with values in the data frame.
+            transform_name : str
+                A short justification for what was done to the
+                updated values.
+            raw : bool (default: False)
+                A flag to update the raw values. This also resets
+                the current values to what is in df.
+
         '''
         # update the transformation log
         self._transformation_log(transform_name)
@@ -113,11 +137,14 @@ class Expr(Camoco):
         # Sort the table by genes
         df = df.sort()
         try:
-            self.hdf5[table] = self.expr = df
+            self.hdf5[table] = self._expr = df
             self.hdf5.flush(fsync=True)
         except Exception as e:
             self.log('Unable to update expression table values: {}',e)
             raise
+        if raw == True:
+            # Get rid of the current values
+            self._reset(raw=False)
 
     def _transformation_log(self,transform=None):
         if transform is None:
@@ -135,11 +162,11 @@ class Expr(Camoco):
             self.log('Resetting raw expression data')
             self.hdf5['raw_expr'] = pd.DataFrame()
         self.log('Resetting expression data')
-        self.hdf5['expr'] = self.expr = pd.DataFrame()
+        self.hdf5['expr'] = self._expr = pd.DataFrame()
         self._transformation_log('reset')
 
 
-    def _normalize(self,method=None,is_raw=None,max_val=None,**kwargs):
+    def _normalize(self,norm_method=None,is_raw=None,max_val=None,**kwargs):
         ''' evaluates qc expression data and re-enters 
             normaized data into database '''
         self.log('------------ Normalizing')
@@ -150,9 +177,9 @@ class Expr(Camoco):
             # Something fucked up is happending
             raise TypeError('Attempting normalization on already normalized dataset. Consider passing a max_val < {} if Im wrong.'.format(min(self.max_values())))
         else:
-            df = self.expr
-            if method is not None:
-                method = method
+            df = self._expr
+            if norm_method is not None:
+                method = norm_method
             elif self.rawtype.upper() == 'RNASEQ':
                 method = np.arcsinh
             elif self.rawtype.upper() == 'MICROARRAY':
@@ -221,9 +248,10 @@ class Expr(Camoco):
             Each accessions gene expression values are replaced with 
             ranked gene averages.
         '''
+        raise NotImplementedError('This method is BROKEN!')
         # get gene by accession matrix
         self.log('------------ Quantile ')
-        expr = self.expr
+        expr = self._expr
         self.log('Ranking data')
         # assign ranks by accession (column)
         expr_ranks = expr.rank(axis=0,method='dense',na_option='keep')
@@ -271,6 +299,24 @@ class Expr(Camoco):
         self._global('refgen',refgen.name)
         self.refgen = refgen
 
+    @property 
+    def _cmap(self):
+        '''
+            Used for the heatmap function. Retruns a matplotlib cmap which is yellow/blue
+        '''
+        heatmapdict = {
+            'red': ((0.0, 1.0, 1.0),
+                    (0.5, 1.0, 1.0),
+                    (1.0, 0.0, 0.0)),
+            'green':((0.0, 1.0, 1.0),
+                    (0.5, 1.0, 1.0),
+                    (1.0, 0.0, 0.0)),
+            'blue': ((0.0, 0.0, 0.0),
+                    (0.5, 1.0, 1.0),
+                    (1.0, 1.0, 1.0))}
+        heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
+        return heatmap_cmap
+
 
     ''' ------------------------------------------------------------------------------------------
             Class Methods
@@ -278,6 +324,27 @@ class Expr(Camoco):
 
     @classmethod
     def create(cls,name,description,refgen):
+        '''
+            Create an empty Expr instance. Overloads the Camoco
+            create method. See Camoco.create(...)
+
+            Parameters
+            ----------
+            name : str
+                A name for the Expr object to reference in the Camoco database
+            description : str
+                A short description for the dataset
+            refgen : camoco.RefGen
+                A Camoco refgen object which describes the reference
+                genome referred to by the genes in the dataset. This 
+                is cross references during import so we can pull information
+                about genes we are interested in during analysis. 
+
+            Returns
+            -------
+                An empty Expr instance
+
+        '''
         # Piggy back on the super create method
         self = super(Expr,cls).create(name,description,type='Expr')
         self._set_refgen(refgen,filter=False)
@@ -287,16 +354,99 @@ class Expr(Camoco):
     def from_table(cls,filename,name,description,refgen,rawtype=None,
             sep='\t',normalize=True,quality_control=True,**kwargs):
         ''' 
-            Returns a Expr instance read in from a table file 
+            Create a Expr instance from a file containing raw expression data.
+            For instance FPKM or results from a microarray experiment. This
+            is a convenience method which reads the table in to a pandas DataFrame
+            object and passes the object the Expr.from_DataFrame(...). See the
+            doc on Expr.from_DataFrame(...) for more options.
+
+            Parameters
+            ----------
+            filename : str (path)
+                a path the the table containing the raw expression data.
+            name : str
+                A short name to refer to from the camoco dataset API.
+            description : str
+                A short description for the dataset
+            refgen : camoco.RefGen
+                A Camoco refgen object which describes the reference
+                genome referred to by the genes in the dataset. This 
+                is cross references during import so we can pull information
+                about genes we are interested in during analysis. 
+            rawtype : str (default: None)
+                This is noted here to reinforce the impotance of the rawtype passed to 
+                camoco.Expr.from_DataFrame. See docs there for more information.
+            sep : str (default: \t)
+                Column delimiter for the data in filename path
+            normalize : bool (Default: True)
+                Specifies whether or not to normalize the data so raw expression values
+                lie within a log space. This is best practices for generating interpretable 
+                expression analyses. See Expr._normalize method for more information.
+                info.
+            quality_control : bool (Default: True)
+                A flag which specifies whether or not to perform QC. Parameters for QC are passed
+                in using the **kwargs arguments. For default parameters and options 
+                see Expr._quality_control.
+            **kwargs : key value pairs
+                additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
+
+            Returns
+            -------
+            An Expr instance
+
         '''
         tbl = pd.read_table(filename,sep=sep)
         return cls.from_DataFrame(tbl,name,description,refgen,rawtype=rawtype,**kwargs)
 
     @classmethod
-    def from_DataFrame(cls,tbl,name,description,refgen,rawtype=None,basedir='~/.camoco',
-        normalize=True,quantile=True,quality_control=True,**kwargs):
+    def from_DataFrame(cls,tbl,name,description,refgen,rawtype=None,
+        normalize=True,norm_method=None,quantile=False,quality_control=True,**kwargs):
         ''' 
-            Imports a Expr instance based on a pandas table (genes as rows and accessions as cols)
+            Creates an Expr instance from a pandas DataFrame. Expects that the DataFrame
+            index is gene names and the column names are accessions (i.e. experiments).
+            This is the preferred method for creating an Expr instance, in other words, 
+            other classmethods transform their data so they can call this method.
+
+            Parameters
+            ----------
+            tbl : pandas.DataFrame
+                a DataFrame containing expression data. Assumes index is the genes and
+                columns is the accessions (experiment names)
+            name : str
+                A short name to refer to from the camoco dataset API.
+            description : str
+                A short description for the dataset
+            refgen : camoco.RefGen
+                A Camoco refgen object which describes the reference
+                genome referred to by the genes in the dataset. This 
+                is cross references during import so we can pull information
+                about genes we are interested in during analysis. 
+            rawtype : str (one of: 'RNASEQ' or 'MICROARRAY')
+                Specifies the fundamental datatype used to measure expression. During importation
+                of the raw expression data, this value is used to make decisions in converting data
+                to log-space. 
+            normalize : bool (Default: True)
+                Specifies whether or not to normalize the data so raw expression values
+                lie within a log space. This is best practices for generating interpretable 
+                expression analyses. See Expr._normalize method for more information.
+                info.
+            norm_method : None OR python function
+                If rawtype is NOT RNASEQ or MICROARRY AND normalize is still True, the normalization
+                method for the raw expression values needs to be passed in. This is for extreme customization
+                situations. 
+            quantile : bool (Default : False)
+                Specifies whether or not to perform quantile normalization on import. 
+            quality_control : bool (Default: True)
+                A flag which specifies whether or not to perform QC. Parameters for QC are passed
+                in using the **kwargs arguments. For default parameters and options 
+                see Expr._quality_control.
+            **kwargs : key value pairs
+                additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
+
+            Returns
+            -------
+            An Expr instance
+
         '''
         # we are all pandas on the inside O.O
         self = cls.create(name,description,refgen)
@@ -324,24 +474,6 @@ class Expr(Camoco):
         self._set_refgen(refgen,filter=True)
         return self
 
-    @property 
-    def cmap(self):
-        '''
-            Used for the heatmap function. Retruns a cmap which is yellow/blue
-        '''
-        heatmapdict = {
-            'red': ((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'green':((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'blue': ((0.0, 0.0, 0.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 1.0, 1.0))}
-        heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap',heatmapdict,256)
-        return heatmap_cmap
-
 
     '''
         Unimplemented ---------------------------------------------------------------------------------
@@ -350,10 +482,12 @@ class Expr(Camoco):
     def heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
         cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
         heatmap_unit_label='Expression Z Score',png_encode=False):
-        ''' Draw clustered heatmaps of an expression matrix'''
+        ''' 
+            Draw clustered heatmaps of an expression matrix
+        '''
         from matplotlib import rcParams
         rcParams.update({'figure.autolayout': True})
-        dm = self.expr(genes=genes,accessions=accessions,zscore=zscore,raw=raw).T
+        dm = self._expr(genes=genes,accessions=accessions,zscore=zscore,raw=raw).T
         D = np.array(dm)
         row_labels = dm.index
         col_labels = dm.columns
@@ -397,10 +531,10 @@ class Expr(Camoco):
         # Handle NaNs
         if maskNaNs:
             nan_mask = np.ma.array(D,mask=np.isnan(D))
-            cmap = self.cmap
+            cmap = self._cmap
             cmap.set_bad('grey',1.0)
         else:
-            cmap = self.cmap
+            cmap = self.__cmap
         im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
         # Handle Axis Labels
         axmatrix.set_xticks(np.arange(D.shape[1]))
@@ -434,7 +568,7 @@ class Expr(Camoco):
 
     def plot_value_hist(self,groupby='accession',raw=False,bins=50,figsize=(16,16),title='',log=False):
         ''' Plots Value histograms on one of the expression matrix axis'''
-        for group,df in self.expr(long=True,raw=raw).groupby(groupby):
+        for group,df in self._expr(long=True,raw=raw).groupby(groupby):
             self.log('Plotting values for {}',group)
             plt.clf()
             plt.hist(
