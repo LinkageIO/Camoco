@@ -1,4 +1,4 @@
-Camoco
+Camoco - Cache,Money,Corn
 ======
 
 Co-Analysis of Molecular Components
@@ -27,8 +27,8 @@ from the camoco class. This is nice because, as I said before, many of the data 
 are expensive to compute. What camoco does is to require datasets to have names and descriptions,
 so after they are built, they can be cached on disk using sqlite and hdf5. This makes it fast
 to come back! On disk objects are stored in a directory specified as `basedir` in the configuration file:
-`~/.camoco.conf `. This is all done automatically, and if camoco is doing its job, you shouldn't
-ever have to interact with it directly. It should just work!
+`~/.camoco.conf `. This is all done automatically, so if camoco is doing its job, you shouldn't
+ever have to interact with it directly. It should just work! (not guaranteed ... ).
 
 The other methods which are exposed when you import camoco are housekeeping methods. You can view, delete,
 move, and rename camoco datasets using the following methods:
@@ -41,9 +41,16 @@ move, and rename camoco datasets using the following methods:
     co.redescribe_dataset() 
 ```
 
+Other than that, Camoco has three main classes which each have some companion classes.
+These classes/subclasses are as follows:
+
++ RefGen and Locus
++ COB and Expr
++ Ontology and Term
 
 
-
-CacheMoneyCorn
---------------
-
+RefGen and Locus
+----------------
+Python has a fantastic range of built in data types. It lacks however in a data type which succinctly 
+represents a locus. Loci cover a large range of biological data types; a gene is a locus, as is a SNP,
+or a QTL, or an entire chromosome. It all depends on context. The 
