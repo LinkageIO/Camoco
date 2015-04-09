@@ -1,5 +1,23 @@
-Camoco - Cache,Money,Corn
+Camoco
 ======
+
+Installation
+------------
+Newest tagged releases are available on PyPi. Otherwise, you should be able to run 
+`python setup.py install` once you have the following dependencies resolved:
+
+Required:
++ pandas>=0.16
++ apsw>=3.8
++ scipy>=0.15
++ numpy>=1.9.1
++ cython>=0.16    
++ matplotlib>=1.4.3
+
+Optional:
++ igraph>=0.1.5
++ termcolor>=1.1.0
+
 
 Co-Analysis of Molecular Components
 -----------------------------------
@@ -54,3 +72,7 @@ RefGen and Locus
 Python has a fantastic range of built in data types. It lacks however in a data type which succinctly 
 represents a locus. Loci cover a large range of biological data types; a gene is a locus, as is a SNP,
 or a QTL, or an entire chromosome. It all depends on context. The 
+
+
+CacheMoneyCorn
+--------------
