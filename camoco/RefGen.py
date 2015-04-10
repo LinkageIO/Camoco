@@ -150,6 +150,7 @@ class RefGen(Camoco):
         try:
             iterator = iter(loci)   
             genes = [self.flanking_genes(locus,gene_limit=gene_limit) for locus in iterator]
+            import pdb; pdb.set_trace()
             if chain:
                 genes = list(itertools.chain(*genes))
             return genes
@@ -323,7 +324,29 @@ class RefGen(Camoco):
 
     @classmethod
     def from_gff(cls,filename,name,description,build,organism):
-        ''' imports refgen from gff file '''
+        ''' 
+            Imports RefGen object from a gff (General Feature Format) file.
+            See more about the format here: http://www.ensembl.org/info/website/upload/gff.html
+
+            Parameters
+            ----------
+
+            filename : str
+                The path to the GFF file.
+            name : str
+                The name if the RefGen object to be stored in the core
+                camoco database.
+            description : str
+                A short description of the RefGen for future reference
+            build : str
+                A string designating the genome build, used for comparison
+                operations, genes may share IDS but are different across build.
+            organism : str
+                A short string describing the organims this RefGen is coming from.
+                Again, is used in comparing equality among genes which may have the 
+                same id or name.
+
+        '''
         self = cls.create(name,description,type='RefGen')
         self._global('build',build)
         self._global('organism',organism)
@@ -385,7 +408,6 @@ class RefGen(Camoco):
             Unimplemented
     '''
 
-
     def within_gene(self,locus):
         ''' 
             Returns the gene the locus is within, or None 
@@ -400,7 +422,6 @@ class RefGen(Camoco):
             return x
         except Exception as e:
             return None
-
 
     def nearest_gene(self,locus):
         ''' return the gene nearest the locus '''
