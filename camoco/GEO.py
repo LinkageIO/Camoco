@@ -89,10 +89,9 @@ class Sample(Soft):
             log.warn("Attempting to perform transormation of apparently non raw data")
         self.tbl.VALUE = func(list(map(float,self.tbl.VALUE.values)))
         self.name = self.name
-        # make sure we didnt intriduce and -Inf values
-        self.tbl.VALUE[self.tbl.VALUE == float('-Inf')] = np.nan
+        # make sure we didnt introduce and -Inf values
+        self.tbl.loc[self.tbl.VALUE == float('-Inf'),'VALUE'] = np.nan
         return True
-
 
     def __add__(self,other):
         if self.is_raw() and not other.is_raw():
@@ -122,6 +121,9 @@ class Family(object):
 
             See Also: GEO.Family.filter_from_keepfile()'''
         # Extract info from samples
+        if os.path.exists(filename):
+            self.log('{} exists ... skipping',filename)
+            return
         info = pd.DataFrame([sample.info for sample in self.samples])[['geo_accession','title','description','characteristics_ch1','series_id']]
         info.sort("title") # Replicates most likely to have similar names
         if keep_hint:
