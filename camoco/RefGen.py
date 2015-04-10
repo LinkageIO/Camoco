@@ -165,17 +165,52 @@ class RefGen(Camoco):
                 return list(itertools.chain(up_genes,down_genes))
             return (up_genes,down_genes)
 
-    def bootstrap_candidate_genes(self,loci,gene_limit=4,chain=True):
+    def bootstrap_candidate_genes(self,loci,gene_limit=4,chain=True,max_genes_between=0):
         '''
             Returns candidate genes which are random, but conserves 
-            vital structure like flanking regions.
+            total number of overall genes.
+
+            Parameters
+            ----------
+            loci : camoco.Locus (also handles iterable)
+                a camoco locus or iterable of loci 
+            gene_limit : int (default : 4)
+                The total number of flanking genes 
+                considered a candidate surrounding a locus
+            chain : bool (default : true)
+                Calls itertools chain on results before returning  
+            max_genes_between : int (default : 0)
+                Many times when candidate genes are generated
+                for non-overlapping, but close loci, there produce
+                the same candidate genes. If there are more than
+                max_genes_between two loci, they are collapsed 
+                before doing the bootstrap call.
+
+            Returns
+            -------
+            a list of candidate genes (or list of lists if chain is False)
+
         '''
         try:
-            # Handle case where we pass in an iterable list of loci
-            iterator = iter(loci)
-            genes = [self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
+            # Sort the loci so we can collapse down 
+            self.log("sorting list")
+            locus_list = sorted(loci) 
+            self.log('sorted')
+            collapsed = [locus_list.pop(0)]
+            self.log('popping')
+            for locus in locus_list:
+                # compare downstream of last locus to current locus
+                between_genes = set(self.downstream_genes(locus_list[-1])) & self.upstream_genes(locus)
+                if len(between_genes) > max_genes_between:
+                    self.log("Collapsing {} and {}",collapsed[-1].name, locus.name)
+                    # both loci tag same gene, so collapse
+                    collapsed[-1] = collapsed[-1] + locus
+                else:
+                    collapsed.append(locus)
+            genes = [self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in collapsed]
             if chain:
                 genes = list(set(itertools.chain(*genes)))
+            self.log('Length of bs: {}',len(genes))
             return genes
         except TypeError as e:
             # We now have a single locus

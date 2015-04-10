@@ -47,9 +47,10 @@ class Term(object):
         '''
         return [locus for locus in self.locus_list if abs(gene-locus) <= window_size]
 
-    def effective_snps(self,window_size=None):
+    def effective_snps(self,window_size=None,max_genes_between=1):
         ''' 
-            Collapse down loci that have overlapping windows
+            Collapse down loci that have overlapping windows.
+            Also collapses down snps that have 
         '''
         locus_list = sorted(self.locus_list)
         if window_size is not None:
@@ -59,6 +60,7 @@ class Term(object):
         for locus in locus_list:
             # if they have overlapping windows, collapse
             if locus in collapsed[-1]:
+                # Collapse if the windows overlap
                 collapsed[-1] = collapsed[-1] + locus
             else:
                 collapsed.append(locus)
@@ -79,13 +81,10 @@ class Ontology(Camoco):
         if self.refgen:
             self.refgen = RefGen(self.refgen)
 
-    def __getitem__(self,item):
-        return self.term(item) 
-
     def __len__(self):
         return self.db.cursor().execute("SELECT COUNT(*) FROM terms;").fetchone()[0]
 
-    def term(self,name):
+    def __getitem__(self,name):
         ''' retrieve a term by name '''
         try:
             desc = self.db.cursor().execute(
