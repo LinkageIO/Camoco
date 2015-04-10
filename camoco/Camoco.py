@@ -12,6 +12,10 @@ from apsw import ConstraintError
 
 class Camoco(object):
 
+    '''
+
+    '''
+
     def __init__(self,name,type='Camoco',basedir="~/.camoco"):
         # Set up our base directory
         self.log = log()
