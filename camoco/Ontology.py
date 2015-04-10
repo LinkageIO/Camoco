@@ -59,7 +59,7 @@ class Term(object):
         for locus in locus_list:
             # if they have overlapping windows, collapse
             if locus in collapsed[-1]:
-                collapsed[-1] = collapsed[-1].collapse(locus)
+                collapsed[-1] = collapsed[-1] + locus
             else:
                 collapsed.append(locus)
         return collapsed
@@ -88,13 +88,13 @@ class Ontology(Camoco):
     def term(self,name):
         ''' retrieve a term by name '''
         try:
-            name,desc = self.db.cursor().execute(
-                'SELECT name,desc from terms WHERE name = ?',(name,)
+            desc = self.db.cursor().execute(
+                'SELECT desc from terms WHERE name = ?',(name,)
             ).fetchone()
-            term_snps = [Loci.from_record(record) for x in self.db.cursor().execute(
-                'SELECT chrom,start,end,window, FROM term_loci WHERE term = ?',(id,)
+            term_loci = [Locus.from_record(record) for record in self.db.cursor().execute(
+                'SELECT chrom,start,end,name,window,id FROM term_loci WHERE term = ?',(name,)
             ).fetchall()]
-            return Term(id,name,type,desc,gene_list=term_genes,snp_list=term_snps)
+            return Term(name,desc,locus_list=term_loci)
         except TypeError as e: # Not in database
             raise
 
@@ -102,7 +102,7 @@ class Ontology(Camoco):
         return [self.term(x[0]) for x in self.db.cursor().execute('SELECT id FROM terms WHERE name LIKE ?',(like,)).fetchall()]
 
     def iter_terms(self):
-        for id, in self.db.cursor().execute("SELECT id FROM terms"):
+        for id, in self.db.cursor().execute("SELECT name FROM terms"):
             yield self.term(id)
 
     def terms(self):
