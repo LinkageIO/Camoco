@@ -10,7 +10,7 @@ class Locus(object):
         self._end = int(end) if end is not None else int(start)
         self.window = int(window)
         self.attr = kwargs
-        self.sub_loci = sub_loci if sub_loci is not None else set()
+        self.sub_loci = set(sub_loci) if sub_loci is not None else set()
         #  Warn us if something seems off
         if self._start > self._end:
             raise ValueError("Wonky start and stop positions for: {}".format(self))
@@ -29,6 +29,9 @@ class Locus(object):
     @classmethod
     def from_record(cls,tpl):
         return cls(*tpl)
+
+    def __iter__(self):
+        raise TypeError('Cannot iterate on locus object.')
 
     def __setitem__(self,key,val):
         self.attr[key] = val
@@ -73,7 +76,7 @@ class Locus(object):
         new_start = int(max(0,min(self.start,locus.start)))
         new_end = int(max(self.end,locus.end))
         new_window = self.window
-        new_id = str(self.id)+'-'+str(locus.id)
+        new_id = str(self.id)+';'+str(locus.id)
         new_sub_loci = self.sub_loci | locus.sub_loci | set([self.id, locus.id])
         return Locus(self.chrom,new_start,new_end,window=new_window,sub_loci=new_sub_loci)
     
