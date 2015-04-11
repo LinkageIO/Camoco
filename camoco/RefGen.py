@@ -6,12 +6,13 @@ from collections import defaultdict
 import matplotlib.pylab as plt
 
 from camoco.Camoco import Camoco
-from camoco.Locus import Gene
+from camoco.Locus import Gene,Locus
 from camoco.Chrom import Chrom
 from camoco.Genome import Genome
 from camoco.Tools import memoize
 
 import itertools
+import collections
 import random
 import pandas as pd
 import numpy as np
@@ -68,20 +69,15 @@ class RefGen(Camoco):
 
     @memoize
     def __getitem__(self,item):
-        try:
+        if isinstance(loci,Locus):
+            # Just send back a gene
             gene_data = self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes WHERE id = ?
             ''',(item,)).fetchone()
             return Gene(*gene_data,build=self.build,organism=self.organism)
-        except Exception as e:
-            pass
-        try:
-            _ = (x for x in item)
-            return list(self.from_ids(list(_)))
-        except TypeError as e:
-            self.log('not iterable: {}',e)
-            pass
-        return None
+        else:
+            # Support passing in an iterable
+            return list(self.from_ids([x for x in item]))
     
     def chromosome(self,id):
         ''' 
@@ -98,19 +94,19 @@ class RefGen(Camoco):
         ''' 
             Returns the genes within a locus, or None 
         '''
-        try:
-            iterator = iter(loci)   
-            genes = [self.genes_within(locus,chain=chain) for locus in iterator]
-            if chain:
-                genes = list(itertools.chain(*genes))
-            return genes
-        except TypeError as e:
+        if isinstance(loci,Locus):
             return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
                 SELECT chromosome,start,end,id FROM genes
                 WHERE chromosome = ?
                 AND start > ?
                 AND end < ?
             ''',(loci.chrom,loci.start,loci.end))]
+        else:
+            iterator = iter(loci)   
+            genes = [self.genes_within(locus,chain=chain) for locus in iterator]
+            if chain:
+                genes = list(itertools.chain(*genes))
+            return genes
 
     def upstream_genes(self,locus,gene_limit=1000):
         ''' 
@@ -147,14 +143,7 @@ class RefGen(Camoco):
             Returns genes upstream and downstream from a locus
             ** including genes locus is within **
         '''
-        try:
-            iterator = iter(loci)   
-            genes = [self.flanking_genes(locus,gene_limit=gene_limit) for locus in iterator]
-            import pdb; pdb.set_trace()
-            if chain:
-                genes = list(itertools.chain(*genes))
-            return genes
-        except TypeError as e:
+        if isinstance(loci,Locus):
             # If we cant iterate, we have a single locus
             locus = loci
             upstream_gene_limit = math.ceil(gene_limit/2)
@@ -164,6 +153,12 @@ class RefGen(Camoco):
             if chain:
                 return list(itertools.chain(up_genes,down_genes))
             return (up_genes,down_genes)
+        else:
+            iterator = iter(loci)   
+            genes = [self.flanking_genes(locus,gene_limit=gene_limit) for locus in iterator]
+            if chain:
+                genes = list(itertools.chain(*genes))
+            return genes
 
     def bootstrap_candidate_genes(self,loci,gene_limit=4,chain=True,max_genes_between=0):
         '''
@@ -191,28 +186,7 @@ class RefGen(Camoco):
             a list of candidate genes (or list of lists if chain is False)
 
         '''
-        try:
-            # Sort the loci so we can collapse down 
-            self.log("sorting list")
-            locus_list = sorted(loci) 
-            self.log('sorted')
-            collapsed = [locus_list.pop(0)]
-            self.log('popping')
-            for locus in locus_list:
-                # compare downstream of last locus to current locus
-                between_genes = set(self.downstream_genes(locus_list[-1])) & self.upstream_genes(locus)
-                if len(between_genes) > max_genes_between:
-                    self.log("Collapsing {} and {}",collapsed[-1].name, locus.name)
-                    # both loci tag same gene, so collapse
-                    collapsed[-1] = collapsed[-1] + locus
-                else:
-                    collapsed.append(locus)
-            genes = [self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in collapsed]
-            if chain:
-                genes = list(set(itertools.chain(*genes)))
-            self.log('Length of bs: {}',len(genes))
-            return genes
-        except TypeError as e:
+        if isinstance(loci,Locus):
             # We now have a single locus
             locus = loci
             # grab the actual candidate genes
@@ -227,19 +201,31 @@ class RefGen(Camoco):
                 # somehow we hit the end of a chromosome or something, just recurse
                 return self.bootstrap_candidate_genes(locus,gene_limit=num_candidates,chain=chain)
             return random_candidates
+        else:
+            # Sort the loci so we can collapse down 
+            locus_list = sorted(loci) 
+            collapsed = [locus_list.pop(0)]
+            for locus in locus_list:
+                # compare downstream of last locus to current locus
+                between_genes = set(self.downstream_genes(locus_list[-1])) & set(self.upstream_genes(locus))
+                if len(between_genes) > max_genes_between:
+                    self.log("Collapsing {} and {}",collapsed[-1].name, locus.name)
+                    # both loci tag same gene, so collapse
+                    collapsed[-1] = collapsed[-1] + locus
+                else:
+                    collapsed.append(locus)
+            genes = [self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in collapsed]
+            if chain:
+                genes = list(set(itertools.chain(*genes)))
+            self.log('Length of bs: {}',len(genes))
+            return genes
 
     def candidate_genes(self, loci, gene_limit=4,chain=True):
         ''' 
             Return Genes between locus start and stop, plus additional 
             flanking genes (up to gene_limit)
         '''
-        try:
-            iterator = iter(loci)   
-            genes = [self.candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
-            if chain:
-                genes = list(set(itertools.chain(*genes)))
-            return genes
-        except TypeError as e:
+        if isinstance(loci,Locus):
             # If not an iterator, its a single locus
             locus = loci
             genes_within = self.genes_within(locus)
@@ -247,6 +233,12 @@ class RefGen(Camoco):
             if chain:
                 return list(itertools.chain(up_genes,genes_within,down_genes))
             return (up_genes,genes_within,down_genes)
+        else:
+            iterator = iter(loci)   
+            genes = [self.candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
+            if chain:
+                genes = list(set(itertools.chain(*genes)))
+            return genes
  
 
     def pairwise_distance(self, gene_list=None):
@@ -340,16 +332,16 @@ class RefGen(Camoco):
         ''')
 
     def add_gene(self,gene):
-        try:
+        if isinstance(loci,Locus):
+            self.db.cursor().execute(''' 
+            INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
+            ''',(gene.id,gene.chrom,gene.start,gene.end))
+        else:
             # support adding lists of genes
             genes = iter(gene)
             self.db.cursor().executemany('''
             INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
             ''',((gene.id,gene.chrom,gene.start,gene.end) for gene in genes))
-        except TypeError as e:
-            self.db.cursor().execute(''' 
-            INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
-            ''',(gene.id,gene.chrom,gene.start,gene.end))
 
     def add_chromosome(self,chrom):
         ''' adds a chromosome object to the class '''
