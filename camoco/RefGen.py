@@ -38,10 +38,27 @@ class RefGen(Camoco):
         ''' returns the number of genes in the dataset '''
         return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
 
-    def random_gene(self):
+    def random_gene(self,**kwargs):
+        '''
+            Returns a random gene within the reference genome.
+            Also allows passing of keyword arguments to Locus 
+            constructor method allowing for flexible generation.
+            See Locus.__init__ for more details.
+
+            Parameters
+            ----------
+            **kwargs : key,value pairs
+                Extra parameters passed onto the locus init method.
+
+            Returns
+            -------
+            A locus object (Gene)
+
+        '''
         return Gene(*self.db.cursor().execute(''' 
             SELECT chromosome,start,end,id from genes WHERE rowid = ?
-            ''',(random.randint(1,self.num_genes()),)).fetchone()
+            ''',(random.randint(1,self.num_genes()),)).fetchone(),
+            **kwargs
         )
 
     def iter_chromosomes(self):
@@ -135,7 +152,7 @@ class RefGen(Camoco):
             AND start < ?
             ORDER BY start ASC
             LIMIT ?
-            ''',(locus.chrom, locus.start, locus.downstream, gene_limit)
+            ''',(locus.chrom, locus.end, locus.downstream, gene_limit)
         )]
 
     def flanking_genes(self, loci, gene_limit=4,chain=True):
@@ -160,26 +177,20 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def bootstrap_candidate_genes(self,loci,gene_limit=4,chain=True,max_genes_between=0):
+    def bootstrap_candidate_genes(self,loci,gene_limit=4,chain=True):
         '''
             Returns candidate genes which are random, but conserves 
             total number of overall genes.
 
             Parameters
             ----------
-            loci : camoco.Locus (also handles iterable)
+            loci : camoco.Locus (also handles an iterable containing Loci)
                 a camoco locus or iterable of loci 
             gene_limit : int (default : 4)
                 The total number of flanking genes 
                 considered a candidate surrounding a locus
             chain : bool (default : true)
                 Calls itertools chain on results before returning  
-            max_genes_between : int (default : 0)
-                Many times when candidate genes are generated
-                for non-overlapping, but close loci, there produce
-                the same candidate genes. If there are more than
-                max_genes_between two loci, they are collapsed 
-                before doing the bootstrap call.
 
             Returns
             -------
@@ -191,6 +202,8 @@ class RefGen(Camoco):
             locus = loci
             # grab the actual candidate genes
             num_candidates = len(self.candidate_genes(locus,gene_limit=gene_limit,chain=True))
+            if num_candidates == 0:
+                return []
             # Snps a random genes from the genome
             random_gene = self.random_gene()
             # Extend the window to something crazy
@@ -200,30 +213,49 @@ class RefGen(Camoco):
             if len(random_candidates) != num_candidates:
                 # somehow we hit the end of a chromosome or something, just recurse
                 return self.bootstrap_candidate_genes(locus,gene_limit=num_candidates,chain=chain)
+            assert len(random_candidates) == num_candidates
             return random_candidates
         else:
             # Sort the loci so we can collapse down 
             locus_list = sorted(loci) 
-            collapsed = [locus_list.pop(0)]
+            seen = set()
+            bootstraps = list()
             for locus in locus_list:
                 # compare downstream of last locus to current locus
-                between_genes = set(self.downstream_genes(locus_list[-1])) & set(self.upstream_genes(locus))
-                if len(between_genes) > max_genes_between:
-                    self.log("Collapsing {} and {}",collapsed[-1].name, locus.name)
-                    # both loci tag same gene, so collapse
-                    collapsed[-1] = collapsed[-1] + locus
-                else:
-                    collapsed.append(locus)
-            genes = [self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in collapsed]
+                genes = self.bootstrap_candidate_genes(
+                    locus, gene_limit=gene_limit, chain=chain
+                )
+                # If genes randomly overlap, resample
+                while np.any([x in seen for x in itertools.chain(genes,)]):
+                    genes = self.bootstrap_candidate_genes(
+                        locus, gene_limit=gene_limit, chain=chain
+                    )
+                [seen.add(x) for x in itertools.chain(genes,)]
+                bootstraps.append(genes)
             if chain:
-                genes = list(set(itertools.chain(*genes)))
-            self.log('Length of bs: {}',len(genes))
-            return genes
+                bootstraps = list(set(itertools.chain(*bootstraps)))
+            return bootstraps
 
     def candidate_genes(self, loci, gene_limit=4,chain=True):
         ''' 
+            SNP to Gene mapping.
             Return Genes between locus start and stop, plus additional 
             flanking genes (up to gene_limit)
+
+            Parameters
+            ----------
+            loci : camoco.Locus (also handles an iterable containing Loci)
+                a camoco locus or iterable of loci 
+            gene_limit : int (default : 4)
+                The total number of flanking genes 
+                considered a candidate surrounding a locus
+            chain : bool (default : true)
+                Calls itertools chain on results before returning  
+
+            Returns
+            -------
+            a list of candidate genes (or list of lists if chain is False)
+
         '''
         if isinstance(loci,Locus):
             # If not an iterator, its a single locus

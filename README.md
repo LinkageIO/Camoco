@@ -3,11 +3,12 @@ Camoco
 
 Installation
 ------------
-Newest tagged releases are available on PyPi. Otherwise, you should be able to run 
+Newest tagged releases are available on PyPi: `pip install camoco`. Otherwise, you should be able to run 
 `python setup.py install` once you have the following dependencies resolved:
 
 Required:
 + pandas>=0.16
++ tables>=3.0.0 (hdf5)
 + apsw>=3.8
 + scipy>=0.15
 + numpy>=1.9.1

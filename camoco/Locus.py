@@ -30,9 +30,6 @@ class Locus(object):
     def from_record(cls,tpl):
         return cls(*tpl)
 
-    def __iter__(self):
-        raise TypeError('Cannot iterate on locus object.')
-
     def __setitem__(self,key,val):
         self.attr[key] = val
 
@@ -127,12 +124,7 @@ class Locus(object):
         else:
             return self.start - other.start
     def __str__(self):
-        return '''
-            id: {}
-            chromosome: {}
-            start: {}
-            end: {}
-            window:{}'''.format(self.id,self.chrom,self.start,self.end,self.window)
+        return '''<{}>{}:{}-{}+{}'''.format(self.id,self.chrom,self.start,self.end,self.window)
     def __repr__(self):
         return str(self)
     def __hash__(self):
