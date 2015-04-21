@@ -44,7 +44,25 @@ def pair_correlation(double[:, ::1] x):
     return res.base
 
 def coex_index(long[:] ids, int mi):
+    '''
+        Camoco stores the coexpression matrix in long form. This is 
+        space efficient, but accessing elements in an [i,j] format 
+        requires additional overhead. This function takes in the original
+        indicies for the [i,j] matrix and returns the long form indices for each 
+        pairwise combinations of ids.
 
+        Parameters
+        ----------
+        ids : array of indices 
+            gene indices from the Expr matrix
+        mi : int
+            The total number of genes in the Expr matrix
+
+        Returns
+        -------
+        An array of indices you can extract from the coex table
+
+    '''
     cdef long[::] indices = np.empty(comb(ids.shape[0],2,exact=True),dtype=np.long)
     cdef long count = 0
    
@@ -53,13 +71,61 @@ def coex_index(long[:] ids, int mi):
             i = min(ids[ix],ids[jx])
             j = max(ids[ix],ids[jx])
             # Calculate what the index would be if it were a square matrix
-            k = ((i * mi) + j) 
+            #k = ((i * mi) + j) 
             # Calculate the number of cells in the lower diagonal
-            ld = (((i+1)**2) - (i+1))/2
+            #ld = (((i+1)**2) - (i+1))/2
             # Calculate the number of items on diagonal
-            d = i + 1
-            indices[count] = k-ld-d
+            #d = i + 1
+            #indices[count] = k-ld-d
+            indices[count] = square_to_vector(i,j,mi)
             count += 1
     return indices.base 
 
+def square_to_vector(long i, long j, mi):
+    '''
+        Convert an index from its square form
+        to its vector form
+    '''
+    k = ((i * mi) + j) 
+    # Calculate the number of cells in the lower diagonal
+    ld = (((i+1)**2) - (i+1))/2
+    # Calculate the number of items on diagonal
+    d = i + 1
+    return k-ld-d
 
+def coex_neighbors(long id, int mi):
+    '''
+        Calculate the indices for the neighbors of id.
+        This is better by example. If i == 4, what are 
+        the indices for the neighbors (designated as '^')
+        in the picture. Diagonal is '-'.
+        Looks like:
+
+         0123456789   
+         
+      0  -000^00000
+      1  0-00^00000
+      2  00-0^00000
+      3  000-^00000
+      4  0000-^^^^^
+      5  00000-0000
+      6  000000-000
+      7  0000000-00
+      8  00000000-0
+      9  000000000-
+
+    '''
+
+    cdef long[::] indices = np.empty(mi-1,dtype=np.long)
+    cdef long count = 0
+    cdef long pivot
+
+    for i in range(id):
+        indices[count] = square_to_vector(i,id,mi)
+        count += 1
+    pivot = square_to_vector(id,id+1,mi)
+    for j in range(id+1,mi):
+        indices[count] = pivot
+        pivot += 1
+        count += 1
+    return indices.base
