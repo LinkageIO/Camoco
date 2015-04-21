@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python4
 import pyximport; pyximport.install() 
 import camoco.RefGenDist as RefGenDist
 
@@ -35,7 +35,9 @@ class RefGen(Camoco):
 
     @memoize
     def num_genes(self):
-        ''' returns the number of genes in the dataset '''
+        ''' 
+            Returns the number of genes in the dataset 
+        '''
         return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
 
     def random_gene(self,**kwargs):
@@ -74,8 +76,37 @@ class RefGen(Camoco):
             ''')
         )
 
-    def from_ids(self,gene_list,check_shape=False,enumerated=False):
-        ''' returns gene object list from an iterable of id strings '''
+    def from_ids(self, gene_list, check_shape=False):
+        ''' 
+            Returns a list of gene object from an iterable of id strings 
+            OR from a single gene id string.
+            
+            Parameters
+            ----------
+            gene_list : str OR iterable of str
+                ID(s) of the genes you want to pull out
+            check_shape : bool (default: False)
+                Check if you get back the same number of ids you
+                pass in. If false (default), just give back what
+                you find, ignoring erronous ids.
+
+            Returns
+            -------
+            A list of locus objects if you pass in an iterable,
+            otherwise a single gene
+                
+        '''
+        if isinstance(gene_list,str):
+            # Handle when we pass in a single id
+            gene_id = gene_list
+            return Gene(
+                *self.db.cursor().execute('''
+                    SELECT chromosome,start,end,id FROM genes WHERE id = ? 
+                    ''',(gene_id,)
+                ).fetchone(),
+                 build=self.build,
+                 organism=self.organism
+            ) 
         genes = [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
             SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
             '''.format("','".join(map(str.upper,gene_list))))
@@ -84,17 +115,11 @@ class RefGen(Camoco):
             raise ValueError('Some input ids do not have genes in reference')
         return genes
 
-    @memoize
     def __getitem__(self,item):
-        if isinstance(loci,Locus):
-            # Just send back a gene
-            gene_data = self.db.cursor().execute('''
-                SELECT chromosome,start,end,id FROM genes WHERE id = ?
-            ''',(item,)).fetchone()
-            return Gene(*gene_data,build=self.build,organism=self.organism)
-        else:
-            # Support passing in an iterable
-            return list(self.from_ids([x for x in item]))
+        '''
+            A convenience method to extract loci from the reference geneome. 
+        '''
+        return self.from_ids(item)
     
     def chromosome(self,id):
         ''' 
