@@ -63,11 +63,49 @@ class COB(Expr):
                 self.num_accessions(),
         ))
 
+    def neighbors(self,gene,sig_only=True):
+        '''
+            Returns a DataFrame containing the neighbors for gene.
+    
+            Parameters
+            ----------
+            gene : co.Locus
+                The gene for which to extract neighbors
+    
+            Returns
+            -------
+            A DataFrame containing edges
+        '''
+        gene_id = self._expr_index[gene.id]
+        neighbor_indices = PCCUP.coex_neighbors(gene_id,self.num_genes())
+        edges = self.coex.iloc[neighbor_indices]
+        if sig_only:
+            return edges[edges.significant == 1]
+        else:
+            return edges
+
     def coexpression(self,gene_a,gene_b):
         ''' 
-            returns coexpression z-score between two genes 
+            Returns a coexpression z-score between two genes. This
+            is the pearson correlation coefficient of the two genes'
+            expression profiles across the accessions (experiments).
+            This value is pulled from the 
+
+            Parameters
+            ----------
+            gene_a : camoco.Locus
+                The first gene
+            gene_b : camoco.Locus
+                The second gene
+        
+            Returns
+            -------
+            Coexpression Z-Score 
+
         '''
+        # Grab the indices in the original expression matrix
         ids = np.array([self._expr_index[gene_a.id],self._expr_index[gene_b.id]])
+        # We need the number of genes
         num_genes = self.num_genes()
         index = PCCUP.coex_index(ids,num_genes)[0]
         return self.coex.iloc[index]
@@ -85,6 +123,7 @@ class COB(Expr):
                 # filter out the Nones 
                 ids = np.array(list(filter(None,ids)))
             num_genes = self.num_genes()
+            # Grab the coexpression indices for the genes
             indices = PCCUP.coex_index(ids,num_genes)
             df = self.coex.iloc[indices]
         if min_distance:
@@ -192,10 +231,10 @@ class COB(Expr):
             Returns the global degree of a list of genes
         '''
         try:
-            try:
-                return self.degree.ix[[x.id for x in genes]].fillna(0)
-            except TypeError as e:
+            if isinstance(genes,Locus):
                 return self.degree.ix[genes.id].Degree
+            else:
+                return self.degree.ix[[x.id for x in genes]].fillna(0)
         except KeyError as e:
             return 0
 
@@ -242,6 +281,10 @@ class COB(Expr):
     ''' ------------------------------------------------------------------------------------------
             Internal Methods
     '''
+    def _coex_indices(self,ids):
+        return 
+
+
     def _calculate_coexpression(self,significance_thresh=3):
         ''' 
             Generates pairwise PCCs for gene expression profiles in self._expr.
@@ -443,12 +486,6 @@ class COB(Expr):
         Unimplemented ---------------------------------------------------------------------------------
     '''
 
-    def neighbors(self,gene_list,min_distance=None,sig_only=True):
-        ''' Input : a list of COBGene Objects
-            Output: Returns the neighbors for a list of genes as a DataFrame
-            Columns returned: query_name, queryID, neighbor_name, neighbor, score
-        '''
-        pass
 
     def next_neighbors(self,gene_list):
         ''' returns a list containing the strongest connected neighbors '''
