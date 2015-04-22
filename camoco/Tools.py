@@ -59,7 +59,7 @@ def plot_locality_regression(snps,cob,gene_limit=10):
     #bsdegree = pd.concat([cob.locality(cob.refgen.bootstrap_candidate_genes(snps,gene_limit=gene_limit,chain=True)) for x in range(50)]).sort('local')
     # get OLS for the bootstrapped degree 
     log('Fitting models')
-    model = sm.OLS(degree['global'],degree.local)
+    model = sm.OLS(degree['local'],degree['global'])
     res = model.fit()
     std, iv_l, iv_u = wls_prediction_std(res)
     # plot the bootstrapped data
