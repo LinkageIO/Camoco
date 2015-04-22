@@ -102,7 +102,7 @@ class Ontology(Camoco):
 
     def iter_terms(self):
         for id, in self.db.cursor().execute("SELECT name FROM terms"):
-            yield self.term(id)
+            yield self[id]
 
     def terms(self):
         return list(self.iter_terms())
