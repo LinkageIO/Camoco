@@ -51,37 +51,6 @@ def B73_eq_Mo17(snp,HM):
     else:
         return False
 
-def plot_locality_regression(snps,cob,gene_limit=10):
-    # Get degree and bootstrap degree
-    log('Fetching Empirical Degree')
-    degree = cob.locality(cob.refgen.candidate_genes(snps,gene_limit=gene_limit,chain=True)).sort('local')
-    log('Fetching BS Degree')
-    #bsdegree = pd.concat([cob.locality(cob.refgen.bootstrap_candidate_genes(snps,gene_limit=gene_limit,chain=True)) for x in range(50)]).sort('local')
-    # get OLS for the bootstrapped degree 
-    log('Fitting models')
-    model = sm.OLS(degree['local'],degree['global'])
-    res = model.fit()
-    std, iv_l, iv_u = wls_prediction_std(res)
-    # plot the bootstrapped data
-    fig,ax = pylab.subplots(figsize=(8,6)) 
-    fig.hold(True)
-    ax.set_xlim(0,max(degree.local))
-    ax.set_ylim(0,max(degree['global']))
-    # plot the bootstraps std
-    # plot the true data
-    log('Plotting Empirical')
-    ax.plot(degree.local,degree['global'],'o',label='Empirical')
-    log('Plotting Residuals')
-    ax.plot(degree.local,res.fittedvalues,'--')
-    ax.plot(degree.local,res.fittedvalues+2.5*std,'r--')
-    ax.plot(degree.local,res.fittedvalues-2.5*std,'r--')
-    ax.set_xlabel('Number Local Interactions')
-    ax.set_ylabel('Number Global Interactions')
-    log('Saving Figure')
-    fig.savefig('{}_locality.png'.format(cob.name))
-
-
-
 def plot_flanking_vs_inter(cob):
     import numpy as np
     from scipy import stats
