@@ -7,6 +7,7 @@ from camoco.RefGen import RefGen
 from camoco.Locus import Locus,Gene
 from camoco.Expr import Expr
 from camoco.Tools import memoize
+from camoco.lowess import lowess,confband
 
 from numpy import matrix,arcsinh,tanh
 from collections import defaultdict,Counter
@@ -238,9 +239,26 @@ class COB(Expr):
         except KeyError as e:
             return 0
 
-    def locality(self,gene_list):
+    def locality(self,gene_list,include_zscore=False,num_bootstraps=10):
         '''
             Computes the merged local vs global degree table
+            
+            Parameters
+            ----------
+            gene_list : iterable of camoco.Loci
+               self-explanitory
+            include_zscore : bool
+                flag indicating on whether or not to include 
+                zscore based on bootstrap value
+            num_bootstraps : int
+                the number of included bootstrap
+                values to asses significance
+
+            Returns
+            -------
+            A pandas DataFrame with local,global and residual columns
+            based on linear regression of local on global degree. 
+
         '''
         degree = self.local_degree(gene_list).merge(
             self.global_degree(gene_list),
@@ -250,32 +268,71 @@ class COB(Expr):
         )
         degree.columns = ['local','global']
         # Add the regression lines
-        degree['resid'] = sm.OLS(degree['global'],degree['local']).fit().resid
+        if include_zscore:
+            # compare against the bootstrapps
+            bs = pd.concat(
+                    [self.locality(
+                        self.refgen.bootstrap_candidate_genes(gene_list),bootstraps=0
+                    ) for x in range(num_bootstraps)]
+                )
+            # predict the global degree based on local degree
+            bsresids = sm.OLS(bs['local'],bs['global']).fit().resid
+            emresids = sm.OLS(degree['local'],degree['global']).fit().resid
+            degree['zscore'] = (emresids - bsresids.mean()) / bsresids.std()
         return degree
 
-    def plot_locality(self,gene_list,bootstraps=None,filename=None):
-        plt.clf()
-        if bootstraps is not None:
-            for gene_list in bootstraps:
-                degree = self.local_degree(gene_list).merge(
-                    self.global_degree(gene_list),
-                    left_index=True,
-                    right_index=True
-                )
-                plt.scatter(degree.Degree_x,degree.Degree_y,alpha=0.05,color='red')
-        degree = self.local_degree(gene_list).merge(
-            self.global_degree(gene_list),
-            left_index=True,
-            right_index=True
-        )
-        plt.scatter(degree.Degree_x,degree.Degree_y,color='blue')
-        plt.xlabel('Local Degree')
-        plt.ylabel('Global Degree')
-        if filename is None:
-            filename = '{}_Locality.png'.format(self.name)
-        plt.savefig(filename)
-        return plt
+    def plot_locality(self,gene_list,bootstraps=10,num_windows=100,sd_thresh=2):
+        '''
+            Make a fancy locality plot.
+        '''
+        # Generate a blank fig
+        fig,ax = plt.subplots(figsize=(8,6)) 
+        fig.hold(True)
+        # Y axis is local degree (what we are TRYING to predict)
+        degree = self.locality(gene_list).sort('global')
+        ax.set_ylim(0,max(degree['local']))
+        ax.set_xlim(0,max(degree['global']))
+        if bootstraps > 0:
+            bs = pd.concat(
+                [self.locality(
+                    self.refgen.bootstrap_candidate_genes(gene_list)
+                ) for x in range(10)]
+            ).sort('global')
+            ax.set_ylim(0,max(bs['local']))
+            ax.set_xlim(0,max(bs['global']))
+            plt.plot(bs['global'],bs['local'],'ro',alpha=0.05,label='Bootstraps')
+        # Plot the bootstraps and the empirical
+        plt.plot(degree['global'],degree['local'],'bo',label='Empirical')
+        emp_ols = sm.OLS(degree['local'],degree['global']).fit()
+        ax.plot(degree['global'],emp_ols.fittedvalues,'k:',label='Empirical OLS')
 
+        if bootstraps > 0:
+            # Get the OLS
+            bs_ols = sm.OLS(bs['local'],bs['global']).fit()
+            bs['resid'] = bs_ols.resid
+            bs['fitted'] = bs_ols.fittedvalues
+            ax.plot(bs['global'],bs_ols.fittedvalues,'g--',label='bootstrap OLS')
+            # Do lowess on the residuals
+            # We only care about windows within the empirical part
+            window_tick = len(bs)/num_windows
+            bs['window'] = [int(x/window_tick) for x in range(len(bs))]
+            # get std for each window
+            win_std = bs.groupby('window').apply(lambda df: df['resid'].std()).to_dict()
+            bs['std_envelope'] = [win_std[x] for x in bs.window.values]
+            # Plot confidence intervals
+            prstd, iv_l, iv_u = wls_prediction_std(bs_ols)           
+            ax.plot(bs['global'], iv_u, 'g--',label='conf int.')
+            ax.plot(bs['global'], iv_l, 'g--')
+            # plot the  
+            ax.plot(
+                bs['global'],bs['fitted']+(sd_thresh*bs['std_envelope']),'r--'
+                ,label='{} s.d. envelope'.format(sd_thresh)
+            )
+            ax.plot(bs['global'],bs['fitted']-(sd_thresh*bs['std_envelope']),'r--')
+        ax.set_xlabel('Number Global Interactions')
+        ax.set_ylabel('Number Local Interactions')
+        legend = ax.legend(loc='best')
+        return plt
 
 
     ''' ------------------------------------------------------------------------------------------
