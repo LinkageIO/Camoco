@@ -158,8 +158,28 @@ class Ontology(Camoco):
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(self.name,self.description,len(self),self.refgen)
 
-    def del_term(self,term):
-        pass
+    def del_term(self,name):
+        '''
+        Remove a term from the dataset.
+
+        Parameters
+        ----------
+        name : string
+            The term name you wish to remove.
+
+        Returns
+        -------
+            bool indicating success
+        '''
+        cur = self.db.cursor()
+        cur.execute('''
+            BEGIN TRANSACTION;
+            DELETE FROM terms WHERE name = ?;
+            DELETE FROM loci_attr WHERE id IN (
+                SELECT id FROM term_loci WHERE term = ?
+            );
+            DELETE FROM term_loci WHERE term = ?;
+        ''',(name,name,name))
 
     def add_term(self,term,overwrite=True):
         ''' This will add a single term to the ontology '''
@@ -181,9 +201,9 @@ class Ontology(Camoco):
             )
             # Add the loci attrs
             cur.executemany('''
-                INSERT OR REPLACE INTO loci_attr (loci_id,key,val)
+                INSERT OR REPLACE INTO loci_attr (term_name,loci_id,key,val)
                 VALUES (?,?,?)
-            ''',[(locus.id,key,val) for key,val in locus.attr.items()])
+            ''',[(term.name,locus.id,key,val) for key,val in locus.attr.items()])
 
         cur.execute('END TRANSACTION')
 
@@ -313,6 +333,7 @@ class Ontology(Camoco):
         ''')
         cur.execute(''' 
             CREATE TABLE IF NOT EXISTS loci_attr (
+                term TEXT,
                 loci_id TEXT,
                 key TEXT,
                 val TEXT,
