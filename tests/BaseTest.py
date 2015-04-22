@@ -19,6 +19,7 @@ class BaseRefGen(unittest.TestCase):
     @unittest.skipUnless(
             co.available_datasets('RefGen','Zm5bFGS') and 
             co.available_datasets('Ontology','ZmIonome'),'Not Adequate Datasets')
+
     def test_candidate_vs_bootstrap_length(self):
         ZM = co.RefGen('Zm5bFGS')
         snps = co.Ontology("ZmIonome")['Fe57'].effective_snps(window_size=50000)

@@ -9,8 +9,6 @@ import pandas as pd
 import itertools
 from camoco.Config import cf
 
-# Set the basedir to the testdir
-cf.set('options','basedir', cf.get('options','testdir'))
 
 # write test case to import refgen from GFF
 
@@ -32,6 +30,7 @@ class BuildOntology(unittest.TestCase):
         csv = os.path.join(cf.get('options','testdir'),'raw','sigGWASsnpsCombinedIterations.longhorn.allLoc.csv')
         ZM = co.RefGen('Zm5bFGS')
         df = pd.DataFrame.from_csv(csv,index_col=None)
+        co.del_dataset('Ontology','ZmIonome')
         IONS  = co.Ontology.from_DataFrame(df,'ZmIonome','Maize Ionome',ZM,term_col='el',chr_col='chr',pos_col='pos');
         self.assertIsInstance(IONS,co.Ontology)
 
