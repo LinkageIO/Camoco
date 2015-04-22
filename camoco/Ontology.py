@@ -174,18 +174,19 @@ class Ontology(Camoco):
         cur = self.db.cursor()
         cur.execute('''
             BEGIN TRANSACTION;
-            DELETE FROM terms WHERE name = ?;
-            DELETE FROM loci_attr WHERE id IN (
+            DELETE FROM loci_attr WHERE loci_id IN (
                 SELECT id FROM term_loci WHERE term = ?
             );
             DELETE FROM term_loci WHERE term = ?;
+            DELETE FROM terms WHERE name = ?;
+            END TRANSACTION;
         ''',(name,name,name))
 
     def add_term(self,term,overwrite=True):
         ''' This will add a single term to the ontology '''
         cur = self.db.cursor()
         if overwrite:
-            self.del_term(term)
+            self.del_term(term.name)
         cur.execute('BEGIN TRANSACTION')
         # Add the term name and description
         cur.execute('''
@@ -201,10 +202,9 @@ class Ontology(Camoco):
             )
             # Add the loci attrs
             cur.executemany('''
-                INSERT OR REPLACE INTO loci_attr (term_name,loci_id,key,val)
-                VALUES (?,?,?)
+                INSERT OR REPLACE INTO loci_attr (term,loci_id,key,val)
+                VALUES (?,?,?,?)
             ''',[(term.name,locus.id,key,val) for key,val in locus.attr.items()])
-
         cur.execute('END TRANSACTION')
 
     @classmethod
@@ -248,6 +248,7 @@ class Ontology(Camoco):
                     term.locus_list.add(snp) 
             self.log("Importing {}",term)
             self.add_term(term)
+        return self
             
 
     @classmethod
