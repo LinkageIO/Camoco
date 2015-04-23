@@ -12,7 +12,7 @@ from camoco.Config import cf
 
 # write test case to import refgen from GFF
 
-class BuildRefGen(unittest.TestCase):
+class RefGen(unittest.TestCase):
     def Tair10(self):
         gff = os.path.join(cf.get('options','testdir'),'raw','TAIR10_GFF3_genes.gff')
         co.del_dataset('RefGen','T10',safe=False)
@@ -25,7 +25,7 @@ class BuildRefGen(unittest.TestCase):
         ZM = co.RefGen.from_gff(gff,'Zm5bFGS','Maize 5b Filtered Gene Set','5b','Zea Mays')
         self.assertIsInstance(ZM,co.RefGen)
 
-class BuildOntology(unittest.TestCase):
+class Ontology(unittest.TestCase):
     def Ionome(self):
         csv = os.path.join(cf.get('options','testdir'),'raw','sigGWASsnpsCombinedIterations.longhorn.allLoc.csv')
         ZM = co.RefGen('Zm5bFGS')
@@ -34,7 +34,7 @@ class BuildOntology(unittest.TestCase):
         IONS  = co.Ontology.from_DataFrame(df,'ZmIonome','Maize Ionome',ZM,term_col='el',chr_col='chr',pos_col='pos');
         self.assertIsInstance(IONS,co.Ontology)
 
-class BuildCOB(unittest.TestCase):
+class COB(unittest.TestCase):
 
     def AtLeaf(self):
         Leaf = ['GSE14578','GSE5630','GSE13739', #'GSE26199',

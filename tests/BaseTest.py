@@ -9,13 +9,13 @@ import pandas as pd
 import itertools
 from camoco.Config import cf
 
-class LocusBase(unittest.TestCase):
+class Locus(unittest.TestCase):
     def test_locus_initialization(self):
         # numeric chromosomes
         a = co.Locus(1,500)
         self.assertIsInstance(a,co.Locus)
 
-class BaseRefGen(unittest.TestCase):
+class RefGen(unittest.TestCase):
     @unittest.skipUnless(
             co.available_datasets('RefGen','Zm5bFGS') and 
             co.available_datasets('Ontology','ZmIonome'),'Not Adequate Datasets')
@@ -35,7 +35,7 @@ class BaseRefGen(unittest.TestCase):
         self.assertIsInstance(ZM['GRMZM2G000014'],co.Locus)
         self.assertIsInstance(ZM.from_ids(['GRMZM2G000014'])[0],co.Locus)
 
-class BaseCOB(unittest.TestCase):
+class COB(unittest.TestCase):
 
     @unittest.skipUnless(co.available_datasets('Expr','ZmRoot'),'ZmRoot not defined')
     def setUp(self):
