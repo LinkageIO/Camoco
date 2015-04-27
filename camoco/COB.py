@@ -183,13 +183,33 @@ class COB(Expr):
             )['score'].to_csv(OUT,sep='\t')
             self.log('Done')
 
-    def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=100000,min_size=0,max_size=10e10):
+    def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=100000,min_cluster_size=0,max_cluster_size=10e10):
         ''' 
             A *very* thin wrapper to the MCL program. The MCL program must
             be accessible by a subprocess (i.e. by the shell).
             Returns clusters (as list) as designated by MCL. 
-            Input: a gene list
-            Output: a list of lists of genes within each cluster
+            
+            Parameters
+            ----------
+            gene_list : a gene iterable
+                These are the genes which will be clustered
+            I : float (default: 2.0)
+                This is the inflation parameter passed into mcl.
+            scheme : int in 1:7
+                MCL accepts parameter schemes. See mcl docs for more details
+            min_distance : int (default: 100000)
+                The minimum distance between genes for which to consider co-expression
+                interactions. This filters out cis edges. 
+            min_cluster_size : int (default: 0)
+                The minimum cluster size to return. Filter out clusters smaller
+                than this.
+            max_cluster_size : float (default: 10e10)
+                The maximum cluster size to return. Filter out clusters larger
+                than this. 
+
+            Returns
+            -------
+            A list clusters containing a lists of genes within each cluster
         '''
         # output dat to tmpfile
         tmp = self._tmpfile()
@@ -205,7 +225,7 @@ class COB(Expr):
             self.log('...Done')
             if p.returncode==0:
                 # Filter out cluters who are smaller than the min size
-                return list(filter(lambda x: len(x) > min_size and len(x) < max_size,
+                return list(filter(lambda x: len(x) > min_cluster_size and len(x) < max_cluster_size,
                     # Generate ids from the refgen
                     [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
                 ))
@@ -554,7 +574,6 @@ class COB(Expr):
                     with another gene in the input list. Also returns global degree '''
         pass
 
-
     def lcc(self,gene_list,min_distance=None):
         ''' returns an igraph of the largest connected component in graph '''
         pass
@@ -573,20 +592,6 @@ class COB(Expr):
             in a new layout object. If no layout has been stored or a gene does not have
             coordinates, returns (0,0) for each mystery gene'''
         pass
-
-    def cluster(self,raw=False):
-        # Convert to tsv
-        rawtype = 'raw' if raw else 'norm'
-        filename  = '{}_{}.tsv'.format(self.name, rawtype)
-        self.expr(raw=raw,zscore=True).to_csv(filename,sep='\t')
-        try: 
-            cmd = ['cluster', '-f', filename, '-g', '2', '-e', '2']
-            self.log("Executing {}",' '.join(cmd))
-            p = Popen(cmd, stderr=self.log_file, shell=True)
-            self.log('Waiting for {} cluster...'.format(filename))
-            p.wait()
-        except FileNotFoundError as e:
-            self.log('Could not find cluster command in PATH. Make sure its installed and shell accessible as "cluster".')
 
     def plot(self,gene_list,filename=None,width=3000,height=3000,layout=None,**kwargs):
         pass
