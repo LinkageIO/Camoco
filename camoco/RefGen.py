@@ -360,7 +360,7 @@ class RefGen(Camoco):
 
     def __contains__(self,obj):
         ''' flexible on what you pass into the 'in' function '''
-        try:
+        if isinstance(obj,Locus):
             # you can pass in a gene object (this expression should ALWAYS be true if you 
             # created gene object from this RefGen)
             if self.db.cursor().execute(
@@ -368,18 +368,15 @@ class RefGen(Camoco):
                 return True
             else:
                 return False
-        except Exception as e:
-            pass
-        try:
+        elif isinstance(obj,str):
             # Can be a string object
             if self.db.cursor().execute('''
                 SELECT COUNT(*) FROM genes WHERE id = ?''',(str(obj).upper(),)).fetchone()[0] == 1:
                 return True
             else:
                 return False
-        except Exception as e:
-            pass
-        self.log("object {} not correct type to test membership in {}",obj,self.name)
+        else:
+            raise TypeError('Cannot test for containment for {}'.format(obj))
 
     def _build_indices(self):
         cur = self.db.cursor()
@@ -389,7 +386,7 @@ class RefGen(Camoco):
         ''')
 
     def add_gene(self,gene):
-        if isinstance(loci,Locus):
+        if isinstance(gene,Locus):
             self.db.cursor().execute(''' 
             INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
             ''',(gene.id,gene.chrom,gene.start,gene.end))
