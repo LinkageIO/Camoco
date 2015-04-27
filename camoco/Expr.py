@@ -13,6 +13,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pylab as plt
 import io               
+import re
+import string
 
 class Expr(Camoco):
     ''' 
@@ -136,8 +138,14 @@ class Expr(Camoco):
         table = 'raw_expr' if raw else 'expr'
         # Sort the table by genes
         df = df.sort()
+        # ensure that column names are alphanumeric
+        # hdf5 doesn't like unicode characters
+        pattern = re.compile('[^\w ]+')
+        df.columns = [pattern.sub('',x) for x in df.columns.values ]
+        df.index = [pattern.sub('',x) for x in df.index.values ]
         try:
-            self.hdf5[table] = self._expr = df
+            self._expr = df
+            self.hdf5[table] = df
             self.hdf5.flush(fsync=True)
         except Exception as e:
             self.log('Unable to update expression table values: {}',e)
@@ -225,18 +233,18 @@ class Expr(Camoco):
                 5000 genes.
         '''        
         self.log('------------Quality Control')
-        df = self.hdf5['raw_expr']
+        df = self.expr(raw=True)
         # remember how we set the flags
         self._global('qc_min_expr',min_expr)
         self._global('qc_max_gene_missing_data',max_gene_missing_data)
         self._global('qc_min_single_sample_expr',min_single_sample_expr)
         self._global('qc_max_accession_missing_data',max_accession_missing_data)
-        self._global('qc_membership',str(membership))
         # retrieve raw data as a data frame
         self.log('Raw Starting set: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         # ------ Membership test
         if not membership:
             membership = self.refgen
+        self._global('qc_membership',str(membership))
         self.log("Filtering out genes not in {}",membership)
         df = df[[x in membership for x in df.index]]
         self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
@@ -376,7 +384,8 @@ class Expr(Camoco):
 
         '''
         # Piggy back on the super create method
-        self = super(Expr,cls).create(name,description,type='Expr')
+        self = super().create(name,description,type='Expr')
+        # Delete existing datasets 
         self._set_refgen(refgen,filter=False)
         return self
 
