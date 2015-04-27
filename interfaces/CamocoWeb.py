@@ -7,7 +7,7 @@ import json
 from math import isinf
 import numpy as np
  
-networks = {x:co.COB(x) for x in ['ZmRoot']}
+networks = {x:co.COB(x) for x in ['ZmRoot','ZmSAM','ZmPAN']}
 ZM = co.RefGen('Zm5bFGS')
 
 @app.route('/')
@@ -75,24 +75,35 @@ def COB_network(network_name,ontology,term):
     term = co.Ontology(ontology)[term]
     nodes = []
     seen = set()
-    effective_snps = term.effective_snps(window_size=50000)
+    effective_snps = term.effective_snps(window_size=100000)
     candidate_genes = cob.refgen.candidate_genes(effective_snps,gene_limit=10,chain=False)
-    local_degree = cob.local_degree([item for sublist in candidate_genes for item in sublist])
+    locality = cob.locality(set([item for sublist in candidate_genes for subsublist in sublist for item in subsublist]))
     for snp,genes in zip(effective_snps,candidate_genes):
         # Put the SNP in there 
-        nodes.append({'data':{'id':str(snp.summary())}})
+        #nodes.append({'data':{'id':str(snp.summary())}})
         # append 
-        for gene in genes:
+        for gene in [item for sublist in genes for item in sublist]:
             if gene.id not in seen:
-                global_degree = cob.global_degree(gene)
-                local_degree = local_degree.ix[gene]
-                locality = local_degree / global_degree
+                try:
+                    local_degree = locality.ix[gene.id]['local']
+                    global_degree = locality.ix[gene.id]['global']
+                except KeyError as e:
+                    local_degree = 0
+                gene_locality = local_degree / global_degree
+                if np.isnan(gene_locality):
+                    gene_locality = 0
                 nodes.append(
-                        {'data':{'id':str(gene.id), 'locality':locality,'degree':int(local_degree), 'gdegree':int(global_degree) }}  
+                        {'data':{
+                            'id':str(gene.id), 
+                            'locality':int(gene_locality*100),
+                            'degree':int(local_degree), 
+                            'snp':str(snp.summary()),
+                            'gdegree':int(global_degree) 
+                        }}  
                 )
             seen.add(gene.id)
     # Now do the edges
-    subnet = cob.subnetwork(cob.refgen.candidate_genes(term.effective_snps(window_size=50000),gene_limit=10))
+    subnet = cob.subnetwork(cob.refgen.candidate_genes(term.effective_snps(window_size=100000),gene_limit=10))
     subnet.reset_index(inplace=True)
     net['nodes'] = nodes
     net['edges'] = [

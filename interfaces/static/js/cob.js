@@ -13,6 +13,7 @@
         this.node_filter = 1 // degree
         
         this.params.div
+        .append($('<img>',{class:'snapshot'}))
         .append($('<div>',{class:'cy'}))
         .append($('<ul>',{class:'graph_controls'})
             .append($('<li>')
@@ -22,6 +23,10 @@
                 .append($('<button>Layout</button>',{})
                     .on({'click':function(){cob.graph.cy.layout(cola_options)}})
                 )
+                .append($('<button>Snapshot</button>',{}))
+                    .on({'click':function()
+                            $('#cob .graph .snapshop').style.zIndex='100'
+                    })
             )
             .append($('<li>')
                 .append('<span>').html('Edge Filter')
@@ -64,8 +69,8 @@
                 'background-color': '#144566',
                 'border-width': 1,
                 'border-color': '#000',
-                'height' : 'mapData(locality,0,1,1,10)',
-                'width' : 'mapData(locality,0,1,1,10)',
+                'height' : 'mapData(locality,0,100,5,50)',
+                'width' : 'mapData(locality,0,100,5,50)',
                 'content':'data(id)',
                 'text-halign':'right',
                 'font-size' : '12pt',
@@ -276,10 +281,16 @@
 
     function COB(params){
         // Extend the default parameters
+        var timeout;
         defaults = {
             'div': $('<div>'),
         }    
         this.params = $.extend(true,defaults,params)
+
+        this._delay = function(func,wait){
+            var args = Array.prototype.slice.call(arguments,2);
+            return setTimeout(function(){return func.apply(null,args);}, wait);
+        }
 
         this.params.div
             .append($('<div>',{class:'graph'}))
@@ -383,42 +394,37 @@
                 //remove all non-sticky decorators
                 $('#cob .LociTable .selected').toggleClass('selected')
                 cob.graph.cy.$('.neighbors').removeClass('neighbors')
-                //cob.loci.LociTable.search(cob.graph.selected.join("|"),true).draw()
             }
         })
         this.graph.cy.on('click','node',{},function(evt){
             var node = evt.cyTarget
             console.log("CLICKED "+node.id())
+            console.log(node.data())
             // If already highlighted, also highlight neighbos
             if(node.selected()){
                 console.log("Already CLICKED "+node.id())
-                //cob.graph.cy.$('.neighbors').removeClass('neighbors')
-                //cob.graph.cy.$('.neighbors').toggleClass('selected')
+                _.delay(function(id){
+                    cob.graph.cy.$('.neighbors').removeClass('neighbors')
+                    cob.graph.cy.$('[id="'+id+'"]').unselect().neighborhood().select()
+                },100,node.id())
             } 
-            // highlight neighbors
-            //unhighlight old rows
-            cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
-                .nodes()
-                .to$()
-                .toggleClass('selected')
-            // highlight new rows
-            cob.menu.get_tab('Genes').highlighted_rows = cob.menu.get_tab('Genes')
-                .LociTable.rows().flatten()
-                .filter(function(rowIdx){
-                    return cob.menu.get_tab('Genes').LociTable.cell(rowIdx,0).data() == node.id() ? true : false;
-                })
-            
-            // scroll to row
-            //$('#cob .dataTables_scrollBody .LociTable').scrollTo(
-                    cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
+            else{
+                // highlight neighbors
+                //unhighlight old rows
+                cob.menu.get_tab('Genes').LociTable.rows(cob.menu.get_tab('Genes').highlighted_rows)
                     .nodes()
                     .to$()
                     .toggleClass('selected')
-            //)
-            cob.graph.cy.$('.neighbors').removeClass('neighbors')
-            node.neighborhood().addClass('neighbors')
+                // highlight new rows
+                cob.menu.get_tab('Genes').highlighted_rows = cob.menu.get_tab('Genes')
+                    .LociTable.rows().flatten()
+                    .filter(function(rowIdx){
+                        return cob.menu.get_tab('Genes').LociTable.cell(rowIdx,0).data() == node.id() ? true : false;
+                })
+                cob.graph.cy.$('.neighbors').removeClass('neighbors')
+                node.neighborhood().addClass('neighbors')
+            }
         })
-        var timeout;
         this.graph.cy.on('select',{},function(evt){
             cob.graph.selected = []
             clearTimeout(timeout)
