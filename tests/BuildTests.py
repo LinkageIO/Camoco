@@ -43,7 +43,7 @@ class COB(unittest.TestCase):
         LeafFam = sum([co.Family.from_file("raw/GSE/{}_family.soft".format(x)) for x in Leaf ])
         # Generate the LeafKeep file
         #LeafFam.to_keepfile("LeafKeep.tsv",keep_hint="lea")
-        AtLeaf = co.COB.from_DataFrame(LeafFam.series_matrix(keepfile="raw/GSE/LeafKeep.tsv"),'AtLeaf','Arabidopsis Leaf',co.RefGen('Tair10'),rawtype='MICROARRAY')
+        AtLeaf = co.COB.from_DataFrame(LeafFam.series_matrix(keepfile="raw/GSE/LeafKeep.tsv"),'AtLeaf','Arabidopsis Leaf',co.RefGen('T10'),rawtype='MICROARRAY')
         self.assertIsInstance(AtLeaf,co.COB)
 
     def AtSeed(self):
@@ -51,21 +51,21 @@ class COB(unittest.TestCase):
                 'GSE1051','GSE11852','GSE5634']
         SeedFam = sum([co.Family.from_file("raw/GSE/{}_family.soft".format(x)) for x in Seed ])
         #SeedFam.to_keepfile("SeedKeep.tsv",keep_hint='seed')
-        AtSeed = co.COB.from_DataFrame(SeedFam.series_matrix(keepfile="raw/GSE/SeedKeep.tsv"),'AtSeed','Arabidopsis Seed',co.RefGen('Tair10'),rawtype='MICROARRAY')
+        AtSeed = co.COB.from_DataFrame(SeedFam.series_matrix(keepfile="raw/GSE/SeedKeep.tsv"),'AtSeed','Arabidopsis Seed',co.RefGen('T10'),rawtype='MICROARRAY')
 
     def AtRoot(self):
         Root = ['GSE14578','GSE46205','GSE7631','GSE10576','GSE42007','GSE34130','GSE21611','GSE22966','GSE7641','GSE5620',
                 'GSE8934','GSE5628','GSE30095','GSE30097','GSE5624','GSE5626','GSE5749','GSE5621','GSE5622','GSE5623','GSE5625','GSE5688']
         RootFam = sum([co.Family.from_file("raw/GSE/{}_family.soft".format(x)) for x in Root ])
         #RootFam.to_keepfile("RootKeep.tsv",keep_hint='root')
-        AtRoot = co.COB.from_DataFrame(RootFam.series_matrix(keepfile="raw/GSE/RootKeep.tsv"),'AtRoot','Arab Root',co.RefGen('Tair10'),rawtype='MICROARRAY')
+        AtRoot = co.COB.from_DataFrame(RootFam.series_matrix(keepfile="raw/GSE/RootKeep.tsv"),'AtRoot','Arab Root',co.RefGen('T10'),rawtype='MICROARRAY')
 
     def AtGen(self):
         General = ['GSE18975','GSE39384','GSE19271','GSE5632','GSE39385','GSE5630','GSE15617','GSE5617','GSE5686','GSE2473',
                    'GSE5633','GSE5620','GSE5628','GSE5624','GSE5626','GSE5621','GSE5622','GSE5623','GSE5625','GSE5688']
         GenFam = sum([co.Family.from_file("raw/GSE/{}_family.soft".format(x)) for x in General ])
         #GenFam.to_keepfile("GenKeep.tsv")
-        AtGen = co.COB.from_DataFrame(GenFam.series_matrix(keepfile="raw/GSE/GenKeep.tsv"),'AtGen','Arab General',co.RefGen('Tair10'),rawtype='MICROARRAY')
+        AtGen = co.COB.from_DataFrame(GenFam.series_matrix(keepfile="raw/GSE/GenKeep.tsv"),'AtGen','Arab General',co.RefGen('T10'),rawtype='MICROARRAY')
 
     def ZmSAM(self):
         co.del_dataset('Expr','ZmSAM',safe=False)
