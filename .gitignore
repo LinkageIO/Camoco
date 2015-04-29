@@ -2,7 +2,7 @@
 analyses/*
 build/*
 sensitive/*
-tests/*/
+tests/*/raw
 *.pyc
 *.py.swp
 *.swn
