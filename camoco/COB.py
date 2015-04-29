@@ -259,8 +259,7 @@ class COB(Expr):
         except KeyError as e:
             return 0
 
-    def locality(self, gene_list, include_zscore=False, num_bootstraps=100,
-                 num_windows=100,include_fdr=False):
+    def locality(self, gene_list):
         '''
             Computes the merged local vs global degree table
             
@@ -268,17 +267,6 @@ class COB(Expr):
             ----------
             gene_list : iterable of camoco.Loci
                 A list or equivalent of loci
-            include_zscore : bool
-                flag indicating on whether or not to include 
-                zscore based on bootstrap value
-            num_bootstraps : int
-                the number of included bootstrap
-                values to asses significance
-            num_windows : int (default: 100)
-                The number of windows to use when calculating
-                bootstrap statisics
-            include_fdr : bool
-                Runs bootstraps to calculate fdr at certain Zscores
 
             Returns
             -------
@@ -295,54 +283,10 @@ class COB(Expr):
         )
         degree.columns = ['local','global']
         degree = degree.sort('global')
-        # split the empirical data into windows
-        window_tick = max(degree['global'])/num_windows
-        degree['window'] = [int(x/window_tick) for x in degree['global']]
         # Add the regression lines
         ols = sm.OLS(degree['local'],degree['global']).fit()
         degree['resid'] = ols.resid
         degree['fitted'] = ols.fittedvalues
-
-        if include_zscore:
-            self.log('Calculating ZScores ... ')
-            # compare against the bootstrapps
-            bs = pd.concat(
-                    [self.locality(
-                        self.refgen.bootstrap_candidate_genes(gene_list),include_zscore=False
-                    ) for x in range(num_bootstraps)]
-                ).sort('global')
-            # filter out values above the max empirical global interactions
-            bs = bs[bs['global'] <= max(degree['global'])]
-            # Proportion the windows based on equal size
-            bs['window'] = [int(x/window_tick) for x in bs['global']]
-            # predict the global degree based on local degree
-            bs_ols = sm.OLS(bs['local'],bs['global']).fit()
-            bs['resid'] = bs_ols.resid
-            bs['fitted'] = bs_ols.fittedvalues
-            # assign z-scores for 
-            win_std = bs.groupby('window').apply(lambda df: df['resid'].std()).to_dict()
-            degree['bs_std'] = [win_std[x['window']] for i,x in degree.iterrows()]
-            degree['zscore'] = [x['resid']/win_std[x['window']] for i,x in degree.iterrows()]
-
-            if include_fdr:
-                self.log('Calculating PVals ... ')
-                # compare against the bootstrapps
-                bs = pd.concat(
-                        [self.locality(
-                            self.refgen.bootstrap_candidate_genes(gene_list),include_zscore=False
-                        ) for x in range(num_bootstraps)]
-                    ).sort('global')
-                # filter out values above the max empirical global interactions
-                bs = bs[bs['global'] <= max(degree['global'])]
-                # Proportion the windows based on equal size
-                bs['window'] = [int(x/window_tick) for x in bs['global']]
-                # assign z-scores for 
-                win_std = bs.groupby('window').apply(lambda df: df['resid'].std()).to_dict()
-                bs['bs_std'] = [win_std[x['window']] for i,x in bs.iterrows()]
-                bs['zscore'] = [x['resid']/win_std[x['window']] for i,x in bs.iterrows()]
-                zfreqs = [(sum(degree['zscore'] >= z)/len(degree))/(sum(bs['zscore'] >= z)/len(bs)) for z in range(0,int(max(degree['zscore'])))]
-                    
-                
 
         return degree
 
