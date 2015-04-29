@@ -72,12 +72,12 @@ class Expr(Camoco):
     def accessions(self):
         return self._expr.columns
 
-    def genes(self,enumerated=True,raw=False):
+    def genes(self,raw=False):
         # Returns a list of distinct genes 
         if raw is False:
-            return self.refgen.from_ids(self._expr.index,enumerated=enumerated)
+            return self.refgen.from_ids(self._expr.index)
         else:
-            return self.refgen.from_ids(self.hdf5['raw_expr'].index,enumerated=enumerated)
+            return self.refgen.from_ids(self.hdf5['raw_expr'].index)
 
     def expr_profile(self,gene):
         '''
@@ -140,7 +140,7 @@ class Expr(Camoco):
         df = df.sort()
         # ensure that column names are alphanumeric
         # hdf5 doesn't like unicode characters
-        pattern = re.compile('[^\w ]+')
+        pattern = re.compile('[^\w ,;]+')
         df.columns = [pattern.sub('',x) for x in df.columns.values ]
         df.index = [pattern.sub('',x) for x in df.index.values ]
         try:
