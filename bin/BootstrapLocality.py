@@ -147,7 +147,7 @@ def main(args):
     fig.hold(True)
 
     # Plot the empirical Z-score distributions
-    zscores = list(range(0,6))
+    zscores = list(range(0,8))
     zcdf = [sum(loc['zscore'] >= x) for x in zscores]
     ax.plot(zscores,zcdf,'bo',label='Empirical Zscore > x')
     # plot the fdr scores spread
@@ -163,8 +163,31 @@ def main(args):
     ax.set_xlabel('Z-Score')
     ax.set_ylabel('Number of Genes > Z')
     legend = ax.legend(loc='best')
+    plt.savefig('FDR_ZScore.png')
 
-    plt.savefig('FDR.png')
+    # Do the same thing, but with residuals
+
+    fig,ax = plt.subplots(figsize=(8,6)) 
+    fig.hold(True)
+
+    resids = list(range(0,int(max(loc['resid'])+2)))
+    rcdf = [sum(loc['resid'] >= x) for x in resids]
+    ax.plot(resids,rcdf,'bo',label='Empirical Residuals')
+    rcdf = pd.DataFrame(
+         [ mean_confidence_interval(
+            fdr.groupby('bootstrap_name').apply(
+                lambda df: sum(df['resid'] >= x )
+            )
+        ) for x in resids ],
+        columns=['mean','ci']
+    )
+    ax.errorbar(resids,rcdf['mean'],yerr=rcdf['ci'],label='Bootstrap Residuals',color='red')  
+    ax.set_xlabel('Residual')
+    ax.set_ylabel('Number of Genes > X')
+    legend = ax.legend(loc='best')
+    plt.savefig('FDR_Resid.png')
+
+
 
     # Go back to beginning
     os.chdir(cwd)

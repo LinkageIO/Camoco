@@ -7,7 +7,6 @@ from camoco.RefGen import RefGen
 from camoco.Locus import Locus,Gene
 from camoco.Expr import Expr
 from camoco.Tools import memoize
-from camoco.lowess import lowess,confband
 
 from numpy import matrix,arcsinh,tanh
 from collections import defaultdict,Counter
@@ -19,7 +18,6 @@ import statsmodels.api as sm
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 import pandas as pd
-import igraph as ig
 import numpy as np
 import itertools
 import matplotlib.pylab as plt
@@ -29,7 +27,7 @@ from scipy.stats import pearsonr
 class COB(Expr):
     def __init__(self,name):
         super().__init__(name=name)
-        self.hdf5 = self._hdf5(name)
+        #self.hdf5 = self._hdf5(name)
         try:
             self.log('Loading coex table')
             self.coex = self.hdf5['coex']
@@ -146,9 +144,11 @@ class COB(Expr):
         if len(edges) == 1:
             return edges.score[0]
         if return_mean:
-            return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
-                    (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
-                    (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
+            return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
+            # old code worth a look
+            # return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
+            #        (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
+            #        (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
         else:
             return edges
 
@@ -259,7 +259,7 @@ class COB(Expr):
         except KeyError as e:
             return 0
 
-    def locality(self, gene_list):
+    def locality(self, gene_list,bootstrap_name=None):
         '''
             Computes the merged local vs global degree table
             
@@ -267,6 +267,11 @@ class COB(Expr):
             ----------
             gene_list : iterable of camoco.Loci
                 A list or equivalent of loci
+            bootstrap_name : object (default: none)
+                This will be added as a column. Useful for
+                generating bootstraps of locality and keeping
+                track of which one a row came from after catting
+                multiple bootstraps together. 
 
             Returns
             -------
@@ -287,7 +292,8 @@ class COB(Expr):
         ols = sm.OLS(degree['local'],degree['global']).fit()
         degree['resid'] = ols.resid
         degree['fitted'] = ols.fittedvalues
-
+        if bootstrap_name is not None:
+            degree['bootstrap_name'] = bootstrap_name
         return degree
 
 
