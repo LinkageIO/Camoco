@@ -6,7 +6,7 @@ setup(
     name = 'camoco',
     version = '0.1.5',
     packages = find_packages(),
-    scripts = [],
+    scripts = ['bin/BootstrapLocality.py'],
 
     install_requires = [
         'cython>=0.16',    
