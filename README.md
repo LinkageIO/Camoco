@@ -7,19 +7,20 @@ Installation
 Newest tagged releases are available on PyPi: `pip install camoco`. Otherwise, you should be able to run 
 `python setup.py install` once you have the following dependencies resolved:
 
-Required:
+Required: python>=3.3
+
+Required (install in this order to save pain):
++ cython>=0.16    
++ numpy>=1.9.1
++ scipy>=0.15
++ ipython>=3.1.0
 + pandas>=0.16
++ numexpr>=2.0.0
 + tables>=3.0.0 (hdf5)
 + apsw>=3.8
-+ scipy>=0.15
-+ numpy>=1.9.1
-+ cython>=0.16    
 + matplotlib>=1.4.3
-
-Optional:
-+ igraph>=0.1.5
++ statsmodels>=0.6.1
 + termcolor>=1.1.0
-
 
 Co-Analysis of Molecular Components
 -----------------------------------

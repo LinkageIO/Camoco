@@ -1,2 +1,3 @@
 include camoco/RefGenDist.pyx
 include camoco/PCCUP.pyx
+include bin/*
