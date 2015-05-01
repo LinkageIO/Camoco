@@ -6,7 +6,6 @@ import sys
 import numpy as np
 from scipy.stats import pearsonr
 
-from camoco.lowess import lowess
 from camoco.Camoco import Camoco
 from camoco.Chrom import Chrom
 
