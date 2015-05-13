@@ -259,7 +259,7 @@ class COB(Expr):
         except KeyError as e:
             return 0
 
-    def locality(self, gene_list,bootstrap_name=None):
+    def locality(self, gene_list,bootstrap_name=None,include_regression=False):
         '''
             Computes the merged local vs global degree table
             
@@ -288,10 +288,11 @@ class COB(Expr):
         )
         degree.columns = ['local','global']
         degree = degree.sort('global')
-        # Add the regression lines
-        ols = sm.OLS(degree['local'],degree['global']).fit()
-        degree['resid'] = ols.resid
-        degree['fitted'] = ols.fittedvalues
+        if include_regression:
+            # Add the regression lines
+            ols = sm.OLS(degree['local'],degree['global']).fit()
+            degree['resid'] = ols.resid
+            degree['fitted'] = ols.fittedvalues
         if bootstrap_name is not None:
             degree['bootstrap_name'] = bootstrap_name
         return degree
