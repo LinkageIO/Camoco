@@ -1,8 +1,11 @@
 .*
+*egg-info*
 analyses/*
 build/*
 sensitive/*
-tests/*/raw
+dist/
+tests/raw
+tests/databases
 *.pyc
 *.py.swp
 *.swn
