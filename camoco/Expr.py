@@ -95,13 +95,32 @@ class Expr(Camoco):
         return self._expr.apply(lambda col: np.nanmax(col.values) < max_val ,axis=0)
     
     def anynancol(self):
-        ''' A gut check method to make sure none of the expression columns
-            got turned into all nans. Because apparently that is a problem.'''
+        ''' 
+            A gut check method to make sure none of the expression columns
+            got turned into all nans. Because apparently that is a problem.
+        '''
         return any(self._expr.apply(lambda col: all(np.isnan(col)),axis=0))
 
-    def expr(self,genes=None,accessions=None,long=False,raw=False,zscore=False):
+    def expr(self,genes=None,accessions=None,raw=False):
         '''
             Access raw and QC'd expression data. 
+
+            Parameters
+            ----------
+            genes : iterable of camoco.Locus objects (default: None)
+                If not None, this will retrieve the expression values for
+                the loci specified within the iterable, otherwise it will
+                include ALL loci in the expr dataset
+            accessions : iterable of str (default: None)
+                If not None, will retrieve expression values for the
+                accessions (experiments) specified, otherwise will 
+                retrieve ALL accessions.
+            raw : bool (default: False)
+                Flag to indicate on using the raw table versus the current
+                expr table. See the transformation_log for more details on
+                the difference.
+            zscore : bool (default: False)
+                
         '''
         df = self.hdf5['raw_expr'] if raw is True else self._expr
         if genes is not None:
