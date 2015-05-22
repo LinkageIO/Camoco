@@ -41,10 +41,6 @@ class NearestDict(OrderedDict):
 def main(args):
     # Initiate for args 
     # Generate output dirs
-    cwd = os.getcwd()
-    os.makedirs(args.out,exist_ok=True)
-    os.chdir(args.out)
-    os.makedirs('CSV',exist_ok=True)
 
     ont = co.Ontology(args.ontology)
     term = ont[args.term]
@@ -57,6 +53,7 @@ def main(args):
 
     gs = plt.GridSpec(len(xaxes),len(yaxes))
     fig = plt.figure(figsize=(4*len(xaxes),4*len(yaxes)))
+    # Add in text for axes
     for i,xaxis in enumerate(xaxes):
         for j,yaxis in enumerate(yaxes):
             ax = fig.add_subplot(gs[i,j]) 
@@ -70,11 +67,19 @@ def main(args):
             setattr(perm_args,yaxes_key,yaxis)
             # Generate data using permuted arguments
             loc,bsloc,fdr = generate_data(cob,term,perm_args) 
-            plot_scatter(args,loc,bsloc,fdr,ax)
+            plot_fdr(args,loc,bsloc,fdr,ax)
+            if i == 0:
+                ax.set_title(yaxis)
+            if j == 0:
+                ax.set_ylabel(xaxis)
+            if i == 0 and j == 0:
+                ax.set_title(str(yaxes_key)+' '+str(yaxis))
+                ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
+
+
 
     plt.tight_layout()
     plt.savefig(args.out.replace('.png','')+'.png')
-    os.chdir(cwd)
 
     if args.debug:
         import ipdb; ipdb.set_trace()
@@ -213,7 +218,6 @@ def plot_scatter(args,loc,bsloc,fdr,ax):
     ax.set_xlim(0,max(loc['global']))
     ax.set_xlabel('Number Global Interactions')
     ax.set_ylabel('Number Local Interactions')
-    ax.set_title('OLS Fitting')
 
     # UGH! map lowess 
     fdrlowess = lowess(
@@ -271,10 +275,10 @@ def plot_fdr(args,loc,bsloc,fdr,ax):
         ) for x in zscores ],
         columns=['mean','ci']
     )
-    zcdf['emp'] = zloc
-    zcdf['el'] = args.term
-    zcdf['min_fdr_degree'] = args.min_fdr_degree
-    zcdf['can_gene_limit'] = args.candidate_gene_limit
+    #zcdf['emp'] = zloc
+    #zcdf['el'] = args.term
+    #zcdf['min_fdr_degree'] = args.min_fdr_degree
+    #zcdf['can_gene_limit'] = args.candidate_gene_limit
     ax.errorbar(
         zscores,
         zcdf['mean'],
@@ -285,9 +289,6 @@ def plot_fdr(args,loc,bsloc,fdr,ax):
     ax.set_xlabel('Z-Score')
     ax.set_ylabel('Number of Genes > Z')
     ax.set_title('Z Score FDR')
-    legend = ax.legend(loc='best')
-
-    # Do the same thing, but with residuals
 
 
 def plot_resid(args,loc,bsloc,fdr,ax):
