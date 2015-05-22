@@ -3,6 +3,7 @@
 import argparse
 import sys
 import os
+import copy
 
 import numpy as np
 import scipy as sp
@@ -39,20 +40,51 @@ class NearestDict(OrderedDict):
 
 def main(args):
     # Initiate for args 
-    ont = co.Ontology(args.ontology)
-    term = ont[args.term]
-    cob = co.COB(args.cob)
     # Generate output dirs
     cwd = os.getcwd()
     os.makedirs(args.out,exist_ok=True)
     os.chdir(args.out)
     os.makedirs('CSV',exist_ok=True)
 
-    '''---------------------------------------------------
-        Empirical and SD Calculations
+    ont = co.Ontology(args.ontology)
+    term = ont[args.term]
+    cob = co.COB(args.cob)
+
+    # Create a plot comparing spread of specified shit
+    xaxes_key,yaxes_key = [x.replace('-','_') for x in args.axes]
+    xaxes = getattr(args,xaxes_key)
+    yaxes = getattr(args,yaxes_key)
+
+    gs = plt.GridSpec(len(xaxes),len(yaxes))
+    fig = plt.figure(figsize=(4*len(xaxes),4*len(yaxes)))
+    for i,xaxis in enumerate(xaxes):
+        for j,yaxis in enumerate(yaxes):
+            ax = fig.add_subplot(gs[i,j]) 
+            print("Looking at {}:{} x {}:{}".format(
+                xaxes_key,xaxis,
+                yaxes_key,yaxis,
+            ))
+            perm_args = copy.deepcopy(args) 
+            # Change the relevent things in the permuted args 
+            setattr(perm_args,xaxes_key,xaxis)
+            setattr(perm_args,yaxes_key,yaxis)
+            # Generate data using permuted arguments
+            loc,bsloc,fdr = generate_data(cob,term,perm_args) 
+            plot_scatter(args,loc,bsloc,fdr,ax)
+
+    plt.tight_layout()
+    plt.savefig(args.out.replace('.png','')+'.png')
+    os.chdir(cwd)
+
+    if args.debug:
+        import ipdb; ipdb.set_trace()
+
+
+def generate_data(cob,term,args):
+    '''
+        Generates the data according to parameters in args
     '''
 
-    # Find the empirical Locality
     effective_snps = term.effective_snps(
             window_size=args.candidate_window_size
     ) 
@@ -60,6 +92,7 @@ def main(args):
         effective_snps,
         gene_limit=args.candidate_gene_limit
     )
+    # Find the empirical Locality
     loc = cob.locality(
         candidate_genes,
         include_regression=True
@@ -77,6 +110,11 @@ def main(args):
                 bootstrap_name=x
             ) for x in range(args.num_bootstraps)]
     )
+
+    '''---------------------------------------------------
+        Empirical and SD Calculations
+    '''
+
     # We need to perform regression for the entire bootstrap dataset
     OLS = sm.OLS(bsloc['local'],bsloc['global']).fit()
     bsloc['fitted'] = OLS.fittedvalues
@@ -118,7 +156,6 @@ def main(args):
     )
     fit_std = {f:win_std[w]for f,w in win_map.items()}
     
-   
     # Create a dict where keys are fitted valus and 
     # values are that fitted values std
     fit_std = NearestDict(
@@ -131,7 +168,6 @@ def main(args):
         ).sort('fitted').set_index('fitted').to_dict()['sd']
     )
 
-
     # Calculate the s.d. of the residuals in each window
     # divide empirical residuals by the s.d. in their respective window
     loc['bs_std'] = [fit_std[x] for x in loc['fitted']]
@@ -140,7 +176,6 @@ def main(args):
     '''---------------------------------------------------
         FDR Calculations
     '''
-    
     # Repeat bootstraps to assess global FDR
     fdr = pd.concat(
             [cob.locality(
@@ -164,26 +199,21 @@ def main(args):
     fdr['bs_std'] = [fit_std[x] for x in fdr['fitted']]
     fdr['zscore'] = [x['resid']/x['bs_std'] for i,x in fdr.iterrows()]
 
+    # Give em the gold
+    return loc,bsloc,fdr
 
+
+def plot_scatter(args,loc,bsloc,fdr,ax):
 
     ''' ---------------------------------------------------
         Plotting
     '''
-    # Make plots for later
-    gs = plt.GridSpec(3,2)
-    fig = plt.figure(figsize=(16,16))
-    ax1 = fig.add_subplot(gs[0,0])
-    ax2 = fig.add_subplot(gs[0,1])
-    ax3 = fig.add_subplot(gs[1,0])
-    ax4 = fig.add_subplot(gs[1,1])
-    ax5 = fig.add_subplot(gs[2,:1])
-    ax1.hold(True)
     # Y axis is local degree (what we are TRYING to predict)
-    ax1.set_ylim(0,max(loc['local']))
-    ax1.set_xlim(0,max(loc['global']))
-    ax1.set_xlabel('Number Global Interactions')
-    ax1.set_ylabel('Number Local Interactions')
-    ax1.set_title('OLS Fitting')
+    ax.set_ylim(0,max(loc['local']))
+    ax.set_xlim(0,max(loc['global']))
+    ax.set_xlabel('Number Global Interactions')
+    ax.set_ylabel('Number Local Interactions')
+    ax.set_title('OLS Fitting')
 
     # UGH! map lowess 
     fdrlowess = lowess(
@@ -192,32 +222,33 @@ def main(args):
         is_sorted=False
     )
     # plot the bootstrap points
-    ax1.plot(fdr['global'],fdr['local'],'ro',alpha=0.05,label='Bootstraps')
+    ax.plot(fdr['global'],fdr['local'],'ro',alpha=0.05,label='Bootstraps')
     # plot the OLS lowess line
     ci = fdr.groupby('window')['fitted','global'].agg(
         [np.mean,confidence_interval]
     )
     
     #for win,df in fdr.groupby('bootstrap_name'):
-    #    ax1.plot(df['global'],df['fitted'],alpha=1)
+    #    ax.plot(df['global'],df['fitted'],alpha=1)
         
-    ax1.errorbar(
+    ax.errorbar(
         ci['global','mean'],ci['fitted','mean'],
         yerr=ci['fitted','confidence_interval'],
         color='g',label='Bootstrap OLS'
     )
 
     #plot the empirical data
-    ax1.plot(loc['global'],loc['local'],'bo',alpha=1,label='Empirical')
-    ax1.plot(loc['global'],loc['fitted'],'k-',alpha=1,label='Empirical OLS')
+    ax.plot(loc['global'],loc['local'],'bo',alpha=1,label='Empirical')
+    ax.plot(loc['global'],loc['fitted'],'k-',alpha=1,label='Empirical OLS')
     # finish plots
-    #legend = ax1.legend(loc='best') 
+    #legend = ax.legend(loc='best') 
 
     '''---------------------------------------------------
         FDR Plotting
     '''
     
 
+def plot_fdr(args,loc,bsloc,fdr,ax):
     # Plot the empirical Z-score distributions
     zscores = list(range(1,8))
     zloc = [
@@ -227,7 +258,7 @@ def main(args):
         )) 
         for x in zscores
     ]
-    ax2.plot(zscores,zloc,'bo',label='Empirical Zscore > x')
+    ax.plot(zscores,zloc,'bo',label='Empirical Zscore > x')
     # plot the fdr scores spread
     zcdf = pd.DataFrame(
         [ mean_confidence_interval(
@@ -244,24 +275,25 @@ def main(args):
     zcdf['el'] = args.term
     zcdf['min_fdr_degree'] = args.min_fdr_degree
     zcdf['can_gene_limit'] = args.candidate_gene_limit
-    ax2.errorbar(
+    ax.errorbar(
         zscores,
         zcdf['mean'],
         yerr=zcdf['ci'],
         label='Bootstrap Z-scores',
         color='red'
     )  
-    ax2.set_xlabel('Z-Score')
-    ax2.set_ylabel('Number of Genes > Z')
-    ax2.set_title('Z Score FDR')
-    legend = ax2.legend(loc='best')
+    ax.set_xlabel('Z-Score')
+    ax.set_ylabel('Number of Genes > Z')
+    ax.set_title('Z Score FDR')
+    legend = ax.legend(loc='best')
 
     # Do the same thing, but with residuals
 
 
+def plot_resid(args,loc,bsloc,fdr,ax):
     resids = list(range(0,int(max(loc['resid'])+2)))
     rcdf = [sum(loc['resid'] >= x) for x in resids]
-    ax3.plot(resids,rcdf,'bo',label='Empirical Residuals')
+    ax.plot(resids,rcdf,'bo',label='Empirical Residuals')
     rcdf = pd.DataFrame(
          [ mean_confidence_interval(
             fdr.groupby('bootstrap_name').apply(
@@ -270,17 +302,17 @@ def main(args):
         ) for x in resids ],
         columns=['mean','ci']
     )
-    ax3.errorbar(
+    ax.errorbar(
         resids,
         rcdf['mean'],
         yerr=rcdf['ci'],
         label='Bootstrap Residuals',
         color='red'
     )  
-    ax3.set_xlabel('Residual')
-    ax3.set_ylabel('Number of Genes > X')
-    ax3.set_title('Residual FDR')
-    legend = ax3.legend(loc='best')
+    ax.set_xlabel('Residual')
+    ax.set_ylabel('Number of Genes > X')
+    ax.set_title('Residual FDR')
+    legend = ax.legend(loc='best')
 
     # Plot the predicted vs residuals
 
@@ -288,17 +320,18 @@ def main(args):
         Residual Plotting
     '''
 
-    ax4.set_xlabel('Fitted')
-    ax4.set_ylabel('Residual')
-    ax4.set_title('Model Fitting')
-    ax4.plot(loc['fitted'],loc['resid'],'bo')
+    ax.set_xlabel('Fitted')
+    ax.set_ylabel('Residual')
+    ax.set_title('Model Fitting')
+    ax.plot(loc['fitted'],loc['resid'],'bo')
     # plot the Z-scores for the std
-    ax4.plot(list(fit_std.keys()),list(fit_std.values()),'g.',marker='.')
+    ax.plot(list(fit_std.keys()),list(fit_std.values()),'g.',marker='.')
     # plot where windows are
 
-    ax5.xaxis.set_visible(False)
-    ax5.yaxis.set_visible(False)
-    ax5.text(.1,.1,'''
+def plot_data(args,loc,bsloc,fdr,ax):
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
+    ax.text(.1,.1,'''
         COB: {}
         Ontology: {}
         Term: {}
@@ -326,6 +359,8 @@ def main(args):
         args.num_snps)
     )
 
+
+
     out_string = '_'.join(map(str,[
         args.term,
         args.cob,
@@ -335,12 +370,12 @@ def main(args):
         args.candidate_window_size
     ]))
 
-    zcdf.to_csv(
-        os.path.join(
-            'CSV',
-            '{}_FDR.csv'.format(out_string)
-        )        
-    )
+    #zcdf.to_csv(
+    #    os.path.join(
+    #        'CSV',
+    #        '{}_FDR.csv'.format(out_string)
+    #    )        
+    #)
 
 
    ## Output the datafiles
@@ -364,57 +399,74 @@ def main(args):
    #)
 
 
-    plt.savefig(
-        '{}_{}_{}_{}_{}_{}_{}_{}_{}.png'.format(
-            args.term,
-            args.cob,
-            args.ontology,
-            args.window_size,
-            args.num_bootstraps,
-            args.min_fdr_degree,
-            args.candidate_window_size,
-            args.candidate_gene_limit,
-            args.num_snps
-        )
-    )
-    os.chdir(cwd)
-
-    if args.debug:
-        import ipdb; ipdb.set_trace()
-
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()    
-    parser.add_argument('--cob', help='The camoco network to use.')
-    parser.add_argument('--ontology', help='The camoco ontology to use.')
-    parser.add_argument('--term', help='The term within the ontology to use.')
+    # Data Set Arguments
     parser.add_argument(
-            '--window-size', default=15, 
-            type=int, help='The number of items within a window.')
-    parser.add_argument('--num-bootstraps', default=50,
-            type=int, 
-            help='''The number of bootstraps to perform in order
-                  to estimate a null distribution.''')
-    parser.add_argument('--sd-envelope', default=2, type=int,
-            help='''The number or standard deviations to 
-                use for the regression window.''')
-    parser.add_argument('--min-fdr-degree', default=2, 
-            type=int, help='''The miniumum degree to be included 
-            as true positive in FDR calculation.''')
-    parser.add_argument('--candidate-window-size',default=50000,
-            type=int,
-            help='The window size for mapping effective SNPs to genes.')
-    parser.add_argument('--candidate-gene-limit',default=2,
-            type=int,
-            help='The number of flanking genes included in SNP to gene mapping')
-    parser.add_argument('--num-snps',default=None,
-            type=int,help='The number of SNPs to ')
-    parser.add_argument('--out',default='Output',
-            type=str,help='Name of output directory')
-    parser.add_argument('--debug',default=False,
-            action='store_true',
-            help='Drop into an ipdb debugger before quitting.')
+        '--cob', help='The camoco network to use.'
+    )
+    parser.add_argument(
+        '--ontology', help='The camoco ontology to use.'
+    )
+    parser.add_argument(
+        '--term', help='The term within the ontology to use.'
+    )
+
+    # Data Analysis parameters  
+    parser.add_argument(
+       '--axes', nargs='*',
+       help='This are the x and y axis for the plot'
+    )
+    parser.add_argument(
+       '--num-bootstraps', default=50,type=int, 
+       help='''The number of bootstraps to perform in order
+             to estimate a null distribution.'''
+    )
+    parser.add_argument(
+       '--sd-envelope', default=2, type=int,
+       help='''The number or standard deviations to 
+           use for the regression window.'''
+    )
+    parser.add_argument(
+       '--window-size', default=15, 
+       type=int, help='The number of items within a window.'
+    )
+
+    # Permutation parameters
+    parser.add_argument(
+       '--min-fdr-degree', default=2, nargs='*',
+       type=int, help='''The miniumum degree to be included 
+       as true positive in FDR calculation.'''
+    )
+    parser.add_argument(
+       '--candidate-window-size',default=50000,
+       type=int, nargs='*',  
+       help='The window size for mapping effective SNPs to genes.'
+    )
+    parser.add_argument(
+       '--candidate-gene-limit',default=2,
+       type=int, nargs='*',
+       help='The number of flanking genes included in SNP to gene mapping'
+    )
+    # Dont worry about this right now
+    # parser.add_argument(
+    #    '--num-snps',default=None, nargs='*',
+    #    type=int,help='The number of SNPs to '
+    # )
+
+    # Data Formatting Parameters
+    parser.add_argument(
+       '--out',default='Output',
+       type=str,help='Name of output directory'
+    )
+    parser.add_argument(
+       '--debug',default=False,
+       action='store_true',
+       help='Drop into an ipdb debugger before quitting.'
+    )
+
     args = parser.parse_args()
     sys.exit(main(args))
     
