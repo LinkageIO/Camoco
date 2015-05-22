@@ -242,10 +242,13 @@ class COB(Expr):
             list(Counter(chain(*self.subnetwork(genes,sig_only=True).index.get_values())).items()),
             columns=['Gene','Degree']
         ).set_index('Gene')
-        for gene in genes:
-            if gene.id not in local_degree.index:
-                local_degree.ix[gene.id] = 0
-        return local_degree
+        # We need to find genes not in the subnetwork and add them as degree 0
+        degree_zero_genes = pd.DataFrame( # The code below is optimized
+            [(gene.id,0) for gene in genes if gene.id not in local_degree.index],
+            columns=['Gene','Degree']        
+        ).set_index('Gene')
+
+        return pd.concat([local_degree,degree_zero_genes])
 
     def global_degree(self,genes):
         '''
@@ -280,12 +283,9 @@ class COB(Expr):
 
         '''
         self.log('Fetching Degree ... ')
-        degree = self.local_degree(gene_list).merge(
-            self.global_degree(gene_list),
-            how='inner',
-            left_index=True,
-            right_index=True
-        )
+        degree = self.local_degree(gene_list)
+        # Add on the global degree
+        degree['global'] = self.global_degree(self.refgen.from_ids(degree.index.values))['Degree']
         degree.columns = ['local','global']
         degree = degree.sort('global')
         if include_regression:
