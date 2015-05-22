@@ -237,7 +237,7 @@ class RefGen(Camoco):
             random_candidates = self.upstream_genes(random_gene,gene_limit=num_candidates)
             if len(random_candidates) != num_candidates:
                 # somehow we hit the end of a chromosome or something, just recurse
-                return self.bootstrap_candidate_genes(locus,gene_limit=num_candidates,chain=chain)
+                return self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain)
             assert len(random_candidates) == num_candidates
             return random_candidates
         else:
@@ -247,6 +247,7 @@ class RefGen(Camoco):
             bootstraps = list()
             for locus in locus_list:
                 # compare downstream of last locus to current locus
+                target_len = len(self.candidate_genes(locus,gene_limit=gene_limit))
                 genes = self.bootstrap_candidate_genes(
                     locus, gene_limit=gene_limit, chain=chain
                 )
@@ -255,10 +256,13 @@ class RefGen(Camoco):
                     genes = self.bootstrap_candidate_genes(
                         locus, gene_limit=gene_limit, chain=chain
                     )
+                # Add all new bootstrapped genes to the seen list 
                 [seen.add(x) for x in itertools.chain(genes,)]
+                assert target_len == len(genes)
                 bootstraps.append(genes)
             if chain:
                 bootstraps = list(set(itertools.chain(*bootstraps)))
+            self.log("Found {} bootstraps",len(bootstraps))
             return bootstraps
 
     def candidate_genes(self, loci, gene_limit=4,chain=True):
@@ -291,10 +295,11 @@ class RefGen(Camoco):
                 return list(itertools.chain(up_genes,genes_within,down_genes))
             return (up_genes,genes_within,down_genes)
         else:
-            iterator = iter(loci)   
+            iterator = iter(sorted(loci))
             genes = [self.candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
             if chain:
                 genes = list(set(itertools.chain(*genes)))
+            self.log("Found {} candidates",len(genes))
             return genes
  
 
