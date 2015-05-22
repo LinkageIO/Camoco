@@ -124,7 +124,7 @@ class Expr(Camoco):
         '''
         df = self.hdf5['raw_expr'] if raw is True else self._expr
         if genes is not None:
-            df = df.loc[genes,:]
+            df = df.loc[[x.id for x in genes],:]
         if accessions is not None:
             df = df[accessions]
         return df
