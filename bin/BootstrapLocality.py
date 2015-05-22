@@ -17,13 +17,15 @@ import statsmodels.api as sm
 
 lowess = sm.nonparametric.lowess
 
-def mean_confidence_interval(data, confidence=0.95):
+def mean_confidence_interval(data):
+    return np.mean(data), confidence_interval(data)
+
+def confidence_interval(data, confidence=0.95):
     a = 1.0*np.array(data)
     n = len(a)
     m, se = np.mean(a), scipy.stats.sem(a)
     h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
-    return m, h
-
+    return 1.96*se
 
 class NearestDict(OrderedDict):
     '''
@@ -51,11 +53,15 @@ def main(args):
     '''
 
     # Find the empirical Locality
+    effective_snps = term.effective_snps(
+            window_size=args.candidate_window_size
+    ) 
+    candidate_genes = cob.refgen.candidate_genes(
+        effective_snps,
+        gene_limit=args.candidate_gene_limit
+    )
     loc = cob.locality(
-        cob.refgen.candidate_genes(
-            term.effective_snps(window_size=args.candidate_window_size),
-            gene_limit=args.candidate_gene_limit
-        ),
+        candidate_genes,
         include_regression=True
     )
     
@@ -63,7 +69,9 @@ def main(args):
     bsloc = pd.concat(
             [cob.locality(
                 cob.refgen.bootstrap_candidate_genes(
-                    term.effective_snps(window_size=args.candidate_window_size),
+                    term.effective_snps(
+                        window_size=args.candidate_window_size
+                    ),
                     gene_limit=args.candidate_gene_limit
                 ),
                 bootstrap_name=x
@@ -81,7 +89,7 @@ def main(args):
             it=5,
             delta=0.1*len(bsloc),
             is_sorted=False
-        )
+    )
 
     # Windowing
     bsloc = bsloc.sort('fitted')
@@ -111,10 +119,15 @@ def main(args):
     fit_std = {f:win_std[w]for f,w in win_map.items()}
     
    
-    # Create a dict where keys are fitted valus and values are that fitted values std
+    # Create a dict where keys are fitted valus and 
+    # values are that fitted values std
     fit_std = NearestDict(
         pd.DataFrame(
-            lowess(np.array(list(fit_std.values())),np.array(list(fit_std.keys())),is_sorted=False),columns=['fitted','sd']
+            lowess(
+                np.array(list(fit_std.values())),
+                np.array(list(fit_std.keys())),
+                is_sorted=False
+            ),columns=['fitted','sd']
         ).sort('fitted').set_index('fitted').to_dict()['sd']
     )
 
@@ -132,15 +145,16 @@ def main(args):
     fdr = pd.concat(
             [cob.locality(
                 cob.refgen.bootstrap_candidate_genes(
-                    term.effective_snps(window_size=args.candidate_window_size),
+                    term.effective_snps(
+                        window_size=args.candidate_window_size
+                    ),
                     gene_limit=args.candidate_gene_limit
                 ),
-                bootstrap_name=x
+                bootstrap_name=x,
+                include_regression=True
             ) for x in range(args.num_bootstraps)]
     ).sort('global')
     OLS = sm.OLS(fdr['local'],fdr['global']).fit()
-    fdr['fitted'] = OLS.fittedvalues
-    fdr['resid'] = OLS.resid
 
     # Remove global degree larger than empirical
     fdr = fdr[fdr['global'] <= max(loc['global'])]
@@ -150,25 +164,6 @@ def main(args):
     fdr['bs_std'] = [fit_std[x] for x in fdr['fitted']]
     fdr['zscore'] = [x['resid']/x['bs_std'] for i,x in fdr.iterrows()]
 
-    # Output the datafiles
-    loc.sort('zscore',ascending=False).to_csv(
-        os.path.join(
-            'CSV',
-            '{}.csv'.format('Empirical_'.join(map(str,[args.term,args.cob,args.window_size,args.term])))
-        )
-    )
-    bsloc.to_csv(
-        os.path.join(
-            'CSV',
-            '{}.csv'.format('Bootstrap_'.join(map(str,[args.term,args.cob,args.window_size,args.term])))
-        )
-    )
-    fdr.sort(['bootstrap_name','zscore'],ascending=False).to_csv(
-        os.path.join(
-            'CSV',
-            '{}.csv'.format('FDR_'.join(map(str,[args.term,args.cob,args.window_size,args.term])))
-        )
-    )
 
 
     ''' ---------------------------------------------------
@@ -191,17 +186,32 @@ def main(args):
     ax1.set_title('OLS Fitting')
 
     # UGH! map lowess 
-    fdrlowess = lowess(fdr['local'],fdr['global'],frac=0.15,it=5,delta=0.1*len(fdr),is_sorted=False)
+    fdrlowess = lowess(
+        fdr['local'],fdr['global'],
+        frac=0.15,it=5,delta=0.1*len(fdr),
+        is_sorted=False
+    )
     # plot the bootstrap points
     ax1.plot(fdr['global'],fdr['local'],'ro',alpha=0.05,label='Bootstraps')
     # plot the OLS lowess line
-    ax1.plot(fdr['global'],fdr['fitted'],'g--',label='Bootstrap OLS')
+    ci = fdr.groupby('window')['fitted','global'].agg(
+        [np.mean,confidence_interval]
+    )
+    
+    #for win,df in fdr.groupby('bootstrap_name'):
+    #    ax1.plot(df['global'],df['fitted'],alpha=1)
+        
+    ax1.errorbar(
+        ci['global','mean'],ci['fitted','mean'],
+        yerr=ci['fitted','confidence_interval'],
+        color='g',label='Bootstrap OLS'
+    )
 
     #plot the empirical data
     ax1.plot(loc['global'],loc['local'],'bo',alpha=1,label='Empirical')
     ax1.plot(loc['global'],loc['fitted'],'k-',alpha=1,label='Empirical OLS')
     # finish plots
-    legend = ax1.legend(loc='best') 
+    #legend = ax1.legend(loc='best') 
 
     '''---------------------------------------------------
         FDR Plotting
@@ -210,18 +220,37 @@ def main(args):
 
     # Plot the empirical Z-score distributions
     zscores = list(range(1,8))
-    zcdf = [sum(np.logical_and(loc['zscore'] >= x , loc['local'] >= args.min_fdr_degree)) for x in zscores]
-    ax2.plot(zscores,zcdf,'bo',label='Empirical Zscore > x')
+    zloc = [
+        sum(np.logical_and(
+            loc['zscore'] >= x ,
+            loc['local'] >= args.min_fdr_degree
+        )) 
+        for x in zscores
+    ]
+    ax2.plot(zscores,zloc,'bo',label='Empirical Zscore > x')
     # plot the fdr scores spread
     zcdf = pd.DataFrame(
         [ mean_confidence_interval(
             fdr.groupby('bootstrap_name').apply(
-                lambda df: sum(np.logical_and(df['zscore'] >= x, df['local'] >= args.min_fdr_degree ))
+                lambda df: sum(np.logical_and(
+                    df['zscore'] >= x,
+                    df['local'] >= args.min_fdr_degree 
+                ))
             )
         ) for x in zscores ],
         columns=['mean','ci']
     )
-    ax2.errorbar(zscores,zcdf['mean'],yerr=zcdf['ci'],label='Bootstrap Z-scores',color='red')  
+    zcdf['emp'] = zloc
+    zcdf['el'] = args.term
+    zcdf['min_fdr_degree'] = args.min_fdr_degree
+    zcdf['can_gene_limit'] = args.candidate_gene_limit
+    ax2.errorbar(
+        zscores,
+        zcdf['mean'],
+        yerr=zcdf['ci'],
+        label='Bootstrap Z-scores',
+        color='red'
+    )  
     ax2.set_xlabel('Z-Score')
     ax2.set_ylabel('Number of Genes > Z')
     ax2.set_title('Z Score FDR')
@@ -241,7 +270,13 @@ def main(args):
         ) for x in resids ],
         columns=['mean','ci']
     )
-    ax3.errorbar(resids,rcdf['mean'],yerr=rcdf['ci'],label='Bootstrap Residuals',color='red')  
+    ax3.errorbar(
+        resids,
+        rcdf['mean'],
+        yerr=rcdf['ci'],
+        label='Bootstrap Residuals',
+        color='red'
+    )  
     ax3.set_xlabel('Residual')
     ax3.set_ylabel('Number of Genes > X')
     ax3.set_title('Residual FDR')
@@ -267,16 +302,80 @@ def main(args):
         COB: {}
         Ontology: {}
         Term: {}
-        Window Size: {}
+        Num Raw SNPS: {}
+        Num Effective SNPS: {}
+        Num Genes: {}
+        CI Window Size: {}
         Num. Bootstraps: {}
         Min FDR Degree: {}
         Candidate Gene Window Size: {}
         Candidate Gene Limit: {}
         Num SNPs: {}
-    '''.format(args.cob,args.ontology,args.term,args.window_size,args.num_bootstraps,args.min_fdr_degree,args.candidate_window_size,args.candidate_gene_limit,args.num_snps))
+    '''.format(
+        args.cob,
+        args.ontology,
+        args.term,
+        len(term.locus_list),
+        len(effective_snps),
+        len(candidate_genes),
+        args.window_size,
+        args.num_bootstraps,
+        args.min_fdr_degree,
+        args.candidate_window_size,
+        args.candidate_gene_limit,
+        args.num_snps)
+    )
+
+    out_string = '_'.join(map(str,[
+        args.term,
+        args.cob,
+        args.window_size,
+        args.min_fdr_degree,
+        args.candidate_gene_limit,
+        args.candidate_window_size
+    ]))
+
+    zcdf.to_csv(
+        os.path.join(
+            'CSV',
+            '{}_FDR.csv'.format(out_string)
+        )        
+    )
+
+
+   ## Output the datafiles
+   #loc.sort('zscore',ascending=False).to_csv(
+   #    os.path.join(
+   #        'CSV',
+   #        'Empirical_{}.csv'.format(out_string)
+   #    )
+   #)
+   #bsloc.to_csv(
+   #    os.path.join(
+   #        'CSV',
+   #        'Bootstrap_{}.csv'.format(out_string)
+   #    )
+   #)
+   #fdr.sort(['bootstrap_name','zscore'],ascending=False).to_csv(
+   #    os.path.join(
+   #        'CSV',
+   #        'FDR_{}.csv'.format(out_string)
+   #    )
+   #)
+
 
     plt.savefig(
-        '{}_{}_{}_{}_{}_{}_{}_{}_{}.png'.format(args.term,args.cob,args.ontology,args.window_size,args.num_bootstraps,args.min_fdr_degree,args.candidate_window_size,args.candidate_gene_limit,args.num_snps)
+        '{}_{}_{}_{}_{}_{}_{}_{}_{}.png'.format(
+            args.term,
+            args.cob,
+            args.ontology,
+            args.window_size,
+            args.num_bootstraps,
+            args.min_fdr_degree,
+            args.candidate_window_size,
+            args.candidate_gene_limit,
+            args.num_snps
+        )
     )
     os.chdir(cwd)
 
@@ -290,15 +389,32 @@ if __name__ == '__main__':
     parser.add_argument('--cob', help='The camoco network to use.')
     parser.add_argument('--ontology', help='The camoco ontology to use.')
     parser.add_argument('--term', help='The term within the ontology to use.')
-    parser.add_argument('--window-size', default=15, type=int, help='The number of items within a window.')
-    parser.add_argument('--num-bootstraps', default=50, type=int, help='The number of bootstraps to perform in order to estimate a null distribution.')
-    parser.add_argument('--sd-envelope', default=2, type=int, help='The number or standard deviations to use for the regression window.')
-    parser.add_argument('--min-fdr-degree', default=2, type=int, help='The miniumum degree to be included as true positive in FDR calculation.')
-    parser.add_argument('--candidate-window-size',default=250000,type=int,help='The window size for mapping effective SNPs to genes.')
-    parser.add_argument('--candidate-gene-limit',default=2,type=int,help='The number of flanking genes included in SNP to gene mapping')
-    parser.add_argument('--num-snps',default=None,type=int,help='The number of SNPs to ')
-    parser.add_argument('--out',default='Output',type=str,help='Name of output directory')
-    parser.add_argument('--debug',default=False,action='store_true',help='Drop into an ipdb debugger before quitting.')
+    parser.add_argument(
+            '--window-size', default=15, 
+            type=int, help='The number of items within a window.')
+    parser.add_argument('--num-bootstraps', default=50,
+            type=int, 
+            help='''The number of bootstraps to perform in order
+                  to estimate a null distribution.''')
+    parser.add_argument('--sd-envelope', default=2, type=int,
+            help='''The number or standard deviations to 
+                use for the regression window.''')
+    parser.add_argument('--min-fdr-degree', default=2, 
+            type=int, help='''The miniumum degree to be included 
+            as true positive in FDR calculation.''')
+    parser.add_argument('--candidate-window-size',default=50000,
+            type=int,
+            help='The window size for mapping effective SNPs to genes.')
+    parser.add_argument('--candidate-gene-limit',default=2,
+            type=int,
+            help='The number of flanking genes included in SNP to gene mapping')
+    parser.add_argument('--num-snps',default=None,
+            type=int,help='The number of SNPs to ')
+    parser.add_argument('--out',default='Output',
+            type=str,help='Name of output directory')
+    parser.add_argument('--debug',default=False,
+            action='store_true',
+            help='Drop into an ipdb debugger before quitting.')
     args = parser.parse_args()
     sys.exit(main(args))
     
