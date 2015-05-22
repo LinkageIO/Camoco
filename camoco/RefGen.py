@@ -38,7 +38,9 @@ class RefGen(Camoco):
         ''' 
             Returns the number of genes in the dataset 
         '''
-        return self.db.cursor().execute(''' SELECT COUNT(*) FROM genes''').fetchone()[0]
+        return self.db.cursor().execute(
+           ''' SELECT COUNT(*) FROM genes'''
+        ).fetchone()[0]
 
     def random_gene(self,**kwargs):
         '''
@@ -70,9 +72,12 @@ class RefGen(Camoco):
         '''))
 
     def iter_genes(self):
-        ''' iterates over genes in refgen, only returns genes within gene filter '''
-        return ( Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute('''
-            SELECT chromosome,start,end,id FROM genes
+        ''' iterates over genes in refgen, 
+            only returns genes within gene filter '''
+        return ( 
+            Gene(*x,build=self.build,organism=self.organism) \
+            for x in self.db.cursor().execute('''
+                SELECT chromosome,start,end,id FROM genes
             ''')
         )
 
@@ -107,8 +112,10 @@ class RefGen(Camoco):
                  build=self.build,
                  organism=self.organism
             ) 
-        genes = [ Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
+        genes = [ 
+            Gene(*x,build=self.build,organism=self.organism) \
+            for x in self.db.cursor().execute(''' 
+                SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
             '''.format("','".join(map(str.upper,gene_list))))
         ]
         if check_shape and len(genes) != len(gene_list):
@@ -127,7 +134,8 @@ class RefGen(Camoco):
         '''
         try:
             return Chrom(*self.db.cursor().execute(
-                '''SELECT id,length FROM chromosomes WHERE id = ?''',(id,)).fetchone()
+                '''SELECT id,length FROM chromosomes WHERE id = ?''',
+                (id,)).fetchone()
             ) 
         except Exception as e:
             self.log("No chromosome where id = {}. Error: {}",id,e)
@@ -137,12 +145,14 @@ class RefGen(Camoco):
             Returns the genes within a locus, or None 
         '''
         if isinstance(loci,Locus):
-            return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-                SELECT chromosome,start,end,id FROM genes
-                WHERE chromosome = ?
-                AND start > ?
-                AND end < ?
-            ''',(loci.chrom,loci.start,loci.end))]
+            return [
+                Gene(*x,build=self.build,organism=self.organism) \
+                for x in self.db.cursor().execute(''' 
+                    SELECT chromosome,start,end,id FROM genes
+                    WHERE chromosome = ?
+                    AND start > ?
+                    AND end < ?
+                ''',(loci.chrom,loci.start,loci.end))]
         else:
             iterator = iter(loci)   
             genes = [self.genes_within(locus,chain=chain) for locus in iterator]
@@ -155,13 +165,15 @@ class RefGen(Camoco):
             returns genes upstream of a locus. Genes are ordered so that the
             nearest genes are at the beginning of the list.
         '''
-        return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,id FROM genes
-            WHERE chromosome = ?
-            AND start <= ?
-            AND start >= ?
-            ORDER BY start DESC
-            LIMIT ?
+        return [
+            Gene(*x,build=self.build,organism=self.organism) \
+            for x in self.db.cursor().execute(''' 
+                SELECT chromosome,start,end,id FROM genes
+                WHERE chromosome = ?
+                AND start <= ?
+                AND start >= ?
+                ORDER BY start DESC
+                LIMIT ?
             ''',(locus.chrom, locus.start, locus.upstream, gene_limit)
         )]
     
@@ -170,13 +182,15 @@ class RefGen(Camoco):
             returns genes downstream of a locus. Genes are ordered so that the 
             nearest genes are at the beginning of the list. 
         '''
-        return [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-            SELECT chromosome,start,end,id FROM genes
-            WHERE chromosome = ?
-            AND start > ?
-            AND start < ?
-            ORDER BY start ASC
-            LIMIT ?
+        return [
+            Gene(*x,build=self.build,organism=self.organism) \
+            for x in self.db.cursor().execute(''' 
+                SELECT chromosome,start,end,id FROM genes
+                WHERE chromosome = ?
+                AND start > ?
+                AND start < ?
+                ORDER BY start ASC
+                LIMIT ?
             ''',(locus.chrom, locus.end, locus.downstream, gene_limit)
         )]
 
@@ -190,14 +204,20 @@ class RefGen(Camoco):
             locus = loci
             upstream_gene_limit = math.ceil(gene_limit/2)
             downstream_gene_limit = math.floor(gene_limit/2)
-            up_genes = self.upstream_genes(locus, gene_limit=upstream_gene_limit)
-            down_genes = self.downstream_genes(locus, gene_limit=downstream_gene_limit)
+            up_genes = self.upstream_genes(
+                locus, gene_limit=upstream_gene_limit
+            )
+            down_genes = self.downstream_genes(
+                locus, gene_limit=downstream_gene_limit
+            )
             if chain:
                 return list(itertools.chain(up_genes,down_genes))
             return (up_genes,down_genes)
         else:
             iterator = iter(loci)   
-            genes = [self.flanking_genes(locus,gene_limit=gene_limit) for locus in iterator]
+            genes = [self.flanking_genes(locus,gene_limit=gene_limit) \
+                for locus in iterator
+            ]
             if chain:
                 genes = list(itertools.chain(*genes))
             return genes
@@ -226,7 +246,9 @@ class RefGen(Camoco):
             # We now have a single locus
             locus = loci
             # grab the actual candidate genes
-            num_candidates = len(self.candidate_genes(locus,gene_limit=gene_limit,chain=True))
+            num_candidates = len(self.candidate_genes(
+                locus,gene_limit=gene_limit,chain=True)
+            )
             if num_candidates == 0:
                 return []
             # Snps a random genes from the genome
@@ -234,10 +256,14 @@ class RefGen(Camoco):
             # Extend the window to something crazy
             random_gene.window = 10e10
             # Snag the same number of candidates
-            random_candidates = self.upstream_genes(random_gene,gene_limit=num_candidates)
+            random_candidates = self.upstream_genes(
+                random_gene,gene_limit=num_candidates
+            )
             if len(random_candidates) != num_candidates:
-                # somehow we hit the end of a chromosome or something, just recurse
-                return self.bootstrap_candidate_genes(locus,gene_limit=gene_limit,chain=chain)
+                # somehow we hit the end of a chromosome 
+                # or something, just recurse
+                return self.bootstrap_candidate_genes(
+                    locus,gene_limit=gene_limit,chain=chain)
             assert len(random_candidates) == num_candidates
             return random_candidates
         else:
@@ -247,7 +273,9 @@ class RefGen(Camoco):
             bootstraps = list()
             for locus in locus_list:
                 # compare downstream of last locus to current locus
-                target_len = len(self.candidate_genes(locus,gene_limit=gene_limit))
+                target_len = len(self.candidate_genes(
+                    locus,gene_limit=gene_limit)
+                )
                 genes = self.bootstrap_candidate_genes(
                     locus, gene_limit=gene_limit, chain=chain
                 )
@@ -290,13 +318,19 @@ class RefGen(Camoco):
             # If not an iterator, its a single locus
             locus = loci
             genes_within = self.genes_within(locus)
-            up_genes,down_genes = self.flanking_genes(locus,gene_limit=gene_limit,chain=False)
+            up_genes,down_genes = self.flanking_genes(
+                locus,gene_limit=gene_limit,chain=False
+            )
             if chain:
                 return list(itertools.chain(up_genes,genes_within,down_genes))
             return (up_genes,genes_within,down_genes)
         else:
             iterator = iter(sorted(loci))
-            genes = [self.candidate_genes(locus,gene_limit=gene_limit,chain=chain) for locus in iterator]
+            genes = [
+                self.candidate_genes(
+                    locus,gene_limit=gene_limit,chain=chain
+                ) for locus in iterator
+            ]
             if chain:
                 genes = list(set(itertools.chain(*genes)))
             self.log("Found {} candidates",len(genes))
@@ -306,7 +340,8 @@ class RefGen(Camoco):
     def pairwise_distance(self, gene_list=None):
         ''' 
             returns a vector containing the pairwise distances between genes 
-            in gene_list in vector form. See np.squareform for matrix conversion.
+            in gene_list in vector form. See np.squareform for matrix 
+            conversion.
         '''
         if gene_list is None:
             gene_list = list(self.iter_genes())
@@ -324,9 +359,13 @@ class RefGen(Camoco):
         ).sort('gene')
         # chromosome needs to be floats
         positions.chrom = positions.chrom.astype('float')
-        assert len(positions) == len(gene_list), 'Some genes in dataset not if RefGen'
-        assert all(positions.gene == [g.id for g in gene_list]), 'Genes are not in the correct order!'
-        distances = RefGenDist.gene_distances(positions.chrom.values,positions.pos.values) 
+        assert len(positions) == len(gene_list), \
+            'Some genes in dataset not if RefGen'
+        assert all(positions.gene == [g.id for g in gene_list]), \
+            'Genes are not in the correct order!'
+        distances = RefGenDist.gene_distances(
+            positions.chrom.values,positions.pos.values
+        ) 
         return distances
 
     def summary(self): 
@@ -334,7 +373,12 @@ class RefGen(Camoco):
             'Reference Genome: {} - {} - {}',
             '{} genes',
             'Genome:',
-            '{}']).format(self.organism,self.build,self.name,self.num_genes(),self.genome))
+            '{}']).format(
+                self.organism,self.build,
+                self.name,self.num_genes(),
+                self.genome
+            )
+        )
 
     def plot_loci(self,snp_list,filename):
         ''' 
@@ -344,11 +388,18 @@ class RefGen(Camoco):
         f, (ax1,ax2) = plt.subplots(2,figsize=(10,10))
         # Loci Locations
         loci = pd.DataFrame([x.as_dict() for x in snp_list])
-        ax1.barh(bottom=loci.chrom.astype('int').values,width=loci.window.values,left=loci.start.values)
+        ax1.barh(
+            bottom=loci.chrom.astype('int').values,
+            width=loci.window.values,
+            left=loci.start.values
+        )
         ax1.set_xlabel('Position (bp)')
         ax1.set_ylabel('Chromosome')
         # Plot inter loci distance
-        distances = RefGenDist.gene_distances(loci.chrom.astype('float').values,loci.pos.values).astype('float')
+        distances = RefGenDist.gene_distances(
+            loci.chrom.astype('float').values,
+            loci.pos.values
+        ).astype('float')
         distances = distances[np.isfinite(distances)]
         ax2.hist(distances)
         ax2.set_xlabel('Inter Window Distance')
@@ -358,7 +409,9 @@ class RefGen(Camoco):
         return distances
 
     def __repr__(self):
-        return 'Reference Genome: {} - {} - {}'.format(self.organism,self.build,self.name)
+        return 'Reference Genome: {} - {} - {}'.format(
+            self.organism,self.build,self.name
+        )
 
     def __len__(self):
         return self.num_genes()        
@@ -366,17 +419,20 @@ class RefGen(Camoco):
     def __contains__(self,obj):
         ''' flexible on what you pass into the 'in' function '''
         if isinstance(obj,Locus):
-            # you can pass in a gene object (this expression should ALWAYS be true if you 
+            # you can pass in a gene object (this expression 
+            # should ALWAYS be true if you 
             # created gene object from this RefGen)
             if self.db.cursor().execute(
-                '''SELECT COUNT(*) FROM genes WHERE id = ?''',(obj.id.upper(),)).fetchone()[0] == 1:
+                '''SELECT COUNT(*) FROM genes WHERE id = ?''',
+                (obj.id.upper(),)).fetchone()[0] == 1:
                 return True
             else:
                 return False
         elif isinstance(obj,str):
             # Can be a string object
             if self.db.cursor().execute('''
-                SELECT COUNT(*) FROM genes WHERE id = ?''',(str(obj).upper(),)).fetchone()[0] == 1:
+                SELECT COUNT(*) FROM genes WHERE id = ?''',
+                (str(obj).upper(),)).fetchone()[0] == 1:
                 return True
             else:
                 return False
@@ -412,7 +468,8 @@ class RefGen(Camoco):
     def from_gff(cls,filename,name,description,build,organism):
         ''' 
             Imports RefGen object from a gff (General Feature Format) file.
-            See more about the format here: http://www.ensembl.org/info/website/upload/gff.html
+            See more about the format here: 
+            http://www.ensembl.org/info/website/upload/gff.html
 
             Parameters
             ----------
@@ -428,9 +485,9 @@ class RefGen(Camoco):
                 A string designating the genome build, used for comparison
                 operations, genes may share IDS but are different across build.
             organism : str
-                A short string describing the organims this RefGen is coming from.
-                Again, is used in comparing equality among genes which may have the 
-                same id or name.
+                A short string describing the organims this RefGen is coming 
+                from. Again, is used in comparing equality among genes which 
+                may have the same id or name.
 
         '''
         self = cls.create(name,description,type='RefGen')
@@ -442,14 +499,21 @@ class RefGen(Camoco):
                 #skip comment lines
                 if line.startswith('#'):
                     continue
-                chrom,source,feature,start,end,score,strand,frame,attributes = line.strip().split()
-                attributes = dict([(field.split('=')) for field in attributes.strip(';').split(';')])
+                (chrom,source,feature,start,
+                 end,score,strand,frame,attributes) = line.strip().split()
+                attributes = dict([(field.split('=')) \
+                    for field in attributes.strip(';').split(';')
+                ])
                 if feature == 'chromosome':
                     self.log('Found a chromosome: {}',attributes['ID'])
                     self.add_chromosome(Chrom(attributes['ID'],end))
                 if feature == 'gene':
                     genes.append(
-                        Gene(chrom,int(start),int(end),attributes['ID'].upper(),strand=strand,build=build,organism=organism)
+                        Gene(
+                            chrom,int(start),int(end),
+                            attributes['ID'].upper(),strand=strand,
+                            build=build,organism=organism
+                        )
                     )
         self.add_gene(genes)
         return self
@@ -457,7 +521,8 @@ class RefGen(Camoco):
     @classmethod
     def filtered_refgen(cls,name,description,refgen,gene_list):
         ''' 
-            Copies from a previous instance of refgen, making sure each gene is within gene list 
+            Copies from a previous instance of refgen, making sure 
+            each gene is within gene list 
         '''
         self = cls.create(name,description,'RefGen')
         self._global('build',refgen.build)
@@ -490,7 +555,7 @@ class RefGen(Camoco):
             )
         ''');
 
-    ''' ----------------------------------------------------------------------------------------
+    ''' ----------------------------------------------------------------------
             Unimplemented
     '''
 
@@ -499,12 +564,13 @@ class RefGen(Camoco):
             Returns the gene the locus is within, or None 
         '''
         try:
-            x = [Gene(*x,build=self.build,organism=self.organism) for x in self.db.cursor().execute(''' 
-                SELECT chromosome,start,end,id FROM genes 
-                WHERE chromosome = ?
-                AND start < ?
-                AND end > ?
-            ''',(locus.chrom,locus.start,locus.start))][0]
+            x = [Gene(*x,build=self.build,organism=self.organism) \
+                for x in self.db.cursor().execute(''' 
+                    SELECT chromosome,start,end,id FROM genes 
+                    WHERE chromosome = ?
+                    AND start < ?
+                    AND end > ?
+                ''',(locus.chrom,locus.start,locus.start))][0]
             return x
         except Exception as e:
             return None
@@ -512,12 +578,16 @@ class RefGen(Camoco):
     def nearest_gene(self,locus):
         ''' return the gene nearest the locus '''
         candidates = self.flanking_genes(locus)
-        val,idx  = min((val,idx) for (idx,val) in enumerate([abs(locus-candidate) for candidate in candidates]))
+        val,idx  = min((val,idx) for (idx,val) \
+            in enumerate([abs(locus-candidate) for candidate in candidates]))
         return candidates[idx]
 
     @memoize
     def flanking_genes_index(self,gene_limit=4,window=50000):
-        ''' Generate an index of flanking genes useful for bootstrapping (i.e. we can get rid of while loop '''
+        ''' 
+            Generate an index of flanking genes useful for 
+            bootstrapping (i.e. we can get rid of while loop 
+        '''
         # iterate over genes keeping track of number of flanking genes 
         self.log("Generating flanking gene index gene_limit {}",gene_limit)
         index = defaultdict(list)
@@ -526,7 +596,8 @@ class RefGen(Camoco):
             flanks = self.flanking_genes(gene,gene_limit=gene_limit)
             index[len(flanks)].append(flanks)
         for num in index:
-            self.log("Found {} genes with {} flanking genes",len(index[num]),num)
+            self.log(
+                "Found {} genes with {} flanking genes",
+                len(index[num]),num
+            )
         return index
- 
-
