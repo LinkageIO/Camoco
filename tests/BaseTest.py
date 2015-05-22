@@ -16,22 +16,20 @@ class Locus(unittest.TestCase):
         self.assertIsInstance(a,co.Locus)
 
 class RefGen(unittest.TestCase):
-    @unittest.skipUnless(
-            co.available_datasets('RefGen','Zm5bFGS') and 
-            co.available_datasets('Ontology','ZmIonome'),'Not Adequate Datasets')
+
+    def setUp(self):
+        self.Fe = co.Ontology('ZmIonome')['Fe57']
+        self.ZM = co.RefGen('Zm5bFGS')
 
     def test_candidate_vs_bootstrap_length(self):
-        ZM = co.RefGen('Zm5bFGS')
-        snps = co.Ontology("ZmIonome")['Fe57'].effective_snps(window_size=50000)
+        snps = self.Fe.effective_snps(window_size=50000)
         self.assertEqual(
-            len(ZM.candidate_genes(snps)),
-            len(ZM.bootstrap_candidate_genes(snps)),
+            len(self.ZM.candidate_genes(snps)),
+            len(self.ZM.bootstrap_candidate_genes(snps)),
             'Bootstrap vs emirical candidate gene sizes do not match'
         )
 
-    @unittest.skipUnless(co.available_datasets('RefGen','Zm5bFGS'),'Not Adequate Datasets')
     def test_get_attr_and_generating_from_ids(self):
-        ZM = co.RefGen('Zm5bFGS')
         self.assertIsInstance(ZM['GRMZM2G000014'],co.Locus)
         self.assertIsInstance(ZM.from_ids(['GRMZM2G000014'])[0],co.Locus)
 
