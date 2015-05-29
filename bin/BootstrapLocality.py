@@ -51,6 +51,8 @@ def main(args):
     xaxes = getattr(args,xaxes_key)
     yaxes = getattr(args,yaxes_key)
 
+    #Open a log file
+
     gs = plt.GridSpec(len(xaxes),len(yaxes))
     fig = plt.figure(figsize=(4*len(xaxes),4*len(yaxes)))
     # Add in text for axes
@@ -62,12 +64,17 @@ def main(args):
                 yaxes_key,yaxis,
             ))
             perm_args = copy.deepcopy(args) 
+            # Set the values we aren't permuting to their first value
+            # I hate this
+            for arg in perm_args.permutable:
+                if arg not in [xaxes_key,yaxes_key]:
+                    setattr(perm_args,arg,getattr(args,arg)[0])
             # Change the relevent things in the permuted args 
             setattr(perm_args,xaxes_key,xaxis)
             setattr(perm_args,yaxes_key,yaxis)
             # Generate data using permuted arguments
             loc,bsloc,fdr = generate_data(cob,term,perm_args) 
-            plot_fdr(args,loc,bsloc,fdr,ax)
+            plot_fdr(perm_args,loc,bsloc,fdr,ax)
             if i == 0:
                 ax.set_title(yaxis)
             if j == 0:
@@ -75,8 +82,6 @@ def main(args):
             if i == 0 and j == 0:
                 ax.set_title(str(yaxes_key)+' '+str(yaxis))
                 ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
-
-
 
     plt.tight_layout()
     plt.savefig(args.out.replace('.png','')+'.png')
@@ -435,6 +440,14 @@ if __name__ == '__main__':
        type=int, help='The number of items within a window.'
     )
 
+
+    parser.add_argument(
+       '--permutable', default=[
+            'min_fdr_degree',
+            'candidate_window_size',
+            'candidate_gene_limit'
+        ]        
+    )
     # Permutation parameters
     parser.add_argument(
        '--min-fdr-degree', default=2, nargs='*',
@@ -468,8 +481,14 @@ if __name__ == '__main__':
        help='Drop into an ipdb debugger before quitting.'
     )
 
+    parser.add_argument(
+        '--plot',default='fdr',
+        action='store',
+        help='Designates which item to plot. On of [fdr,scatter]'
+    )
+
     args = parser.parse_args()
     sys.exit(main(args))
-    
+
 
 
