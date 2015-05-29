@@ -55,6 +55,12 @@ def main(args):
 
     gs = plt.GridSpec(len(xaxes),len(yaxes))
     fig = plt.figure(figsize=(4*len(xaxes),4*len(yaxes)))
+
+    # Figure out what to plot
+    possibles = globals().copy()
+    possibles.update(locals())
+    method = possibles.get('plot_'+args.plot)
+
     # Add in text for axes
     for i,xaxis in enumerate(xaxes):
         for j,yaxis in enumerate(yaxes):
@@ -84,7 +90,7 @@ def main(args):
                 ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
 
     plt.tight_layout()
-    plt.savefig(args.out.replace('.png','')+'.png')
+    plt.savefig(args.plot+'_'+args.out.replace('.png','')+'.png')
 
     if args.debug:
         import ipdb; ipdb.set_trace()
