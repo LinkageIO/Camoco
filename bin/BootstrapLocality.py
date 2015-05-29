@@ -54,7 +54,7 @@ def main(args):
     #Open a log file
 
     gs = plt.GridSpec(len(xaxes),len(yaxes))
-    fig = plt.figure(figsize=(4*len(xaxes),4*len(yaxes)))
+    fig = plt.figure(figsize=(4*len(yaxes),4*len(xaxes)))
 
     # Figure out what to plot
     possibles = globals().copy()
@@ -80,7 +80,7 @@ def main(args):
             setattr(perm_args,yaxes_key,yaxis)
             # Generate data using permuted arguments
             loc,bsloc,fdr = generate_data(cob,term,perm_args) 
-            plot_fdr(perm_args,loc,bsloc,fdr,ax)
+            method(perm_args,loc,bsloc,fdr,ax)
             if i == 0:
                 ax.set_title(yaxis)
             if j == 0:
