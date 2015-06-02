@@ -108,6 +108,7 @@ class Locus(object):
             return 1
         else:
             return -1
+
     def __lt__(self,locus):
         if self.chrom == locus.chrom:
             return self.start < locus.start    

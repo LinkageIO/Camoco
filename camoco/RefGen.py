@@ -335,7 +335,7 @@ class RefGen(Camoco):
                 genes = list(set(itertools.chain(*genes)))
             self.log("Found {} candidates",len(genes))
             return genes
- 
+
 
     def pairwise_distance(self, gene_list=None):
         ''' 
@@ -380,33 +380,65 @@ class RefGen(Camoco):
             )
         )
 
-    def plot_loci(self,snp_list,filename):
+    def plot_loci(self,loci,filename):
         ''' 
-            Plots the snps and windows for each chromosome
+            Plots the loci, windows and candidate genes
+            
+            Parameters
+            ----------
+            loci : iterable of co.Loci
+            filename : output filename
         '''
         plt.clf()
-        f, (ax1,ax2) = plt.subplots(2,figsize=(10,10))
+        # Each chromosome gets a plot
+        chroms = set([x.chrom for x in loci])
+        f, axes = plt.subplots(len(chroms),figsize=(10,4*len(chroms)))
         # Loci Locations
-        loci = pd.DataFrame([x.as_dict() for x in snp_list])
-        ax1.barh(
-            bottom=loci.chrom.astype('int').values,
-            width=loci.window.values,
-            left=loci.start.values
-        )
-        ax1.set_xlabel('Position (bp)')
-        ax1.set_ylabel('Chromosome')
-        # Plot inter loci distance
-        distances = RefGenDist.gene_distances(
-            loci.chrom.astype('float').values,
-            loci.pos.values
-        ).astype('float')
-        distances = distances[np.isfinite(distances)]
-        ax2.hist(distances)
-        ax2.set_xlabel('Inter Window Distance')
-        ax2.set_ylabel('Frequency')
+        chromloci = defaultdict(list)
+        for locus in sorted(loci):
+            chromloci[locus.chrom].append(locus)
+        import pdb; pdb.set_trace()
+
+        # iterate over Loci
+        seen_chroms = set([loci[0].chrom])
+        voffset = 1 # Vertical Offset
+        hoffset = 0 # Horizonatal Offset
+        current_chrom = 0
+        for i,locus in enumerate(loci):
+            # Reset the temp variables in necessary
+            if locus.chrom not in seen_chroms:
+                seen_chroms.add(locus.chrom)
+                current_chrom += 1
+                voffset = 1
+                hoffset = 0  
+            # Do the access things
+            cax = axes[current_chrom]
+            cax.set_ylabel('Chrom: '+ locus.chrom)
+            cax.set_xlabel('Loci')
+            cax.get_yaxis().set_ticks([])
+            #cax.get_xaxis().set_ticks([])
+            # shortcut for current axis
+            cax.hold(True)
+            # place marker for start window
+            cax.scatter(hoffset,voffset,marker='>') 
+            # place marker for start snp
+            cax.scatter(hoffset+locus.window,voffset,marker='o')
+            # place marker for stop snp
+            cax.scatter(hoffset+locus.window+len(locus),voffset,marker='o')
+            # place marker for stop snp
+            cax.scatter(hoffset+locus.window+len(locus)+locus.window,voffset,marker='<')
+            # place a block for interlocal distance
+            cax.barh(
+                bottom=voffset,
+                width=50,
+                height=1,
+                left=hoffset+locus.window+len(locus)+locus.window,
+                color='red'
+            )
+            voffset += 5
+
         plt.savefig(filename)
         del f
-        return distances
 
     def __repr__(self):
         return 'Reference Genome: {} - {} - {}'.format(
