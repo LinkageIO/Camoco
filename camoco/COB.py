@@ -544,7 +544,7 @@ class COB(Expr):
             rawtype : str (default: None)
                 This is noted here to reinforce the impotance of the rawtype passed to 
                 camoco.Expr.from_DataFrame. See docs there for more information.
-            sep : str (default: \t)
+            sep : str (default: \\t)
                 Specifies the delimiter of the file referenced by the filename parameter.
             **kwargs : key value pairs
                 additional parameters passed to subsequent methods.
