@@ -52,7 +52,6 @@ def main(args):
     yaxes = getattr(args,yaxes_key)
 
     #Open a log file
-
     gs = plt.GridSpec(len(xaxes),len(yaxes))
     fig = plt.figure(figsize=(4*len(yaxes),4*len(xaxes)))
 
@@ -445,7 +444,6 @@ if __name__ == '__main__':
        '--window-size', default=15, 
        type=int, help='The number of items within a window.'
     )
-
 
     parser.add_argument(
        '--permutable', default=[
