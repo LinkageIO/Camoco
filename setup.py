@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages, Extension
+import os
 
 setup(
     name = 'camoco',
-    version = '0.1.6',
+    version = open(os.path.join('camoco','VERSION.txt')).read().strip(),
     packages = find_packages(),
     scripts = [
         'bin/BootstrapLocality.py',

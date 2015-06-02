@@ -18,12 +18,7 @@ before_install:
 # Install packages
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION Cython ipython nose numexpr numpy pandas patsy pyparsing python-dateutil pytz scipy six pytables statsmodels matplotlib
-  - 'git clone https://github.com/rogerbinns/apsw.git && cd apsw'
-  - 'python setup.py fetch --all build --enable-all-extensions install --user && cd ..'
-  - 'pip install numpy'
-  - 'pip install numexpr'
-  - 'pip install cython'
-  - 'pip install -r requirements.txt'
+  - 'pip install camoco'
 # command to run tests, e.g. python setup.py test
 script:  
   - echo 0
