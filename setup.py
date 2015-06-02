@@ -4,9 +4,12 @@ from setuptools import setup, find_packages, Extension
 
 setup(
     name = 'camoco',
-    version = '0.1.5',
+    version = '0.1.6',
     packages = find_packages(),
-    scripts = ['bin/BootstrapLocality.py'],
+    scripts = [
+        'bin/BootstrapLocality.py',
+        'interfaces/CamocoWeb.py'
+    ],
 
     install_requires = [
         'cython>=0.16',    
@@ -28,7 +31,5 @@ setup(
     author_email = 'schae234@gmail.com',
     description = 'Library for Co-Analysis of Molecular Componenets.',
     license = "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License",
-    url = 'https://github.com/schae234/camoco',
-
-
+    url = 'https://github.com/schae234/camoco'
 )
