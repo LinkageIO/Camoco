@@ -14,7 +14,6 @@ setup(
 
     install_requires = [
         'cython>=0.16',    
-        'apsw>=3.8',
         'igraph>=0.1.5',
         'matplotlib>=1.4.3',
         'numpy>=1.9.1',
