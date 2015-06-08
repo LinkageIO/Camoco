@@ -33,6 +33,15 @@ class RefGen(Camoco):
             ''')] 
         )
 
+    def Gene(self,chrom,start,end,name,window=0,sub_loci=None,**kwargs):
+        attrs = dict(self.db.cursor().execute(''' 
+            SELECT key,val FROM gene_attrs WHERE id = ?
+        ''',(name,)).fetchall())
+        return Gene(chrom,start,end,name,window,
+                sub_loci,**kwargs).update(
+                    attrs        
+                )
+
     @memoize
     def num_genes(self):
         ''' 
@@ -59,7 +68,7 @@ class RefGen(Camoco):
             A locus object (Gene)
 
         '''
-        return Gene(*self.db.cursor().execute(''' 
+        return self.Gene(*self.db.cursor().execute(''' 
             SELECT chromosome,start,end,id from genes WHERE rowid = ?
             ''',(random.randint(1,self.num_genes()),)).fetchone(),
             **kwargs
@@ -75,7 +84,7 @@ class RefGen(Camoco):
         ''' iterates over genes in refgen, 
             only returns genes within gene filter '''
         return ( 
-            Gene(*x,build=self.build,organism=self.organism) \
+            self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes
             ''')
@@ -104,7 +113,7 @@ class RefGen(Camoco):
         if isinstance(gene_list,str):
             # Handle when we pass in a single id
             gene_id = gene_list
-            return Gene(
+            return self.Gene(
                 *self.db.cursor().execute('''
                     SELECT chromosome,start,end,id FROM genes WHERE id = ? 
                     ''',(gene_id,)
@@ -113,7 +122,7 @@ class RefGen(Camoco):
                  organism=self.organism
             ) 
         genes = [ 
-            Gene(*x,build=self.build,organism=self.organism) \
+            self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute(''' 
                 SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
             '''.format("','".join(map(str.upper,gene_list))))
@@ -146,7 +155,7 @@ class RefGen(Camoco):
         '''
         if isinstance(loci,Locus):
             return [
-                Gene(*x,build=self.build,organism=self.organism) \
+                self.Gene(*x,build=self.build,organism=self.organism) \
                 for x in self.db.cursor().execute(''' 
                     SELECT chromosome,start,end,id FROM genes
                     WHERE chromosome = ?
@@ -166,7 +175,7 @@ class RefGen(Camoco):
             nearest genes are at the beginning of the list.
         '''
         return [
-            Gene(*x,build=self.build,organism=self.organism) \
+            self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute(''' 
                 SELECT chromosome,start,end,id FROM genes
                 WHERE chromosome = ?
@@ -183,7 +192,7 @@ class RefGen(Camoco):
             nearest genes are at the beginning of the list. 
         '''
         return [
-            Gene(*x,build=self.build,organism=self.organism) \
+            self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute(''' 
                 SELECT chromosome,start,end,id FROM genes
                 WHERE chromosome = ?
@@ -397,7 +406,6 @@ class RefGen(Camoco):
         chromloci = defaultdict(list)
         for locus in sorted(loci):
             chromloci[locus.chrom].append(locus)
-        import pdb; pdb.set_trace()
 
         # iterate over Loci
         seen_chroms = set([loci[0].chrom])
@@ -476,19 +484,28 @@ class RefGen(Camoco):
         cur.execute('''
             CREATE INDEX IF NOT EXISTS genepos ON genes (chromosome,start);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
+            CREATE INDEX IF NOT EXISTS geneattr ON gene_attr (id);
         ''')
 
     def add_gene(self,gene):
         if isinstance(gene,Locus):
             self.db.cursor().execute(''' 
             INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
-            ''',(gene.id,gene.chrom,gene.start,gene.end))
+            ''',(gene.name,gene.chrom,gene.start,gene.end))
+            self.db.cursor().executemany('''
+            INSERT OR IGNORE INTO gene_attrs VALUES (?,?,?)
+            ''',[(gene.id,key,val) for key,val in gene.attr.items()])
         else:
             # support adding lists of genes
-            genes = iter(gene)
+            genes = list(gene)
+            self.log('Adding Gene base info to database')
             self.db.cursor().executemany('''
             INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
-            ''',((gene.id,gene.chrom,gene.start,gene.end) for gene in genes))
+            ''',((gene.name,gene.chrom,gene.start,gene.end) for gene in genes))
+            self.log('Adding Gene attr info to database')
+            self.db.cursor().executemany('''
+            INSERT OR IGNORE INTO gene_attrs VALUES (?,?,?)
+            ''',[(gene.id,key,val) for gene in genes for key,val in gene.attr.items()])
 
     def add_chromosome(self,chrom):
         ''' adds a chromosome object to the class '''
@@ -545,7 +562,7 @@ class RefGen(Camoco):
                             chrom,int(start),int(end),
                             attributes['ID'].upper(),strand=strand,
                             build=build,organism=organism
-                        )
+                        ).update(attributes)
                     )
         self.add_gene(genes)
         return self
@@ -596,7 +613,7 @@ class RefGen(Camoco):
             Returns the gene the locus is within, or None 
         '''
         try:
-            x = [Gene(*x,build=self.build,organism=self.organism) \
+            x = [self.Gene(*x,build=self.build,organism=self.organism) \
                 for x in self.db.cursor().execute(''' 
                     SELECT chromosome,start,end,id FROM genes 
                     WHERE chromosome = ?
