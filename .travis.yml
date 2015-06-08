@@ -6,7 +6,14 @@ python:
 
 # Setup anaconda
 before_install:
+  - git clone git@github.com:rogerbinns/apsw.git && cd apsw
+  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user
   - sudo apt-get install hdf5-tools
+  # upgrade to new pip with wheels
+  - pip install pip --upgrade
+  # pytables complains if this isn't installed beforehand
+  - pip install numpy --upgrade
+  - pip install numexpr --upgrade
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
@@ -18,7 +25,7 @@ before_install:
 # Install packages
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION Cython ipython nose numexpr numpy pandas patsy pyparsing python-dateutil pytz scipy six pytables statsmodels matplotlib
-  - 'pip install camoco'
+  - pip install camoco
 # command to run tests, e.g. python setup.py test
 script:  
   - echo 0
