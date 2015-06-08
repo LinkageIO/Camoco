@@ -7,22 +7,22 @@ import json
 from math import isinf
 import numpy as np
  
-networks = {x:co.COB(x) for x in ['ZmRoot','ZmSAM','ZmPAN']}
+networks = {x:co.COB(x) for x in ['ZmRoot']}
 ZM = co.RefGen('Zm5bFGS')
 
 @app.route('/')
 def index():
     return app.send_static_file("index.html")
 
-@app.route("/Camoco/available_datasets")
+@app.route("/available_datasets")
 def all_available_datasets():
     return str(co.available_datasets())
  
-@app.route("/Camoco/available_datasets/<path:type>")
+@app.route("/available_datasets/<path:type>")
 def available_datasets(type=None,*args):
     return jsonify({ "data" : list(co.available_datasets(type)[['Name','Description']].itertuples(index=False))})
 
-@app.route("/api/Expression/<network_name>/<ontology_name>/<term_name>",methods=['GET','POST'])
+@app.route("/Expression/<network_name>/<ontology_name>/<term_name>",methods=['GET','POST'])
 def expression(network_name,ontology_name,term_name):
     pass
     expr = networks[network_name].heatmap(network[network_name].gene_expression_vals(co.Ontology(ontology_name)[term_name].gene_list,zscore=True),cluster_x=True,cluster_y=False,png_encode=True)
@@ -42,14 +42,14 @@ def expression(network_name,ontology_name,term_name):
 @app.route("/Ontology/Terms/<path:term_name>")
 def Ontology_Terms(term_name):
     return jsonify({
-        'data': [ (term.id,term.name,
-                    len(term.snp_list),
-                    len(term.gene_list),
-                    #len([gene for gene in term.gene_list if gene in networks['ROOT'].refgen])
+        'data': [ (term.name,
+                    term.desc,
+                    len(term.locus_list),
+                    len(ZM.candidate_genes(term.effective_snps(window_size=50000)))
                 ) for term in co.Ontology(term_name).iter_terms()]
     })
 
-@app.route('/api/Annotations/<network_name>/<ontology_name>/<term_name>',methods=['GET','POST'])
+@app.route('/Annotations/<network_name>/<ontology_name>/<term_name>',methods=['GET','POST'])
 def Annotations(network_name,ontology_name,term_name):
     # Retrieve SNPs from 
     cob = networks[network_name]
@@ -68,7 +68,7 @@ def Annotations(network_name,ontology_name,term_name):
         'header' : ['Gene'] + list(gene_annots.columns.values)
     })
 
-@app.route("/api/COB/<network_name>/<ontology>/<term>")
+@app.route("/COB/<network_name>/<ontology>/<term>")
 def COB_network(network_name,ontology,term):
     net = {}
     cob = networks[network_name]
@@ -129,4 +129,4 @@ def fix_val(val):
 
 if __name__ == "__main__":
     app.debug = True
-    app.run('0.0.0.0',8080)
+    app.run('0.0.0.0',50000)

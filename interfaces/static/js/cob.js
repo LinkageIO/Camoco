@@ -18,15 +18,19 @@
         .append($('<ul>',{class:'graph_controls'})
             .append($('<li>')
                 .append($('<button>Fit</button>',{})
-                    .on({'click':function(){cob.graph.cy.fit()}})
+                    .on({'click':function(){
+                        cob.graph.cy.fit()
+                    }})
                 )
                 .append($('<button>Layout</button>',{})
-                    .on({'click':function(){cob.graph.cy.layout(cola_options)}})
+                    .on({'click':function(){
+                        cob.graph.cy.layout(cola_options)
+                    }})
                 )
-                .append($('<button>Snapshot</button>',{}))
-                    .on({'click':function()
+                .append($('<button>Snapshot</button>',{})
+                    .on({'click':function(){
                             $('#cob .graph .snapshop').style.zIndex='100'
-                    })
+                    }})
             )
             .append($('<li>')
                 .append('<span>').html('Edge Filter')
@@ -47,6 +51,7 @@
                     )
             )
 
+            )
         )
 
         this.cy = cytoscape(options = {
@@ -314,7 +319,7 @@
         this.menu.get_tab("Dataset").add_table({
             "name" : 'OntologyTable',
             "header" : ['Ontology','Description'],
-            "ajax":"Camoco/available_datasets/Ontology",
+            "ajax":"camoco/available_datasets/Ontology",
             'sScrollY': this.menu.params.div.innerHeight()/4
         })
         this.menu.get_tab('Dataset').add_table({
@@ -325,7 +330,7 @@
         this.menu.get_tab('Network').add_table({
             "name":'NetworkTable',
             "header":['Network','Description'],
-            "ajax":"Camoco/available_datasets/Expr",
+            "ajax":"camoco/available_datasets/Expr",
             'sScrollY':this.menu.params.div.innerHeight()/4
         })
 
@@ -349,7 +354,7 @@
         // Register top level events
         $('#cob .OntologyTable tbody').on('click','tr', function() {
             var name = $('td',this).eq(0).text();
-            cob.menu.get_tab('Dataset').TermTable.clear().ajax.url("Ontology/Terms/"+name).load().draw()
+            cob.menu.get_tab('Dataset').TermTable.clear().ajax.url("camoco/Ontology/Terms/"+name).load().draw()
             cob.menu.LoadedOntology = name
             $('#cob .OntologyTable .selected').toggleClass('selected')
             $(this).toggleClass('selected')
@@ -365,7 +370,7 @@
             $('#cob .NetworkTable .selected').toggleClass('selected')
             $(this).toggleClass('selected')
             cob.menu.LoadedNetwork = $('td',this).eq(0).text();
-            $.getJSON('api/COB/'+cob.menu.LoadedNetwork+'/'+cob.menu.LoadedOntology+'/'+cob.menu.LoadedTerm)
+            $.getJSON('camoco/COB/'+cob.menu.LoadedNetwork+'/'+cob.menu.LoadedOntology+'/'+cob.menu.LoadedTerm)
                 .done(function(data){
                     a = data
                     console.log('loading data')
@@ -460,7 +465,7 @@
             }
             try{
                 // Fetch ajax
-                $.getJSON("api/Annotations/"
+                $.getJSON("camoco/Annotations/"
                     +cob.menu.LoadedNetwork
                     +"/"+cob.menu.LoadedOntology
                     +"/"+cob.menu.LoadedTerm+"?genes="
