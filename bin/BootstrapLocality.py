@@ -55,42 +55,48 @@ def main(args):
     gs = plt.GridSpec(len(xaxes),len(yaxes))
     fig = plt.figure(figsize=(4*len(yaxes),4*len(xaxes)))
 
-    # Figure out what to plot
+    # This gets a list of functions so we can map the string passed into
+    # args.plot to a plotting function
     possibles = globals().copy()
     possibles.update(locals())
-    method = possibles.get('plot_'+args.plot)
 
     # Add in text for axes
-    for i,xaxis in enumerate(xaxes):
-        for j,yaxis in enumerate(yaxes):
-            ax = fig.add_subplot(gs[i,j]) 
-            print("Looking at {}:{} x {}:{}".format(
-                xaxes_key,xaxis,
-                yaxes_key,yaxis,
-            ))
-            perm_args = copy.deepcopy(args) 
-            # Set the values we aren't permuting to their first value
-            # I hate this
-            for arg in perm_args.permutable:
-                if arg not in [xaxes_key,yaxes_key]:
-                    setattr(perm_args,arg,getattr(args,arg)[0])
-            # Change the relevent things in the permuted args 
-            setattr(perm_args,xaxes_key,xaxis)
-            setattr(perm_args,yaxes_key,yaxis)
-            # Generate data using permuted arguments
-            loc,bsloc,fdr = generate_data(cob,term,perm_args) 
-            method(perm_args,loc,bsloc,fdr,ax)
-            if i == 0:
-                ax.set_title(yaxis)
-            if j == 0:
-                ax.set_ylabel(xaxis)
-            if i == 0 and j == 0:
-                ax.set_title(str(yaxes_key)+' '+str(yaxis))
-                ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
-
-    plt.tight_layout()
-    plt.savefig(args.plot+'_'+args.out.replace('.png','')+'.png')
-
+    for plot in args.plot:
+        for i,xaxis in enumerate(xaxes):
+            for j,yaxis in enumerate(yaxes):
+                ax = fig.add_subplot(gs[i,j]) 
+                print("Looking at {}:{} x {}:{}".format(
+                    xaxes_key,xaxis,
+                    yaxes_key,yaxis,
+                ))
+                perm_args = copy.deepcopy(args) 
+                # Set the values we aren't permuting to their first value
+                # I hate this
+                for arg in perm_args.permutable:
+                    if arg not in [xaxes_key,yaxes_key]:
+                        setattr(perm_args,arg,getattr(args,arg)[0])
+                # Change the relevent things in the permuted args 
+                setattr(perm_args,xaxes_key,xaxis)
+                setattr(perm_args,yaxes_key,yaxis)
+                # Generate data using permuted arguments
+                loc,bsloc,fdr = generate_data(cob,term,perm_args) 
+                # Get the plot function based on args
+                plot_function = possibles.get('plot_'+plot)
+                # Plot the data
+                plot_function(perm_args,loc,bsloc,fdr,ax)
+                if i == 0:
+                    ax.set_title(yaxis)
+                if j == 0:
+                    ax.set_ylabel(xaxis)
+                if i == 0 and j == 0:
+                    ax.set_title(str(yaxes_key)+' '+str(yaxis))
+                    ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
+        plt.tight_layout()
+        plt.savefig("{}_{}.png".format(
+            plot,
+            args.out.replace('.png','')
+        ))
+    
     if args.debug:
         import ipdb; ipdb.set_trace()
 
@@ -410,8 +416,6 @@ def plot_data(args,loc,bsloc,fdr,ax):
    #)
 
 
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()    
     # Data Set Arguments
@@ -485,12 +489,15 @@ if __name__ == '__main__':
        help='Drop into an ipdb debugger before quitting.'
     )
 
+    # Make this a list  
     parser.add_argument(
         '--plot',default='fdr',
-        action='store',
-        help='Designates which item to plot. On of [fdr,scatter]'
+        action='store', nargs='*',
+        help=("Designates which item to plot. Must be in: ['fdr','scatter']")
     )
 
+    with open('command_log.txt','a') as LOG:
+        print('{}'.format(' '.join(sys.argv)),file=LOG)
     args = parser.parse_args()
     sys.exit(main(args))
 
