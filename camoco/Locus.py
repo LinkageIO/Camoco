@@ -23,6 +23,16 @@ class Locus(object):
             'end'   : self.end
         }
 
+    def update(self,dict):
+        '''
+            updates the attr attribute with values from the dictionary
+        '''
+        self.attr.update(dict)
+        return self
+
+    def summary(self):
+        return str(self)
+
     def as_record(self):
         return (self.chrom,self.start,self.end,self.name,self.window,self.id)
 
