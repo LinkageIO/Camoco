@@ -1,4 +1,4 @@
-from flask import Flask, url_for, jsonify, request
+from flask import Flask, url_for, jsonify, request, send_from_directory
 app = Flask(__name__)
 
 import camoco as co
@@ -13,6 +13,10 @@ ZM = co.RefGen('Zm5bFGS')
 @app.route('/')
 def index():
     return app.send_static_file("index.html")
+
+@app.route('/static/<path:path>')
+def send_js(path):
+    return send_from_directory('static',path)
 
 @app.route("/available_datasets")
 def all_available_datasets():
