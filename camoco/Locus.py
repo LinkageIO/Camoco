@@ -84,7 +84,7 @@ class Locus(object):
         new_end = int(max(self.end,locus.end))
         new_window = self.window
         new_id = str(self.id)+';'+str(locus.id)
-        new_sub_loci = self.sub_loci | locus.sub_loci | set([self.id, locus.id])
+        new_sub_loci = self.sub_loci | locus.sub_loci | set([self, locus])
         return Locus(self.chrom,new_start,new_end,window=new_window,sub_loci=new_sub_loci)
     
     def __eq__(self,locus):
