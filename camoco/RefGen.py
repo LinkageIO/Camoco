@@ -112,15 +112,18 @@ class RefGen(Camoco):
         '''
         if isinstance(gene_list,str):
             # Handle when we pass in a single id
-            gene_id = gene_list
-            return self.Gene(
-                *self.db.cursor().execute('''
-                    SELECT chromosome,start,end,id FROM genes WHERE id = ? 
-                    ''',(gene_id,)
-                ).fetchone(),
-                 build=self.build,
-                 organism=self.organism
-            ) 
+            gene_id = gene_list.upper()
+            try:
+                return self.Gene(
+                    *self.db.cursor().execute('''
+                        SELECT chromosome,start,end,id FROM genes WHERE id = ? 
+                        ''',(gene_id,)
+                    ).fetchone(),
+                    build=self.build,
+                    organism=self.organism
+                ) 
+            except TypeError as e:
+                raise ValueError('{} not in {}'.format(gene_id,self.name))
         genes = [ 
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute(''' 
@@ -389,7 +392,7 @@ class RefGen(Camoco):
             )
         )
 
-    def plot_loci(self,loci,filename):
+    def plot_loci(self,loci,filename,gene_limit=4):
         ''' 
             Plots the loci, windows and candidate genes
             
@@ -430,11 +433,16 @@ class RefGen(Camoco):
             # place marker for start window
             cax.scatter(hoffset,voffset,marker='>') 
             # place marker for start snp
-            cax.scatter(hoffset+locus.window,voffset,marker='o')
+            cax.scatter(hoffset+locus.window,voffset,marker='.',color='blue')
             # place marker for stop snp
-            cax.scatter(hoffset+locus.window+len(locus),voffset,marker='o')
+            cax.scatter(hoffset+locus.window+len(locus),voffset,marker='.',color='blue')
             # place marker for stop snp
             cax.scatter(hoffset+locus.window+len(locus)+locus.window,voffset,marker='<')
+
+            # place markers for sub snps
+            for subsnp in locus.sub_loci:
+                cax.scatter(hoffset+subsnp.start-locus.start+locus.window,voffset,marker='.',color='blue')
+
             # place a block for interlocal distance
             cax.barh(
                 bottom=voffset,
@@ -443,6 +451,15 @@ class RefGen(Camoco):
                 left=hoffset+locus.window+len(locus)+locus.window,
                 color='red'
             )
+            # grab the candidate genes
+            for gene in self.candidate_genes(locus,gene_limit=gene_limit):
+                cax.barh(
+                    bottom=voffset,
+                    width = len(gene),
+                    height= 1,
+                    left=gene.start-locus.start+locus.window,
+                    color='red'
+                )
             voffset += 5
 
         plt.savefig(filename)
@@ -484,7 +501,7 @@ class RefGen(Camoco):
         cur.execute('''
             CREATE INDEX IF NOT EXISTS genepos ON genes (chromosome,start);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
-            CREATE INDEX IF NOT EXISTS geneattr ON gene_attr (id);
+            CREATE INDEX IF NOT EXISTS geneattr ON gene_attrs (id);
         ''')
 
     def add_gene(self,gene):
