@@ -18,19 +18,28 @@ import string
 
 class Expr(Camoco):
     ''' 
-        A representation of gene expression. 
+        A representation of gene expression. The base data structure for this 
+        guy is a 
     '''
     def __init__(self,name):
         super().__init__(name=name,type='Expr') 
+        # Part I: Load the Expression dataset
         try:
             self.log('Loading Expr table')
+            # Open the HDF5 store
             self.hdf5 = self._hdf5(name)
+            # Load the expression Data
             self._expr = self.hdf5['expr']
+            self._gene_qc_status = self.hdf5['gene_qc_status']
         except KeyError as e:
             self.log('{} is empty: ({})',name,e)
             self._expr = pd.DataFrame()
         self.log('Building Expr Index')
-        self._expr_index = defaultdict(lambda: None,{gene:index for index,gene in enumerate(self._expr.index)}) 
+        self._expr_index = defaultdict(
+            lambda: None,
+            {gene:index for index,gene in enumerate(self._expr.index)}
+        ) 
+        # Part II: Load the Reference Genome
         try:
             self.log('Loading RefGen')
             self.refgen = RefGen(self.refgen)
@@ -92,7 +101,9 @@ class Expr(Camoco):
             max_val = 1100 
         elif self.rawtype.upper() == 'MICROARRAY':
             max_val = 100 
-        return self._expr.apply(lambda col: np.nanmax(col.values) < max_val ,axis=0)
+        return self._expr.apply(
+            lambda col: np.nanmax(col.values) < max_val, axis=0
+        )
     
     def anynancol(self):
         ''' 
@@ -130,7 +141,7 @@ class Expr(Camoco):
         return df
 
     '''
-        Internal Methods --------------------------------------------------------------------------------
+        Internal Methods ------------------------------------------------------
     '''
 
     def _update_values(self,df,transform_name,raw=False):
@@ -161,7 +172,8 @@ class Expr(Camoco):
         # hdf5 doesn't like unicode characters
         pattern = re.compile('[^\w ,;]+')
         df.columns = [pattern.sub('',x) for x in df.columns.values ]
-        df.index = [pattern.sub('',x) for x in df.index.values ]
+        # Also, make sure gene names are uppercase
+        df.index = [pattern.sub('',x).upper() for x in df.index.values ]
         try:
             self._expr = df
             self.hdf5[table] = df
@@ -179,8 +191,11 @@ class Expr(Camoco):
         elif transform == 'reset' or self._global('transformation_log') is None:
             self._global('transformation_log','raw')
         else:
-            self._global('transformation_log',self._global('transformation_log') + '->' + str(transform))
-            self.log('Transformation Log: {}',self._global('transformation_log'))
+            self._global(
+                'transformation_log',
+                self._global('transformation_log') + '->' + str(transform)
+            )
+            self.log('Trans. Log: {}',self._global('transformation_log'))
  
     def _reset(self,raw=False):
         ''' resets the expression values to their raw state undoing any normalizations '''
@@ -202,7 +217,10 @@ class Expr(Camoco):
             self._transformation_log('DetectedPreNormalized')
         elif any(self.is_normalized(max_val=max_val)):
             # Something fucked up is happending
-            raise TypeError('Attempting normalization on already normalized dataset. Consider passing a max_val < {} if Im wrong.'.format(min(self.max_values())))
+            raise TypeError(
+                ('Attempting normalization on already normalized'
+                ' dataset. Consider passing a max_val '
+                '< {} if Im wrong.').format(min(self.max_values())))
         else:
             df = self._expr
             if norm_method is not None:
@@ -212,44 +230,51 @@ class Expr(Camoco):
             elif self.rawtype.upper() == 'MICROARRAY':
                 method = np.log2
             else:
-                raise ValueError('Could not guess correct normalization for {}, pass in function through method argument.'.format(self.rawtype))
+                raise ValueError(
+                    ('Could not guess correct normalization for {}'
+                    ' pass in function through method argument.'
+                    ).format(self.rawtype))
             # apply the normalization to each column (accession)
             df = df.apply(lambda col: method(col),axis=0)
             # update values
             self._update_values(df,method.__name__)
 
-    def _quality_control(self,min_expr=1,max_gene_missing_data=0.2,min_single_sample_expr=5, \
-        max_accession_missing_data=0.5,membership=None,dry_run=False):
+    def _quality_control(self,min_expr=1,max_gene_missing_data=0.2,\
+        min_single_sample_expr=5, max_accession_missing_data=0.5,\
+        membership=None, dry_run=False, **kwargs):
         ''' 
-            Perform Quality Control on raw expression data. This method filters genes based on
-            membership to some RefGen instance, filters based on a minimum FPKM or equivalent 
-            expression value, filters out genes and accessions with too much missing data,
-            filters out genes which are lowly expressed (do not have at least one accession
-            that meets an FPKM threshold, i.e. likely presence absense). See parameters for more
-            details.
+            Perform Quality Control on raw expression data. This method filters
+            genes based on membership to some RefGen instance, filters based on
+            a minimum FPKM or equivalent expression value, filters out genes
+            and accessions with too much missing data, filters out genes which
+            are lowly expressed (do not have at least one accession that meets
+            an FPKM threshold, i.e. likely presence absense). See parameters
+            for more details.
 
             Parameters
             ----------
             min_expr : int (default: 1)
-                FPKM (or equivalent) values under this threshold will be set to NaN and
-                not used during correlation calculations.
+                FPKM (or equivalent) values under this threshold will be set to
+                NaN and not used during correlation calculations.
             max_gene_missing_data : float (default: 0.2)
-                Maximum percentage missing data a gene can have. Genes under this are removed
-                from dataset.
+                Maximum percentage missing data a gene can have. Genes under
+                this are removed from dataset.
             min_single_sample_expr : int (default: 5)
-                Genes that do not have a single accession having an expression value above this
-                threshold are removed from analysis. These are likely presence/absence and will
-                not have a strong coexpression pattern.
+                Genes that do not have a single accession having an expression
+                value above this threshold are removed from analysis. These are
+                likely presence/absence and will not have a strong coexpression
+                pattern.
             max_accession_missing_data : float (default: 0.5)
-                maximum percentage missing data an accession (experiment) can have before
-                it is removed.
+                maximum percentage missing data an accession (experiment) can
+                have before it is removed.
             membership : RefGen 
-                Genes which are not contained within this RefGen will be removed. Note: this could
-                also be another object that will implement an interface that will check to see if 
-                gene ids are contained within it i.e. a set of gene ids.
+                Genes which are not contained within this RefGen will be
+                removed. Note: this could also be another object that will
+                implement an interface that will check to see if gene ids are
+                contained within it i.e. a set of gene ids.
             dry_run : bool (default: False)
-                Used in testing to speed up calculations. Limits the QC dataframe to only have
-                5000 genes.
+                Used in testing to speed up calculations. Limits the QC
+                dataframe to only have 5000 genes.
         '''        
         self.log('------------Quality Control')
         df = self.expr(raw=True)
@@ -259,39 +284,79 @@ class Expr(Camoco):
         self._global('qc_min_single_sample_expr',min_single_sample_expr)
         self._global('qc_max_accession_missing_data',max_accession_missing_data)
         # retrieve raw data as a data frame
-        self.log('Raw Starting set: {} genes {} accessions'.format(len(df.index),len(df.columns)))
-        # ------ Membership test
+        self.log('Raw Starting set: {} genes {} accessions'.format(
+            len(df.index),len(df.columns))
+        )
+        # Remember why we remove certain genes
+        # If TRUE it passes, if FALSE it fails!!!
+        qc_gene = pd.DataFrame({'has_id':True},index=df.index)
+        qc_accession = pd.DataFrame({'has_id':True},index=df.columns)
+
+        # -----------------------------------------
+        # Gene Membership test
         if not membership:
             membership = self.refgen
         self._global('qc_membership',str(membership))
         self.log("Filtering out genes not in {}",membership)
-        df = df[[x in membership for x in df.index]]
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
+        qc_gene['pass_membership'] = [x in membership for x in df.index]
+
         # -----------------------------------------
         # Set minimum FPKM threshold
         self.log("Filtering out expression values lower than {}",min_expr)
         df_flt = df.copy()
         df_flt[df < min_expr] = np.nan
         df = df_flt
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         # -----------------------------------------
-        # filter out genes with too much missing data
-        self.log("Filtering out genes with > {} missing data",max_gene_missing_data)
-        df = df.loc[df.apply(lambda x : ((sum(np.isnan(x))) < len(x)*max_gene_missing_data),axis=1),:] 
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
+        # Gene Missing Data Test
+        self.log(
+            "Filtering out genes with > {} missing data",
+            max_gene_missing_data
+        )
+        qc_gene['pass_missing_data'] = df.apply(
+            lambda x : ((sum(np.isnan(x))) < len(x)*max_gene_missing_data),
+            axis=1
+        )
         # -----------------------------------------
-        # filter out genes which do not meet a minimum expr threshold in at least one sample
-        self.log("Filtering out genes which do not have one sample above {}",min_single_sample_expr)
-        df = df[df.apply(lambda x: any(x >= min_single_sample_expr),axis=1)]
-        self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
+        # Gene Min Expression Test
+        # filter out genes which do not meet a minimum expr 
+        # threshold in at least one sample
+        self.log(("Filtering out genes which "
+                  "do not have one sample above {}"),min_single_sample_expr)
+        qc_gene['pass_min_expression'] = df.apply(
+            lambda x: any(x >= min_single_sample_expr),
+            axis=1 # 1 is column
+        )
+        qc_gene['PASS_ALL'] = qc_gene.apply(
+            lambda row: np.all(row),axis=1
+        )
+        df = df.loc[qc_gene['PASS_ALL'],:] 
         # -----------------------------------------
         # Filter out ACCESSIONS with too much missing data
         self.log("Filtering out accessions with > {} missing data",max_accession_missing_data)
-        accession_mask = df.apply(lambda x : ((sum(np.isnan(x))) / len(x)),axis=0)
-        for i,percent in enumerate(accession_mask):
-            if percent > max_accession_missing_data:
-                self.log("\tRemoved: {}: missing {} data",df.columns[i],percent*100)
-        df = df.loc[:,np.logical_not(accession_mask > max_accession_missing_data)] 
+        qc_accession['pass_missing_data'] = df.apply(
+            lambda col : (
+                ((sum(np.isnan(col)) / len(col)) <= max_accession_missing_data)
+            ),
+            axis=0 # 0 is columns
+        )
+        # Update the total QC passing column
+        qc_accession['PASS_ALL'] = qc_accession.apply(
+            lambda row: np.all(row),axis=1
+        )
+        df = df.loc[:,qc_accession['PASS_ALL']] 
+        # Update the database
+        self.hdf5['qc_accession'] = qc_accession
+        self.hdf5['qc_gene'] = qc_gene
+        # Report your findings
+        self.log('Gene Removal:\n{}',str(qc_gene.apply(sum,axis=0)))
+        self.log('Accession Removal:\n{}',str(qc_accession.apply(sum,axis=0)))
+        # Also report a breakdown by chromosome
+        qc_gene = qc_gene[qc_gene['pass_membership']]
+        qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index] 
+        self.log('Genes passing QC by chromosome:\n{}',
+            str(qc_gene.groupby('chrom').aggregate(sum,axis=0))
+        )
+        # update the df to reflect only genes/accession passing QC
         self.log('Kept: {} genes {} accessions'.format(len(df.index),len(df.columns)))
         if dry_run:
             # If dry run, take first 100 rows of QC
@@ -404,6 +469,13 @@ class Expr(Camoco):
         '''
         # Piggy back on the super create method
         self = super().create(name,description,type='Expr')
+        # Create appropriate HDF5 tables
+        self.hdf5['expr'] = pd.DataFrame()
+        self.hdf5['raw_expr'] = pd.DataFrame()
+        self.hdf5['gene_qc_status'] = pd.DataFrame()
+        self.hdf5['accession_qc_status'] = pd.DataFrame()
+        self.hdf5['coex'] = pd.DataFrame()
+        self.hdf5['degree'] = pd.DataFrame()
         # Delete existing datasets 
         self._set_refgen(refgen,filter=False)
         return self
@@ -510,7 +582,8 @@ class Expr(Camoco):
         self = cls.create(name,description,refgen)
         self._reset(raw=True)
         if rawtype is None:
-            self.log('WARNING: not passing in a rawtype makes downstream normalization hard...')
+            self.log(('WARNING: not passing in a rawtype makes'
+                      ' downstream normalization hard...'))
             rawtype = ''
         self._global('rawtype',rawtype)
         # put raw values into the database
