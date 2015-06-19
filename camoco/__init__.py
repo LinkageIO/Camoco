@@ -60,7 +60,7 @@ def del_dataset(type,name,safe=True):
         c.log('Database Not Found: {}'.format(e))
     if type == 'Expr':
         # also have to remove the COB specific refgen
-        del_dataset('RefGen','Filtered'+name)
+        del_dataset('RefGen','Filtered'+name,safe=safe)
 
 def mv_dataset(type,name,new_name):
     c = Camoco("Camoco")
