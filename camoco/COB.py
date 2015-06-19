@@ -14,6 +14,7 @@ from itertools import chain
 from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
 from scipy.misc import comb
+from scipy.stats import norm
 import statsmodels.api as sm
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
@@ -53,6 +54,7 @@ class COB(Expr):
                 TransformationLog: {}
                 Num Genes: {}
                 Num Accessions: {}
+                Edge FDR: {}
         '''.format(
                 self.name, self.organism, self.build,
                 self.description,
@@ -60,7 +62,18 @@ class COB(Expr):
                 self._transformation_log(),
                 self.num_genes(),
                 self.num_accessions(),
+                self.edge_FDR
         ))
+
+    @property
+    @memoize
+    def edge_FDR(self):
+        # get the percent of significant edges
+        num_sig = sum(self.coex['significant'])/len(self.coex)
+        # calulate the number expected
+        num_exp = 1-norm.cdf(int(self._global('significance_threshold')))
+        # FDR is the percentage expected over the percentage found
+        return num_exp/num_sig
 
     def neighbors(self,gene,sig_only=True):
         '''
@@ -109,16 +122,18 @@ class COB(Expr):
         index = PCCUP.coex_index(ids,num_genes)[0]
         return self.coex.iloc[index]
 
-    def subnetwork(self,gene_list=None,sig_only=True,min_distance=100000,fly_by_the_seat_of_your_pants=True):
+    def subnetwork(self,gene_list=None,sig_only=True,min_distance=100000,
+        filter_missing_gene_ids=True):
         '''
             Input: a gene list (passing None gives you all genes)
-            Output: a dataframe containing all edges EXCLUSIVELY between genes within list
+            Output: a dataframe containing all edges EXCLUSIVELY between genes
+                within list
         '''
         if gene_list is None:
             df = self.coex
         else:
             ids = np.array([self._expr_index[x.id] for x in gene_list])
-            if fly_by_the_seat_of_your_pants:
+            if filter_missing_gene_ids:
                 # filter out the Nones 
                 ids = np.array(list(filter(None,ids)))
             num_genes = self.num_genes()
@@ -131,6 +146,12 @@ class COB(Expr):
             df = df[df.significant == 1]
         return df
 
+    def trans_locus_density(self,locus_list,return_mean=True):
+        '''
+            Calculates the 
+        '''
+        pass
+
     def density(self,gene_list,return_mean=True,min_distance=50000):
         ''' 
             calculates the denisty of the non-thresholded network amongst genes
@@ -138,7 +159,9 @@ class COB(Expr):
             cis regulatory elements increasing noise in coexpression network 
         '''
         # filter for only genes within network
-        edges = self.subnetwork(gene_list,min_distance=min_distance,sig_only=False)
+        edges = self.subnetwork(gene_list,
+            min_distance=min_distance,sig_only=False
+        )
         if len(edges) == 0:
             return np.nan
         if len(edges) == 1:
@@ -373,16 +396,12 @@ class COB(Expr):
         self.log("Calculating Coexpression")
         # Calculate the PCCs
         pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(self._expr.as_matrix()))
-        # Set the diagonal to zero (corrects for floating point errors)
-        assert np.allclose(np.diagonal(pccs),1)
-        np.fill_diagonal(pccs,0)
         # return the long form of the 
-        pccs = squareform(pccs)
         assert len(pccs) == len(tbl)
         tbl['score'] = pccs
         # correlations of 1 dont transform well, they cause infinities
-        tbl[tbl['score'] == 1].score = 0.99999999
-        tbl[tbl['score'] == -1].score = -0.99999999
+        tbl.loc[tbl['score'] == 1,'score'] = 0.99999999
+        tbl.loc[tbl['score'] == -1,'score'] = -0.99999999
         # Perform fisher transform on PCCs
         tbl['score'] = np.arctanh(tbl['score'])
         # Sometimes, with certain datasets, the NaN mask overlap completely for the
@@ -396,6 +415,7 @@ class COB(Expr):
         self._global('pcc_std',pcc_std)
         tbl['score'] = (valid_scores-pcc_mean)/pcc_std
         # Assign significance
+        self._global('significance_threshold',significance_thresh)
         tbl['significant'] = pd.Series(list(tbl['score'] >= significance_thresh),dtype='int_')
         self.log("Calculating Gene Distance")
         distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(self._expr.index))
@@ -458,6 +478,7 @@ class COB(Expr):
     ''' ------------------------------------------------------------------------------------------
             Class Methods -- Factory Methods
     '''
+
     @classmethod
     def from_Expr(cls,expr):
         ''' 
