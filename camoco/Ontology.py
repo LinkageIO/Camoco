@@ -64,7 +64,7 @@ class Term(object):
                 collapsed[-1] = collapsed[-1] + locus
             else:
                 collapsed.append(locus)
-        log('Found {} SNPs -> {} effective SNPs',len(self.locus_list),len(collapsed))
+        log('{}: Found {} SNPs -> {} effective SNPs',self.name,len(self.locus_list),len(collapsed))
         return collapsed
         
     def __str__(self):
@@ -323,7 +323,7 @@ class Ontology(Camoco):
         
 
     def _build_indices(self):
-        pass
+        pass    
 
     def _create_tables(self):
         cur = self.db.cursor()
