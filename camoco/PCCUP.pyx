@@ -8,14 +8,16 @@ cdef extern from "math.h":
 # input is a typed numpy memoryview (::1 means c contiguous array)
 def pair_correlation(double[:, ::1] x):
     # Define a new memoryview on an empty gene X gene matrix
-    cdef double[:, ::] res = np.empty((x.shape[0], x.shape[0]))
+    cdef double[:] pccs = np.empty(comb(x.shape[0],2,exact=True))
     cdef double u, v
     cdef int i, j, k, count
     cdef double du, dv, d, n, r
     cdef double sum_u, sum_v, sum_u2, sum_v2, sum_uv
+    cdef long index
 
+    index = 0
     for i in range(x.shape[0]):
-        for j in range(i, x.shape[0]):
+        for j in range(i+1, x.shape[0]):
             sum_u = sum_v = sum_u2 = sum_v2 = sum_uv = 0.0
             count = 0            
             for k in range(x.shape[1]):
@@ -30,18 +32,21 @@ def pair_correlation(double[:, ::1] x):
                     sum_uv += u*v
                     count += 1
             if count < 10:
-                res[i, j] = res[j, i] = np.nan
-                continue
-
-            um = sum_u / count
-            vm = sum_v / count
-            n = sum_uv - sum_u * vm - sum_v * um + um * vm * count
-            du = sqrt(sum_u2 - 2 * sum_u * um + um * um * count) 
-            dv = sqrt(sum_v2 - 2 * sum_v * vm + vm * vm * count)
-            r = 1 - n / (du * dv)
-            res[i, j] = res[j, i] = r
+                pccs[index] = np.nan
+            else:
+                um = sum_u / count
+                vm = sum_v / count
+                n = sum_uv - sum_u * vm - sum_v * um + um * vm * count
+                du = sqrt(sum_u2 - 2 * sum_u * um + um * um * count) 
+                dv = sqrt(sum_v2 - 2 * sum_v * vm + vm * vm * count)
+                if (du * dv) == 0:
+                    pccs[index] = np.nan
+                else:
+                    r = 1 - n / (du * dv)
+                    pccs[index] = r
+            index += 1
     # Return the base of the memory view
-    return res.base
+    return pccs.base
 
 def coex_index(long[:] ids, int mi):
     '''
