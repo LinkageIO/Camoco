@@ -240,6 +240,7 @@ class COB(unittest.TestCase):
             dry_run=False,
             max_val=300
         )
+        self.assertIsInstance(ZmSAM,co.COB)
 
     def ZmPAN(self):
         co.del_dataset('Expr','ZmPAN',safe=False)
@@ -260,6 +261,7 @@ class COB(unittest.TestCase):
             sep=',',
             max_val=300
         )
+        self.assertIsInstance(ZmPAN,co.COB)
 
     def ZmRoot(self):
         co.del_dataset('Expr','ZmRoot',safe=False)
@@ -278,6 +280,7 @@ class COB(unittest.TestCase):
             quantile=False,
             max_val=300
         )
+        self.assertIsInstance(ZmRoot,co.COB)
 
 if __name__ == '__main__':
     unittest.main()
