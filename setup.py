@@ -5,7 +5,7 @@ import os
 
 setup(
     name = 'camoco',
-    version = open(os.path.join('camoco','VERSION.txt')).read().strip(),
+    version = '0.1.8',
     packages = find_packages(),
     scripts = [
         'bin/BootstrapLocality.py',
