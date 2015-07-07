@@ -497,6 +497,7 @@ class RefGen(Camoco):
             raise TypeError('Cannot test for containment for {}'.format(obj))
 
     def _build_indices(self):
+        self.log('Building Indices')
         cur = self.db.cursor()
         cur.execute('''
             CREATE INDEX IF NOT EXISTS genepos ON genes (chromosome,start);
@@ -582,6 +583,7 @@ class RefGen(Camoco):
                         ).update(attributes)
                     )
         self.add_gene(genes)
+        self._build_indices()
         return self
 
     @classmethod
@@ -620,50 +622,3 @@ class RefGen(Camoco):
                 val TEXT
             )
         ''');
-
-    ''' ----------------------------------------------------------------------
-            Unimplemented
-    '''
-
-    def within_gene(self,locus):
-        ''' 
-            Returns the gene the locus is within, or None 
-        '''
-        try:
-            x = [self.Gene(*x,build=self.build,organism=self.organism) \
-                for x in self.db.cursor().execute(''' 
-                    SELECT chromosome,start,end,id FROM genes 
-                    WHERE chromosome = ?
-                    AND start < ?
-                    AND end > ?
-                ''',(locus.chrom,locus.start,locus.start))][0]
-            return x
-        except Exception as e:
-            return None
-
-    def nearest_gene(self,locus):
-        ''' return the gene nearest the locus '''
-        candidates = self.flanking_genes(locus)
-        val,idx  = min((val,idx) for (idx,val) \
-            in enumerate([abs(locus-candidate) for candidate in candidates]))
-        return candidates[idx]
-
-    @memoize
-    def flanking_genes_index(self,gene_limit=4,window=50000):
-        ''' 
-            Generate an index of flanking genes useful for 
-            bootstrapping (i.e. we can get rid of while loop 
-        '''
-        # iterate over genes keeping track of number of flanking genes 
-        self.log("Generating flanking gene index gene_limit {}",gene_limit)
-        index = defaultdict(list)
-        for gene in self.iter_genes():
-            gene.window = window
-            flanks = self.flanking_genes(gene,gene_limit=gene_limit)
-            index[len(flanks)].append(flanks)
-        for num in index:
-            self.log(
-                "Found {} genes with {} flanking genes",
-                len(index[num]),num
-            )
-        return index
