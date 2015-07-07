@@ -15,20 +15,19 @@ from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
 from scipy.misc import comb
 from scipy.stats import norm
-import statsmodels.api as sm
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 import pandas as pd
 import numpy as np
 import itertools
 import matplotlib.pylab as plt
+import statsmodels.api as sm
 
 from scipy.stats import pearsonr
 
 class COB(Expr):
     def __init__(self,name):
         super().__init__(name=name)
-        #self.hdf5 = self._hdf5(name)
         try:
             self.log('Loading coex table')
             self.coex = self.hdf5['coex']
