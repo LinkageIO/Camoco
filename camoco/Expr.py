@@ -32,7 +32,7 @@ class Expr(Camoco):
             self._expr = self.hdf5['expr']
             self._gene_qc_status = self.hdf5['gene_qc_status']
         except KeyError as e:
-            self.log('{} is empty: ({})',name,e)
+            self.log.warn('{} is empty: ({})',name,e)
             self._expr = pd.DataFrame()
         self.log('Building Expr Index')
         self._expr_index = defaultdict(
