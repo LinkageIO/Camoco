@@ -21,6 +21,7 @@ from camoco.Locus import *
 from camoco.Tools import *
 from camoco.GEO import *
 from camoco.Annotation import *
+from camoco.Config import cf
 import pandas as pd
 import os
 
@@ -51,11 +52,25 @@ def del_dataset(type,name,safe=True):
     c.log("Deleting {}",name)
     c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name,type))
     try:
-        os.remove(c._resource("databases",".".join([type,name])+".db"))
+        os.remove(
+            os.path.expanduser(os.path.join(
+                cf.get('options','basedir'),
+                'databases',
+                '{}.{}.db'.format(type,name)
+                )
+            )
+        )
     except FileNotFoundError as e:
         c.log('Database Not Found: {}'.format(e))
     try:
-        os.remove(c._resource("databases",".".join([name])+".hd5"))
+        os.remove(
+            os.path.expanduser(os.path.join(
+                cf.get('options','basedir'),
+                'databases',
+                '{}.{}.hd5'.format(type,name)
+                )
+            )
+        )
     except FileNotFoundError as e:
         c.log('Database Not Found: {}'.format(e))
     if type == 'Expr':
