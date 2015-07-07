@@ -13,16 +13,18 @@ from apsw import ConstraintError
 class Camoco(object):
 
     '''
-
+        Cache Money
     '''
 
     def __init__(self,name,type='Camoco',basedir="~/.camoco"):
         # Set up our base directory
         self.log = log()
+        self.type = type
         # A dataset already exists, return it
-        self.db = self._database(".".join([type,name]))
-        (self.ID,self.name,self.description,
-            self.type,self.added) = self._database('Camoco.Camoco').cursor().execute(
+        self.db = self._database(name)
+        (self.ID,self.name,self.description,self.type,self.added) \
+        = self._database('Camoco',type='Camoco') \
+            .cursor().execute(
             "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
             (name,type)
         ).fetchone()
@@ -35,25 +37,49 @@ class Camoco(object):
             CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
             ''')
 
-    def _resource(self,type,filename):
-        return os.path.expanduser(os.path.join(cf.get('options','basedir'),type,filename))
-
-    def _database(self,dbname):
+    def _database(self,dbname,type=None):
         # return a connection if exists
-        return lite.Connection(self._resource("databases",str(dbname)+".db"))
+        if type is None: # This lets us grab databases for other types
+            type = self.type
+        return lite.Connection(
+            os.path.expanduser(
+                os.path.join(
+                    cf.get('options','basedir'),
+                    'databases',
+                    "{}.{}.db".format(type,dbname)
+                )
+            )
+        )
 
-    def _hdf5(self,dbname):
-        return pd.HDFStore(self._resource("databases",str(dbname)+'.hd5'))
+    def _hdf5(self,dbname,type=None):
+        if type is None:
+            type = self.type
+        # return a connection if exists
+        return pd.HDFStore(
+            os.path.expanduser(
+                os.path.join(
+                    cf.get('options','basedir'),
+                    'databases',
+                    "{}.{}.hd5".format(type,dbname)
+                )
+            )
+        )
 
     def _tmpfile(self):
         # returns a handle to a tmp file
-        return tempfile.NamedTemporaryFile(dir=os.path.join(cf.get('options','basedir'),"tmp"))
+        return tempfile.NamedTemporaryFile(
+            dir=os.path.join(
+                cf.get('options','basedir'),
+                "tmp"
+            )
+        )
 
     def _global(self,key,val=None):
         # set the global for the dataset
         if val is not None:
             self.db.cursor().execute('''
-                INSERT OR REPLACE INTO globals (key,val)VALUES (?,?)''',(key,val)
+                INSERT OR REPLACE INTO globals 
+                (key,val)VALUES (?,?)''',(key,val)
             )
         else:
             try:
@@ -73,9 +99,11 @@ class Camoco(object):
             This is a class method to create a new camoco type object.
             It initializes base directory hierarchy 
         '''
-        basedir = os.path.realpath(os.path.expanduser(cf.get('options','basedir')))
-        # Create the basedir if not exists
+        basedir = os.path.realpath(
+            os.path.expanduser(cf.get('options','basedir'))
+        )
 
+        # Create the basedir if not exists
         try:    
             os.makedirs(basedir,exist_ok=True)
             os.makedirs(os.path.join(basedir,"logs"),exist_ok=True)
