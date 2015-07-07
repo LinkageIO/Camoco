@@ -9,6 +9,8 @@ import pandas as pd
 import itertools
 from camoco.Config import cf
 
+
+
 class Locus(unittest.TestCase):
     def test_locus_initialization(self):
         # numeric chromosomes
@@ -18,8 +20,8 @@ class Locus(unittest.TestCase):
 class RefGen(unittest.TestCase):
 
     def setUp(self):
-        self.Fe = co.Ontology('ZmIonome')['Fe57']
-        self.ZM = co.RefGen('Zm5bFGS')
+        self.Fe = co.Ontology(cf['test']['ontology'])[cf['test']['term']]
+        self.ZM = co.RefGen(cf['test']['refgen'])
 
     def test_candidate_vs_bootstrap_length(self):
         snps = self.Fe.effective_snps(window_size=50000)
@@ -30,14 +32,16 @@ class RefGen(unittest.TestCase):
         )
 
     def test_get_attr_and_generating_from_ids(self):
-        self.assertIsInstance(ZM['GRMZM2G000014'],co.Locus)
-        self.assertIsInstance(ZM.from_ids(['GRMZM2G000014'])[0],co.Locus)
+        self.assertIsInstance(self.ZM[cf['test']['gene']],co.Locus)
+        self.assertIsInstance(self.ZM.from_ids([cf['test']['gene']])[0],co.Locus)
 
 class COB(unittest.TestCase):
 
-    @unittest.skipUnless(co.available_datasets('Expr','ZmRoot'),'ZmRoot not defined')
+    @unittest.skipUnless(
+        co.available_datasets('Expr',cf['test']['cob']),'COB net not defined'
+    )
     def setUp(self):
-        self.cob = co.COB('ZmRoot')
+        self.cob = co.COB(cf['test']['cob'])
 
     def ZmRoot(self):
         self.assertEqual(len(self.cob.coex), comb(self.cob.num_genes(),2),
