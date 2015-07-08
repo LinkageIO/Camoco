@@ -582,9 +582,7 @@ class Expr(Camoco):
         self = cls.create(name,description,refgen)
         self._reset(raw=True)
         if rawtype is None:
-            self.log(('WARNING: not passing in a rawtype makes'
-                      ' downstream normalization hard...'))
-            rawtype = ''
+            raise TypeError("raw_type must be one of ['RNASEQ','MICROARRAY']")
         self._global('rawtype',rawtype)
         # put raw values into the database
         self.log('Importing Raw Expression Values')
