@@ -71,7 +71,7 @@ def mv_dataset(type,name,new_name):
     c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
     os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
 
-def redescibe_dataset(type,name,new_desc):
+def redescribe_dataset(type,name,new_desc):
     c = Camoco("Camoco")
     c.db.cursor().execute("UPDATE datasets SET description = ? WHERE name = ? and type = ?",(new_desc,name,type))
 
@@ -101,15 +101,6 @@ class log(object):
     def __call__(self,msg,*args,color='green'):
         print(colored(" ".join(["[LOG]",time.ctime(), '-', msg.format(*args)]),color=color),file=sys.stderr)
 
-def ext(filename):
-    return os.path.join(os.path.expanduser("~/MetaboloCOB/"+filename))
-
-def B73_eq_Mo17(snp,HM):
-    genotypes = HM.genotypes(snp,accessions=['B73','MO17'])
-    if genotypes[0] == genotypes[1]:
-        return True
-    else:
-        return False
 
 def plot_flanking_vs_inter(cob):
     import numpy as np
