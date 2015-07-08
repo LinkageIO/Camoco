@@ -335,7 +335,8 @@ class RefGen(Camoco):
             )
             if chain:
                 return list(itertools.chain(up_genes,genes_within,down_genes))
-            return (up_genes,genes_within,down_genes)
+            else:
+                return (up_genes,genes_within,down_genes)
         else:
             iterator = iter(sorted(loci))
             genes = [
@@ -345,7 +346,6 @@ class RefGen(Camoco):
             ]
             if chain:
                 genes = list(set(itertools.chain(*genes)))
-            self.log("Found {} candidates",len(genes))
             return genes
 
 
@@ -399,7 +399,9 @@ class RefGen(Camoco):
             Parameters
             ----------
             loci : iterable of co.Loci
-            filename : output filename
+                The loci to print
+            filename : str
+                The output filename
         '''
         plt.clf()
         # Each chromosome gets a plot
