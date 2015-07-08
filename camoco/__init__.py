@@ -17,13 +17,7 @@ from camoco.COB import COB
 from camoco.RefGen import RefGen
 from camoco.Ontology import Ontology,Term
 from camoco.HapMap import HapMap
-from camoco.Locus import *
-from camoco.Tools import *
-from camoco.GEO import *
-from camoco.Annotation import *
+from camoco.Locus import Locus
+from camoco.Tools import available_datasets,del_dataset,\
+                         mv_dataset,redescribe_dataset
 from camoco.Config import cf
-import pandas as pd
-import os
-
-
-
