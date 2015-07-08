@@ -140,20 +140,59 @@ class COB(Expr):
             indices = PCCUP.coex_index(ids,num_genes)
             df = self.coex.iloc[indices]
         if min_distance:
-            df = df[df.distance >= min_distance]
+            df = df.loc[df.distance >= min_distance,:]
         if sig_only:
-            df = df[df.significant == 1]
-        return df
+            df = df.loc[df.significant == 1,:]
+        return df.copy()
 
-    def trans_locus_density(self,locus_list,return_mean=True):
+    def trans_locus_density(self,locus_list,return_mean=True,gene_limit=4,
+        bootstrap=False):
         '''
-            Calculates the 
+            Calculates the density of edges which span loci 
+
+            Parameters
+            ----------
+            locus_list : iter of Loci
+                an iterable of loci
         '''
-        pass
+        # convert to list of loci to lists of genes
+        if not bootstrap:
+            genes_list = self.refgen.candidate_genes(
+                locus_list, gene_limit=gene_limit,chain=False
+            )
+        else:
+            genes_list = self.refgen.bootstrap_candidate_genes(
+                locus_list, gene_limit=gene_limit,chain=False
+            )
+        # create a dict of gene to locus mapping
+        gene_origin = {}
+        full_gene_set = []
+        for i,genes in enumerate(genes_list):
+            # RefGen.candidate_genes returns u,w,d with chain == False
+            for gene in itertools.chain(*genes):
+                gene_origin[gene.id] = i
+                full_gene_set.append(gene)
+        self.log("Found {} candidate genes",len(full_gene_set))
+
+        edges = self.subnetwork(
+            full_gene_set,
+            min_distance=0,
+            sig_only=False
+        )
+        # iterate over 
+        edges['trans'] = [
+            gene_origin[a]!=gene_origin[b] for a,b in edges.index.values
+        ]
+        if return_mean:
+            scores = edges.loc[edges['trans']==True,'score']
+            return np.nanmean(scores)/(1/np.sqrt(len(scores)))
+        else:
+            return edges
+        
 
     def density(self,gene_list,return_mean=True,min_distance=50000):
         ''' 
-            calculates the denisty of the non-thresholded network amongst genes
+            Calculates the denisty of the non-thresholded network amongst genes
             not within a certain distance of each other. This corrects for
             cis regulatory elements increasing noise in coexpression network 
         '''
@@ -168,9 +207,9 @@ class COB(Expr):
         if return_mean:
             return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
             # old code worth a look
-            # return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
-            #        (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
-            #        (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
+            #return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
+            #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
+            #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
         else:
             return edges
 
@@ -377,9 +416,6 @@ class COB(Expr):
     ''' ------------------------------------------------------------------------------------------
             Internal Methods
     '''
-    def _coex_indices(self,ids):
-        return 
-
 
     def _calculate_coexpression(self,significance_thresh=3):
         ''' 
