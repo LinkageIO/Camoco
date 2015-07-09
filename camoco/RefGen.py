@@ -519,13 +519,17 @@ class RefGen(Camoco):
             # support adding lists of genes
             genes = list(gene)
             self.log('Adding Gene base info to database')
-            self.db.cursor().executemany('''
-            INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
-            ''',((gene.name,gene.chrom,gene.start,gene.end) for gene in genes))
+            self.db.cursor().execute('BEGIN TRANSACTION')
+            self.db.cursor().executemany(
+                'INSERT OR IGNORE INTO genes VALUES (?,?,?,?)',
+                ((gene.name,gene.chrom,gene.start,gene.end) for gene in genes)
+            )
             self.log('Adding Gene attr info to database')
-            self.db.cursor().executemany('''
-            INSERT OR IGNORE INTO gene_attrs VALUES (?,?,?)
-            ''',[(gene.id,key,val) for gene in genes for key,val in gene.attr.items()])
+            self.db.cursor().executemany(
+                'INSERT OR IGNORE INTO gene_attrs VALUES (?,?,?)',
+                ((gene.id,key,val) for gene in genes for key,val in gene.attr.items())
+            )
+            self.db.cursor().execute('END TRANSACTION')
 
     def add_chromosome(self,chrom):
         ''' adds a chromosome object to the class '''
