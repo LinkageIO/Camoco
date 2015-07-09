@@ -15,12 +15,13 @@ from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
 from scipy.misc import comb
 from scipy.stats import norm
+from scipy.cluster.hierarchy import linkage,leaves_list
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 import pandas as pd
 import numpy as np
 import itertools
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
 from scipy.stats import pearsonr
@@ -213,23 +214,6 @@ class COB(Expr):
         else:
             return edges
 
-    def plot_scores(self,filename=None,pcc=True,bins=50):
-        ''' 
-            Plot the histogram of PCCs.
-        '''
-        if filename is None:
-            filename = self.name+'.png'
-        plt.clf()
-        # grab the scores only and put in a np array to save space (pandas DF was HUGE)
-        scores = (self.coex.score.values + float(self._global('pcc_mean'))) * float(self._global('pcc_std'))
-        if pcc:
-            self.log('Transforming scores')
-            # Transform Z-scores to pcc scores (inverse fisher transform)
-            scores = tanh(scores)
-        plt.hist(scores,bins=bins)
-        plt.xlabel('PCC')
-        plt.ylabel('Freq')
-        plt.savefig(filename) 
 
     def to_dat(self,gene_list=None,filename=None,sig_only=False,min_distance=0):
         '''
@@ -359,6 +343,39 @@ class COB(Expr):
         return degree
 
 
+
+    def plot_scores(self,filename=None,pcc=True,bins=50):
+        ''' 
+            Plot the histogram of PCCs.
+
+            Parameters
+            ----------
+            filename : str (default: None)
+                The output filename, if none will return the matplotlib object    
+            pcc : bool (default:True)
+                flag to convert scores to pccs
+            bins : int (default: 50)
+                the number of bins in the histogram
+        '''
+        fig,ax = plt.subplots(figsize=(8,6))
+        # grab the scores only and put in a 
+        # np array to save space (pandas DF was HUGE)
+        scores = self.coex.score.values 
+        if pcc:
+            self.log('Transforming scores')
+            scores = (scores * float(self._global('pcc_std'))) \
+                + float(self._global('pcc_mean'))
+            # Transform Z-scores to pcc scores (inverse fisher transform)
+            scores = np.tanh(scores)
+        ax.hist(scores,bins=bins)
+        ax.set_xlabel('PCC') if pcc else ax.set_xlabel('Z-Score')
+        ax.set_ylabel('Freq')
+        if filename is not None:
+            fig.savefig(filename) 
+        else:
+            return fig
+
+
     def plot_locality(self,gene_list,bootstraps=10,num_windows=100,sd_thresh=2):
         '''
             Make a fancy locality plot.
@@ -412,10 +429,98 @@ class COB(Expr):
         legend = ax.legend(loc='best')
         return plt
 
+    def plot_heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
+        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
+        heatmap_unit_label='Expression Z Score',png_encode=False):
+        ''' 
+            Draw clustered heatmaps of an expression matrix
+        '''
+        from matplotlib import rcParams
+        rcParams.update({'figure.autolayout': True})
+        dm = self._expr(genes=genes,accessions=accessions,zscore=zscore,raw=raw).T
+        D = np.array(dm)
+        row_labels = dm.index
+        col_labels = dm.columns
+        f = plt.figure(figsize=figsize,facecolor='white')
+        # add matrix plot
+        axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
+        def masked_corr(x,y):
+            mask = np.logical_and(np.isfinite(x),np.isfinite(y)) 
+            if cluster_method == "euclidean":
+                return euclidean(x[mask],y[mask])
+            else:
+                return pearsonr(x[mask],y[mask])[1]
+        # add first dendrogram
+        if cluster_y and len(dm.index) > 1:
+            # calculate the squareform of the distance matrix
+            D1 = squareform(pdist(D, masked_corr))
+            ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
+            ax1.set_frame_on(False)
+            Y = linkage(D1, method='complete')
+            Z1 = dendrogram(Y, orientation='right')
+            row_labels = row_labels[Z1['leaves']]
+            D = D[Z1['leaves'], :]
+            ax1.set_xticks([])
+            ax1.set_yticks([])
+        # add second dendrogram
+        if cluster_x and len(dm.columns) > 1:
+            D2 = squareform(pdist(D.T, masked_corr))
+            ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
+            ax2.set_frame_on(False)
+            Y = linkage(D2, method='complete')
+            Z2 = dendrogram(Y)
+            D = D[:, Z2['leaves']]
+            col_labels = col_labels[Z2['leaves']]
+            ax2.set_xticks([])
+            ax2.set_yticks([])
+        if title:
+            plt.title(title)
+        vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
+        vmin = vmax*-1
+        self.log("Extremem Values: {}",vmax)
+        # Handle NaNs
+        if maskNaNs:
+            nan_mask = np.ma.array(D,mask=np.isnan(D))
+            cmap = self._cmap
+            cmap.set_bad('grey',1.0)
+        else:
+            cmap = self.__cmap
+        im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
+        # Handle Axis Labels
+        axmatrix.set_xticks(np.arange(D.shape[1]))
+        axmatrix.xaxis.tick_bottom()
+        axmatrix.tick_params(axis='x',labelsize='xx-small')
+        axmatrix.set_xticklabels(col_labels,rotation=90,ha='center')
+        axmatrix.yaxis.tick_right()
+        axmatrix.set_yticks(np.arange(D.shape[0]))
+        axmatrix.set_yticklabels(row_labels)
+        axmatrix.tick_params(axis='y',labelsize='x-small')
+        plt.gcf().subplots_adjust(right=0.15)
+        # Add color bar
+        axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
+        f.colorbar(im,orientation='horizontal',cax=axColorBar,
+            ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
+        )
+        plt.title(heatmap_unit_label)
+        if filename:
+            plt.savefig(filename)
+            plt.close()
+        if png_encode is True:
+            imgdata = io.BytesIO()
+            plt.savefig(imgdata)
+            return base64.encodebytes(imgdata.getvalue()).decode()
+            
+        return pd.DataFrame(
+            data=D,
+            index=row_labels,
+            columns=col_labels
+        )
+
 
     ''' ------------------------------------------------------------------------------------------
             Internal Methods
     '''
+    
 
     def _calculate_coexpression(self,significance_thresh=3):
         ''' 
@@ -427,6 +532,9 @@ class COB(Expr):
             list(itertools.combinations(self._expr.index.values,2)),
             columns=['gene_a','gene_b']
         )
+        # Reindex the table to match genes
+        self.log('Indexing coex table')
+        tbl.set_index(['gene_a','gene_b'],inplace=True)
         # Now add coexpression data
         self.log("Calculating Coexpression")
         # Calculate the PCCs
@@ -456,9 +564,6 @@ class COB(Expr):
         distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(self._expr.index))
         assert len(distances) == len(tbl)
         tbl['distance'] = distances
-        # Reindex the table to match genes
-        self.log('Indexing coex table')
-        tbl.set_index(['gene_a','gene_b'],inplace=True)
         # put in the hdf5 store
         self._build_tables(tbl)
         self.log("Done")
@@ -476,6 +581,27 @@ class COB(Expr):
         except Exception as e:
             self.log("Something bad happened:{}",e)
             raise
+
+    def _calculate_leaves(self):
+        '''
+            This calculates the leaves of the dendrogram from the coex
+        '''
+        # We need to recreate the original PCCs
+        if len(self.coex) == 0:
+            raise ValueError('Cannot calculate leaves without coex')
+        pcc_mean = float(self._global('pcc_mean'))
+        pcc_std  = float(self._global('pcc_std'))
+        # Subtract pccs from 1 so we do not get negative distances
+        dists = 1 - np.tanh((self.coex.score * pcc_std)+pcc_mean)
+        self.leaves = pd.DataFrame(
+            leaves_list(linkage(dists,method='single')),
+            index=self._expr.index,
+            columns=['index']
+        )
+        # store the leaves
+        self.hdf5['leaves'] = self.leaves
+        self.hdf5.flush(fsync=True)
+
 
     def _build_tables(self,tbl):
         try:
@@ -513,6 +639,15 @@ class COB(Expr):
     ''' ------------------------------------------------------------------------------------------
             Class Methods -- Factory Methods
     '''
+    @classmethod
+    def create(cls,name,description,refgen):
+        self = super().create(name,description,refgen)
+        self.hdf5['gene_qc_status'] = pd.DataFrame()
+        self.hdf5['accession_qc_status'] = pd.DataFrame()
+        self.hdf5['coex'] = pd.DataFrame()
+        self.hdf5['degree'] = pd.DataFrame()
+        self.hdf5['leaves'] = pd.DataFrame()
+        return self
 
     @classmethod
     def from_Expr(cls,expr):
@@ -536,6 +671,7 @@ class COB(Expr):
         self = expr
         self._calculate_coexpression()
         self._calculate_degree()
+        self._calculate_leaves()
         return self
 
     @classmethod
