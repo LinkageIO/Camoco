@@ -22,20 +22,24 @@ class Camoco(object):
         self.type = type
         # A dataset already exists, return it
         self.db = self._database(name)
-        (self.ID,self.name,self.description,self.type,self.added) \
-        = self._database('Camoco',type='Camoco') \
-            .cursor().execute(
-            "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
-            (name,type)
-        ).fetchone()
-        cur = self.db.cursor()  
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS globals (
-                key TEXT,
-                val TEXT
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
-            ''')
+        try:
+            (self.ID,self.name,self.description,self.type,self.added) = \
+            self._database('Camoco',type='Camoco') \
+                .cursor().execute(
+                "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
+                (name,type)
+            ).fetchone()
+            cur = self.db.cursor()  
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS globals (
+                    key TEXT,
+                    val TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
+                ''')
+        except TypeError as e:
+            raise TypeError('{}.{} does not exist'.format(type,name))
+
 
     def _database(self,dbname,type=None):
         # return a connection if exists
