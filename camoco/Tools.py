@@ -6,7 +6,9 @@ import functools
 
 from termcolor import colored,cprint
 from itertools import chain
-from camoco.Locus import *
+
+from camoco.Locus import Locus
+from camoco.Config import cf
 
 import camoco as co
 import matplotlib.pylab as pylab
@@ -16,7 +18,7 @@ import statsmodels.api as sm
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 def available_datasets(type=None,name=None):
-    cur = Camoco("Camoco",type='Camoco').db.cursor()
+    cur = co.Camoco("Camoco",type='Camoco').db.cursor()
     if type:
         datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
     else:
@@ -32,7 +34,7 @@ def available_datasets(type=None,name=None):
         return datasets
 
 def del_dataset(type,name,safe=True):
-    c = Camoco("Camoco")
+    c = co.Camoco("Camoco")
     if safe:
         c.log("Are you sure you want to delete {}",name)
         if input("[Y/n]:") != 'Y':
