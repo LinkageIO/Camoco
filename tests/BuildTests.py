@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import unittest
 import itertools
 import os
 import glob
@@ -11,13 +10,15 @@ import pandas as pd
 
 from camoco.Config import cf
 
+import unittest
 
 # write test case to import refgen from GFF
 
 class RefGen(unittest.TestCase):
+
     def Tair10(self):
         gff = os.path.join(
-            cf.get('options','testdir'),
+            cf['options']['testdir'],
             'raw','TAIR10_GFF3_genes.gff'
         )
         co.del_dataset('RefGen','T10',safe=False)
@@ -26,7 +27,7 @@ class RefGen(unittest.TestCase):
 
     def Zm5bFGS(self):
         gff = os.path.join(
-            cf.get('options','testdir'),
+            cf['options']['testdir'],
             'raw','ZmB73_5b_FGS.gff'
         )
         co.del_dataset('RefGen','Zm5bFGS',safe=False)
@@ -34,6 +35,12 @@ class RefGen(unittest.TestCase):
             gff,'Zm5bFGS','Maize 5b Filtered Gene Set','5b','Zea Mays'
         )
         self.assertIsInstance(ZM,co.RefGen)
+
+def RefGenSuite():
+    suite = unittest.TestSuite()
+    suite.addTest(RefGen('Tair10'))
+    suite.addTest(RefGen('Zm5bFGS'))
+    return suite
 
 class Ontology(unittest.TestCase):
 
@@ -142,8 +149,19 @@ class Ontology(unittest.TestCase):
             df,'ZmIonome','Maize Ionome',
             ZM,term_col='el',chr_col='chr',pos_col='pos'
         )
+        IONS.del_term('Co59')
         # I guess we need a test in here too
         self.assertIsInstance(IONS,co.Ontology)
+
+def OntologySuite():
+    suite = unittest.TestSuite()
+    suite.addTest(Ontology('AtSeedIonome'))
+    suite.addTest(Ontology('AtLeafIonome'))
+    suite.addTest(Ontology('AtLeafHydroIonome'))
+    suite.addTest(Ontology('AtRootHydroIonome'))
+    suite.addTest(Ontology('ZmIonome'))
+    return suite
+
 
 class COB(unittest.TestCase):
 
