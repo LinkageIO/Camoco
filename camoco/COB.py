@@ -77,12 +77,12 @@ class COB(Expr):
     def neighbors(self,gene,sig_only=True):
         '''
             Returns a DataFrame containing the neighbors for gene.
-    
+
             Parameters
             ----------
             gene : co.Locus
                 The gene for which to extract neighbors
-    
+
             Returns
             -------
             A DataFrame containing edges
@@ -96,11 +96,11 @@ class COB(Expr):
             return edges
 
     def coexpression(self,gene_a,gene_b):
-        ''' 
+        '''
             Returns a coexpression z-score between two genes. This
             is the pearson correlation coefficient of the two genes'
             expression profiles across the accessions (experiments).
-            This value is pulled from the 
+            This value is pulled from the
 
             Parameters
             ----------
@@ -108,10 +108,10 @@ class COB(Expr):
                 The first gene
             gene_b : camoco.Locus
                 The second gene
-        
+
             Returns
             -------
-            Coexpression Z-Score 
+            Coexpression Z-Score
 
         '''
         # Grab the indices in the original expression matrix
@@ -133,7 +133,7 @@ class COB(Expr):
         else:
             ids = np.array([self._expr_index[x.id] for x in gene_list])
             if filter_missing_gene_ids:
-                # filter out the Nones 
+                # filter out the Nones
                 ids = np.array(list(filter(None,ids)))
             num_genes = self.num_genes()
             # Grab the coexpression indices for the genes
@@ -148,7 +148,7 @@ class COB(Expr):
     def trans_locus_density(self,locus_list,return_mean=True,gene_limit=4,
         bootstrap=False):
         '''
-            Calculates the density of edges which span loci 
+            Calculates the density of edges which span loci
 
             Parameters
             ----------
@@ -179,7 +179,7 @@ class COB(Expr):
             min_distance=0,
             sig_only=False
         )
-        # iterate over 
+        # iterate over
         edges['trans'] = [
             gene_origin[a]!=gene_origin[b] for a,b in edges.index.values
         ]
@@ -188,13 +188,13 @@ class COB(Expr):
             return np.nanmean(scores)/(1/np.sqrt(len(scores)))
         else:
             return edges
-        
+
 
     def density(self,gene_list,return_mean=True,min_distance=50000):
-        ''' 
+        '''
             Calculates the denisty of the non-thresholded network amongst genes
             not within a certain distance of each other. This corrects for
-            cis regulatory elements increasing noise in coexpression network 
+            cis regulatory elements increasing noise in coexpression network
         '''
         # filter for only genes within network
         edges = self.subnetwork(gene_list,
@@ -214,7 +214,7 @@ class COB(Expr):
             return edges
 
     def plot_scores(self,filename=None,pcc=True,bins=50):
-        ''' 
+        '''
             Plot the histogram of PCCs.
         '''
         if filename is None:
@@ -229,7 +229,7 @@ class COB(Expr):
         plt.hist(scores,bins=bins)
         plt.xlabel('PCC')
         plt.ylabel('Freq')
-        plt.savefig(filename) 
+        plt.savefig(filename)
 
     def to_dat(self,gene_list=None,filename=None,sig_only=False,min_distance=0):
         '''
@@ -245,11 +245,11 @@ class COB(Expr):
             self.log('Done')
 
     def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=100000,min_cluster_size=0,max_cluster_size=10e10):
-        ''' 
+        '''
             A *very* thin wrapper to the MCL program. The MCL program must
             be accessible by a subprocess (i.e. by the shell).
-            Returns clusters (as list) as designated by MCL. 
-            
+            Returns clusters (as list) as designated by MCL.
+
             Parameters
             ----------
             gene_list : a gene iterable
@@ -260,13 +260,13 @@ class COB(Expr):
                 MCL accepts parameter schemes. See mcl docs for more details
             min_distance : int (default: 100000)
                 The minimum distance between genes for which to consider co-expression
-                interactions. This filters out cis edges. 
+                interactions. This filters out cis edges.
             min_cluster_size : int (default: 0)
                 The minimum cluster size to return. Filter out clusters smaller
                 than this.
             max_cluster_size : float (default: 10e10)
                 The maximum cluster size to return. Filter out clusters larger
-                than this. 
+                than this.
 
             Returns
             -------
@@ -275,7 +275,7 @@ class COB(Expr):
         # output dat to tmpfile
         tmp = self._tmpfile()
         self.to_dat(filename=tmp.name,gene_list=gene_list,min_distance=min_distance,sig_only=True)
-        # build the mcl command 
+        # build the mcl command
         cmd = "mcl {} --abc -scheme {} -I {} -o -".format(tmp.name,scheme,I)
         self.log("running MCL: {}",cmd)
         try:
@@ -295,7 +295,7 @@ class COB(Expr):
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
-    def local_degree(self,genes):
+    def local_degree(self,genes=None):
         '''
             Returns the local degree of a list of genes
         '''
@@ -303,10 +303,11 @@ class COB(Expr):
             list(Counter(chain(*self.subnetwork(genes,sig_only=True).index.get_values())).items()),
             columns=['Gene','Degree']
         ).set_index('Gene')
+        print(local_degree)
         # We need to find genes not in the subnetwork and add them as degree 0
         degree_zero_genes = pd.DataFrame( # The code below is optimized
             [(gene.id,0) for gene in genes if gene.id not in local_degree.index],
-            columns=['Gene','Degree']        
+            columns=['Gene','Degree']
         ).set_index('Gene')
 
         return pd.concat([local_degree,degree_zero_genes])
@@ -326,7 +327,7 @@ class COB(Expr):
     def locality(self, gene_list,bootstrap_name=None,include_regression=False):
         '''
             Computes the merged local vs global degree table
-            
+
             Parameters
             ----------
             gene_list : iterable of camoco.Loci
@@ -335,12 +336,12 @@ class COB(Expr):
                 This will be added as a column. Useful for
                 generating bootstraps of locality and keeping
                 track of which one a row came from after catting
-                multiple bootstraps together. 
+                multiple bootstraps together.
 
             Returns
             -------
             A pandas DataFrame with local,global and residual columns
-            based on linear regression of local on global degree. 
+            based on linear regression of local on global degree.
 
         '''
         self.log('Fetching Degree ... ')
@@ -364,7 +365,7 @@ class COB(Expr):
             Make a fancy locality plot.
         '''
         # Generate a blank fig
-        fig,ax = plt.subplots(figsize=(8,6)) 
+        fig,ax = plt.subplots(figsize=(8,6))
         fig.hold(True)
         # Y axis is local degree (what we are TRYING to predict)
         degree = self.locality(gene_list).sort('global')
@@ -398,10 +399,10 @@ class COB(Expr):
             win_std = bs.groupby('window').apply(lambda df: df['resid'].std()).to_dict()
             bs['std_envelope'] = [win_std[x] for x in bs.window.values]
             # Plot confidence intervals
-            prstd, iv_l, iv_u = wls_prediction_std(bs_ols)           
+            prstd, iv_l, iv_u = wls_prediction_std(bs_ols)
             ax.plot(bs['global'], iv_u, 'g--',label='conf int.')
             ax.plot(bs['global'], iv_l, 'g--')
-            # plot the  
+            # plot the
             ax.plot(
                 bs['global'],bs['fitted']+(sd_thresh*bs['std_envelope']),'r--'
                 ,label='{} s.d. envelope'.format(sd_thresh)
@@ -418,7 +419,7 @@ class COB(Expr):
     '''
 
     def _calculate_coexpression(self,significance_thresh=3):
-        ''' 
+        '''
             Generates pairwise PCCs for gene expression profiles in self._expr.
             Also calculates pairwise gene distance.
         '''
@@ -431,7 +432,7 @@ class COB(Expr):
         self.log("Calculating Coexpression")
         # Calculate the PCCs
         pccs = 1-PCCUP.pair_correlation(np.ascontiguousarray(self._expr.as_matrix()))
-        # return the long form of the 
+        # return the long form of the
         assert len(pccs) == len(tbl)
         tbl['score'] = pccs
         # correlations of 1 dont transform well, they cause infinities
@@ -493,14 +494,14 @@ class COB(Expr):
     def _coex_concordance(self,gene_a,gene_b,maxnan=10):
         '''
             This is a sanity method to ensure that the pcc calculated
-            directly from the expr profiles matches the one stored in 
+            directly from the expr profiles matches the one stored in
             the database
         '''
         expr_a = self.expr_profile(gene_a).values
         expr_b = self.expr_profile(gene_b).values
         mask = np.logical_and(np.isfinite(expr_a),np.isfinite(expr_b))
         if sum(mask) < maxnan:
-            # too many nans to reliably calculate pcc 
+            # too many nans to reliably calculate pcc
             return np.nan
         r = pearsonr(expr_a[mask],expr_b[mask])[0]
         # fisher transform it
@@ -508,7 +509,7 @@ class COB(Expr):
         # standard normalize it
         z = (z - float(self._global('pcc_mean')))/float(self._global('pcc_std'))
         return z
- 
+
 
     ''' ------------------------------------------------------------------------------------------
             Class Methods -- Factory Methods
@@ -516,21 +517,21 @@ class COB(Expr):
 
     @classmethod
     def from_Expr(cls,expr):
-        ''' 
+        '''
             Create a COB instance from an camoco.Expr (Expression) instance.
             A COB inherits all the methods of a Expr instance and implements additional
             coexpression specific methods. This method accepts an already build Expr
-            instance and then performs the additional computations needed to build a 
+            instance and then performs the additional computations needed to build a
             full fledged COB instance.
 
             Parameters
             ----------
             expr : camoco.Expr
-                
+
             Returns
             -------
             camoco.COB instance
-            
+
         '''
         # The Expr object already exists, just get a handle on it
         self = expr
@@ -541,9 +542,9 @@ class COB(Expr):
     @classmethod
     def from_DataFrame(cls,df,name,description,refgen,rawtype=None,**kwargs):
         '''
-            The method will read the table in (as a pandas dataframe), 
+            The method will read the table in (as a pandas dataframe),
             build the Expr object passing all keyword arguments in **kwargs
-            to the classmethod Expr.from_DataFrame(...). See additional 
+            to the classmethod Expr.from_DataFrame(...). See additional
             **kwargs in COB.from_Expr(...)
 
             Parameters
@@ -558,11 +559,11 @@ class COB(Expr):
                 Short string describing the dataset
             refgen : camoco.RefGen
                 A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This 
+                genome referred to by the genes in the dataset. This
                 is cross references during import so we can pull information
-                about genes we are interested in during analysis. 
+                about genes we are interested in during analysis.
             rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype passed to 
+                This is noted here to reinforce the impotance of the rawtype passed to
                 camoco.Expr.from_DataFrame. See docs there for more information.
             **kwargs : key value pairs
                 additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
@@ -579,7 +580,7 @@ class COB(Expr):
         '''
             Build a COB Object from an FPKM or Micrarray CSV. This is a
             convenience method which handles reading in of tables.
-            Files need to have gene names as the first column and 
+            Files need to have gene names as the first column and
             accession (i.e. experiment) names as the first row. All
             kwargs will be passed to COB.from_DataFrame(...). See
             docstring there for option descriptions.
@@ -594,11 +595,11 @@ class COB(Expr):
                 Short string describing the dataset
             refgen : camoco.RefGen
                 A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This 
+                genome referred to by the genes in the dataset. This
                 is cross references during import so we can pull information
-                about genes we are interested in during analysis. 
+                about genes we are interested in during analysis.
             rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype passed to 
+                This is noted here to reinforce the impotance of the rawtype passed to
                 camoco.Expr.from_DataFrame. See docs there for more information.
             sep : str (default: \\t)
                 Specifies the delimiter of the file referenced by the filename parameter.
@@ -631,8 +632,8 @@ class COB(Expr):
         ''' returns an igraph of the largest connected component in graph '''
         pass
 
-    def seed(self, gene_list, limit=65): 
-        ''' Input: given a set of nodes, add on the next X strongest connected nodes ''' 
+    def seed(self, gene_list, limit=65):
+        ''' Input: given a set of nodes, add on the next X strongest connected nodes '''
         pass
 
     def graph(self,gene_list,min_distance=None):
@@ -641,7 +642,7 @@ class COB(Expr):
         pass
 
     def coordinates(self,gene_list,layout=None):
-        ''' returns the static layout, you can change the stored layout by passing 
+        ''' returns the static layout, you can change the stored layout by passing
             in a new layout object. If no layout has been stored or a gene does not have
             coordinates, returns (0,0) for each mystery gene'''
         pass
@@ -665,6 +666,21 @@ class COB(Expr):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
         pass
 
-    def compare_degree(self,obj,score_cutoff=3):
+    def compare_degree(self,obj,diff_genes=10,score_cutoff=3):
         ''' Compares the degree of one COB to another '''
-        pass
+        self.log("Comparing degrees of {} and {}",self.name,obj.name)
+
+        # Put the two degree tables in the same table
+        lis = pd.concat([self.degree.copy(), obj.degree.copy()],axis=1,ignore_index=True)
+
+        # Filter the table of entries to ones where both entries exist and are above 3
+        lis = lis[(lis[0] > 0) & (lis[1] > 0)]
+
+        delta = lis[0] - lis[1]
+
+        delta.sort(ascending=False)
+        highest = sorted(list(dict(delta[:diff_genes]).items()),key=lambda x: x[1],reverse=True)
+        lowest = sorted(list(dict(delta[-diff_genes:]).items()),key=lambda x: x[1],reverse=False)
+        ans = {'correlation':lis[0].corr(lis[1]), 'biggest_diffs_high':highest, 'biggest_diffs_low':lowest}
+        # Find and return the correlation beteween the two sets, and the genes with the biggest differences
+        return ans
