@@ -11,7 +11,7 @@ from collections import defaultdict
 import matplotlib
 import pandas as pd
 import numpy as np
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import io               
 import re
 import string
@@ -32,7 +32,6 @@ class Expr(Camoco):
             self._expr = self.hdf5['expr']
             self._gene_qc_status = self.hdf5['gene_qc_status']
         except KeyError as e:
-            self.log.warn('{} is empty: ({})',name,e)
             self._expr = pd.DataFrame()
         self.log('Building Expr Index')
         self._expr_index = defaultdict(
@@ -472,10 +471,6 @@ class Expr(Camoco):
         # Create appropriate HDF5 tables
         self.hdf5['expr'] = pd.DataFrame()
         self.hdf5['raw_expr'] = pd.DataFrame()
-        self.hdf5['gene_qc_status'] = pd.DataFrame()
-        self.hdf5['accession_qc_status'] = pd.DataFrame()
-        self.hdf5['coex'] = pd.DataFrame()
-        self.hdf5['degree'] = pd.DataFrame()
         # Delete existing datasets 
         self._set_refgen(refgen,filter=False)
         return self
@@ -608,92 +603,7 @@ class Expr(Camoco):
         Unimplemented ---------------------------------------------------------------------------------
     '''
        
-    def heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
-        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
-        heatmap_unit_label='Expression Z Score',png_encode=False):
-        ''' 
-            Draw clustered heatmaps of an expression matrix
-        '''
-        from matplotlib import rcParams
-        rcParams.update({'figure.autolayout': True})
-        dm = self._expr(genes=genes,accessions=accessions,zscore=zscore,raw=raw).T
-        D = np.array(dm)
-        row_labels = dm.index
-        col_labels = dm.columns
-        f = plt.figure(figsize=figsize,facecolor='white')
-        # add matrix plot
-        axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
-        def masked_corr(x,y):
-            mask = np.logical_and(np.isfinite(x),np.isfinite(y)) 
-            if cluster_method == "euclidean":
-                return euclidean(x[mask],y[mask])
-            else:
-                return pearsonr(x[mask],y[mask])[1]
-        # add first dendrogram
-        if cluster_y and len(dm.index) > 1:
-            # calculate the squareform of the distance matrix
-            D1 = squareform(pdist(D, masked_corr))
-            ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
-            ax1.set_frame_on(False)
-            Y = linkage(D1, method='complete')
-            Z1 = dendrogram(Y, orientation='right')
-            row_labels = row_labels[Z1['leaves']]
-            D = D[Z1['leaves'], :]
-            ax1.set_xticks([])
-            ax1.set_yticks([])
-        # add second dendrogram
-        if cluster_x and len(dm.columns) > 1:
-            D2 = squareform(pdist(D.T, masked_corr))
-            ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
-            ax2.set_frame_on(False)
-            Y = linkage(D2, method='complete')
-            Z2 = dendrogram(Y)
-            D = D[:, Z2['leaves']]
-            col_labels = col_labels[Z2['leaves']]
-            ax2.set_xticks([])
-            ax2.set_yticks([])
-        if title:
-            plt.title(title)
-        vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
-        vmin = vmax*-1
-        self.log("Extremem Values: {}",vmax)
-        # Handle NaNs
-        if maskNaNs:
-            nan_mask = np.ma.array(D,mask=np.isnan(D))
-            cmap = self._cmap
-            cmap.set_bad('grey',1.0)
-        else:
-            cmap = self.__cmap
-        im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
-        # Handle Axis Labels
-        axmatrix.set_xticks(np.arange(D.shape[1]))
-        axmatrix.xaxis.tick_bottom()
-        axmatrix.tick_params(axis='x',labelsize='xx-small')
-        axmatrix.set_xticklabels(col_labels,rotation=90,ha='center')
-        axmatrix.yaxis.tick_right()
-        axmatrix.set_yticks(np.arange(D.shape[0]))
-        axmatrix.set_yticklabels(row_labels)
-        axmatrix.tick_params(axis='y',labelsize='x-small')
-        plt.gcf().subplots_adjust(right=0.15)
-        # Add color bar
-        axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
-        f.colorbar(im,orientation='horizontal',cax=axColorBar,
-            ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
-        )
-        plt.title(heatmap_unit_label)
-        if filename:
-            plt.savefig(filename)
-            plt.close()
-        if png_encode is True:
-            imgdata = io.BytesIO()
-            plt.savefig(imgdata)
-            return base64.encodebytes(imgdata.getvalue()).decode()
-            
-        return pd.DataFrame(
-            data=D,
-            index=row_labels,
-            columns=col_labels
-        )
+
 
     def plot_value_hist(self,groupby='accession',raw=False,bins=50,figsize=(16,16),title='',log=False):
         ''' Plots Value histograms on one of the expression matrix axis'''
