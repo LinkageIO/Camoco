@@ -55,7 +55,9 @@ class COB(unittest.TestCase):
 
     def test_num_neighbors_equals_degree(self):
         random_gene = self.cob.refgen.random_gene()
-        self.assertTrue(len(self.cob.neighbors(random_gene) == self.cob.global_degree(random_gene)))
+        self.assertTrue(
+            len(self.cob.neighbors(random_gene) \
+            == self.cob.global_degree(random_gene)))
 
 if __name__ == '__main__':
     unittest.main()
