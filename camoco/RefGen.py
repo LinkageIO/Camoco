@@ -573,18 +573,17 @@ class RefGen(Camoco):
                 if line.startswith('#'):
                     continue
                 (chrom,source,feature,start,
-                 end,score,strand,frame,attributes) = line.strip().split()
-                attributes = dict([(field.split('=')) \
-                    for field in attributes.strip(';').split(';')
-                ])
+                 end,score,strand,frame,attributes) = line.strip().split('\t')
+                attributes = dict([(field.strip().split('=')) \
+                    for field in attributes.strip(';').split(';')])
                 if feature == 'chromosome':
-                    self.log('Found a chromosome: {}',attributes['ID'])
-                    self.add_chromosome(Chrom(attributes['ID'],end))
+                    self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
+                    self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
                 if feature == 'gene':
                     genes.append(
                         Gene(
                             chrom,int(start),int(end),
-                            attributes['ID'].upper(),strand=strand,
+                            attributes['ID'].upper().strip('"'),strand=strand,
                             build=build,organism=organism
                         ).update(attributes)
                     )
