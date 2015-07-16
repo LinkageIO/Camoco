@@ -30,7 +30,7 @@ class Term(object):
             self.attrs[key] = val
 
     def __len__(self):
-        ''' 
+        '''
             Returns the number of loci in the term.
         '''
         return len(self.locus_list)
@@ -39,18 +39,18 @@ class Term(object):
         '''
             Adds a locus to the Term.
         '''
-        self.locus_list.add(locus) 
-    
+        self.locus_list.add(locus)
+
     def flanking_snps(self,gene,window_size=100000):
-        ''' 
-            returns any nearby Term SNPs to a gene 
+        '''
+            returns any nearby Term SNPs to a gene
         '''
         return [locus for locus in self.locus_list if abs(gene-locus) <= window_size]
 
     def effective_snps(self,window_size=None,max_genes_between=1):
-        ''' 
+        '''
             Collapse down loci that have overlapping windows.
-            Also collapses down snps that have 
+            Also collapses down snps that have
         '''
         locus_list = sorted(self.locus_list)
         if window_size is not None:
@@ -66,7 +66,7 @@ class Term(object):
                 collapsed.append(locus)
         log('{}: Found {} SNPs -> {} effective SNPs',self.name,len(self.locus_list),len(collapsed))
         return collapsed
-        
+
     def __str__(self):
         return "Term: {}, Desc: {}, {} Loci".format(self.name,self.desc,len(self))
 
@@ -74,8 +74,8 @@ class Term(object):
         return str(self.name)
 
 class Ontology(Camoco):
-    ''' An Ontology is just a collection of terms. Each term is just a collection of genes. 
-        Sometimes terms are related or nested within each other, sometimes not. Simple enough.  
+    ''' An Ontology is just a collection of terms. Each term is just a collection of genes.
+        Sometimes terms are related or nested within each other, sometimes not. Simple enough.
     '''
     def __init__(self,name):
         super().__init__(name,type='Ontology')
@@ -114,7 +114,7 @@ class Ontology(Camoco):
             self.log("Caculating Enrichemnt for {}",label)
         cur = self.db.cursor()
         terms = [ x[0] for x in cur.execute(
-            '''SELECT DISTINCT(term) FROM gene_terms 
+            '''SELECT DISTINCT(term) FROM gene_terms
             WHERE gene IN ('{}');'''.format("','".join([x.id for x in gene_list]))
         )]
         # compute hypergeometric for each term
@@ -191,7 +191,7 @@ class Ontology(Camoco):
         cur.execute('BEGIN TRANSACTION')
         # Add the term name and description
         cur.execute('''
-            INSERT OR REPLACE INTO terms (name,desc) 
+            INSERT OR REPLACE INTO terms (name,desc)
             VALUES (?,?)''',(term.name,term.desc)
         )
         # Add the term loci
@@ -210,11 +210,11 @@ class Ontology(Camoco):
 
     @classmethod
     def create(cls,name,description,refgen):
-        ''' 
-            This method creates a fresh Ontology with nothing it it. 
+        '''
+            This method creates a fresh Ontology with nothing it it.
         '''
         # run the inherited create method from Camoco
-        self = super(Ontology,cls).create(name,description,type='Ontology')
+        self = super().create(name,description,type='Ontology')
         # add the global refgen
         self._global('refgen',refgen.name)
         # set the refgen for the current instance
@@ -231,7 +231,7 @@ class Ontology(Camoco):
             start_col=None, end_col=None, id_col=None
             ):
         '''
-            Import an ontology from a pandas dataframe. 
+            Import an ontology from a pandas dataframe.
             Groups by term_col, then iterates over the rows in the group.
             It adds each row as a locus to the term.
         '''
@@ -246,16 +246,17 @@ class Ontology(Camoco):
                     # this is hackey and I dont like it
                     kwargs = {key:val for key,val in dict(row).items() if key not in Locus.__init__.__code__.co_varnames}
                     snp = Locus(row[chr_col],int(row[pos_col]),int(row[pos_col]),gene_build=self.refgen.build,**kwargs)
-                    term.locus_list.add(snp) 
+                    term.locus_list.add(snp)
             self.log("Importing {}",term)
             self.add_term(term)
         return self
-            
+
 
     @classmethod
-    def from_obo(self,filename,name,description,refgen):
+    def from_obo(cls,filename,name,description,refgen):
         ''' Convenience function for importing GO obo files '''
-        self.log('importing OBO: {}',filename)
+        self = cls.create(name,description,refgen)
+        self.log('Importing OBO: {}',filename)
         terms= defaultdict(dict)
         is_a = list()
         cur_term = ''
@@ -264,10 +265,11 @@ class Ontology(Camoco):
             for line in INOBO:
                 line = line.strip()
                 if line.startswith('id: '):
-                    cur_term = line.replace('id: ','') 
+                    cur_term = line.replace('id: ','')
                 elif line.startswith('name: '):
                     terms[cur_term]['name'] = line.replace('name: ','')
                     terms[cur_term]['desc'] = ''
+                    terms[cur_term]['is_a'] = ''
                 elif line.startswith('namespace: '):
                     terms[cur_term]['type'] = line.replace('namespace: ','')
                 elif line.startswith('def: '):
@@ -275,25 +277,27 @@ class Ontology(Camoco):
                 elif line.startswith('comment: '):
                     terms[cur_term]['desc'] += line.replace('comment: ','')
                 elif line.startswith('is_a: '):
-                    is_a.append((cur_term,isa_re.match(line).group(1)))
-        self.log("Dumping {} annotations and {} relationships",len(terms),len(is_a))
+                    terms[cur_term]['is_a'] += isa_re.match(line).group(1) + ','
+                    #is_a.append((cur_term,isa_re.match(line).group(1)))
+        self.log("Dumping {} annotations",len(terms))
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
         cur.executemany('''
-            INSERT INTO terms (id,name,type,desc) VALUES(?,?,?,?)''', 
-            [ (key,val['name'],val['type'],val['desc']) for key,val in terms.items()]
+            INSERT INTO terms (id,name,type,desc,is_a) VALUES(?,?,?,?,?)''',
+            [ (key,val['name'],val['type'],val['desc'],val['is_a'][:-1]) for key,val in terms.items()]
         )
         self.log('Done inserting terms')
-        cur.executemany(''' 
-            INSERT INTO relationships (term,is_a) VALUES (?,?)''',
-            is_a
-        )
+        #cur.executemany('''
+        #    INSERT INTO relationships (term,is_a) VALUES (?,?)''',
+        #    is_a
+        #)
         cur.execute('END TRANSACTION')
         self._build_indices()
+        #return self
 
     @classmethod
     def from_mapman(self,filename):
-        ''' Convenience function for files provided by MapMan, columns are 
+        ''' Convenience function for files provided by MapMan, columns are
             CODE,NAME,Gene,DESC,TYPE seperated by space and enclosed in single quotes'''
         self.log('Importing MAPMAN text file: {}',filename)
         terms = dict()
@@ -308,7 +312,7 @@ class Ontology(Camoco):
                 (term,name,gene,desc,*type) = [x.strip("'") for x in  line.strip().split("\t")]
                 # strip transcript out of gene name
                 gene = transcript_strip.sub('',gene.upper())
-                terms[term] = (term,name,'','') 
+                terms[term] = (term,name,'','')
                 gene_terms.append((gene,term))
                 # add if there is a relationship there
                 if is_a_pattern.match(term):
@@ -317,23 +321,26 @@ class Ontology(Camoco):
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
         cur.executemany('''INSERT INTO terms (id,name,type,desc) VALUES (?,?,?,?)''',terms.values())
-        cur.executemany('''INSERT INTO relationships (term,is_a) VALUES (?,?) ''',is_a.items()) 
+        cur.executemany('''INSERT INTO relationships (term,is_a) VALUES (?,?) ''',is_a.items())
         cur.executemany('''INSERT INTO gene_terms (gene,term) VALUES (?,?)''',gene_terms)
         cur.execute('END TRANSACTION')
-        
+
 
     def _build_indices(self):
-        pass    
+        pass
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute(''' 
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS terms (
-                name TEXT UNIQUE,
-                desc TEXT   
-            ); 
+                id TEXT UNIQUE,
+                name TEXT,
+                type TEXT,
+                desc TEXT,
+                is_a TEXT
+            );
         ''')
-        cur.execute(''' 
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS loci_attr (
                 term TEXT,
                 loci_id TEXT,
@@ -355,4 +362,3 @@ class Ontology(Camoco):
             );
         ''')
         self._build_indices()
-    
