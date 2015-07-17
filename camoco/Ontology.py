@@ -19,8 +19,10 @@ class Term(object):
     '''
         A Term is a just group of loci that are related.
     '''
-    def __init__(self,name,desc='',locus_list=None,**kwargs):
+    def __init__(self,id,name='',type='',desc='',locus_list=None,**kwargs):
+        self.id = id
         self.name = name
+        self.type = type
         self.desc = desc
         self.locus_list = set()
         self.attr = {}
@@ -102,7 +104,7 @@ class Ontology(Camoco):
         return [self.term(x[0]) for x in self.db.cursor().execute('SELECT id FROM terms WHERE name LIKE ?',(like,)).fetchall()]
 
     def iter_terms(self):
-        for id, in self.db.cursor().execute("SELECT name FROM terms"):
+        for id, in self.db.cursor().execute("SELECT id FROM terms"):
             yield self[id]
 
     def terms(self):
@@ -159,7 +161,7 @@ class Ontology(Camoco):
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(self.name,self.description,len(self),self.refgen)
 
-    def del_term(self,name):
+    def del_term(self,id):
         '''
         Remove a term from the dataset.
 
@@ -179,9 +181,9 @@ class Ontology(Camoco):
                 SELECT id FROM term_loci WHERE term = ?
             );
             DELETE FROM term_loci WHERE term = ?;
-            DELETE FROM terms WHERE name = ?;
+            DELETE FROM terms WHERE id = ?;
             END TRANSACTION;
-        ''',(name,name,name))
+        ''',(id,id,id))
 
     def add_term(self,term,overwrite=True):
         ''' This will add a single term to the ontology '''
@@ -191,21 +193,21 @@ class Ontology(Camoco):
         cur.execute('BEGIN TRANSACTION')
         # Add the term name and description
         cur.execute('''
-            INSERT OR REPLACE INTO terms (name,desc)
-            VALUES (?,?)''',(term.name,term.desc)
+            INSERT OR REPLACE INTO terms (id,name,type,desc)
+            VALUES (?,?,?,?)''',(term.id,term.name,term.type,term.desc)
         )
         # Add the term loci
         for locus in term.locus_list:
             cur.execute('''
                 INSERT OR REPLACE INTO term_loci (term,chrom,start,end,name,window,id)
                 VALUES (?,?,?,?,?,?,?)
-                ''',(term.name,) + locus.as_record()
+                ''',(term.id,) + locus.as_record()
             )
             # Add the loci attrs
             cur.executemany('''
                 INSERT OR REPLACE INTO loci_attr (term,loci_id,key,val)
                 VALUES (?,?,?,?)
-            ''',[(term.name,locus.id,key,val) for key,val in locus.attr.items()])
+            ''',[(term.id,locus.id,key,val) for key,val in locus.attr.items()])
         cur.execute('END TRANSACTION')
 
     @classmethod
@@ -237,8 +239,8 @@ class Ontology(Camoco):
         '''
         self = cls.create(name,description,refgen)
         # group each trait by its name
-        for term_name,df in df.groupby(term_col):
-            term = Term(term_name)
+        for term_id,df in df.groupby(term_col):
+            term = Term(term_id)
             # we have a SNP
             if pos_col is not None:
                 for i,row in df.iterrows():
@@ -253,47 +255,84 @@ class Ontology(Camoco):
 
 
     @classmethod
-    def from_obo(cls,filename,name,description,refgen):
+    def from_obo(cls,obo_file,gene_map_file,name,description,refgen):
         ''' Convenience function for importing GO obo files '''
         self = cls.create(name,description,refgen)
-        self.log('Importing OBO: {}',filename)
-        terms= defaultdict(dict)
-        is_a = list()
+
+        # Importing the obo information
+        self.log('Importing OBO: {}',obo_file)
+        terms = defaultdict(dict)
         cur_term = ''
+        alt_terms = []
         isa_re = re.compile('is_a: (.*) !.*')
-        with open(filename,'r') as INOBO:
+        with open(obo_file,'r') as INOBO:
             for line in INOBO:
                 line = line.strip()
                 if line.startswith('id: '):
+                    for alt in alt_terms:
+                        terms[alt] = terms[cur_term].copy()
+                    alt_terms = []
                     cur_term = line.replace('id: ','')
                 elif line.startswith('name: '):
                     terms[cur_term]['name'] = line.replace('name: ','')
                     terms[cur_term]['desc'] = ''
-                    terms[cur_term]['is_a'] = ''
+                    terms[cur_term]['is_a'] = []
+                    terms[cur_term]['genes'] = []
                 elif line.startswith('namespace: '):
                     terms[cur_term]['type'] = line.replace('namespace: ','')
+                elif line.startswith('alt_id: '):
+                    alt_terms.append(line.replace('alt_id: ',''))
                 elif line.startswith('def: '):
                     terms[cur_term]['desc'] += line.replace('def: ','')
                 elif line.startswith('comment: '):
                     terms[cur_term]['desc'] += line.replace('comment: ','')
                 elif line.startswith('is_a: '):
-                    terms[cur_term]['is_a'] += isa_re.match(line).group(1) + ','
-                    #is_a.append((cur_term,isa_re.match(line).group(1)))
-        self.log("Dumping {} annotations",len(terms))
-        cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
-        cur.executemany('''
-            INSERT INTO terms (id,name,type,desc,is_a) VALUES(?,?,?,?,?)''',
-            [ (key,val['name'],val['type'],val['desc'],val['is_a'][:-1]) for key,val in terms.items()]
-        )
-        self.log('Done inserting terms')
-        #cur.executemany('''
-        #    INSERT INTO relationships (term,is_a) VALUES (?,?)''',
-        #    is_a
-        #)
-        cur.execute('END TRANSACTION')
-        self._build_indices()
-        #return self
+                    terms[cur_term]['is_a'].append(isa_re.match(line).group(1))
+
+        # Importing gene map information, and cross referencing with obo information
+        self.log('Importing Gene Map: {}', gene_map_file)
+        genes = dict()
+        gene = ''
+        cur_term = ''
+        INMAP = open(gene_map_file)
+        garb = INMAP.readline()
+        for line in INMAP.readlines():
+            row = line.strip().split('\t')
+            gene = row[0].split('_')[0].strip()
+            cur_term = row[1]
+            if gene not in genes:
+                genes[gene] = set([cur_term])
+            else:
+                genes[gene].add(cur_term)
+            for isa_term in terms[cur_term]['is_a']:
+                genes[gene].add(isa_term)
+
+        # Get the requisite gene objects
+        self.log('Mixing genes and obo data.')
+        del cur_term
+        for (cur_gene,cur_terms) in genes.items():
+            for cur_term in cur_terms:
+                terms[cur_term]['genes'].append(cur_gene)
+        del genes
+
+        # Making the Term objects
+        self.log('Making the objects to insert into the database.')
+        termObjs = []
+        for (term,info) in terms.items():
+            # Make the Gene Objects from the refgen
+            geneObjs = refgen.from_ids(info['genes'])
+
+            # Make the Term object and add it to the list
+            termObjs.append(Term(term,name=info['name'],type=info['type'],
+            desc=info['desc'],locus_list=geneObjs))
+        del terms
+
+        # Add them all to the database
+        self.log('Adding the records to the databse.')
+        for term in termObjs:
+            self.add_term(term)
+        del termObjs
+        return
 
     @classmethod
     def from_mapman(self,filename):
@@ -336,8 +375,7 @@ class Ontology(Camoco):
                 id TEXT UNIQUE,
                 name TEXT,
                 type TEXT,
-                desc TEXT,
-                is_a TEXT
+                desc TEXT
             );
         ''')
         cur.execute('''
