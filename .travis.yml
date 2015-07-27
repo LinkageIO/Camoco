@@ -13,8 +13,6 @@ before_install:
   # upgrade to new pip with wheels
   - pip install pip --upgrade
   # pytables complains if this isn't installed beforehand
-  - pip install numpy --upgrade
-  - pip install numexpr --upgrade
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
@@ -26,7 +24,6 @@ before_install:
 # Install packages
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION Cython ipython nose numexpr numpy pandas patsy pyparsing python-dateutil pytz scipy six pytables statsmodels matplotlib
-  - python 
 # command to run tests, e.g. python setup.py test
 script:  
-  - py.test -v tests/BaseTests.py
+  - py.test -v tests/BaseTest.py
