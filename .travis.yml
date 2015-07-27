@@ -3,28 +3,25 @@ python:
   - "3.3"
   - "3.4"
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+#
+virtualenv:
+  system_site_packages: true
 
 # Setup anaconda
 before_install:
   - ls -la
+  - sudo apt-get install hdf5-tools
+  - sudo apt-get install -qq python-numpy python-scipy
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
   - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
-  - sudo apt-get install hdf5-tools
   # upgrade to new pip with wheels
   - pip install pip --upgrade
   # pytables complains if this isn't installed beforehand
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda/bin:$PATH
-  - conda update --yes conda
-  # The next couple lines fix a crash with multiprocessing on Travis and are not specific to using Miniconda
-  - sudo rm -rf /dev/shm
-  - sudo ln -s /run/shm /dev/shm
+  - pip install -r requirements.txt
 # Install packages
 install:
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION Cython ipython nose numexpr numpy pandas patsy pyparsing python-dateutil pytz scipy six pytables statsmodels matplotlib
   - python setup.py install
+  - export PYTHONPATH=/home/travis/miniconda/lib/python3./site-packages
 # command to run tests, e.g. python setup.py test
 script:  
   - py.test -v tests/BaseTest.py
