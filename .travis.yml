@@ -24,6 +24,7 @@ before_install:
 # Install packages
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION Cython ipython nose numexpr numpy pandas patsy pyparsing python-dateutil pytz scipy six pytables statsmodels matplotlib
+  - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:  
   - py.test -v tests/BaseTest.py
