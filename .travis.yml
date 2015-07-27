@@ -28,4 +28,4 @@ install:
   - pip install camoco
 # command to run tests, e.g. python setup.py test
 script:  
-  - echo 0
+  - py.test -v tests/BaseTests.py
