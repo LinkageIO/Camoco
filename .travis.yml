@@ -6,8 +6,8 @@ python:
 
 # Setup anaconda
 before_install:
-  - git clone git@github.com:rogerbinns/apsw.git && cd apsw
-  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user
+  - git clone https://github.com/rogerbinns/apsw.git && cd apsw
+  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
   - sudo apt-get install hdf5-tools
   # upgrade to new pip with wheels
   - pip install pip --upgrade
