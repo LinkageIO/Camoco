@@ -6,6 +6,7 @@ python:
 
 # Setup anaconda
 before_install:
+  - ls -la
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
   - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
   - sudo apt-get install hdf5-tools
@@ -25,7 +26,7 @@ before_install:
 # Install packages
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION Cython ipython nose numexpr numpy pandas patsy pyparsing python-dateutil pytz scipy six pytables statsmodels matplotlib
-  - pip install camoco
+  - python 
 # command to run tests, e.g. python setup.py test
 script:  
   - py.test -v tests/BaseTests.py
