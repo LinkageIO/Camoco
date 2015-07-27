@@ -6,6 +6,8 @@ import configparser
 
 
 global cf
+
+
 cf = configparser.ConfigParser()
 cf._interpolation = configparser.ExtendedInterpolation()
 
