@@ -4,8 +4,6 @@ analyses/*
 build/*
 sensitive/*
 dist/
-tests/raw
-tests/databases
 *.pyc
 *.py.swp
 *.swn
