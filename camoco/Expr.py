@@ -103,6 +103,9 @@ class Expr(Camoco):
         return self._expr.apply(
             lambda col: np.nanmax(col.values) < max_val, axis=0
         )
+
+    def max_values(self,axis=0):
+        return np.nanmax(self._expr,axis=axis)
     
     def anynancol(self):
         ''' 
@@ -218,8 +221,8 @@ class Expr(Camoco):
             # Something fucked up is happending
             raise TypeError(
                 ('Attempting normalization on already normalized'
-                ' dataset. Consider passing a max_val '
-                '< {} if Im wrong.').format(min(self.max_values())))
+                ' dataset. Consider passing a max_val ({}) '
+                '< {} if Im wrong.').format(max_val,min(self.max_values())))
         else:
             df = self._expr
             if norm_method is not None:
