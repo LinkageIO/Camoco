@@ -11,9 +11,7 @@ before_install:
   #- export HDF5_DIR='/usr/lib'
   # upgrade to new pip with wheels
   - pip install pip --upgrade
-  - pip install numexpr --upgrade
-  - pip install cython --upgrade
-  - PIP_ARGS="-I --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
+  - PIP_ARGS="-I --trusted-host lovelace.cs.umn.edu --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
   - pip install $PIP_ARGS -r requirements.txt
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
   - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
