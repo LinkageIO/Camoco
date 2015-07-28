@@ -15,8 +15,8 @@ before_install:
 # Install packages
 install:
   - python setup.py install
-# command to run tests, e.g. python setup.py test
-script:  
   # import camoco to compile the pyx modules
   - python -c 'import camoco as co;'
+# command to run tests, e.g. python setup.py test
+script:  
   - py.test -v tests/BaseTest.py
