@@ -351,6 +351,5 @@ def COBAtSuite():
     return suite
 
 
-
 if __name__ == '__main__':
     unittest.main()
