@@ -11,13 +11,14 @@ before_install:
   #- wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/numpy-1.9.2-cp34-cp34m-linux_x86_64.whl && cd ..
   #- pip install --no-index --find-links=wheelhouse numpy
   - sudo apt-get install hdf5-tools
-  - git clone https://github.com/rogerbinns/apsw.git && cd apsw
-  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
+  - export HDF5_DIR='/usr/lib'
   # upgrade to new pip with wheels
   - pip install pip --upgrade
   - pip install numexpr --upgrade
   - pip install cython --upgrade
   - pip install -r requirements.txt
+  - git clone https://github.com/rogerbinns/apsw.git && cd apsw
+  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
 # Install packages
 install:
   - python setup.py install
