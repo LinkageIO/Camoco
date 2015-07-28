@@ -7,7 +7,8 @@ python:
 # Setup anaconda
 before_install:
   - ls -la
-  - mkdir wheelhouse && cd wheelhouse
+  - mkdir wheelhouse
+  - cd wheelhouse
   - wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/numpy-1.9.2-cp34-cp34m-linux_x86_64.whl
   - wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/scipy-0.16.0-cp34-cp34m-linux_x86_64.whl
   - wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/tables-3.2.0-cp34-cp34m-linux_x86_64.whl
