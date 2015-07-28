@@ -12,7 +12,6 @@ python-dateutil==2.4.2
 pytz==2015.2
 scipy==0.15.1
 six==1.9.0
-tables==3.1.1
 statsmodels==0.6.1
 termcolor==1.1.0
 matplotlib==1.4.3
