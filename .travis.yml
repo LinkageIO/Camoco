@@ -7,24 +7,14 @@ python:
 # Setup anaconda
 before_install:
   - ls -la
-  - mkdir wheelhouse
-  - cd wheelhouse
-  - wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/numpy-1.9.2-cp34-cp34m-linux_x86_64.whl
-  - wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/scipy-0.16.0-cp34-cp34m-linux_x86_64.whl
-  - wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/tables-3.2.0-cp34-cp34m-linux_x86_64.whl
-  - wget http://lovelace.cs.umn.edu/schaefer/wheelhouse/numexpr-2.4.3-cp34-cp34m-linux_x86_64.whl
-  - cd ..
-  - pip install --no-index --find-links=wheelhouse numpy
-  - pip install --no-index --find-links=wheelhouse scipy
-  - pip install --no-index --find-links=wheelhouse numexpr
-  - pip install --no-index --find-links=wheelhouse tables
   #- sudo apt-get install hdf5-tools
   #- export HDF5_DIR='/usr/lib'
   # upgrade to new pip with wheels
   - pip install pip --upgrade
   - pip install numexpr --upgrade
   - pip install cython --upgrade
-  - pip install -r requirements.txt
+  - PIP_ARGS = "-I --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
+  - pip install $PIP_ARGS -r requirements.txt
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
   - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
 # Install packages
