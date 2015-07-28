@@ -6,15 +6,12 @@ python:
 
 # Setup anaconda
 before_install:
-  - ls -la
-  #- sudo apt-get install hdf5-tools
-  #- export HDF5_DIR='/usr/lib'
+  - git clone https://github.com/rogerbinns/apsw.git && cd apsw
+  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
   # upgrade to new pip with wheels
   - pip install pip --upgrade
   - PIP_ARGS="-I --trusted-host lovelace.cs.umn.edu --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
   - pip install $PIP_ARGS -r requirements.txt
-  - git clone https://github.com/rogerbinns/apsw.git && cd apsw
-  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user && cd ..
 # Install packages
 install:
   - python setup.py install
