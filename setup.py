@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages, Extension
+from Cython.Distutils import build_ext
 import os
 
 pccup = Extension(
@@ -21,6 +22,7 @@ setup(
         'interfaces/CamocoWeb.py'
     ],
     ext_modules = [pccup,refgendist],
+    cmdclass = {'build_ext': build_ext}
 
     install_requires = [
         'cython>=0.16',    
