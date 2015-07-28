@@ -6,11 +6,11 @@ import os
 
 pccup = Extension(
     'PCCUP',
-    sources=['PCCUP.pyx']
+    sources=['camoco/PCCUP.pyx']
 )
 refgendist = Extension(
     'RefGenDist',
-    sources=['RefGenDist.pyx']
+    sources=['camoco/RefGenDist.pyx']
 )
 
 setup(
