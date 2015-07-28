@@ -22,7 +22,7 @@ setup(
         'interfaces/CamocoWeb.py'
     ],
     ext_modules = [pccup,refgendist],
-    cmdclass = {'build_ext': build_ext}
+    cmdclass = {'build_ext': build_ext},
 
     install_requires = [
         'cython>=0.16',    
