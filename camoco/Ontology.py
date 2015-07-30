@@ -306,7 +306,8 @@ class Ontology(Camoco):
                 genes[gene].add(cur_term)
             for isa_term in terms[cur_term]['is_a']:
                 genes[gene].add(isa_term)
-
+        INMAP.close()
+        
         # Get the requisite gene objects
         self.log('Mixing genes and obo data.')
         del cur_term
