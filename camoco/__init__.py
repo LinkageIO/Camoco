@@ -11,6 +11,8 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
+import pyximport; pyximport.install() 
+
 from camoco.Camoco import Camoco
 from camoco.Expr import Expr
 from camoco.COB import COB

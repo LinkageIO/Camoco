@@ -2,35 +2,6 @@ Camoco
 ======
 [![Build Status](https://travis-ci.org/schae234/Camoco.svg?branch=master)](https://travis-ci.org/schae234/Camoco)
 
-Installation
-------------
-Newest tagged releases are available on PyPi: `pip install camoco`. Otherwise,
-you should be able to run `python setup.py install` once you have the following
-dependencies resolved:
-
-Required: python>=3.3
-
-Hints on how we routinely build camoco can be found in our Travis-CI
-configuration file, `.travis.yml`. Following these steps should result in a
-successful build (at least on our test platform).
-
-We decided to use APSW as an sqlite3 python wrapper, instructions on building
-apsw can be found
-[here](http://rogerbinns.github.io/apsw/build.html#recommended-build)
-
-Required (install in this order to save pain):
-+ cython>=0.16    
-+ numpy>=1.9.1
-+ scipy>=0.15
-+ ipython>=3.1.0
-+ pandas>=0.16
-+ numexpr>=2.0.0
-+ tables>=3.0.0 (hdf5)
-+ apsw>=3.8
-+ matplotlib>=1.4.3
-+ statsmodels>=0.6.1
-+ termcolor>=1.1.0
-
 Co-Analysis of Molecular Components
 -----------------------------------
 
@@ -88,7 +59,43 @@ RefGen and Locus
 Python has a fantastic range of built in data types. It lacks however in a data
 type which succinctly represents a locus. Loci cover a large range of
 biological data types; a gene is a locus, as is a SNP, or a QTL, or an entire
-chromosome. It all depends on context. The 
+chromosome. It all depends on context.
+
+Installation
+------------
+Tagged releases are available on PyPi: `pip install camoco`. Otherwise,
+you should be able to run `python setup.py install` once you have the following
+dependencies resolved:
+
+Required: python>=3.3
+
+Hints on how we routinely build camoco can be found in our Travis-CI
+configuration file, `.travis.yml`. Following these steps should result in a
+successful build (at least on our test platform).
+
+We decided to use APSW as an sqlite3 python wrapper, instructions on building
+apsw can be found
+[here](http://rogerbinns.github.io/apsw/build.html#recommended-build)
+
+Required (install in this order to save pain):
++ cython>=0.16    
++ numpy>=1.9.1
++ scipy>=0.15
++ ipython>=3.1.0
++ pandas>=0.16
++ numexpr>=2.0.0
++ tables>=3.0.0 (hdf5)
++ apsw>=3.8
++ matplotlib>=1.4.3
++ statsmodels>=0.6.1
++ termcolor>=1.1.0
+
+
+Tests
+-----
+Unit tests within Camoco are implemented using the pytest framework. Unit tests
+as well as Build tests can be found in the test directory.
+
 
 
 CacheMoneyCorn

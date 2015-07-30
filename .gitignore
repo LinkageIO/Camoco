@@ -1,11 +1,10 @@
 .*
+camoco/*.c
 *egg-info*
 analyses/*
 build/*
 sensitive/*
 dist/
-tests/raw
-tests/databases
 *.pyc
 *.py.swp
 *.swn

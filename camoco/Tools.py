@@ -93,15 +93,19 @@ def memoize(obj):
 
 
 class log(object):
+
     def __init__(self,msg=None,*args,color='green'):
         if msg is not None:
             print(colored(" ".join(["[LOG]",time.ctime(), '-', msg.format(*args)]),color=color),file=sys.stderr)
+        self.quiet = False
+
     @classmethod
     def warn(cls,msg,*args):
         cls(msg,*args,color='red')
 
     def __call__(self,msg,*args,color='green'):
-        print(colored(" ".join(["[LOG]",time.ctime(), '-', msg.format(*args)]),color=color),file=sys.stderr)
+        if cf['options']['log_level'] == 'verbose':
+            print(colored(" ".join(["[LOG]",time.ctime(), '-', msg.format(*args)]),color=color),file=sys.stderr)
 
 
 def plot_flanking_vs_inter(cob):

@@ -69,7 +69,7 @@ class COB(Expr):
     @memoize
     def edge_FDR(self):
         # get the percent of significant edges
-        num_sig = sum(self.coex['significant'])/len(self.coex)
+        num_sig = np.sum(self.coex['significant'])/len(self.coex)
         # calulate the number expected
         num_exp = 1-norm.cdf(int(self._global('significance_threshold')))
         # FDR is the percentage expected over the percentage found
@@ -170,7 +170,7 @@ class COB(Expr):
         full_gene_set = []
         for i,genes in enumerate(genes_list):
             # RefGen.candidate_genes returns u,w,d with chain == False
-            for gene in itertools.chain(*genes):
+            for gene in genes:
                 gene_origin[gene.id] = i
                 full_gene_set.append(gene)
         self.log("Found {} candidate genes",len(full_gene_set))
@@ -532,9 +532,6 @@ class COB(Expr):
             list(itertools.combinations(self._expr.index.values,2)),
             columns=['gene_a','gene_b']
         )
-        # Reindex the table to match genes
-        self.log('Indexing coex table')
-        tbl.set_index(['gene_a','gene_b'],inplace=True)
         # Now add coexpression data
         self.log("Calculating Coexpression")
         # Calculate the PCCs
@@ -564,6 +561,9 @@ class COB(Expr):
         distances = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(self._expr.index))
         assert len(distances) == len(tbl)
         tbl['distance'] = distances
+        # Reindex the table to match genes
+        self.log('Indexing coex table')
+        tbl.set_index(['gene_a','gene_b'],inplace=True)
         # put in the hdf5 store
         self._build_tables(tbl)
         self.log("Done")

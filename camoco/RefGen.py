@@ -333,10 +333,7 @@ class RefGen(Camoco):
             up_genes,down_genes = self.flanking_genes(
                 locus,gene_limit=gene_limit,chain=False
             )
-            if chain:
-                return list(itertools.chain(up_genes,genes_within,down_genes))
-            else:
-                return (up_genes,genes_within,down_genes)
+            return list(itertools.chain(up_genes,genes_within,down_genes))
         else:
             iterator = iter(sorted(loci))
             genes = [
@@ -518,7 +515,7 @@ class RefGen(Camoco):
         else:
             # support adding lists of genes
             genes = list(gene)
-            self.log('Adding Gene base info to database')
+            self.log('Adding {} Gene base info to database'.format(len(genes)))
             self.db.cursor().execute('BEGIN TRANSACTION')
             self.db.cursor().executemany(
                 'INSERT OR IGNORE INTO genes VALUES (?,?,?,?)',

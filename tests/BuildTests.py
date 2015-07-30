@@ -277,8 +277,8 @@ class COB(unittest.TestCase):
         ZM = co.RefGen('Zm5bFGS')
         ZmSAM = co.COB.from_table(
             os.path.join(
-                cf.get('options','testdir'),'raw',
-                'Expression','RNASEQ'
+                cf.get('options','testdir'),
+                'raw','Expression','RNASEQ',
                 'TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt'
             ),
             'ZmSAM',
@@ -289,7 +289,7 @@ class COB(unittest.TestCase):
             min_expr=0.1,
             quantile=False,
             dry_run=False,
-            max_val=300
+            max_val=250
         )
         self.assertIsInstance(ZmSAM,co.COB)
 
@@ -349,7 +349,6 @@ def COBAtSuite():
     suite.addTest(COB('AtRoot'))
     suite.addTest(COB('AtGen'))
     return suite
-
 
 
 if __name__ == '__main__':
