@@ -1,31 +1,22 @@
 language: python
 python:
-  - "3.3"
   - "3.4"
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+#
 
 # Setup anaconda
 before_install:
-  - git clone git@github.com:rogerbinns/apsw.git && cd apsw
-  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install --user
-  - sudo apt-get install hdf5-tools
+  - git clone https://github.com/rogerbinns/apsw.git && cd apsw
+  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install && cd ..
   # upgrade to new pip with wheels
   - pip install pip --upgrade
-  # pytables complains if this isn't installed beforehand
-  - pip install numpy --upgrade
-  - pip install numexpr --upgrade
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda/bin:$PATH
-  - conda update --yes conda
-  # The next couple lines fix a crash with multiprocessing on Travis and are not specific to using Miniconda
-  - sudo rm -rf /dev/shm
-  - sudo ln -s /run/shm /dev/shm
+  - PIP_ARGS="-I --trusted-host lovelace.cs.umn.edu --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
+  - pip install $PIP_ARGS -r requirements.txt
 # Install packages
 install:
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION Cython ipython nose numexpr numpy pandas patsy pyparsing python-dateutil pytz scipy six pytables statsmodels matplotlib
-  - pip install camoco
+  - python setup.py install
+  # import camoco to compile the pyx modules
+  - python -c 'import camoco as co;'
 # command to run tests, e.g. python setup.py test
 script:  
-  - echo 0
+  - py.test -v tests/BaseTest.py

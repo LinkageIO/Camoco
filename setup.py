@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages, Extension
+from Cython.Distutils import build_ext
 import os
+
+pccup = Extension(
+    'PCCUP',
+    sources=['camoco/PCCUP.pyx']
+)
+refgendist = Extension(
+    'RefGenDist',
+    sources=['camoco/RefGenDist.pyx']
+)
 
 setup(
     name = 'camoco',
@@ -11,6 +21,8 @@ setup(
         'bin/BootstrapLocality.py',
         'interfaces/CamocoWeb.py'
     ],
+    ext_modules = [pccup,refgendist],
+    cmdclass = {'build_ext': build_ext},
 
     install_requires = [
         'cython>=0.16',    
