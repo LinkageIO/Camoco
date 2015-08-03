@@ -194,7 +194,7 @@ class COB(unittest.TestCase):
             co.RefGen('T10'),rawtype='MICROARRAY',
             max_gene_missing_data=0.3,
             min_expr=0.01,
-            quantile=False,
+            quantile=True,
         )
         self.assertIsInstance(AtLeaf,co.COB)
 
@@ -216,7 +216,9 @@ class COB(unittest.TestCase):
                 keepfile=pjoin(self.rawdir,'GSE','SeedKeep.tsv')
             ),
             'AtSeed','Arabidopsis Seed',
-            co.RefGen('T10'),rawtype='MICROARRAY'
+            co.RefGen('T10'),rawtype='MICROARRAY',
+            quantile=True
+
         )
         self.assertIsInstance(AtSeed,co.COB)
 
@@ -243,7 +245,8 @@ class COB(unittest.TestCase):
             ),
             'AtRoot','Arab Root',
             co.RefGen('T10'),
-            rawtype='MICROARRAY'
+            rawtype='MICROARRAY',
+            quantile=True
         )
         self.assertIsInstance(AtRoot,co.COB)
 
