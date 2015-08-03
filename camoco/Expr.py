@@ -367,27 +367,29 @@ class Expr(Camoco):
             df = df.iloc[0:5000,:]
         self._update_values(df,'quality_control')
 
+    @staticmethod
+    def inplace_nansort(col):
+        # mask invalid data
+        masked_col = np.ma.masked_invalid(col)
+        masked_sorted = np.sort(col[~masked_col.mask].data)
+        # get ranked values
+        col_sorted = np.copy(col)
+        non_nan = 0
+        for i,x in enumerate(~masked_col.mask):
+            if x == True:
+                col_sorted[i] = masked_sorted[non_nan]
+                non_nan += 1
+            else:
+                col_sorted[i] = np.nan
+        return col_sorted
+
     def _quantile(self):
         ''' 
             Perform quantile normalization across each accession. 
             Each accessions gene expression values are replaced with 
             ranked gene averages.
         '''
-        def inplace_nansort(col):
-            # mask invalid data
-            masked_col = np.ma.masked_invalid(col)
-            masked_sorted = np.sort(col[~masked_col.mask].data)
-            # get ranked values
-            col_sorted = np.copy(col)
-            non_nan = 0
-            for i,x in enumerate(~masked_col.mask):
-                if x == True:
-                    col_sorted[i] = masked_sorted[non_nan]
-                    non_nan += 1
-                else:
-                    col_sorted[i] = np.nan
-            return col_sorted
-           
+          
         # get gene by accession matrix
         self.log('------------ Quantile ')
         expr = self._expr
@@ -399,7 +401,7 @@ class Expr(Camoco):
         # we need to know the number of non-nans so we can correct for their ranks later
         self.log('Sorting ranked data')
         # Sort values by accession/column, lowest to highest 
-        expr_sort = expr.apply(np.sort,axis=0)
+        expr_sort = expr.apply(lambda col: self.inplace_nansort(col),axis=0)
         # make sure the nans weren't included in the sort or the rank
         assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
         assert np.all(np.isnan(expr) == np.isnan(expr_sort))
