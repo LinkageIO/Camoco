@@ -408,8 +408,11 @@ class Expr(Camoco):
         # calculate ranked averages
         self.log('Calculating averages')
         rank_average = expr_sort.apply(np.nanmean,axis=1)
+        # we need to apply the percentages to the lenght of the 
         rankmax = len(rank_average)
-        self.log('Range of normalized values:{}..{}'.format(min(rank_average),max(rank_average)))
+        self.log('Range of normalized values:{}..{} n = {}'.format(
+            min(rank_average),max(rank_average),len(rank_average))
+        )
         self.log('Applying non-floating normalization')
         quan_expr = expr_ranks.applymap(
             lambda x : rank_average[int(x*rankmax)-1] if not np.isnan(x) else np.nan
@@ -619,14 +622,15 @@ class Expr(Camoco):
         return self
 
 
-    '''
-        Unimplemented ---------------------------------------------------------------------------------
-    '''
-       
+    def plot_accession_histograms(self,raw=False,bins=50,figsize=(16,16)):
+        ''' 
+            Plot histogram of accession expression values.
+        '''
+        if raw == True:
+            df = self.hdf5['raw_expr']
+        else:
+            df = self.hdf5['expr']
 
-
-    def plot_value_hist(self,groupby='accession',raw=False,bins=50,figsize=(16,16),title='',log=False):
-        ''' Plots Value histograms on one of the expression matrix axis'''
         for group,df in self._expr(long=True,raw=raw).groupby(groupby):
             self.log('Plotting values for {}',group)
             plt.clf()

@@ -15,7 +15,7 @@ from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
 from scipy.misc import comb
 from scipy.stats import norm
-from scipy.cluster.hierarchy import linkage,leaves_list
+from scipy.cluster.hierarchy import linkage,leaves_list,dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 import pandas as pd
@@ -429,72 +429,68 @@ class COB(Expr):
         legend = ax.legend(loc='best')
         return plt
 
-    def plot_heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
-        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
-        heatmap_unit_label='Expression Z Score',png_encode=False):
+    def plot_heatmap(self,genes=None,accessions=None,
+        filename=None,maskNaNs=True, 
+        cluster_x=True, cluster_y=True, cluster_method='ward',
+        title=None, raw=False, 
+        heatmap_unit_label='Expression'):
         ''' 
             Draw clustered heatmaps of an expression matrix
         '''
         from matplotlib import rcParams
         rcParams.update({'figure.autolayout': True})
-        dm = self._expr(genes=genes,accessions=accessions,zscore=zscore,raw=raw).T
-        D = np.array(dm)
+        # Sort the genes by id name
+        genes = set(sorted([x for x in genes if x in self],key=lambda x: x.id))
+        dm = self.expr(genes=genes,accessions=accessions,raw=raw)
+        # Get Z scores for the each genes
+        if raw == False:
+            dm = dm.apply(lambda row: (row-row.mean())/row.std(),axis=1)
         row_labels = dm.index
         col_labels = dm.columns
-        f = plt.figure(figsize=figsize,facecolor='white')
+        f = plt.figure(
+            figsize=(
+                min(500,0.5*dm.shape[0]),
+                min(500,0.25*dm.shape[1])
+            ),
+            facecolor='white'
+        )
         # add matrix plot
         axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
-        def masked_corr(x,y):
-            mask = np.logical_and(np.isfinite(x),np.isfinite(y)) 
-            if cluster_method == "euclidean":
-                return euclidean(x[mask],y[mask])
-            else:
-                return pearsonr(x[mask],y[mask])[1]
         # add first dendrogram
         if cluster_y and len(dm.index) > 1:
             # calculate the squareform of the distance matrix
-            D1 = squareform(pdist(D, masked_corr))
+            D1 = squareform(self.subnetwork(genes,sig_only=False,filter_missing_gene_ids=False,min_distance=0).score)
             ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
             ax1.set_frame_on(False)
-            Y = linkage(D1, method='complete')
+            Y = linkage(D1, method=cluster_method)
             Z1 = dendrogram(Y, orientation='right')
             row_labels = row_labels[Z1['leaves']]
-            D = D[Z1['leaves'], :]
+            D1 = D1[Z1['leaves'], :]
+            dm = dm.ix[Z1['leaves'],:]
             ax1.set_xticks([])
             ax1.set_yticks([])
-        # add second dendrogram
-        if cluster_x and len(dm.columns) > 1:
-            D2 = squareform(pdist(D.T, masked_corr))
-            ax2 = f.add_axes([0.3, 0.71, 0.5, 0.2])
-            ax2.set_frame_on(False)
-            Y = linkage(D2, method='complete')
-            Z2 = dendrogram(Y)
-            D = D[:, Z2['leaves']]
-            col_labels = col_labels[Z2['leaves']]
-            ax2.set_xticks([])
-            ax2.set_yticks([])
         if title:
             plt.title(title)
-        vmax = max(np.nanmin(abs(D)),np.nanmax(abs(D)))
+        vmax = max(np.nanmin(abs(dm)),np.nanmax(abs(dm)))
         vmin = vmax*-1
         self.log("Extremem Values: {}",vmax)
         # Handle NaNs
         if maskNaNs:
-            nan_mask = np.ma.array(D,mask=np.isnan(D))
+            nan_mask = np.ma.array(dm,mask=np.isnan(dm))
             cmap = self._cmap
             cmap.set_bad('grey',1.0)
         else:
             cmap = self.__cmap
-        im = axmatrix.matshow(D,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
+        im = axmatrix.matshow(dm,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
         # Handle Axis Labels
-        axmatrix.set_xticks(np.arange(D.shape[1]))
+        axmatrix.set_xticks(np.arange(dm.shape[1]))
         axmatrix.xaxis.tick_bottom()
         axmatrix.tick_params(axis='x',labelsize='xx-small')
         axmatrix.set_xticklabels(col_labels,rotation=90,ha='center')
         axmatrix.yaxis.tick_right()
-        axmatrix.set_yticks(np.arange(D.shape[0]))
+        axmatrix.set_yticks(np.arange(dm.shape[0]))
         axmatrix.set_yticklabels(row_labels)
-        axmatrix.tick_params(axis='y',labelsize='x-small')
+        axmatrix.tick_params(axis='y',labelsize='xx-small')
         plt.gcf().subplots_adjust(right=0.15)
         # Add color bar
         axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
@@ -505,13 +501,9 @@ class COB(Expr):
         if filename:
             plt.savefig(filename)
             plt.close()
-        if png_encode is True:
-            imgdata = io.BytesIO()
-            plt.savefig(imgdata)
-            return base64.encodebytes(imgdata.getvalue()).decode()
             
         return pd.DataFrame(
-            data=D,
+            data=dm,
             index=row_labels,
             columns=col_labels
         )
