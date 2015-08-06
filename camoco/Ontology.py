@@ -87,16 +87,16 @@ class Ontology(Camoco):
     def __len__(self):
         return self.db.cursor().execute("SELECT COUNT(*) FROM terms;").fetchone()[0]
 
-    def __getitem__(self,name):
-        ''' retrieve a term by name '''
+    def __getitem__(self,id):
+        ''' retrieve a term by id '''
         try:
             desc = self.db.cursor().execute(
-                'SELECT desc from terms WHERE name = ?',(name,)
+                'SELECT * from terms WHERE id = ?',(id,)
             ).fetchone()
             term_loci = [Locus.from_record(record) for record in self.db.cursor().execute(
-                'SELECT chrom,start,end,name,window,id FROM term_loci WHERE term = ?',(name,)
+                'SELECT chrom,start,end,name,window,id FROM term_loci WHERE term = ?',(id,)
             ).fetchall()]
-            return Term(name,desc,locus_list=term_loci)
+            return Term(id,desc,locus_list=term_loci)
         except TypeError as e: # Not in database
             raise
 
@@ -277,7 +277,7 @@ class Ontology(Camoco):
                     terms[cur_term]['name'] = line.replace('name: ','')
                     terms[cur_term]['desc'] = ''
                     terms[cur_term]['is_a'] = []
-                    terms[cur_term]['genes'] = []
+                    terms[cur_term]['genes'] = set()
                 elif line.startswith('namespace: '):
                     terms[cur_term]['type'] = line.replace('namespace: ','')
                 elif line.startswith('alt_id: '):
@@ -304,16 +304,14 @@ class Ontology(Camoco):
                 genes[gene] = set([cur_term])
             else:
                 genes[gene].add(cur_term)
-            for isa_term in terms[cur_term]['is_a']:
-                genes[gene].add(isa_term)
         INMAP.close()
-        
+
         # Get the requisite gene objects
         self.log('Mixing genes and obo data.')
         del cur_term
         for (cur_gene,cur_terms) in genes.items():
             for cur_term in cur_terms:
-                terms[cur_term]['genes'].append(cur_gene)
+                addGenes(terms,cur_term,cur_gene)
         del genes
 
         # Making the Term objects
@@ -330,10 +328,14 @@ class Ontology(Camoco):
 
         # Add them all to the database
         self.log('Adding the records to the databse.')
+        n = 1
         for term in termObjs:
+            if n % 10000 == 0:
+                self.log(str(n)+' terms added.')
             self.add_term(term)
+            n += 1
         del termObjs
-        return
+        return self
 
     @classmethod
     def from_mapman(self,filename):
@@ -401,3 +403,22 @@ class Ontology(Camoco):
             );
         ''')
         self._build_indices()
+
+# These function currently handle adding genes to all relevant terms by recursively
+# traversing the isa relationships in go, this will better integrated in the future
+# but is functional for now.
+def addGenes(terms, term, gene):
+    x = getISA(terms,term)
+    for item in x:
+        terms[item]['genes'].add(gene)
+    return
+
+def getISA(terms,term):
+    tot = set([term])
+    if terms[term]['is_a'] == []:
+        return tot
+    else:
+        for item in terms[term]['is_a']:
+            tot.add(item)
+            tot = tot | getISA(terms,item)
+        return tot
