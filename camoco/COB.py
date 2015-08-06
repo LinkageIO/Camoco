@@ -191,7 +191,7 @@ class COB(Expr):
             return edges
 
 
-    def density(self,gene_list,return_mean=True,min_distance=50000):
+    def density(self,gene_list,return_mean=True,min_distance=None):
         '''
             Calculates the denisty of the non-thresholded network amongst genes
             not within a certain distance of each other. This corrects for
@@ -212,7 +212,7 @@ class COB(Expr):
             #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
             #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
         else:
-            return edges 
+            return edges
 
     def to_dat(self,gene_list=None,filename=None,sig_only=False,min_distance=0):
         '''
@@ -345,22 +345,22 @@ class COB(Expr):
 
 
     def plot_scores(self,filename=None,pcc=True,bins=50):
-        ''' 
+        '''
             Plot the histogram of PCCs.
 
             Parameters
             ----------
             filename : str (default: None)
-                The output filename, if none will return the matplotlib object    
+                The output filename, if none will return the matplotlib object
             pcc : bool (default:True)
                 flag to convert scores to pccs
             bins : int (default: 50)
                 the number of bins in the histogram
         '''
         fig,ax = plt.subplots(figsize=(8,6))
-        # grab the scores only and put in a 
+        # grab the scores only and put in a
         # np array to save space (pandas DF was HUGE)
-        scores = self.coex.score.values 
+        scores = self.coex.score.values
         if pcc:
             self.log('Transforming scores')
             scores = (scores * float(self._global('pcc_std'))) \
@@ -371,7 +371,7 @@ class COB(Expr):
         ax.set_xlabel('PCC') if pcc else ax.set_xlabel('Z-Score')
         ax.set_ylabel('Freq')
         if filename is not None:
-            fig.savefig(filename) 
+            fig.savefig(filename)
         else:
             return fig
 
@@ -429,10 +429,10 @@ class COB(Expr):
         legend = ax.legend(loc='best')
         return plt
 
-    def plot_heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True, 
-        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False, 
+    def plot_heatmap(self,genes=None,accessions=None,filename=None,figsize=(16,16), maskNaNs=True,
+        cluster_x=True, cluster_y=True,cluster_method="euclidian", title=None, zscore=True,raw=False,
         heatmap_unit_label='Expression Z Score',png_encode=False):
-        ''' 
+        '''
             Draw clustered heatmaps of an expression matrix
         '''
         from matplotlib import rcParams
@@ -445,7 +445,7 @@ class COB(Expr):
         # add matrix plot
         axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
         def masked_corr(x,y):
-            mask = np.logical_and(np.isfinite(x),np.isfinite(y)) 
+            mask = np.logical_and(np.isfinite(x),np.isfinite(y))
             if cluster_method == "euclidean":
                 return euclidean(x[mask],y[mask])
             else:
@@ -509,7 +509,7 @@ class COB(Expr):
             imgdata = io.BytesIO()
             plt.savefig(imgdata)
             return base64.encodebytes(imgdata.getvalue()).decode()
-            
+
         return pd.DataFrame(
             data=D,
             index=row_labels,
@@ -520,7 +520,7 @@ class COB(Expr):
     ''' ------------------------------------------------------------------------------------------
             Internal Methods
     '''
-    
+
 
     def _calculate_coexpression(self,significance_thresh=3):
         '''
@@ -808,14 +808,14 @@ class COB(Expr):
         # Put the two degree tables in the same table
         lis = pd.concat([self.degree.copy(), obj.degree.copy()],axis=1,ignore_index=True)
 
-        # Filter the table of entries to ones where both entries exist and are above 3
+        # Filter the table of entries to ones where both entries exist
         lis = lis[(lis[0] > 0) & (lis[1] > 0)]
-
         delta = lis[0] - lis[1]
 
+        # Find the stats beteween the two sets, and the genes with the biggest differences
         delta.sort(ascending=False)
         highest = sorted(list(dict(delta[:diff_genes]).items()),key=lambda x: x[1],reverse=True)
         lowest = sorted(list(dict(delta[-diff_genes:]).items()),key=lambda x: x[1],reverse=False)
-        ans = {'correlation':lis[0].corr(lis[1]), 'biggest_diffs_high':highest, 'biggest_diffs_low':lowest}
-        # Find and return the correlation beteween the two sets, and the genes with the biggest differences
+        ans = {'correlation_between_cobs':lis[0].corr(lis[1]), 'mean_of_difference':delta.mean(), 'std_of_difference':delta.std(), ('bigger_in_'+self.name):highest, ('bigger_in_'+obj.name):lowest}
+
         return ans

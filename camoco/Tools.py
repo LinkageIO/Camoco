@@ -20,7 +20,7 @@ from statsmodels.sandbox.regression.predstd import wls_prediction_std
 def available_datasets(type=None,name=None):
     cur = co.Camoco("Camoco",type='Camoco').db.cursor()
     if type:
-        datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall() 
+        datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall()
     else:
         datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
     if datasets:
@@ -104,7 +104,7 @@ class log(object):
         cls(msg,*args,color='red')
 
     def __call__(self,msg,*args,color='green'):
-        if cf['options']['log_level'] == 'verbose':
+        if cf['logging']['log_level'] == 'verbose':
             print(colored(" ".join(["[LOG]",time.ctime(), '-', msg.format(*args)]),color=color),file=sys.stderr)
 
 
@@ -181,4 +181,3 @@ def plot_local_vs_cc(term,filename=None,bootstraps=1):
     if filename is None:
         filename = "{}_cc.png".format(term.id)
     pylab.savefig(filename)
-
