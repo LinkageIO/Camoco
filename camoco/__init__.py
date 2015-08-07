@@ -14,6 +14,7 @@ __license__ = """
 import pyximport; pyximport.install() 
 
 from camoco.Camoco import Camoco
+Camoco.create()
 from camoco.Expr import Expr
 from camoco.COB import COB
 from camoco.RefGen import RefGen
