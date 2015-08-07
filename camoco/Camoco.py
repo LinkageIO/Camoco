@@ -29,7 +29,7 @@ class Camoco(object):
                 "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
                 (name,type)
             ).fetchone()
-            cur = self.db.cursor()  
+            cur = self.db.cursor()
             cur.execute('''
                 CREATE TABLE IF NOT EXISTS globals (
                     key TEXT,
@@ -82,7 +82,7 @@ class Camoco(object):
         # set the global for the dataset
         if val is not None:
             self.db.cursor().execute('''
-                INSERT OR REPLACE INTO globals 
+                INSERT OR REPLACE INTO globals
                 (key,val)VALUES (?,?)''',(key,val)
             )
         else:
@@ -101,14 +101,14 @@ class Camoco(object):
     def create(cls,name,description,type='Camoco'):
         '''
             This is a class method to create a new camoco type object.
-            It initializes base directory hierarchy 
+            It initializes base directory hierarchy
         '''
         basedir = os.path.realpath(
             os.path.expanduser(cf.get('options','basedir'))
         )
 
         # Create the basedir if not exists
-        try:    
+        try:
             os.makedirs(basedir,exist_ok=True)
             os.makedirs(os.path.join(basedir,"logs"),exist_ok=True)
             os.makedirs(os.path.join(basedir,"databases"),exist_ok=True)
@@ -121,7 +121,7 @@ class Camoco(object):
         # Create the base camoco database
             lite.Connection(
                 os.path.join(basedir,'databases','Camoco.Camoco.db')
-            ).cursor().execute(''' 
+            ).cursor().execute('''
                 CREATE TABLE IF NOT EXISTS datasets (
                     name TEXT NOT NULL,
                     description TEXT,
@@ -136,7 +136,5 @@ class Camoco(object):
             )
         except ConstraintError as e:
             log.warn('CAUTION! {}.{} Database already exists.',name,type)
-        self = cls(name) 
+        self = cls(name)
         return self
-
-
