@@ -70,7 +70,7 @@ class Term(object):
         return collapsed
 
     def __str__(self):
-        return "Term: {}, Desc: {}, {} Loci".format(self.name,self.desc,len(self))
+        return "Term: {}, Name: {}, Type: {}, Desc: {}, {} Loci".format(self.id,self.name,self.type,self.desc,len(self))
 
     def __repr__(self):
         return str(self.name)
@@ -90,13 +90,13 @@ class Ontology(Camoco):
     def __getitem__(self,id):
         ''' retrieve a term by id '''
         try:
-            desc = self.db.cursor().execute(
+            (id,name,type,desc) = self.db.cursor().execute(
                 'SELECT * from terms WHERE id = ?',(id,)
             ).fetchone()
             term_loci = [Locus.from_record(record) for record in self.db.cursor().execute(
                 'SELECT chrom,start,end,name,window,id FROM term_loci WHERE term = ?',(id,)
             ).fetchall()]
-            return Term(id,desc,locus_list=term_loci)
+            return Term(id,name=name,type=type,desc=desc,locus_list=term_loci)
         except TypeError as e: # Not in database
             raise
 
