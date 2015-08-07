@@ -73,6 +73,13 @@ class RefGen(Camoco):
             ''',(random.randint(1,self.num_genes()),)).fetchone(),
             **kwargs
         )
+    def random_genes(self,count,**kwargs):
+        rand_nums = np.random.randint(1,high=self.num_genes(),size=count)
+        gene_info = self.db.cursor().executemany("SELECT chromosome,start,end,id from genes WHERE rowid = ?",[[int(rownum)] for rownum in rand_nums]).fetchall()
+        gene_list = []
+        for (chr,start,end,id) in gene_info:
+            gene_list.append(Gene(chr,start,end=end,name=id,**kwargs))
+        return gene_list
 
     def iter_chromosomes(self):
         ''' returns chrom object iterator '''
