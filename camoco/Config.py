@@ -1,8 +1,7 @@
-#!/usr/env/python3 
+#!/usr/env/python3
 
 import os
 import configparser
-
 
 
 global cf
@@ -18,18 +17,20 @@ default_config = '''
 basedir = ~/.camoco/
 testdir = ~/.camoco/
 
+[logging]
+log_level = verbose
+
 [test]
 refgen   = Zm5bFGS
 cob      = NewRoot
-ontology = ZmIonome 
+ontology = ZmIonome
 term     = Fe57
 gene     = GRMZM2G000014
 '''
 
-# Check to see if 
+# Check to see if
 if not os.path.isfile(cf_file):
-    with open(cf_file,'w') as CF:
+    with open(cf_file, 'w') as CF:
         print(default_config,file=CF)
 
 cf.read(os.path.expanduser('~/.camoco.conf'))
-
