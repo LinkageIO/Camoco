@@ -152,11 +152,20 @@ This contains two files that were made from doing a comparison of density in the
 
 The method was just finding all of the terms that are in the GO ontology that are anotated for maize, giving the list of genes to the density function in the COB class and getting that back. Then we picked the same ammount of random genes that are in the term and did the density measurement. After repeating this 100 times, we count how many densities are bigger than the real network, if it is less than 5, it is considered significant.
 
-Contained are two files, the raw data and the list of terms that were considered significant. Here are some other relevant stats:
+Contained are two files, the raw data and the list of terms that were considered significant.
 
-    Total Testable Terms: ''' +str(len(self.densities))+'''\n
-    Total Significant Terms: ''' +str(len(terms))+'''\n
-    The Expected Number of False Significants: ''' +str(len(self.densities)*0.05)+'''\n
+The following parameters were used in the computaion:
+
+    Max number of genes in term to be testable: '''+str(self.max_members)+'''
+    Min number of genes in term to be testable: '''+str(self.min_members)+'''
+    Number of trials per term: '''+str(self.random_trials)+'''
+    Significance threshold: '''+str(self.sig_threshold)+'''
+
+Here are some of the key overall stats:
+
+    Total Testable Terms: ''' +str(len(self.densities))+'''
+    Total Significant Terms: ''' +str(len(terms))+'''
+    The Expected Number of False Significants (gene count x significance threshold): ''' +str(len(self.densities)*0.05)+'''
 
 Let me know if you want any other stats or information, or have suggestions as to what is or is not useful in a report about a dataset.
 
