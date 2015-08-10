@@ -122,12 +122,35 @@ class COB(Expr):
         index = PCCUP.coex_index(ids,num_genes)[0]
         return self.coex.iloc[index]
 
-    def subnetwork(self,gene_list=None,sig_only=True,min_distance=100000,
+    def subnetwork(self,gene_list=None,sig_only=True,min_distance=None,
         filter_missing_gene_ids=True):
         '''
-            Input: a gene list (passing None gives you all genes)
-            Output: a dataframe containing all edges EXCLUSIVELY between genes
-                within list
+            Extract a subnetwork of edges exclusively between genes
+            within the gene_list. Also includes various options for
+            what information to report, see Parameters.
+
+            Parameters
+            ---------
+            gene_list : iter of Loci
+                The genes from which to extract a subnetwork.
+                If gene_list is None, the function will assume
+                gene_list is all genes in COB object (self).
+            sig_only : bool
+                A flag to include only significant interactions.
+            min_distance : bool (default: None)
+                If not None, only include interactions that are
+                between genes that are a `min_distance` away from
+                one another.
+            filter_missing_gene_ids : bool (default: True)
+                Filter out gene ids that are not in the current
+                COB object (self).
+
+            Returns
+            -------
+            A pandas.DataFrame containing the edges. Columns
+            include score, significant (bool), inter-genic distance,
+            and 
+
         '''
         if gene_list is None:
             df = self.coex
@@ -140,7 +163,7 @@ class COB(Expr):
             # Grab the coexpression indices for the genes
             indices = PCCUP.coex_index(ids,num_genes)
             df = self.coex.iloc[indices]
-        if min_distance:
+        if min_distance is not None:
             df = df.loc[df.distance >= min_distance,:]
         if sig_only:
             df = df.loc[df.significant == 1,:]
@@ -191,11 +214,24 @@ class COB(Expr):
             return edges
 
 
-    def density(self,gene_list,return_mean=True,min_distance=50000):
+    def density(self,gene_list,return_mean=True,min_distance=None):
         '''
-            Calculates the denisty of the non-thresholded network amongst genes
-            not within a certain distance of each other. This corrects for
-            cis regulatory elements increasing noise in coexpression network
+            Calculates the denisty of the non-thresholded network edges 
+            amongst genes within gene_list. Includes parameters to perform
+            measurements for genes within a certain distance of each other. 
+            This corrects for cis regulatory elements increasing noise 
+            in coexpression network.
+
+            Parameters
+            ----------
+            gene_list : iter of Loci
+                List of genes from which to calculate density.
+            return_mean : bool (default: True)
+                Returns the variance stabilized mean of edge density.
+
+            Returns
+            -------
+            A network density 
         '''
         # filter for only genes within network
         edges = self.subnetwork(gene_list,
@@ -205,14 +241,11 @@ class COB(Expr):
             return np.nan
         if len(edges) == 1:
             return edges.score[0]
-        if return_mean:
-            return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
-            # old code worth a look
-            #return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
-            #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
-            #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
-        else:
-            return edges 
+        return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
+        # old code worth a look ;)
+        #return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
+        #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
+        #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
 
     def to_dat(self,gene_list=None,filename=None,sig_only=False,min_distance=0):
         '''
@@ -227,7 +260,8 @@ class COB(Expr):
             )['score'].to_csv(OUT,sep='\t')
             self.log('Done')
 
-    def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=100000,min_cluster_size=0,max_cluster_size=10e10):
+    def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=None,
+            min_cluster_size=0,max_cluster_size=10e10):
         '''
             A *very* thin wrapper to the MCL program. The MCL program must
             be accessible by a subprocess (i.e. by the shell).
@@ -241,9 +275,9 @@ class COB(Expr):
                 This is the inflation parameter passed into mcl.
             scheme : int in 1:7
                 MCL accepts parameter schemes. See mcl docs for more details
-            min_distance : int (default: 100000)
-                The minimum distance between genes for which to consider co-expression
-                interactions. This filters out cis edges.
+            min_distance : int (default: None)
+                The minimum distance between genes for which to consider 
+                co-expression interactions. This filters out cis edges.
             min_cluster_size : int (default: 0)
                 The minimum cluster size to return. Filter out clusters smaller
                 than this.
@@ -274,7 +308,7 @@ class COB(Expr):
                     [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
                 ))
             else:
-                self.log( "MCL failed: return code: {}".format(p.returncode))
+                raise ValueError( "MCL failed: return code: {}".format(p.returncode))
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
