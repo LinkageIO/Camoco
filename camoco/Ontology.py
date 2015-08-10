@@ -19,8 +19,10 @@ class Term(object):
     '''
         A Term is a just group of loci that are related.
     '''
-    def __init__(self,name,desc='',locus_list=None,**kwargs):
+    def __init__(self,id,name='',type='',desc='',locus_list=None,**kwargs):
+        self.id = id
         self.name = name
+        self.type = type
         self.desc = desc
         self.locus_list = set()
         self.attr = {}
@@ -30,7 +32,7 @@ class Term(object):
             self.attrs[key] = val
 
     def __len__(self):
-        ''' 
+        '''
             Returns the number of loci in the term.
         '''
         return len(self.locus_list)
@@ -39,18 +41,18 @@ class Term(object):
         '''
             Adds a locus to the Term.
         '''
-        self.locus_list.add(locus) 
-    
+        self.locus_list.add(locus)
+
     def flanking_snps(self,gene,window_size=100000):
-        ''' 
-            returns any nearby Term SNPs to a gene 
+        '''
+            returns any nearby Term SNPs to a gene
         '''
         return [locus for locus in self.locus_list if abs(gene-locus) <= window_size]
 
     def effective_snps(self,window_size=None,max_genes_between=1):
-        ''' 
+        '''
             Collapse down loci that have overlapping windows.
-            Also collapses down snps that have 
+            Also collapses down snps that have
         '''
         locus_list = sorted(self.locus_list)
         if window_size is not None:
@@ -66,16 +68,16 @@ class Term(object):
                 collapsed.append(locus)
         log('{}: Found {} SNPs -> {} effective SNPs',self.name,len(self.locus_list),len(collapsed))
         return collapsed
-        
+
     def __str__(self):
-        return "Term: {}, Desc: {}, {} Loci".format(self.name,self.desc,len(self))
+        return "Term: {}, Name: {}, Type: {}, Desc: {}, {} Loci".format(self.id,self.name,self.type,self.desc,len(self))
 
     def __repr__(self):
         return str(self.name)
 
 class Ontology(Camoco):
-    ''' An Ontology is just a collection of terms. Each term is just a collection of genes. 
-        Sometimes terms are related or nested within each other, sometimes not. Simple enough.  
+    ''' An Ontology is just a collection of terms. Each term is just a collection of genes.
+        Sometimes terms are related or nested within each other, sometimes not. Simple enough.
     '''
     def __init__(self,name):
         super().__init__(name,type='Ontology')
@@ -85,16 +87,16 @@ class Ontology(Camoco):
     def __len__(self):
         return self.db.cursor().execute("SELECT COUNT(*) FROM terms;").fetchone()[0]
 
-    def __getitem__(self,name):
-        ''' retrieve a term by name '''
+    def __getitem__(self,id):
+        ''' retrieve a term by id '''
         try:
-            desc = self.db.cursor().execute(
-                'SELECT desc from terms WHERE name = ?',(name,)
+            (id,name,type,desc) = self.db.cursor().execute(
+                'SELECT * from terms WHERE id = ?',(id,)
             ).fetchone()
             term_loci = [Locus.from_record(record) for record in self.db.cursor().execute(
-                'SELECT chrom,start,end,name,window,id FROM term_loci WHERE term = ?',(name,)
+                'SELECT chrom,start,end,name,window,id FROM term_loci WHERE term = ?',(id,)
             ).fetchall()]
-            return Term(name,desc,locus_list=term_loci)
+            return Term(id,name=name,type=type,desc=desc,locus_list=term_loci)
         except TypeError as e: # Not in database
             raise
 
@@ -102,7 +104,7 @@ class Ontology(Camoco):
         return [self.term(x[0]) for x in self.db.cursor().execute('SELECT id FROM terms WHERE name LIKE ?',(like,)).fetchall()]
 
     def iter_terms(self):
-        for id, in self.db.cursor().execute("SELECT name FROM terms"):
+        for id, in self.db.cursor().execute("SELECT id FROM terms"):
             yield self[id]
 
     def terms(self):
@@ -114,7 +116,7 @@ class Ontology(Camoco):
             self.log("Caculating Enrichemnt for {}",label)
         cur = self.db.cursor()
         terms = [ x[0] for x in cur.execute(
-            '''SELECT DISTINCT(term) FROM gene_terms 
+            '''SELECT DISTINCT(term) FROM gene_terms
             WHERE gene IN ('{}');'''.format("','".join([x.id for x in gene_list]))
         )]
         # compute hypergeometric for each term
@@ -159,7 +161,7 @@ class Ontology(Camoco):
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(self.name,self.description,len(self),self.refgen)
 
-    def del_term(self,name):
+    def del_term(self,id):
         '''
         Remove a term from the dataset.
 
@@ -179,9 +181,9 @@ class Ontology(Camoco):
                 SELECT id FROM term_loci WHERE term = ?
             );
             DELETE FROM term_loci WHERE term = ?;
-            DELETE FROM terms WHERE name = ?;
+            DELETE FROM terms WHERE id = ?;
             END TRANSACTION;
-        ''',(name,name,name))
+        ''',(id,id,id))
 
     def add_term(self,term,overwrite=True):
         ''' This will add a single term to the ontology '''
@@ -191,30 +193,30 @@ class Ontology(Camoco):
         cur.execute('BEGIN TRANSACTION')
         # Add the term name and description
         cur.execute('''
-            INSERT OR REPLACE INTO terms (name,desc) 
-            VALUES (?,?)''',(term.name,term.desc)
+            INSERT OR REPLACE INTO terms (id,name,type,desc)
+            VALUES (?,?,?,?)''',(term.id,term.name,term.type,term.desc)
         )
         # Add the term loci
         for locus in term.locus_list:
             cur.execute('''
                 INSERT OR REPLACE INTO term_loci (term,chrom,start,end,name,window,id)
                 VALUES (?,?,?,?,?,?,?)
-                ''',(term.name,) + locus.as_record()
+                ''',(term.id,) + locus.as_record()
             )
             # Add the loci attrs
             cur.executemany('''
                 INSERT OR REPLACE INTO loci_attr (term,loci_id,key,val)
                 VALUES (?,?,?,?)
-            ''',[(term.name,locus.id,key,val) for key,val in locus.attr.items()])
+            ''',[(term.id,locus.id,key,val) for key,val in locus.attr.items()])
         cur.execute('END TRANSACTION')
 
     @classmethod
     def create(cls,name,description,refgen):
-        ''' 
-            This method creates a fresh Ontology with nothing it it. 
+        '''
+            This method creates a fresh Ontology with nothing it it.
         '''
         # run the inherited create method from Camoco
-        self = super(Ontology,cls).create(name,description,type='Ontology')
+        self = super().create(name,description,type='Ontology')
         # add the global refgen
         self._global('refgen',refgen.name)
         # set the refgen for the current instance
@@ -231,14 +233,14 @@ class Ontology(Camoco):
             start_col=None, end_col=None, id_col=None
             ):
         '''
-            Import an ontology from a pandas dataframe. 
+            Import an ontology from a pandas dataframe.
             Groups by term_col, then iterates over the rows in the group.
             It adds each row as a locus to the term.
         '''
         self = cls.create(name,description,refgen)
         # group each trait by its name
-        for term_name,df in df.groupby(term_col):
-            term = Term(term_name)
+        for term_id,df in df.groupby(term_col):
+            term = Term(term_id)
             # we have a SNP
             if pos_col is not None:
                 for i,row in df.iterrows():
@@ -246,54 +248,98 @@ class Ontology(Camoco):
                     # this is hackey and I dont like it
                     kwargs = {key:val for key,val in dict(row).items() if key not in Locus.__init__.__code__.co_varnames}
                     snp = Locus(row[chr_col],int(row[pos_col]),int(row[pos_col]),gene_build=self.refgen.build,**kwargs)
-                    term.locus_list.add(snp) 
+                    term.locus_list.add(snp)
             self.log("Importing {}",term)
             self.add_term(term)
         return self
-            
+
 
     @classmethod
-    def from_obo(self,filename,name,description,refgen):
+    def from_obo(cls,obo_file,gene_map_file,name,description,refgen):
         ''' Convenience function for importing GO obo files '''
-        self.log('importing OBO: {}',filename)
-        terms= defaultdict(dict)
-        is_a = list()
+        self = cls.create(name,description,refgen)
+
+        # Importing the obo information
+        self.log('Importing OBO: {}',obo_file)
+        terms = defaultdict(dict)
         cur_term = ''
+        alt_terms = []
         isa_re = re.compile('is_a: (.*) !.*')
-        with open(filename,'r') as INOBO:
+        with open(obo_file,'r') as INOBO:
             for line in INOBO:
                 line = line.strip()
                 if line.startswith('id: '):
-                    cur_term = line.replace('id: ','') 
+                    for alt in alt_terms:
+                        terms[alt] = terms[cur_term].copy()
+                    alt_terms = []
+                    cur_term = line.replace('id: ','')
                 elif line.startswith('name: '):
                     terms[cur_term]['name'] = line.replace('name: ','')
                     terms[cur_term]['desc'] = ''
+                    terms[cur_term]['is_a'] = []
+                    terms[cur_term]['genes'] = set()
                 elif line.startswith('namespace: '):
                     terms[cur_term]['type'] = line.replace('namespace: ','')
+                elif line.startswith('alt_id: '):
+                    alt_terms.append(line.replace('alt_id: ',''))
                 elif line.startswith('def: '):
                     terms[cur_term]['desc'] += line.replace('def: ','')
                 elif line.startswith('comment: '):
                     terms[cur_term]['desc'] += line.replace('comment: ','')
                 elif line.startswith('is_a: '):
-                    is_a.append((cur_term,isa_re.match(line).group(1)))
-        self.log("Dumping {} annotations and {} relationships",len(terms),len(is_a))
-        cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
-        cur.executemany('''
-            INSERT INTO terms (id,name,type,desc) VALUES(?,?,?,?)''', 
-            [ (key,val['name'],val['type'],val['desc']) for key,val in terms.items()]
-        )
-        self.log('Done inserting terms')
-        cur.executemany(''' 
-            INSERT INTO relationships (term,is_a) VALUES (?,?)''',
-            is_a
-        )
-        cur.execute('END TRANSACTION')
-        self._build_indices()
+                    terms[cur_term]['is_a'].append(isa_re.match(line).group(1))
+
+        # Importing gene map information, and cross referencing with obo information
+        self.log('Importing Gene Map: {}', gene_map_file)
+        genes = dict()
+        gene = ''
+        cur_term = ''
+        INMAP = open(gene_map_file)
+        garb = INMAP.readline()
+        for line in INMAP.readlines():
+            row = line.strip().split('\t')
+            gene = row[0].split('_')[0].strip()
+            cur_term = row[1]
+            if gene not in genes:
+                genes[gene] = set([cur_term])
+            else:
+                genes[gene].add(cur_term)
+        INMAP.close()
+
+        # Get the requisite gene objects
+        self.log('Mixing genes and obo data.')
+        del cur_term
+        for (cur_gene,cur_terms) in genes.items():
+            for cur_term in cur_terms:
+                addGenes(terms,cur_term,cur_gene)
+        del genes
+
+        # Making the Term objects
+        self.log('Making the objects to insert into the database.')
+        termObjs = []
+        for (term,info) in terms.items():
+            # Make the Gene Objects from the refgen
+            geneObjs = refgen.from_ids(info['genes'])
+
+            # Make the Term object and add it to the list
+            termObjs.append(Term(term,name=info['name'],type=info['type'],
+            desc=info['desc'],locus_list=geneObjs))
+        del terms
+
+        # Add them all to the database
+        self.log('Adding the records to the databse.')
+        n = 1
+        for term in termObjs:
+            if n % 10000 == 0:
+                self.log(str(n)+' terms added.')
+            self.add_term(term)
+            n += 1
+        del termObjs
+        return self
 
     @classmethod
     def from_mapman(self,filename):
-        ''' Convenience function for files provided by MapMan, columns are 
+        ''' Convenience function for files provided by MapMan, columns are
             CODE,NAME,Gene,DESC,TYPE seperated by space and enclosed in single quotes'''
         self.log('Importing MAPMAN text file: {}',filename)
         terms = dict()
@@ -308,7 +354,7 @@ class Ontology(Camoco):
                 (term,name,gene,desc,*type) = [x.strip("'") for x in  line.strip().split("\t")]
                 # strip transcript out of gene name
                 gene = transcript_strip.sub('',gene.upper())
-                terms[term] = (term,name,'','') 
+                terms[term] = (term,name,'','')
                 gene_terms.append((gene,term))
                 # add if there is a relationship there
                 if is_a_pattern.match(term):
@@ -317,23 +363,25 @@ class Ontology(Camoco):
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
         cur.executemany('''INSERT INTO terms (id,name,type,desc) VALUES (?,?,?,?)''',terms.values())
-        cur.executemany('''INSERT INTO relationships (term,is_a) VALUES (?,?) ''',is_a.items()) 
+        cur.executemany('''INSERT INTO relationships (term,is_a) VALUES (?,?) ''',is_a.items())
         cur.executemany('''INSERT INTO gene_terms (gene,term) VALUES (?,?)''',gene_terms)
         cur.execute('END TRANSACTION')
-        
+
 
     def _build_indices(self):
-        pass    
+        pass
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute(''' 
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS terms (
-                name TEXT UNIQUE,
-                desc TEXT   
-            ); 
+                id TEXT UNIQUE,
+                name TEXT,
+                type TEXT,
+                desc TEXT
+            );
         ''')
-        cur.execute(''' 
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS loci_attr (
                 term TEXT,
                 loci_id TEXT,
@@ -355,4 +403,22 @@ class Ontology(Camoco):
             );
         ''')
         self._build_indices()
-    
+
+# These function currently handle adding genes to all relevant terms by recursively
+# traversing the isa relationships in go, this will better integrated in the future
+# but is functional for now.
+def addGenes(terms, term, gene):
+    x = getISA(terms,term)
+    for item in x:
+        terms[item]['genes'].add(gene)
+    return
+
+def getISA(terms,term):
+    tot = set([term])
+    if terms[term]['is_a'] == []:
+        return tot
+    else:
+        for item in terms[term]['is_a']:
+            tot.add(item)
+            tot = tot | getISA(terms,item)
+        return tot
