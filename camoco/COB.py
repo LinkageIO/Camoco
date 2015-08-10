@@ -513,6 +513,54 @@ class COB(Expr):
             columns=col_labels
         )
 
+    def compare_degree(self,obj,diff_genes=10,score_cutoff=3):
+        ''' 
+            Compares the degree of one COB to another.
+
+            Parameters
+            ----------
+            obj : COB instance
+                The object you are comparing the degree to.
+            diff_genes : int (default: 10)
+                The number of highest and lowest different
+                genes to report
+            score_cutoff : int (default: 3)
+                The edge score cutoff used to called 
+                significant.
+        '''
+        self.log("Comparing degrees of {} and {}",self.name,obj.name)
+
+        # Put the two degree tables in the same table
+        lis = pd.concat(
+            [self.degree.copy(), obj.degree.copy()],
+            axis=1,ignore_index=True
+        )
+
+        # Filter the table of entries to ones where both entries exist
+        lis = lis[(lis[0] > 0) & (lis[1] > 0)]
+        delta = lis[0] - lis[1]
+
+        # Find the stats beteween the two sets, 
+        # and the genes with the biggest differences
+        delta.sort(ascending=False)
+        highest = sorted(
+            list(dict(delta[:diff_genes]).items()),
+            key=lambda x: x[1],reverse=True
+        )
+        lowest = sorted(
+            list(dict(delta[-diff_genes:]).items()),
+            key=lambda x: x[1],reverse=False
+        )
+        ans = {
+            'correlation_between_cobs':lis[0].corr(lis[1]), 
+            'mean_of_difference':delta.mean(), 
+            'std_of_difference':delta.std(), 
+            ('bigger_in_'+self.name):highest, 
+            ('bigger_in_'+obj.name):lowest
+        }
+
+        return ans
+
 
     ''' ------------------------------------------------------------------------------------------
             Internal Methods
@@ -798,21 +846,4 @@ class COB(Expr):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
         pass
 
-    def compare_degree(self,obj,diff_genes=10,score_cutoff=3):
-        ''' Compares the degree of one COB to another '''
-        self.log("Comparing degrees of {} and {}",self.name,obj.name)
 
-        # Put the two degree tables in the same table
-        lis = pd.concat([self.degree.copy(), obj.degree.copy()],axis=1,ignore_index=True)
-
-        # Filter the table of entries to ones where both entries exist
-        lis = lis[(lis[0] > 0) & (lis[1] > 0)]
-        delta = lis[0] - lis[1]
-
-        # Find the stats beteween the two sets, and the genes with the biggest differences
-        delta.sort(ascending=False)
-        highest = sorted(list(dict(delta[:diff_genes]).items()),key=lambda x: x[1],reverse=True)
-        lowest = sorted(list(dict(delta[-diff_genes:]).items()),key=lambda x: x[1],reverse=False)
-        ans = {'correlation_between_cobs':lis[0].corr(lis[1]), 'mean_of_difference':delta.mean(), 'std_of_difference':delta.std(), ('bigger_in_'+self.name):highest, ('bigger_in_'+obj.name):lowest}
-
-        return ans
