@@ -493,7 +493,13 @@ class COB(Expr):
         # add first dendrogram
         if cluster_y and len(dm.index) > 1:
             # calculate the squareform of the distance matrix
-            D1 = squareform(self.subnetwork(genes,sig_only=False,filter_missing_gene_ids=False,min_distance=0).score)
+            D1 = squareform(
+                self.subnetwork(
+                    genes,sig_only=False,
+                    filter_missing_gene_ids=False,
+                    min_distance=None
+                ).score
+            )
             ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
             ax1.set_frame_on(False)
             Y = linkage(D1, method=cluster_method)
@@ -595,24 +601,42 @@ class COB(Expr):
         self.log("Done")
         return self
 
+    def _calculate_clusters(self):
+        '''
+            Calculates global clusters
+        '''
+        clusters = self.mcl()
+        self.hdf5['clusters'] = pd.DataFrame(
+            data=[(gene.id,i) for i,cluster in enumerate(clusters) \
+                    for gene in cluster],
+            columns=['Gene','cluster']
+        ).set_index('Gene')
+        self.hdf5.flush(fsync=True)
+        self.clusters = self.hdf5['clusters']
+        return self
+
     def _calculate_degree(self):
-        try:
-            self.log('Building Degree')
-            self.hdf5['degree'] = pd.DataFrame(
-                list(Counter(chain(*self.subnetwork(sig_only=True).index.get_values())).items()),
-                columns=['Gene','Degree']
-            ).set_index('Gene')
-            self.hdf5.flush(fsync=True)
-            self.degree = self.hdf5['degree']
-        except Exception as e:
-            self.log("Something bad happened:{}",e)
-            raise
+        '''
+            Calculates degrees of genes within network. Stores
+            them in our HDF5 store.
+        '''
+        self.log('Building Degree')
+        self.hdf5['degree'] = pd.DataFrame(
+            data=list(Counter(chain(
+                *self.subnetwork(sig_only=True).index.get_values()
+            )).items()),
+            columns=['Gene','Degree']
+        ).set_index('Gene')
+        self.hdf5.flush(fsync=True)
+        self.degree = self.hdf5['degree']
+        return self
 
     def _calculate_leaves(self):
         '''
             This calculates the leaves of the dendrogram from the coex
         '''
         # We need to recreate the original PCCs
+        self.log('Calculating Leaves')
         if len(self.coex) == 0:
             raise ValueError('Cannot calculate leaves without coex')
         pcc_mean = float(self._global('pcc_mean'))
@@ -627,6 +651,7 @@ class COB(Expr):
         # store the leaves
         self.hdf5['leaves'] = self.leaves
         self.hdf5.flush(fsync=True)
+        return self
 
 
     def _build_tables(self,tbl):
@@ -672,6 +697,7 @@ class COB(Expr):
         self.hdf5['accession_qc_status'] = pd.DataFrame()
         self.hdf5['coex'] = pd.DataFrame()
         self.hdf5['degree'] = pd.DataFrame()
+        self.hdf5['mcl_cluster'] = pd.DataFrame()
         self.hdf5['leaves'] = pd.DataFrame()
         return self
 
@@ -698,6 +724,7 @@ class COB(Expr):
         self._calculate_coexpression()
         self._calculate_degree()
         self._calculate_leaves()
+        self._calculate_clusters()
         return self
 
     @classmethod
@@ -773,6 +800,35 @@ class COB(Expr):
         '''
         return cls.from_DataFrame(pd.read_table(filename,sep=sep),name,description,refgen,rawtype=rawtype,**kwargs)
 
+    def plot(self,filename=None,width=3000,height=3000,
+            layout=None,**kwargs):
+        # Get leaves
+        order = self.hdf5['leaves'].sort('index').index.values
+        # rearrange expression by leaf order
+        dm = self._expr.loc[order,:].apply(
+            lambda row: (row-row.mean())/row.std(),axis=1
+        )
+        f = plt.figure(
+            figsize=(100,100),
+            facecolor='white'
+        )
+        nan_mask = np.ma.array(dm,mask=np.isnan(dm))
+        cmap = self._cmap
+        cmap.set_bad('grey',1.0)
+        vmax = max(np.nanmin(abs(dm)),np.nanmax(abs(dm)))
+        vmin = vmax*-1
+
+        im = plt.matshow(dm,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
+
+        axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
+        
+        f.colorbar(im,orientation='horizontal',cax=axColorBar,
+            ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
+        )
+        plt.savefig('{}_global_heatmap.png'.format(self.name))
+
+        
+
 
     '''
         Unimplemented ---------------------------------------------------------------------------------
@@ -808,8 +864,6 @@ class COB(Expr):
             coordinates, returns (0,0) for each mystery gene'''
         pass
 
-    def plot(self,gene_list,filename=None,width=3000,height=3000,layout=None,**kwargs):
-        pass
 
     def compare_to_COB(self,COB_list,filename=None,gridsize=100,extent=[-10,10,-10,10]):
         ''' Compare the edge weights in this COB to another COB. Prints out edge weights to file'''
