@@ -18,11 +18,12 @@ from scipy.stats import norm
 from scipy.cluster.hierarchy import linkage,leaves_list,dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+import networkx as nx
 import pandas as pd
 import numpy as np
 import itertools
-import matplotlib.pyplot as plt
-import statsmodels.api as sm
 
 from scipy.stats import pearsonr
 
@@ -227,6 +228,21 @@ class COB(Expr):
             )['score'].to_csv(OUT,sep='\t')
             self.log('Done')
 
+    def to_graphml(self,file, gene_list=None,sig_only=True,min_distance=0):
+        # Get all the graph edges (and the nodes implicitly)
+        self.log('Getting the network.')
+        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only, min_distance=min_distance).index.values
+
+        # Build the NetworkX network
+        self.log('Building the graph.')
+        net = nx.Graph()
+        net.add_edges_from(edges)
+
+        # Print the file
+        self.log('Writing the file.')
+        nx.write_graphml(net,file)
+        return
+
     def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=100000,min_cluster_size=0,max_cluster_size=10e10):
         '''
             A *very* thin wrapper to the MCL program. The MCL program must
@@ -430,11 +446,11 @@ class COB(Expr):
         return plt
 
     def plot_heatmap(self,genes=None,accessions=None,
-        filename=None,maskNaNs=True, 
+        filename=None,maskNaNs=True,
         cluster_x=True, cluster_y=True, cluster_method='ward',
-        title=None, raw=False, 
+        title=None, raw=False,
         heatmap_unit_label='Expression'):
-        ''' 
+        '''
             Draw clustered heatmaps of an expression matrix
         '''
         from matplotlib import rcParams
@@ -514,7 +530,7 @@ class COB(Expr):
         )
 
     def compare_degree(self,obj,diff_genes=10,score_cutoff=3):
-        ''' 
+        '''
             Compares the degree of one COB to another.
 
             Parameters
@@ -525,7 +541,7 @@ class COB(Expr):
                 The number of highest and lowest different
                 genes to report
             score_cutoff : int (default: 3)
-                The edge score cutoff used to called 
+                The edge score cutoff used to called
                 significant.
         '''
         self.log("Comparing degrees of {} and {}",self.name,obj.name)
@@ -540,7 +556,7 @@ class COB(Expr):
         lis = lis[(lis[0] > 0) & (lis[1] > 0)]
         delta = lis[0] - lis[1]
 
-        # Find the stats beteween the two sets, 
+        # Find the stats beteween the two sets,
         # and the genes with the biggest differences
         delta.sort(ascending=False)
         highest = sorted(
@@ -552,10 +568,10 @@ class COB(Expr):
             key=lambda x: x[1],reverse=False
         )
         ans = {
-            'correlation_between_cobs':lis[0].corr(lis[1]), 
-            'mean_of_difference':delta.mean(), 
-            'std_of_difference':delta.std(), 
-            ('bigger_in_'+self.name):highest, 
+            'correlation_between_cobs':lis[0].corr(lis[1]),
+            'mean_of_difference':delta.mean(),
+            'std_of_difference':delta.std(),
+            ('bigger_in_'+self.name):highest,
             ('bigger_in_'+obj.name):lowest
         }
 
@@ -845,5 +861,3 @@ class COB(Expr):
     def compare_to_dat(self,filename,sep="\t",score_cutoff=3):
         ''' Compare the number of genes with significant edges as well as degree with a DAT file '''
         pass
-
-

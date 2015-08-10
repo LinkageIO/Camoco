@@ -158,6 +158,15 @@ class Ontology(Camoco):
         for term in self.iter_terms():
             term.print_stats(cob_list,filename,window_size=window_size,gene_limit=gene_limit,num_bootstraps=num_bootstraps,bootstrap_density=boostrap_density)
 
+    def to_bingo(self, file):
+        out = open(file,'w')
+        print('(species=Zea mays)(type=Full)(curator=GO)',file=out)
+        for term in self.iter_terms():
+            for locus in term.locus_list:
+                print(locus.id+' = '+term.id.split(':')[1],file=out)
+        out.close()
+        return
+
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(self.name,self.description,len(self),self.refgen)
 
