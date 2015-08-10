@@ -16,7 +16,7 @@ class Camoco(object):
         Cache Money
     '''
 
-    def __init__(self,name,type='Camoco',basedir="~/.camoco"):
+    def __init__(self,name,type='Camoco'):
         # Set up our base directory
         self.log = log()
         self.type = type
