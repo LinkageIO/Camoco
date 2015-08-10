@@ -15,8 +15,8 @@ cf_file = os.path.expanduser('~/.camoco.conf')
 
 default_config = '''
 [options]
-basedir = /heap/camoco
-testdir = /heap/camoco
+basedir = ~/.camoco/
+testdir = ~/.camoco/
 
 [test]
 refgen   = Zm5bFGS
