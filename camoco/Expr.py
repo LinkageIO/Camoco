@@ -5,6 +5,7 @@ from camoco.RefGen import RefGen
 from camoco.Tools import memoize
 from scipy.spatial.distance import pdist, squareform, euclidean
 from scipy.stats import hypergeom,pearsonr
+from scipy.stats.mstats import rankdata as mrankdata
 from scipy.cluster.hierarchy import linkage, dendrogram
 from collections import defaultdict
 
@@ -366,13 +367,29 @@ class Expr(Camoco):
             df = df.iloc[0:5000,:]
         self._update_values(df,'quality_control')
 
+    @staticmethod
+    def inplace_nansort(col):
+        # mask invalid data
+        masked_col = np.ma.masked_invalid(col)
+        masked_sorted = np.sort(col[~masked_col.mask].data)
+        # get ranked values
+        col_sorted = np.copy(col)
+        non_nan = 0
+        for i,x in enumerate(~masked_col.mask):
+            if x == True:
+                col_sorted[i] = masked_sorted[non_nan]
+                non_nan += 1
+            else:
+                col_sorted[i] = np.nan
+        return col_sorted
+
     def _quantile(self):
         ''' 
             Perform quantile normalization across each accession. 
             Each accessions gene expression values are replaced with 
             ranked gene averages.
         '''
-        raise NotImplementedError('This method is BROKEN!')
+          
         # get gene by accession matrix
         self.log('------------ Quantile ')
         expr = self._expr
@@ -383,23 +400,26 @@ class Expr(Camoco):
         expr_ranks = expr_ranks.apply(lambda col: col/np.nanmax(col.values), axis=0)
         # we need to know the number of non-nans so we can correct for their ranks later
         self.log('Sorting ranked data')
-        # assign accession values by order
-        # NOTE this currently keeps nans where they are. It COULD change with newer versions of pandas. 
-        expr_sort = expr.sort(axis=0)
+        # Sort values by accession/column, lowest to highest 
+        expr_sort = expr.apply(lambda col: self.inplace_nansort(col),axis=0)
         # make sure the nans weren't included in the sort or the rank
         assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
         assert np.all(np.isnan(expr) == np.isnan(expr_sort))
         # calculate ranked averages
         self.log('Calculating averages')
-        rank_average = expr_sort.apply(lambda row: np.mean(row[np.logical_not(np.isnan(row))]),axis=1)
+        rank_average = expr_sort.apply(np.nanmean,axis=1)
+        # we need to apply the percentages to the lenght of the 
         rankmax = len(rank_average)
-        self.log('Range of normalized values:{}..{}'.format(min(rank_average),max(rank_average)))
+        self.log('Range of normalized values:{}..{} n = {}'.format(
+            min(rank_average),max(rank_average),len(rank_average))
+        )
         self.log('Applying non-floating normalization')
-        expr = expr_ranks.applymap(
+        quan_expr = expr_ranks.applymap(
             lambda x : rank_average[int(x*rankmax)-1] if not np.isnan(x) else np.nan
         )
         self.log('Updating values')
-        self._update_values(expr,'quantile')
+        assert np.all(np.isnan(expr) == np.isnan(quan_expr))
+        self._update_values(quan_expr,'quantile')
 
     @property
     def _parent_refgen(self):
@@ -602,14 +622,15 @@ class Expr(Camoco):
         return self
 
 
-    '''
-        Unimplemented ---------------------------------------------------------------------------------
-    '''
-       
+    def plot_accession_histograms(self,raw=False,bins=50,figsize=(16,16)):
+        ''' 
+            Plot histogram of accession expression values.
+        '''
+        if raw == True:
+            df = self.hdf5['raw_expr']
+        else:
+            df = self.hdf5['expr']
 
-
-    def plot_value_hist(self,groupby='accession',raw=False,bins=50,figsize=(16,16),title='',log=False):
-        ''' Plots Value histograms on one of the expression matrix axis'''
         for group,df in self._expr(long=True,raw=raw).groupby(groupby):
             self.log('Plotting values for {}',group)
             plt.clf()
