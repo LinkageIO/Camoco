@@ -1,24 +1,28 @@
 #!/usr/bin/python3
 
 import unittest
-import os
 import numpy as np
 
 import camoco as co
-import pandas as pd
 import itertools
-from camoco.Config import cf
 
+from camoco.Config import cf
+from scipy.misc import comb
 
 
 class Locus(unittest.TestCase):
     def test_locus_initialization(self):
         # numeric chromosomes
-        a = co.Locus(1,500)
-        self.assertIsInstance(a,co.Locus)
+        a = co.Locus(1, 500)
+        self.assertIsInstance(a, co.Locus)
+
 
 class RefGen(unittest.TestCase):
 
+    @unittest.skipUnless(
+        co.available_datasets('RefGen', cf['test']['ontology']),
+        'Test RefGen not defined.'
+    )
     def setUp(self):
         self.Fe = co.Ontology(cf['test']['ontology'])[cf['test']['term']]
         self.ZM = co.RefGen(cf['test']['refgen'])
@@ -32,32 +36,42 @@ class RefGen(unittest.TestCase):
         )
 
     def test_get_attr_and_generating_from_ids(self):
-        self.assertIsInstance(self.ZM[cf['test']['gene']],co.Locus)
-        self.assertIsInstance(self.ZM.from_ids([cf['test']['gene']])[0],co.Locus)
+        self.assertIsInstance(self.ZM[cf['test']['gene']], co.Locus)
+        self.assertIsInstance(
+            self.ZM.from_ids([cf['test']['gene']])[0],
+            co.Locus
+        )
+
 
 class COB(unittest.TestCase):
 
     @unittest.skipUnless(
-        co.available_datasets('Expr',cf['test']['cob']),'COB net not defined'
+        co.available_datasets('Expr', cf['test']['cob']),
+        'COB net not defined.'
     )
     def setUp(self):
         self.cob = co.COB(cf['test']['cob'])
 
     def ZmRoot(self):
-        self.assertEqual(len(self.cob.coex), comb(self.cob.num_genes(),2),
-                "coex dimentions mismatch")
+        self.assertEqual(
+            len(self.cob.coex),
+            comb(self.cob.num_genes(), 2),
+            "coex dimentions mismatch"
+        )
 
     def test_coexpress_concordance(self):
-        for a,b in itertools.combinations([self.cob.refgen.random_gene() for x in range(50)],2):
-            self.assertTrue(abs(self.cob.coexpression(a,b).score - self.cob._coex_concordance(a,b)) < 0.001)
-            dis_dif = abs(self.cob.coexpression(a,b).distance - abs(a-b))
-            self.assertTrue( np.isnan(dis_dif) or dis_dif < 0.001)
+        for a, b in itertools.combinations([self.cob.refgen.random_gene() for x in range(50)], 2):
+            self.assertTrue(abs(self.cob.coexpression(a, b).score - self.cob._coex_concordance(a, b)) < 0.001)
+            dis_dif = abs(self.cob.coexpression(a, b).distance - abs(a-b))
+            self.assertTrue(np.isnan(dis_dif) or dis_dif < 0.001)
 
     def test_num_neighbors_equals_degree(self):
         random_gene = self.cob.refgen.random_gene()
         self.assertTrue(
-            len(self.cob.neighbors(random_gene) \
-            == self.cob.global_degree(random_gene)))
+            len(self.cob.neighbors(random_gene)
+            == self.cob.global_degree(random_gene)
+            )
+        )
 
 if __name__ == '__main__':
     unittest.main()

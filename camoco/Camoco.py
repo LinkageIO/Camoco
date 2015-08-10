@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import apsw as lite
 import os as os
-import time as time
-import sys
 import tempfile
 import pandas as pd
 
@@ -10,20 +8,21 @@ from camoco.Tools import log
 from camoco.Config import cf
 from apsw import ConstraintError
 
+
 class Camoco(object):
 
     '''
         Cache Money
     '''
 
-    def __init__(self,name,type='Camoco',basedir="~/.camoco"):
+    def __init__(self, name, type='Camoco'):
         # Set up our base directory
         self.log = log()
         self.type = type
         # A dataset already exists, return it
         self.db = self._database(name)
         try:
-            (self.ID,self.name,self.description,self.type,self.added) = \
+            (self.ID, self.name, self.description, self.type, self.added) = \
             self._database('Camoco',type='Camoco') \
                 .cursor().execute(
                 "SELECT rowid,* FROM datasets WHERE name = ? AND type = ?",
@@ -115,10 +114,10 @@ class Camoco(object):
             os.makedirs(os.path.join(basedir,"analyses"),exist_ok=True)
             os.makedirs(os.path.join(basedir,"tmp"),exist_ok=True)
         except Exception as e:
-            log(' Could not create files in {}',basedir)
+            log('Could not create files in {}',basedir)
             raise
         try:
-        # Create the base camoco database
+		    # Create the base camoco database
             lite.Connection(
                 os.path.join(basedir,'databases','Camoco.Camoco.db')
             ).cursor().execute('''
