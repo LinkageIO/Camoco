@@ -190,8 +190,10 @@ class COB(unittest.TestCase):
             LeafFam.series_matrix(
                 keepfile=pjoin(self.rawdir,'GSE','LeafKeep.tsv')
             ),
-            'AtLeaf','Arabidopsis Leaf',
-            co.RefGen('T10'),rawtype='MICROARRAY',
+            'AtLeaf',
+            'Arabidopsis Leaf',
+            co.RefGen('T10'),
+            rawtype='MICROARRAY',
             max_gene_missing_data=0.3,
             min_expr=0.01,
             quantile=True,
