@@ -8,6 +8,8 @@ from camoco.Tools import log
 from camoco.Config import cf
 from apsw import ConstraintError
 
+from .Exceptions import CamocoExistsError
+
 
 class Camoco(object):
 
@@ -134,6 +136,8 @@ class Camoco(object):
                 VALUES (?,?,?)''',(name,description,type)
             )
         except ConstraintError as e:
-            log.warn('CAUTION! {}.{} Database already exists.',name,type)
+            raise CamocoExistsError(
+                'CAUTION! {}.{} Database already exists.',name,type
+            )
         self = cls(name)
         return self

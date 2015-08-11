@@ -25,5 +25,3 @@ from camoco.Tools import available_datasets,del_dataset,\
                          mv_dataset,redescribe_dataset
 from camoco.Config import cf
 from camoco.GEO import Family
-
-Camoco.create('Camoco','Recursion.')
