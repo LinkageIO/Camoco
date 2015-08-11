@@ -18,20 +18,23 @@ import statsmodels.api as sm
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 def available_datasets(type=None,name=None):
-    cur = co.Camoco("Camoco",type='Camoco').db.cursor()
-    if type:
-        datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall()
-    else:
-        datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
-    if datasets:
-        datasets = pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
-    else:
-        datasets = pd.DataFrame(columns=["Type","Name","Description","Date Added"])
-    # Check to see if we are looking for a specific dataset
-    if name is not None:
-        return True if name in datasets['Name'].values else False
-    else:
-        return datasets
+    try:
+        cur = co.Camoco("Camoco",type='Camoco').db.cursor()
+        if type:
+            datasets = cur.execute("SELECT type,name,description,added FROM datasets WHERE type = ? ORDER BY type;",(type,)).fetchall()
+        else:
+            datasets = cur.execute("SELECT type,name,description,added FROM datasets ORDER BY type;").fetchall()
+        if datasets:
+            datasets = pd.DataFrame(datasets,columns=["Type","Name","Description","Date Added"])
+        else:
+            datasets = pd.DataFrame(columns=["Type","Name","Description","Date Added"])
+        # Check to see if we are looking for a specific dataset
+        if name is not None:
+            return True if name in datasets['Name'].values else False
+        else:
+            return datasets
+    except CantOpenError as e:
+        return False
 
 def del_dataset(type,name,safe=True):
     c = co.Camoco("Camoco")
