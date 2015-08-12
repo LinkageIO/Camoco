@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from camoco.Camoco import Camoco
 from camoco.RefGen import RefGen
@@ -216,7 +216,7 @@ class Ontology(Camoco):
             cur.executemany('''
                 INSERT OR REPLACE INTO loci_attr (term,loci_id,key,val)
                 VALUES (?,?,?,?)
-            ''',[(term.id,locus.id,key,val) for key,val in locus.attr.items()])
+            ''',[(term.id,locus.id,key,val) for key,val in locus.attr])
         cur.execute('END TRANSACTION')
 
     @classmethod
@@ -332,7 +332,7 @@ class Ontology(Camoco):
 
             # Make the Term object and add it to the list
             termObjs.append(Term(term,name=info['name'],type=info['type'],
-            desc=info['desc'],locus_list=geneObjs))
+            desc=info['desc'],locus_list=geneObjs,is_a=info['is_a']))
         del terms
 
         # Add them all to the database
