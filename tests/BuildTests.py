@@ -352,6 +352,7 @@ def COBAtSuite():
     suite = unittest.TestSuite()
     suite.addTest(COB('AtLeaf'))
     suite.addTest(COB('AtRoot'))
+    suite.addTest(COB('AtSeed'))
     suite.addTest(COB('AtGen'))
     return suite
 
