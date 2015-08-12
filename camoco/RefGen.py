@@ -1,4 +1,4 @@
-#!/usr/bin/python4
+#!/usr/bin/python3
 import pyximport; pyximport.install()
 import camoco.RefGenDist as RefGenDist
 

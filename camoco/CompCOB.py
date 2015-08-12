@@ -7,8 +7,11 @@ from camoco.RefGen import RefGen
 from camoco.Tools import log
 from camoco.COB import COB
 
+from collections import defaultdict
 from pandas import DataFrame
+import networkx as nx
 import numpy as np
+import re
 import os
 
 class CompCOB(Camoco):
@@ -18,12 +21,12 @@ class CompCOB(Camoco):
             self.cob = COB(self.cob)
         if self.ont:
             self.ont = Ontology(self.ont)
-
         try:
             # Open the HDF5 store
             self.hdf5 = self._hdf5(name)
             self.densities = self.hdf5['densities']
         except KeyError as e:
+            # Do a thing
             self.densities = DataFrame()
 
     @classmethod
@@ -127,6 +130,75 @@ class CompCOB(Camoco):
         self.log('Number of Significant Terms: '+ str(significant_terms))
         self.log('Number Random Significants Expected: '+str(len(dens)*0.05))
         return ans
+
+    def to_cytoscape(self,obo_file,out_file):
+        self.log('Importing OBO: {}',obo_file)
+        terms = defaultdict(dict)
+        cur_term = ''
+        alt_terms = []
+        alts = set()
+        isa_re = re.compile('is_a: (.*) !.*')
+        with open(obo_file,'r') as INOBO:
+            for line in INOBO:
+                line = line.strip()
+                if line.startswith('id: '):
+                    for alt in alt_terms:
+                        terms[alt] = terms[cur_term].copy()
+                    alt_terms = []
+                    cur_term = line.replace('id: ','')
+                elif line.startswith('name: '):
+                    terms[cur_term]['name'] = line.replace('name: ','')
+                    terms[cur_term]['desc'] = ''
+                    terms[cur_term]['is_a'] = []
+                    terms[cur_term]['genes'] = set()
+                elif line.startswith('namespace: '):
+                    terms[cur_term]['type'] = line.replace('namespace: ','')
+                elif line.startswith('alt_id: '):
+                    alt_terms.append(line.replace('alt_id: ',''))
+                    alts.add(line.replace('alt_id: ',''))
+                elif line.startswith('def: '):
+                    terms[cur_term]['desc'] += line.replace('def: ','')
+                elif line.startswith('comment: '):
+                    terms[cur_term]['desc'] += line.replace('comment: ','')
+                elif line.startswith('is_a: '):
+                    terms[cur_term]['is_a'].append(isa_re.match(line).group(1))
+
+        def getISA(terms,term,alts):
+            rels = []
+            if terms[term]['is_a'] == []:
+                return None
+            else:
+                for isa in terms[term]['is_a']:
+                    if isa not in alts:
+                        rels.append((term,isa))
+                for isa in terms[term]['is_a']:
+                    if isa not in alts:
+                        x = getISA(terms,isa,alts)
+                        if x:
+                            rels += x
+                return rels
+
+        self.log('Adding the edges.')
+        graph = nx.DiGraph()
+        for term in self.densities.index:
+            if term not in alts:
+                x = getISA(terms,term,alts)
+                if x:
+                    graph.add_edges_from(x)
+
+        self.log('Adding the node information.')
+        all_nodes = set(list(graph.nodes()) + list(self.densities.index))
+        for id in all_nodes:
+            if id not in alts:
+                if id in self.densities.index:
+                    sig = int(self.densities['Significant'][id])
+                else:
+                    sig = 0
+                graph.add_node(id, significant=sig, name=terms[id]['name'], desc=terms[id]['desc'])
+        self.log('Done.')
+
+        nx.write_graphml(graph,out_file)
+        return graph
 
     def report(self, folder=''):
         # Figuring out the names for everything
