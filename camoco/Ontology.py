@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-from camoco.Camoco import Camoco
-from camoco.RefGen import RefGen
-from camoco.Tools import log
-from camoco.Locus import Locus
+from .Camoco import Camoco
+from .RefGen import RefGen
+from .Tools import log
+from .Locus import Locus
 
 
 from collections import defaultdict

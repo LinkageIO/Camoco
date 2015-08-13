@@ -7,10 +7,11 @@ import functools
 from termcolor import colored,cprint
 from itertools import chain
 
-from camoco.Locus import Locus
-from camoco.Config import cf
+from .Locus import Locus
+from .Config import cf
 
 import camoco as co
+
 import matplotlib.pylab as pylab
 import numpy as np
 import pandas as pd
@@ -69,12 +70,12 @@ def del_dataset(type,name,safe=True):
         del_dataset('RefGen','Filtered'+name,safe=safe)
 
 def mv_dataset(type,name,new_name):
-    c = Camoco("Camoco")
+    c = co.Camoco("Camoco")
     c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
     os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
 
 def redescribe_dataset(type,name,new_desc):
-    c = Camoco("Camoco")
+    c = co.Camoco("Camoco")
     c.db.cursor().execute("UPDATE datasets SET description = ? WHERE name = ? and type = ?",(new_desc,name,type))
 
 def memoize(obj):
@@ -147,7 +148,7 @@ def plot_flanking_vs_inter(cob):
 
 
 def plot_local_global_degree(term,filename=None,bootstraps=1):
-    ROOT = co.COB("ROOT")
+    ROOT = COB("ROOT")
     RZM = ROOT.refgen # use root specific for bootstraps
     hood = ROOT.neighborhood(term.flanking_genes(RZM))
     bshood = pd.concat([ROOT.neighborhood(term.bootstrap_flanking_genes(RZM)) for _ in range(0,bootstraps)])
@@ -162,16 +163,16 @@ def plot_local_global_degree(term,filename=None,bootstraps=1):
     pylab.savefig(filename)
 
 def plot_local_vs_cc(term,filename=None,bootstraps=1):
-    RZM = co.COB('ROOT').refgen # use root specific for bootstraps
+    RZM = COB('ROOT').refgen # use root specific for bootstraps
     pylab.clf()
     for _ in range(0,bootstraps):
-        graph = co.COB('ROOT').graph(term.bootstrap_flanking_genes(RZM))
+        graph = COB('ROOT').graph(term.bootstrap_flanking_genes(RZM))
         degree = np.array(graph.degree())
         cc = np.array(graph.transitivity_local_undirected(weights='weight'))
         nan_mask = np.isnan(cc)
         pylab.scatter(degree[~nan_mask],cc[~nan_mask],alpha=0.05)
     # plot empirical
-    graph = co.COB('ROOT').graph(term.flanking_genes(RZM))
+    graph = COB('ROOT').graph(term.flanking_genes(RZM))
     degree = np.array(graph.degree())
     cc = np.array(graph.transitivity_local_undirected(weights='weight'))
     nan_mask = np.isnan(cc)

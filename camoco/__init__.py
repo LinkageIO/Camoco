@@ -13,14 +13,13 @@ __license__ = """
 
 import pyximport; pyximport.install() 
 
-from camoco.Camoco import Camoco
-from camoco.Expr import Expr
-from camoco.COB import COB
-from camoco.RefGen import RefGen
-from camoco.Ontology import Ontology,Term
-from camoco.HapMap import HapMap
-from camoco.Locus import Locus
-from camoco.Tools import available_datasets,del_dataset,\
-                         mv_dataset,redescribe_dataset
-from camoco.Config import cf
-from camoco.GEO import Family
+from .Expr import Expr
+from .COB import COB
+from .RefGen import RefGen
+from .Ontology import Ontology,Term
+from .HapMap import HapMap
+from .Locus import Locus
+from .Tools import available_datasets,del_dataset,\
+                   mv_dataset,redescribe_dataset
+from .Config import cf
+from .GEO import Family

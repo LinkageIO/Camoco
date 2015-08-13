@@ -1,15 +1,15 @@
-#!/usr/bin/python4
-import pyximport; pyximport.install()
+#!/usr/bin/python3
+
 import camoco.RefGenDist as RefGenDist
 
 from collections import defaultdict
 import matplotlib.pylab as plt
 
-from camoco.Camoco import Camoco
-from camoco.Locus import Gene,Locus
-from camoco.Chrom import Chrom
-from camoco.Genome import Genome
-from camoco.Tools import memoize
+from .Camoco import Camoco
+from .Locus import Gene,Locus
+from .Chrom import Chrom
+from .Genome import Genome
+from .Tools import memoize
 
 import itertools
 import collections

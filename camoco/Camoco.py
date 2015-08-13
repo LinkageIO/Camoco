@@ -6,9 +6,8 @@ import sys
 import tempfile
 import pandas as pd
 
-from camoco.Tools import log
-from camoco.Config import cf
-from apsw import ConstraintError
+from .Tools import log
+from .Config import cf
 
 class Camoco(object):
 
