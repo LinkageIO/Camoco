@@ -1,12 +1,12 @@
 #!/usr/bin/python3
-import pyximport; pyximport.install()
+
 import camoco.PCCUP as PCCUP
 
-from camoco.Camoco import Camoco
-from camoco.RefGen import RefGen
-from camoco.Locus import Locus,Gene
-from camoco.Expr import Expr
-from camoco.Tools import memoize
+from .Camoco import Camoco
+from .RefGen import RefGen
+from .Locus import Locus,Gene
+from .Expr import Expr
+from .Tools import memoize
 
 from numpy import matrix,arcsinh,tanh
 from collections import defaultdict,Counter
@@ -790,7 +790,14 @@ class COB(Expr):
             -------
                 a COB object
         '''
-        return cls.from_DataFrame(pd.read_table(filename,sep=sep),name,description,refgen,rawtype=rawtype,**kwargs)
+        return cls.from_DataFrame(
+            pd.read_table(
+                filename,sep=sep,
+                compression='infer'
+            ),
+            name,description,refgen,
+            rawtype=rawtype,**kwargs
+        )
 
 
     '''

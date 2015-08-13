@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 
-from camoco.Camoco import Camoco
-from camoco.RefGen import RefGen
-from camoco.Tools import memoize
+from .Camoco import Camoco
+from .RefGen import RefGen
+from .Tools import memoize
 from scipy.spatial.distance import pdist, squareform, euclidean
 from scipy.stats import hypergeom,pearsonr
 from scipy.stats.mstats import rankdata as mrankdata

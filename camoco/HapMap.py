@@ -6,8 +6,8 @@ import sys
 import numpy as np
 from scipy.stats import pearsonr
 
-from camoco.Camoco import Camoco
-from camoco.Chrom import Chrom
+from .Camoco import Camoco
+from .Chrom import Chrom
 
 from matplotlib import pylab
 
