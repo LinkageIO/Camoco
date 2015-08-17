@@ -13,6 +13,7 @@ __license__ = """
 
 import pyximport; pyximport.install() 
 
+from .Camoco import Camoco
 from .Expr import Expr
 from .COB import COB
 from .RefGen import RefGen
