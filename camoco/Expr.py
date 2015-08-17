@@ -17,6 +17,8 @@ import io
 import re
 import string
 
+pd.set_option('display.width',100)
+
 class Expr(Camoco):
     ''' 
         A representation of gene expression. The base data structure for this 
@@ -136,12 +138,49 @@ class Expr(Camoco):
             zscore : bool (default: False)
                 
         '''
-        df = self.hdf5['raw_expr'] if raw is True else self._expr
+        if raw is True:
+            self.log('Extracting raw expression values')
+            df = self.hdf5['raw_expr'] 
+        else:
+            df = self._expr
         if genes is not None:
             df = df.loc[[x.id for x in genes],:]
         if accessions is not None:
             df = df[accessions]
         return df
+
+    def plot_accession_histograms(self,bins=50,figsize=(16,8)):
+        ''' 
+            Plot histogram of accession expression values.
+        '''
+        raw = self.hdf5['raw_expr']
+        qcd = self._expr
+
+        for name,values in qcd.iteritems():
+            raw_values = raw[name]
+            # Shorten name
+            if len(name) > 20:
+                name = name[0:20] + '...' + name[-11:-1]
+            self.log('Plotting values for {}',name)
+            # Extract out the raw values
+            raw_valid = np.ma.masked_invalid(raw_values)
+            # Extract out the normalized values
+            valid = np.ma.masked_invalid(values)
+            # Plot histograms
+            f = plt.figure(figsize=figsize)
+            plt.subplot(121)
+            plt.hist(raw_valid[~raw_valid.mask],bins=bins) 
+            plt.xlim(-15,15)
+            plt.title('{}:{}'.format(self.name,name))
+            plt.ylabel('Frequency')
+            plt.subplot(122)
+            plt.hist(valid[~valid.mask],bins=bins)
+            plt.xlabel('Expression')
+            plt.xlim(-15,15)
+
+            plt.savefig("ACC_HIST_{}:{}.png".format(self.name,name)) 
+            plt.close(f)
+
 
     '''
         Internal Methods ------------------------------------------------------
@@ -168,7 +207,14 @@ class Expr(Camoco):
         '''
         # update the transformation log
         self._transformation_log(transform_name)
-        table = 'raw_expr' if raw else 'expr'
+        if raw == True:
+            table = 'raw_expr' 
+            # If we are updating the raw table, remove the 
+            # normal table since it assumes it came from 
+            # the raw table.
+            self._reset(raw=False)
+        else:
+            table = 'expr'
         # Sort the table by genes
         df = df.sort()
         # ensure that column names are alphanumeric
@@ -183,10 +229,8 @@ class Expr(Camoco):
             self.hdf5.flush(fsync=True)
         except Exception as e:
             self.log('Unable to update expression table values: {}',e)
-            raise
-        if raw == True:
-            # Get rid of the current values
-            self._reset(raw=False)
+            raise e
+        return self
 
     def _transformation_log(self,transform=None):
         if transform is None:
@@ -201,13 +245,16 @@ class Expr(Camoco):
             self.log('Trans. Log: {}',self._global('transformation_log'))
  
     def _reset(self,raw=False):
-        ''' resets the expression values to their raw state undoing any normalizations '''
+        ''' 
+            resets the expression values to their raw 
+            state undoing any normalizations 
+        '''
         if raw:
             # kill the raw table too
             self.log('Resetting raw expression data')
             self.hdf5['raw_expr'] = pd.DataFrame()
         self.log('Resetting expression data')
-        self.hdf5['expr'] = self._expr = pd.DataFrame()
+        self.hdf5['expr'] = self._expr = self.expr(raw=True)
         self._transformation_log('reset')
 
 
@@ -243,7 +290,7 @@ class Expr(Camoco):
             self._update_values(df,method.__name__)
 
     def _quality_control(self,min_expr=1,max_gene_missing_data=0.2,\
-        min_single_sample_expr=5, max_accession_missing_data=0.5,\
+        min_single_sample_expr=5, max_accession_missing_data=0.3,\
         membership=None, dry_run=False, **kwargs):
         ''' 
             Perform Quality Control on raw expression data. This method filters
@@ -280,7 +327,7 @@ class Expr(Camoco):
                 dataframe to only have 5000 genes.
         '''        
         self.log('------------Quality Control')
-        df = self.expr(raw=True)
+        df = self.expr()
         # remember how we set the flags
         self._global('qc_min_expr',min_expr)
         self._global('qc_max_gene_missing_data',max_gene_missing_data)
@@ -392,7 +439,9 @@ class Expr(Camoco):
           
         # get gene by accession matrix
         self.log('------------ Quantile ')
-        expr = self._expr
+        if 'quantile' in self._transformation_log():
+            raise ValueError('Quanitle already performed on {}',self.name)
+        expr = self.expr()
         self.log('Ranking data')
         # assign ranks by accession (column)
         expr_ranks = expr.rank(axis=0,method='dense',na_option='keep')
@@ -410,9 +459,11 @@ class Expr(Camoco):
         rank_average = expr_sort.apply(np.nanmean,axis=1)
         # we need to apply the percentages to the lenght of the 
         rankmax = len(rank_average)
-        self.log('Range of normalized values:{}..{} n = {}'.format(
+        self.log('Range of normalized values:{}..{} (n = {})'.format(
             min(rank_average),max(rank_average),len(rank_average))
         )
+        self.log('Asserting that no Genes are nan...')
+        assert sum(np.isnan(rank_average)) == 0
         self.log('Applying non-floating normalization')
         quan_expr = expr_ranks.applymap(
             lambda x : rank_average[int(x*rankmax)-1] if not np.isnan(x) else np.nan
@@ -547,7 +598,7 @@ class Expr(Camoco):
         return cls.from_DataFrame(tbl,name,description,refgen,rawtype=rawtype,**kwargs)
 
     @classmethod
-    def from_DataFrame(cls,tbl,name,description,refgen,rawtype=None,
+    def from_DataFrame(cls,df,name,description,refgen,rawtype=None,
         normalize=True,norm_method=None,quantile=False,quality_control=True,**kwargs):
         ''' 
             Creates an Expr instance from a pandas DataFrame. Expects that the DataFrame
@@ -557,7 +608,7 @@ class Expr(Camoco):
 
             Parameters
             ----------
-            tbl : pandas.DataFrame
+            df : pandas.DataFrame
                 a DataFrame containing expression data. Assumes index is the genes and
                 columns is the accessions (experiment names)
             name : str
@@ -604,11 +655,11 @@ class Expr(Camoco):
         self._global('rawtype',rawtype)
         # put raw values into the database
         self.log('Importing Raw Expression Values')
-        self._update_values(tbl,'Raw'+rawtype,raw=True)
+        self._update_values(df,'Raw'+rawtype,raw=True)
         if quality_control:
             self.log('Performing Quality Control on genes')
             self._quality_control(**kwargs)
-        assert self.anynancol() == False
+            assert self.anynancol() == False
         if normalize:
             self.log('Performing Raw Expression Normalization')
             self._normalize(**kwargs)
@@ -622,27 +673,4 @@ class Expr(Camoco):
         return self
 
 
-    def plot_accession_histograms(self,raw=False,bins=50,figsize=(16,16)):
-        ''' 
-            Plot histogram of accession expression values.
-        '''
-        if raw == True:
-            df = self.hdf5['raw_expr']
-        else:
-            df = self.hdf5['expr']
 
-        for group,df in self._expr(long=True,raw=raw).groupby(groupby):
-            self.log('Plotting values for {}',group)
-            plt.clf()
-            plt.hist(
-                list(filter(lambda x: not np.isnan(x),df.value)),
-                bins=bins,
-                log=log
-            )
-            plt.title(group+title)
-            plt.xlabel('Expression')
-            plt.ylabel('Frequency')
-            plt.savefig(
-                filename="{}{}_VALUES.png".format(group,title),
-                figsize=figsize
-            )

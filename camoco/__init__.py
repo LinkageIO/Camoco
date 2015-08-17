@@ -1,17 +1,18 @@
-""" 
+"""
 
-Camoco Library - CoAnalysis of Molecular Components 
+Camoco Library - CoAnalysis of Molecular Components
 
 CacheMoneyCorn
 
 """
 
-__license__ = """ 
+__license__ = """
     Creative Commons Non-Commercial 4.0 Generic
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-import pyximport; pyximport.install() 
+import pyximport
+pyximport.install()
 
 from .Camoco import Camoco
 from .Expr import Expr
