@@ -122,12 +122,35 @@ class COB(Expr):
         index = PCCUP.coex_index(ids,num_genes)[0]
         return self.coex.iloc[index]
 
-    def subnetwork(self,gene_list=None,sig_only=True,min_distance=100000,
+    def subnetwork(self,gene_list=None,sig_only=True,min_distance=None,
         filter_missing_gene_ids=True):
         '''
-            Input: a gene list (passing None gives you all genes)
-            Output: a dataframe containing all edges EXCLUSIVELY between genes
-                within list
+            Extract a subnetwork of edges exclusively between genes
+            within the gene_list. Also includes various options for
+            what information to report, see Parameters.
+
+            Parameters
+            ---------
+            gene_list : iter of Loci
+                The genes from which to extract a subnetwork.
+                If gene_list is None, the function will assume
+                gene_list is all genes in COB object (self).
+            sig_only : bool
+                A flag to include only significant interactions.
+            min_distance : bool (default: None)
+                If not None, only include interactions that are
+                between genes that are a `min_distance` away from
+                one another.
+            filter_missing_gene_ids : bool (default: True)
+                Filter out gene ids that are not in the current
+                COB object (self).
+
+            Returns
+            -------
+            A pandas.DataFrame containing the edges. Columns
+            include score, significant (bool), inter-genic distance,
+            and 
+
         '''
         if gene_list is None:
             df = self.coex
@@ -140,7 +163,7 @@ class COB(Expr):
             # Grab the coexpression indices for the genes
             indices = PCCUP.coex_index(ids,num_genes)
             df = self.coex.iloc[indices]
-        if min_distance:
+        if min_distance is not None:
             df = df.loc[df.distance >= min_distance,:]
         if sig_only:
             df = df.loc[df.significant == 1,:]
@@ -191,11 +214,25 @@ class COB(Expr):
             return edges
 
 
-    def density(self,gene_list,return_mean=True,min_distance=None):
+    def density(self, gene_list, min_distance=None):
         '''
-            Calculates the denisty of the non-thresholded network amongst genes
-            not within a certain distance of each other. This corrects for
-            cis regulatory elements increasing noise in coexpression network
+            Calculates the denisty of the non-thresholded network edges 
+            amongst genes within gene_list. Includes parameters to perform
+            measurements for genes within a certain distance of each other. 
+            This corrects for cis regulatory elements increasing noise 
+            in coexpression network.
+
+            Parameters
+            ----------
+            gene_list : iter of Loci
+                List of genes from which to calculate density.
+            min_distance : int (default: None)
+                Ignore edges between genes less than min_distance
+                in density calculation.
+
+            Returns
+            -------
+            A network density 
         '''
         # filter for only genes within network
         edges = self.subnetwork(gene_list,
@@ -205,14 +242,12 @@ class COB(Expr):
             return np.nan
         if len(edges) == 1:
             return edges.score[0]
-        if return_mean:
-            return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
-            # old code worth a look
-            #return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
-            #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
-            #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
-        else:
-            return edges
+
+        # old code worth a look ;)
+        #return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
+        #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
+        #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
+        return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
 
     def to_dat(self,gene_list=None,filename=None,sig_only=False,min_distance=0):
         '''
@@ -227,7 +262,8 @@ class COB(Expr):
             )['score'].to_csv(OUT,sep='\t')
             self.log('Done')
 
-    def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=100000,min_cluster_size=0,max_cluster_size=10e10):
+    def mcl(self,gene_list=None,I=2.0,scheme=7,min_distance=None,
+            min_cluster_size=0,max_cluster_size=10e10):
         '''
             A *very* thin wrapper to the MCL program. The MCL program must
             be accessible by a subprocess (i.e. by the shell).
@@ -241,9 +277,9 @@ class COB(Expr):
                 This is the inflation parameter passed into mcl.
             scheme : int in 1:7
                 MCL accepts parameter schemes. See mcl docs for more details
-            min_distance : int (default: 100000)
-                The minimum distance between genes for which to consider co-expression
-                interactions. This filters out cis edges.
+            min_distance : int (default: None)
+                The minimum distance between genes for which to consider 
+                co-expression interactions. This filters out cis edges.
             min_cluster_size : int (default: 0)
                 The minimum cluster size to return. Filter out clusters smaller
                 than this.
@@ -274,7 +310,7 @@ class COB(Expr):
                     [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
                 ))
             else:
-                self.log( "MCL failed: return code: {}".format(p.returncode))
+                raise ValueError( "MCL failed: return code: {}".format(p.returncode))
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
@@ -465,7 +501,13 @@ class COB(Expr):
         # add first dendrogram
         if cluster_y and len(dm.index) > 1:
             # calculate the squareform of the distance matrix
-            D1 = squareform(self.subnetwork(genes,sig_only=False,filter_missing_gene_ids=False,min_distance=0).score)
+            D1 = squareform(
+                self.subnetwork(
+                    genes,sig_only=False,
+                    filter_missing_gene_ids=False,
+                    min_distance=None
+                ).score
+            )
             ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
             ax1.set_frame_on(False)
             Y = linkage(D1, method=cluster_method)
@@ -614,24 +656,42 @@ class COB(Expr):
         self.log("Done")
         return self
 
+    def _calculate_clusters(self):
+        '''
+            Calculates global clusters
+        '''
+        clusters = self.mcl()
+        self.hdf5['clusters'] = pd.DataFrame(
+            data=[(gene.id,i) for i,cluster in enumerate(clusters) \
+                    for gene in cluster],
+            columns=['Gene','cluster']
+        ).set_index('Gene')
+        self.hdf5.flush(fsync=True)
+        self.clusters = self.hdf5['clusters']
+        return self
+
     def _calculate_degree(self):
-        try:
-            self.log('Building Degree')
-            self.hdf5['degree'] = pd.DataFrame(
-                list(Counter(chain(*self.subnetwork(sig_only=True).index.get_values())).items()),
-                columns=['Gene','Degree']
-            ).set_index('Gene')
-            self.hdf5.flush(fsync=True)
-            self.degree = self.hdf5['degree']
-        except Exception as e:
-            self.log("Something bad happened:{}",e)
-            raise
+        '''
+            Calculates degrees of genes within network. Stores
+            them in our HDF5 store.
+        '''
+        self.log('Building Degree')
+        self.hdf5['degree'] = pd.DataFrame(
+            data=list(Counter(chain(
+                *self.subnetwork(sig_only=True).index.get_values()
+            )).items()),
+            columns=['Gene','Degree']
+        ).set_index('Gene')
+        self.hdf5.flush(fsync=True)
+        self.degree = self.hdf5['degree']
+        return self
 
     def _calculate_leaves(self):
         '''
             This calculates the leaves of the dendrogram from the coex
         '''
         # We need to recreate the original PCCs
+        self.log('Calculating Leaves')
         if len(self.coex) == 0:
             raise ValueError('Cannot calculate leaves without coex')
         pcc_mean = float(self._global('pcc_mean'))
@@ -646,6 +706,7 @@ class COB(Expr):
         # store the leaves
         self.hdf5['leaves'] = self.leaves
         self.hdf5.flush(fsync=True)
+        return self
 
 
     def _build_tables(self,tbl):
@@ -691,6 +752,7 @@ class COB(Expr):
         self.hdf5['accession_qc_status'] = pd.DataFrame()
         self.hdf5['coex'] = pd.DataFrame()
         self.hdf5['degree'] = pd.DataFrame()
+        self.hdf5['mcl_cluster'] = pd.DataFrame()
         self.hdf5['leaves'] = pd.DataFrame()
         return self
 
@@ -717,6 +779,7 @@ class COB(Expr):
         self._calculate_coexpression()
         self._calculate_degree()
         self._calculate_leaves()
+        self._calculate_clusters()
         return self
 
     @classmethod
@@ -799,6 +862,35 @@ class COB(Expr):
             rawtype=rawtype,**kwargs
         )
 
+    def plot(self,filename=None,width=3000,height=3000,
+            layout=None,**kwargs):
+        # Get leaves
+        order = self.hdf5['leaves'].sort('index').index.values
+        # rearrange expression by leaf order
+        dm = self._expr.loc[order,:].apply(
+            lambda row: (row-row.mean())/row.std(),axis=1
+        )
+        f = plt.figure(
+            figsize=(100,100),
+            facecolor='white'
+        )
+        nan_mask = np.ma.array(dm,mask=np.isnan(dm))
+        cmap = self._cmap
+        cmap.set_bad('grey',1.0)
+        vmax = max(np.nanmin(abs(dm)),np.nanmax(abs(dm)))
+        vmin = vmax*-1
+
+        im = plt.matshow(dm,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
+
+        axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
+        
+        f.colorbar(im,orientation='horizontal',cax=axColorBar,
+            ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
+        )
+        plt.savefig('{}_global_heatmap.png'.format(self.name))
+
+        
+
 
     '''
         Unimplemented ---------------------------------------------------------------------------------
@@ -834,8 +926,6 @@ class COB(Expr):
             coordinates, returns (0,0) for each mystery gene'''
         pass
 
-    def plot(self,gene_list,filename=None,width=3000,height=3000,layout=None,**kwargs):
-        pass
 
     def compare_to_COB(self,COB_list,filename=None,gridsize=100,extent=[-10,10,-10,10]):
         ''' Compare the edge weights in this COB to another COB. Prints out edge weights to file'''
