@@ -21,6 +21,7 @@ testdir = ~/.camoco/
 log_level = verbose
 
 [test]
+force    = True
 refgen   = Zm5bFGS
 cob      = NewRoot
 ontology = ZmIonome
