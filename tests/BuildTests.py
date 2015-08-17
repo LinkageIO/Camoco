@@ -18,18 +18,22 @@ import unittest
 class RefGen(unittest.TestCase):
 
     def Tair10(self):
-        gff = os.path.join(
-            cf['options']['testdir'],
-            'raw','TAIR10_GFF3_genes.gff'
+        gff = os.path.expanduser(
+            os.path.join(
+                cf['options']['testdir'],
+                'raw','RefGen','TAIR10_GFF3_genes.gff'
+            )
         )
         co.del_dataset('RefGen','T10',safe=False)
         T10 = co.RefGen.from_gff(gff,'T10','Tair 10','10','Arabidopsis')
         self.assertIsInstance(T10,co.RefGen)
 
     def Zm5bFGS(self):
-        gff = os.path.join(
-            cf['options']['testdir'],
-            'raw','ZmB73_5b_FGS.gff'
+        gff = os.path.expanduser(
+            os.path.join(
+                cf['options']['testdir'],
+                'raw','RefGen','ZmB73_5b_FGS.gff.gz'
+            )
         )
         co.del_dataset('RefGen','Zm5bFGS',safe=False)
         ZM = co.RefGen.from_gff(
