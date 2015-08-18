@@ -13,3 +13,4 @@ dist/
 *.swp
 *.swl
 interfaces/static/js/lib/*
+interfaces/static/images/*
