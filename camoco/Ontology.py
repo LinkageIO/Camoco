@@ -66,7 +66,7 @@ class Term(object):
                 collapsed[-1] = collapsed[-1] + locus
             else:
                 collapsed.append(locus)
-        log('{}: Found {} SNPs -> {} effective SNPs', self.name, len(self.locus_list), len(collapsed))
+        log('{}: Found {} SNPs -> {} effective SNPs', self.id, len(self.locus_list), len(collapsed))
         return collapsed
 
     def __str__(self):
