@@ -22,6 +22,8 @@ import pandas as pd
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
+rcParams.update({'figure.autolayout': True})
 import statsmodels.api as sm
 
 from scipy.stats import pearsonr
@@ -385,21 +387,19 @@ class COB(Expr):
     '''
 
     def plot(self, filename=None, gene_normalize=True, raw=False,
-             cluster_method='leaf'):
+             cluster_method='mcl'):
         # Get leaves
-        if raw:
-            dm = self.expr(raw=True)
-        else:
-            if cluster_method == 'leaf':
-                order = self.hdf5['leaves'].sort('index').index.values
-            elif cluster_method == 'mcl':
-                order = self.hdf5['clusters'].sort('cluster').index.values
-            # rearrange expression by leaf order
-            dm = self._expr.loc[order, :]
+        dm = self.expr(raw=raw)
         if gene_normalize:
             dm = dm.apply(
                 lambda row: (row-row.mean())/row.std(), axis=1
             )
+        if cluster_method == 'leaf':
+            order = self.hdf5['leaves'].sort('index').index.values
+        elif cluster_method == 'mcl':
+            order = self.hdf5['clusters'].loc[dm.index].fillna(np.inf).sort('cluster').index.values
+        # rearrange expression by leaf order
+        dm = dm.loc[order, :]
         f = plt.figure(
             figsize=(100, 100),
             facecolor='white'
@@ -409,12 +409,12 @@ class COB(Expr):
         cmap.set_bad('grey', 1.0)
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
-
         im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
 
         if filename is None:
             filename = '{}_global_heatmap.png'.format(self.name) 
         plt.savefig(filename)
+        plt.close()
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         '''
@@ -504,93 +504,62 @@ class COB(Expr):
 
     def plot_heatmap(self, genes=None, accessions=None,
         filename=None, maskNaNs=True,
-        cluster_x=True, cluster_y=True, cluster_method='ward',
-        title=None, raw=False,
+        cluster_method='mcl', raw=False,
+        title=None, gene_normalize=True,
         heatmap_unit_label='Expression'):
         '''
             Draw clustered heatmaps of an expression matrix
         '''
-        from matplotlib import rcParams
-        rcParams.update({'figure.autolayout': True})
         # Sort the genes by id name
         genes = set(sorted([x for x in genes if x in self], key=lambda x: x.id))
         dm = self.expr(genes=genes, accessions=accessions, raw=raw)
         # Get Z scores for the each genes
-        if raw == False:
-            dm = dm.apply(lambda row: (row-row.mean())/row.std(), axis=1)
-        row_labels = dm.index
-        col_labels = dm.columns
+        if gene_normalize:
+            dm = dm.apply(
+                lambda row: (row-row.mean())/row.std(), axis=1
+            )
         f = plt.figure(
-            figsize=(
-                min(500, 0.5*dm.shape[0]),
-                min(500, 0.25*dm.shape[1])
-            ),
+            figsize=(100,100),
             facecolor='white'
         )
-        # add matrix plot
-        axmatrix = f.add_axes([0.3, 0.1, 0.5, 0.6])
-        def masked_corr(x, y):
-            mask = np.logical_and(np.isfinite(x), np.isfinite(y))
-            if cluster_method == "euclidean":
-                return euclidean(x[mask], y[mask])
-            else:
-                return pearsonr(x[mask], y[mask])[1]
         # add first dendrogram
-        if cluster_y and len(dm.index) > 1:
-            # calculate the squareform of the distance matrix
-            D1 = squareform(
-                self.subnetwork(
-                    genes, sig_only=False,
-                    filter_missing_gene_ids=False,
-                    min_distance=None
-                ).score
-            )
-            ax1 = f.add_axes([0.09, 0.1, 0.2, 0.6])
-            ax1.set_frame_on(False)
-            Y = linkage(D1, method=cluster_method)
-            Z1 = dendrogram(Y, orientation='right')
-            row_labels = row_labels[Z1['leaves']]
-            D1 = D1[Z1['leaves'], :]
-            dm = dm.ix[Z1['leaves'], :]
-            ax1.set_xticks([])
-            ax1.set_yticks([])
+        if cluster_method == 'leaf':
+            order = self.hdf5['leaves'].loc[dm.index].sort('index').index.values
+        elif cluster_method == 'mcl':
+            order = self.hdf5['clusters'].loc[dm.index].fillna(np.inf).sort('cluster').index.values
+            # rearrange expression by leaf order
+        dm = dm.loc[order, :]
+
         if title:
             plt.title(title)
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
         self.log("Extremem Values: {}", vmax)
         # Handle NaNs
-        if maskNaNs:
-            nan_mask = np.ma.array(dm, mask=np.isnan(dm))
-            cmap = self._cmap
-            cmap.set_bad('grey', 1.0)
-        else:
-            cmap = self.__cmap
-        im = axmatrix.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        nan_mask = np.ma.array(dm, mask=np.isnan(dm))
+        cmap = self._cmap
+        cmap.set_bad('grey', 1.0)
+        im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
         # Handle Axis Labels
-        axmatrix.set_xticks(np.arange(dm.shape[1]))
-        axmatrix.xaxis.tick_bottom()
-        axmatrix.tick_params(axis='x', labelsize='xx-small')
-        axmatrix.set_xticklabels(col_labels, rotation=90, ha='center')
-        axmatrix.yaxis.tick_right()
-        axmatrix.set_yticks(np.arange(dm.shape[0]))
-        axmatrix.set_yticklabels(row_labels)
-        axmatrix.tick_params(axis='y', labelsize='xx-small')
+        #plt.set_xticks(np.arange(dm.shape[1]))
+        #plt.xaxis.tick_bottom()
+        #plt.tick_params(axis='x', labelsize='xx-small')
+        #plt.set_xticklabels(col_labels, rotation=90, ha='center')
+        #plt.yaxis.tick_right()
+        #plt.set_yticks(np.arange(dm.shape[0]))
+        #plt.set_yticklabels(row_labels)
+        #plt.tick_params(axis='y', labelsize='xx-small')
         plt.gcf().subplots_adjust(right=0.15)
         # Add color bar
         axColorBar = f.add_axes([0.09, 0.75, 0.2, 0.05])
-        f.colorbar(im, orientation='horizontal', cax=axColorBar,
+        plt.colorbar(im, orientation='horizontal', cax=axColorBar,
             ticks=np.arange(np.ceil(vmin), np.ceil(vmax), int((vmax-vmin)/2))
         )
         plt.title(heatmap_unit_label)
         if filename:
             plt.savefig(filename)
             plt.close()
-        return pd.DataFrame(
-            data=dm,
-            index=row_labels,
-            columns=col_labels
-        )
+        return dm
 
     def compare_degree(self, obj, diff_genes=10, score_cutoff=3):
         '''
