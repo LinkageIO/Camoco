@@ -337,6 +337,7 @@ class Expr(Camoco):
         self.log('Raw Starting set: {} genes {} accessions'.format(
             len(df.index), len(df.columns))
         )
+
         # Remember why we remove certain genes
         # If TRUE it passes, if FALSE it fails!!!
         qc_gene = pd.DataFrame({'has_id':True}, index=df.index)
@@ -466,7 +467,7 @@ class Expr(Camoco):
         # Sort values by accession/column, lowest to highest 
         expr_sort = expr.apply(lambda col: self.inplace_nansort(col), axis=0)
         # make sure the nans weren't included in the sort or the rank
-        assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
+        assert np.all(np.isnan(expr) ==dmexpr_ranks))
         assert np.all(np.isnan(expr) == np.isnan(expr_sort))
         # calculate ranked averages
         self.log('Calculating averages')
