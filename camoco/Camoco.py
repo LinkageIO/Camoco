@@ -86,12 +86,9 @@ class Camoco(object):
                 (key, val)VALUES (?, ?)''', (key, val)
             )
         else:
-            try:
-                return self.db.cursor().execute(
-                    '''SELECT val FROM globals WHERE key = ?''', (key, )
-                ).fetchone()[0]
-            except Exception:
-                return None
+           return self.db.cursor().execute(
+               '''SELECT val FROM globals WHERE key = ?''', (key, )
+           ).fetchone()[0]
 
     def __getattr__(self, name):
         return self._global(name)
@@ -130,7 +127,7 @@ class Camoco(object):
                 );
                 INSERT OR IGNORE INTO datasets (name, description, type)
                 VALUES ('Camoco', 'Camoco base', 'Camoco');
-                INSERT OR FAIL INTO datasets (name, description, type)
+                INSERT OR IGNORE INTO datasets (name, description, type)
                 VALUES (?, ?, ?)''', (name, description, type)
             )
         except ConstraintError:
