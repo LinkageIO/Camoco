@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
 import statsmodels.api as sm
+import sys
 
 from scipy.stats import pearsonr
 
@@ -300,7 +301,7 @@ class COB(Expr):
         cmd = "mcl {} --abc -scheme {} -I {} -o -".format(tmp.name, scheme, I)
         self.log("running MCL: {}", cmd)
         try:
-            p = Popen(cmd, stdout=PIPE, stderr=self.log_file, shell=True)
+            p = Popen(cmd, stdout=PIPE, stderr=sys.stderr, shell=True)
             self.log('waiting for MCL to finish...')
             sout = p.communicate()[0]
             p.wait()
