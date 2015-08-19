@@ -15,31 +15,6 @@ import unittest
 
 # write test case to import refgen from GFF
 
-class RefGen(unittest.TestCase):
-
-    def Tair10(self):
-        gff = os.path.expanduser(
-            os.path.join(
-                cf['options']['testdir'],
-                'raw','RefGen','TAIR10_GFF3_genes.gff'
-            )
-        )
-        co.del_dataset('RefGen','T10',safe=False)
-        T10 = co.RefGen.from_gff(gff,'T10','Tair 10','10','Arabidopsis')
-        self.assertIsInstance(T10,co.RefGen)
-
-    def Zm5bFGS(self):
-        gff = os.path.expanduser(
-            os.path.join(
-                cf['options']['testdir'],
-                'raw','RefGen','ZmB73_5b_FGS.gff.gz'
-            )
-        )
-        co.del_dataset('RefGen','Zm5bFGS',safe=False)
-        ZM = co.RefGen.from_gff(
-            gff,'Zm5bFGS','Maize 5b Filtered Gene Set','5b','Zea Mays'
-        )
-        self.assertIsInstance(ZM,co.RefGen)
 
 def RefGenSuite():
     suite = unittest.TestSuite()
@@ -203,30 +178,6 @@ class COB(unittest.TestCase):
             quantile=True,
         )
         self.assertIsInstance(AtLeaf,co.COB)
-
-    def AtSeed(self):
-        co.del_dataset('Expr','AtSeed',safe=False)
-        Seed = ['GSE12404',#'GSE30223',
-                'GSE1051','GSE11852','GSE5634']
-        SeedFam = sum(
-            [co.Family.from_file(
-                pjoin(
-                    self.rawdir,'GSE','{}_family.soft'.format(x)
-                )
-            )
-            for x in Seed ]
-        )
-        #SeedFam.to_keepfile("SeedKeep.tsv",keep_hint='seed')
-        AtSeed = co.COB.from_DataFrame(
-            SeedFam.series_matrix(
-                keepfile=pjoin(self.rawdir,'GSE','SeedKeep.tsv')
-            ),
-            'AtSeed','Arabidopsis Seed',
-            co.RefGen('T10'),rawtype='MICROARRAY',
-            quantile=True
-
-        )
-        self.assertIsInstance(AtSeed,co.COB)
 
     def AtRoot(self):
         co.del_dataset('Expr','AtRoot',safe=False)
