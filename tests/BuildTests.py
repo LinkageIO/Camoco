@@ -254,6 +254,7 @@ class COB(unittest.TestCase):
 
 
     def AtGen(self):
+        co.del_dataset('Expr','AtGen',safe=False)
         General = ['GSE18975','GSE39384','GSE19271','GSE5632','GSE39385',
                    'GSE5630','GSE15617','GSE5617','GSE5686','GSE2473',
                    'GSE5633','GSE5620','GSE5628','GSE5624',
@@ -273,7 +274,8 @@ class COB(unittest.TestCase):
             ),
             'AtGen','Arab General',
             co.RefGen('T10'),
-            rawtype='MICROARRAY'
+            rawtype='MICROARRAY',
+            quantile=True
         )
         self.assertIsInstance(AtGen,co.COB)
 
