@@ -24,7 +24,9 @@ class Soft(object):
             self.info[key].append(val)
 
     def __add__(self,other):
-        ''' combines two Soft instances into a single instance '''
+        ''' 
+            combines two Soft instances into a single instance 
+        '''
         # complain if types do not match up
         soft = Soft("{}-{}".format(self.name,other.name),type=self.type)
         if self.type != other.type:
@@ -115,16 +117,22 @@ class Family(object):
         self.samples = []
 
     def to_keepfile(self,filename,group_max_r2=0.99,keep_hint=None):
-        ''' Creates a tsv file for each sample containing sample information. Included are two columns 
-            used for further filtering of the aggregated samples. The 'Keep' columns is a hard filter
-            used to remove experiments (columns) completely. The "Group" column is for biological replicates.
+        ''' 
+            Creates a tsv file for each sample containing sample information. 
+            Included are two columns used for further filtering of the 
+            aggregated samples. The 'Keep' columns is a hard filter
+            used to remove experiments (columns) completely. 
+            The "Group" column is for biological replicates.
 
-            See Also: GEO.Family.filter_from_keepfile()'''
+            See Also: GEO.Family.filter_from_keepfile()
+        '''
         # Extract info from samples
         if os.path.exists(filename):
             self.log('{} exists ... skipping',filename)
             return
-        info = pd.DataFrame([sample.info for sample in self.samples])[['geo_accession','title','description','characteristics_ch1','series_id']]
+        info = pd.DataFrame(
+                    [sample.info for sample in self.samples]
+                )[['geo_accession','title','description','characteristics_ch1','series_id']]
         info.sort("title") # Replicates most likely to have similar names
         if keep_hint:
             # This first join joins all the words together
@@ -217,15 +225,19 @@ class Family(object):
             newitem = item
             while newitem in seen: # keep increasing fudge until not seen 
                 fudge += 1
-                newitem = "{}_{}".format(item, fudge)
+                newitem = "{}_{}".format(item,fudge)
             new.append(newitem)
             seen.add(newitem)
+        assert len(set(new)) == len(new)
         return new
 
     @staticmethod
     def _guess_groups(dataframe,max_r2=0.99,max_namediff=0.8):
-        ''' Given a data frame, this method checks to see that each column has a correlation
-            below the max_r2. If it is above, a new column is created using the mean.'''
+        ''' 
+            Given a data frame, this method checks to see that each column 
+            has a correlation below the max_r2. If it is above, a new column 
+            is created using the mean.
+        '''
         # Calculate correlation
         cors = dataframe.corr()
         # Each column starts in its own group
@@ -243,14 +255,19 @@ class Family(object):
         #  |    d
         for i,row in enumerate(np.triu(cors.as_matrix(),k=1)):
             if any(row > max_r2):
-                # higher numbered columns are highly correlated with current column
+                # higher numbered columns are highly correlated 
+                # with current column
                 which = np.where(row > max_r2)[0]
                 from difflib import SequenceMatcher
                 for match in which:
-                    diffratio = SequenceMatcher(None,dataframe.columns[i],dataframe.columns[match]).ratio()
+                    diffratio = SequenceMatcher(
+                        None,
+                        dataframe.columns[i],dataframe.columns[match]
+                    ).ratio()
                     # if column group is already assigned, keep assignment
                     if column_groups[i] != i and diffratio > max_namediff:
-                        # Here, samples have high expression correlation AND similar names (i.e. rep1 vs rep2)
+                        # Here, samples have high expression correlation 
+                        # AND similar names (i.e. rep1 vs rep2)
                         group = column_groups[i]
                         log("{} is {} correlated with {}",
                             dataframe.columns[i],
@@ -266,9 +283,12 @@ class Family(object):
 
     def series_matrix(self,keepfile=None):
         # If multiple samples, create SeriesMatrix
+
         organisms = set([sample.info['organism_ch1'] for sample in self.samples])
         if len(organisms) > 1:
-            raise ValueError("Cannot combine series from different organisms: {}".format(",".join()))
+            raise ValueError(
+                "Cannot combine series from different organisms: {}".format(",".join())
+            )
         if len(self.samples) > 0:
             series_matrix = pd.DataFrame(
                 data=[x.tbl.VALUE for x in self.samples],
@@ -286,33 +306,45 @@ class Family(object):
             if keepfile is not None:
                 # Read in the keepfile
                 keepfile = pd.read_table(keepfile,sep='\t')
+                # We did this up above, so we need to do it down here
                 keepfile.title = self._uniqify_columns(keepfile.title)
                 # Reorder the columns based on the keepfile
                 series_matrix = series_matrix.reindex_axis(keepfile.title,axis=1)
                 # Make sure the above worked
                 assert all(series_matrix.columns == keepfile.title)
+                # Relabel the columns to just be the first biorep
+                series_matrix.columns = [
+                    '{}:{}'.format(a,b[0:30].replace(' ','_')) for i,(a,b) \
+                    in keepfile[['geo_accession','title']].iterrows()
+                ]
                 # Filter based on the keepfile
                 groups = series_matrix[series_matrix.columns[keepfile.Keep]].groupby(
                     keepfile[keepfile.Keep].Group.values, axis=1
                 )
-                series_matrix = groups.apply(lambda group: group.mean(skipna=True,axis=1))
-                # Relabel the columns
-                series_matrix.columns = [group[0] if len(group) == 1 else "(BioRep) "+";".join(group) for group in groups.groups.values()]
+                # Average the group values
+                series_matrix = groups.apply(
+                    lambda group: group.mean(skipna=True,axis=1)
+                )
+                series_matrix.columns = [
+                    group[0] if len(group) == 1 \
+                    else "(BioRep)"+group[0] \
+                    for group in groups.groups.values()
+                ]
             return series_matrix
 
         else:
             raise ValueError("Not enough samples to build matrix")
-
 
     def __add__(self,family):
         ''' combines families into a single instance '''
         # make a new one
         fam = Family()
         fam.database = self.database + family.database
-        fam.series = self.series + family.series
+        fam.series   = self.series + family.series
         fam.platform = self.platform + family.platform
-        fam.samples = self.samples + family.samples
+        fam.samples  = self.samples + family.samples
         return fam
+
     def __radd__(self,something):
         if isinstance(something,int):
             return self
