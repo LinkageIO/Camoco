@@ -206,6 +206,8 @@ class Expr(Camoco):
 
         '''
         # update the transformation log
+        assert len(set(df.columns)) == len(df.columns)
+        assert len(set(df.index)) == len(df.index)
         self._transformation_log(transform_name)
         if raw == True:
             table = 'raw_expr' 
@@ -215,18 +217,24 @@ class Expr(Camoco):
             self._reset(raw=False)
         else:
             table = 'expr'
+            # Keep full names in raw, but compress the 
+            # names in the normed network
+            df.columns = [
+                lambda x: x[0:20] + '...' + x[-10:-1] \
+                if len(x) > 30 else x for x in df.columns
+            ]
         # Sort the table by genes
         df = df.sort()
         # ensure that column names are alphanumeric
         # hdf5 doesn't like unicode characters
-        pattern = re.compile('[^\w , ;]+')
+        pattern = re.compile('[^A-Za-z0-9_, ;:()]')
         df.columns = [pattern.sub('', x) for x in df.columns.values ]
         # Also, make sure gene names are uppercase
         df.index = [pattern.sub('', x).upper() for x in df.index.values ]
         try:
-            self._expr = df
             self.hdf5[table] = df
             self.hdf5.flush(fsync=True)
+            self._expr = self.hdf5[table]
         except Exception as e:
             self.log('Unable to update expression table values: {}', e)
             raise e
@@ -333,11 +341,10 @@ class Expr(Camoco):
         self._global('qc_max_gene_missing_data', max_gene_missing_data)
         self._global('qc_min_single_sample_expr', min_single_sample_expr)
         self._global('qc_max_accession_missing_data', max_accession_missing_data)
-        # retrieve raw data as a data frame
+        # Retrieve raw data as a data frame
         self.log('Raw Starting set: {} genes {} accessions'.format(
             len(df.index), len(df.columns))
         )
-
         # Remember why we remove certain genes
         # If TRUE it passes, if FALSE it fails!!!
         qc_gene = pd.DataFrame({'has_id':True}, index=df.index)
@@ -384,6 +391,7 @@ class Expr(Camoco):
         # -----------------------------------------
         # Filter out ACCESSIONS with too much missing data
         self.log("Filtering out accessions with > {} missing data", max_accession_missing_data)
+
         qc_accession['pass_missing_data'] = df.apply(
             lambda col : (
                 ((sum(np.isnan(col)) / len(col)) <= max_accession_missing_data)
@@ -467,7 +475,7 @@ class Expr(Camoco):
         # Sort values by accession/column, lowest to highest 
         expr_sort = expr.apply(lambda col: self.inplace_nansort(col), axis=0)
         # make sure the nans weren't included in the sort or the rank
-        assert np.all(np.isnan(expr) ==dmexpr_ranks))
+        assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
         assert np.all(np.isnan(expr) == np.isnan(expr_sort))
         # calculate ranked averages
         self.log('Calculating averages')
