@@ -219,10 +219,12 @@ class Expr(Camoco):
             table = 'expr'
             # Keep full names in raw, but compress the 
             # names in the normed network
-            df.columns = [
-                lambda x: x[0:20] + '...' + x[-10:-1] \
-                if len(x) > 30 else x for x in df.columns
-            ]
+            def shorten(x):
+                if len(x) > 30:
+                    return x[0:20] + '...' + x[-10:-2]
+                else:
+                    return x
+            df.columns = [shorten(x) for x in df.columns]
         # Sort the table by genes
         df = df.sort()
         # ensure that column names are alphanumeric
@@ -234,7 +236,7 @@ class Expr(Camoco):
         try:
             self.hdf5[table] = df
             self.hdf5.flush(fsync=True)
-            self._expr = self.hdf5[table]
+            self._expr = df
         except Exception as e:
             self.log('Unable to update expression table values: {}', e)
             raise e
