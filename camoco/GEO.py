@@ -151,54 +151,58 @@ class Family(object):
     @classmethod
     def from_file(cls,filename,normalize=True):
         self = cls() 
-        with open(filename,'r') as IN:
-            in_data_table = False
-            cur_soft = None
-            cur_data = list()
-            for i,line in enumerate(IN):
-                line = line.strip()
-                if line.startswith('^'):
-                    if cur_soft: # Add the filled SOFT to Family
-                        if cur_soft.type == 'Sample':
-                            if cur_soft.is_raw() and normalize:
-                                log("Normalizing {}",cur_soft.name)
-                                cur_soft.transform()
-                            self.samples.append(cur_soft)
-                        else:
-                            setattr(self,cur_soft.type.lower(),cur_soft)
-                    # WE have a new SOFT
-                    type,name = line.replace('^','').replace(' = ','=').split('=',1)
-                    type = type.lower().capitalize()
-                    if type == 'Series':
-                        cur_soft = Series(name)
-                    elif type == 'Sample':
-                        cur_soft = Sample(name)
-                    elif type == 'Platform':
-                        cur_soft = Platform(name)
+        if filename.endswith('.gz'):
+            IN = gzip.open(filename,'rt')
+        else:
+            IN = open(filename,'r')
+        in_data_table = False
+        cur_soft = None
+        cur_data = list()
+        for i,line in enumerate(IN):
+            line = line.strip()
+            if line.startswith('^'):
+                if cur_soft: # Add the filled SOFT to Family
+                    if cur_soft.type == 'Sample':
+                        if cur_soft.is_raw() and normalize:
+                            log("Normalizing {}",cur_soft.name)
+                            cur_soft.transform()
+                        self.samples.append(cur_soft)
                     else:
-                        cur_soft = Soft(name,type=type.lower().capitalize())
-                    cur_data = list()
-                elif line.startswith('!') and 'table_begin' in line:
-                    in_data_table = True
-                elif line.startswith('!') and 'table_end' in line:
-                    in_data_table = False
-                    # Create DataFrame and append to SOFT
-                    cur_headers = cur_data.pop(0)
-                    cur_soft.tbl = pd.DataFrame.from_records(data=cur_data,columns=cur_headers)
-                    cur_soft.tbl.index = cur_soft.tbl.icol(0)
-                    # Turn -Inf into NaNs
-                    cur_soft.tbl[cur_soft.tbl == float('-Inf')]  = np.nan
-                    cur_data = list()
-                elif line.startswith("!"):
-                    # add info to 
-                    key,val = map(str.strip,line.replace('!'+cur_soft.type+'_','').split('=',1))
-                    cur_soft.update_info(key,val)
-                elif line.startswith('#'):
-                    # Columns descriptions
-                    cur_soft.headers.append(line)
-                elif in_data_table:
-                    cur_data.append(line.replace('"','').split('\t'))
-            return self
+                        setattr(self,cur_soft.type.lower(),cur_soft)
+                # WE have a new SOFT
+                type,name = line.replace('^','').replace(' = ','=').split('=',1)
+                type = type.lower().capitalize()
+                if type == 'Series':
+                    cur_soft = Series(name)
+                elif type == 'Sample':
+                    cur_soft = Sample(name)
+                elif type == 'Platform':
+                    cur_soft = Platform(name)
+                else:
+                    cur_soft = Soft(name,type=type.lower().capitalize())
+                cur_data = list()
+            elif line.startswith('!') and 'table_begin' in line:
+                in_data_table = True
+            elif line.startswith('!') and 'table_end' in line:
+                in_data_table = False
+                # Create DataFrame and append to SOFT
+                cur_headers = cur_data.pop(0)
+                cur_soft.tbl = pd.DataFrame.from_records(data=cur_data,columns=cur_headers)
+                cur_soft.tbl.index = cur_soft.tbl.icol(0)
+                # Turn -Inf into NaNs
+                cur_soft.tbl[cur_soft.tbl == float('-Inf')]  = np.nan
+                cur_data = list()
+            elif line.startswith("!"):
+                # add info to 
+                key,val = map(str.strip,line.replace('!'+cur_soft.type+'_','').split('=',1))
+                cur_soft.update_info(key,val)
+            elif line.startswith('#'):
+                # Columns descriptions
+                cur_soft.headers.append(line)
+            elif in_data_table:
+                cur_data.append(line.replace('"','').split('\t'))
+        IN.close()
+        return self
 
     def probe2gene(self,probe_list):
         ''' returns a mapping from probes to genes '''
