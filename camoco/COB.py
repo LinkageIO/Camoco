@@ -387,10 +387,11 @@ class COB(Expr):
         Plotting Methods
     '''
 
-    def plot(self, filename=None, gene_normalize=True, raw=False,
+    def plot(self, filename=None, genes=None,accessions=None,
+             gene_normalize=True, raw=False,
              cluster_method='mcl'):
         # Get leaves
-        dm = self.expr(raw=raw)
+        dm = self.expr(genes=genes,accessions=accessions,raw=raw)
         if gene_normalize:
             dm = dm.apply(
                 lambda row: (row-row.mean())/row.std(), axis=1
@@ -398,24 +399,28 @@ class COB(Expr):
         if cluster_method == 'leaf':
             order = self.hdf5['leaves'].sort('index').index.values
         elif cluster_method == 'mcl':
-            order = self.hdf5['clusters'].loc[dm.index].fillna(np.inf).sort('cluster').index.values
+            order = self.hdf5['clusters'].loc[dm.index].\
+                    fillna(np.inf).sort('cluster').index.values
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
-        f = plt.figure(
-            figsize=(100, 100),
-            facecolor='white'
-        )
-        nan_mask = np.ma.array(dm, mask=np.isnan(dm))
-        cmap = self._cmap
-        cmap.set_bad('grey', 1.0)
-        vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
-        vmin = vmax*-1
-        im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        # Save plot if provided filename
+        if filename is not None:
+            #filename = '{}_global_heatmap.png'.format(self.name) 
+            f = plt.figure(
+                figsize=(100, 100),
+                facecolor='white'
+            )
+            nan_mask = np.ma.array(dm, mask=np.isnan(dm))
+            cmap = self._cmap
+            cmap.set_bad('grey', 1.0)
+            vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
+            vmin = vmax*-1
+            im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
 
-        if filename is None:
-            filename = '{}_global_heatmap.png'.format(self.name) 
-        plt.savefig(filename)
-        plt.close()
+            plt.savefig(filename)
+            plt.close()
+
+        return dm
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         '''
