@@ -51,7 +51,7 @@ class COB(Expr):
 
     def summary(self):
         print( '''
-            COB Dataset: {} - {} - {}
+            COB Dataset: {}
                 Desc: {}
                 RawType: {}
                 TransformationLog: {}
@@ -59,7 +59,7 @@ class COB(Expr):
                 Num Accessions: {}
                 Edge FDR: {}
         '''.format(
-                self.name, self.organism, self.build,
+                self.name,
                 self.description,
                 self.rawtype,
                 self._transformation_log(),
@@ -890,35 +890,6 @@ class COB(Expr):
             name,description,refgen,
             rawtype=rawtype,**kwargs
         )
-
-    def plot(self,filename=None,width=3000,height=3000,
-            layout=None,**kwargs):
-        # Get leaves
-        order = self.hdf5['leaves'].sort('index').index.values
-        # rearrange expression by leaf order
-        dm = self._expr.loc[order,:].apply(
-            lambda row: (row-row.mean())/row.std(),axis=1
-        )
-        f = plt.figure(
-            figsize=(100,100),
-            facecolor='white'
-        )
-        nan_mask = np.ma.array(dm,mask=np.isnan(dm))
-        cmap = self._cmap
-        cmap.set_bad('grey',1.0)
-        vmax = max(np.nanmin(abs(dm)),np.nanmax(abs(dm)))
-        vmin = vmax*-1
-
-        im = plt.matshow(dm,aspect='auto',cmap=cmap,vmax=vmax,vmin=vmin)
-
-        axColorBar = f.add_axes([0.09,0.75,0.2,0.05])
-        
-        f.colorbar(im,orientation='horizontal',cax=axColorBar,
-            ticks=np.arange(np.ceil(vmin),np.ceil(vmax),int((vmax-vmin)/2))
-        )
-        plt.savefig('{}_global_heatmap.png'.format(self.name))
-
-        
 
 
     '''
