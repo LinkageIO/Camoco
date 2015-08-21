@@ -216,7 +216,7 @@ class Ontology(Camoco):
             cur.executemany('''
                 INSERT OR REPLACE INTO loci_attr (term,loci_id,key,val)
                 VALUES (?,?,?,?)
-            ''',[(term.id,locus.id,key,val) for key,val in locus.attr])
+            ''',[(term.id,locus.id,key,val) for key,val in locus.attr.items()])
         cur.execute('END TRANSACTION')
 
     @classmethod
@@ -264,7 +264,7 @@ class Ontology(Camoco):
 
 
     @classmethod
-    def from_obo(cls,obo_file,gene_map_file,name,description,refgen):
+    def from_obo(cls,obo_file,gene_map_file,name,description,refgen,go_col=1):
         ''' Convenience function for importing GO obo files '''
         self = cls.create(name,description,refgen)
 
@@ -308,7 +308,7 @@ class Ontology(Camoco):
         for line in INMAP.readlines():
             row = line.strip().split('\t')
             gene = row[0].split('_')[0].strip()
-            cur_term = row[1]
+            cur_term = row[go_col]
             if gene not in genes:
                 genes[gene] = set([cur_term])
             else:
@@ -332,7 +332,7 @@ class Ontology(Camoco):
 
             # Make the Term object and add it to the list
             termObjs.append(Term(term,name=info['name'],type=info['type'],
-            desc=info['desc'],locus_list=geneObjs,is_a=info['is_a']))
+            desc=info['desc'],locus_list=geneObjs))
         del terms
 
         # Add them all to the database
