@@ -79,8 +79,8 @@ class Ontology(Camoco):
         collection of genes. Sometimes terms are related or nested
         within each other, sometimes not. Simple enough.
     '''
-    def __init__(self, name):
-        super().__init__(name, type='Ontology')
+    def __init__(self, name, type='Ontology'):
+        super().__init__(name, type=type)
         if self.refgen:
             self.refgen = RefGen(self.refgen)
 

@@ -21,7 +21,7 @@ from .RefGen import RefGen
 from .Ontology import Ontology,Term
 from .HapMap import HapMap
 from .Locus import Locus
-from .Tools import available_datasets,del_dataset,\
-                   mv_dataset,redescribe_dataset
+from .Tools import available_datasets,del_dataset
+from .Tools import mv_dataset,redescribe_dataset
 from .Config import cf
 from .GEO import Family
