@@ -3,6 +3,8 @@
 from .Camoco import Camoco
 from .RefGen import RefGen
 from .Tools import memoize
+from .Exceptions import CamocoGeneNameError,CamocoAccessionNameError
+
 from scipy.spatial.distance import pdist, squareform, euclidean
 from scipy.stats import hypergeom, pearsonr
 from scipy.stats.mstats import rankdata as mrankdata
@@ -204,10 +206,20 @@ class Expr(Camoco):
                 A flag to update the raw values. This also resets
                 the current values to what is in df.
 
+            Returns
+            -------
+            self : Expr Object
+
+            Raises:
+            ------
+            CamocoGeneNamesError
+            CamocoAccessNamesError
         '''
         # update the transformation log
-        assert len(set(df.columns)) == len(df.columns)
-        assert len(set(df.index)) == len(df.index)
+        if len(set(df.columns)) != len(df.columns):
+            raise CamocoGeneNameError('Gene names not Unique.')        
+        if len(set(df.index)) != len(df.index):
+            raise CamocoAccessionNameError('Accession names not Unique')
         self._transformation_log(transform_name)
         if raw == True:
             table = 'raw_expr' 
@@ -220,8 +232,8 @@ class Expr(Camoco):
             # Keep full names in raw, but compress the 
             # names in the normed network
             def shorten(x):
-                if len(x) > 30:
-                    return x[0:20] + '...' + x[-10:-2]
+                if len(x) > 100:
+                    return x[0:89] + '...' + x[-10:-1]
                 else:
                     return x
             df.columns = [shorten(x) for x in df.columns]
@@ -229,7 +241,7 @@ class Expr(Camoco):
         df = df.sort()
         # ensure that column names are alphanumeric
         # hdf5 doesn't like unicode characters
-        pattern = re.compile('[^A-Za-z0-9_, ;:()]')
+        pattern = re.compile('[^A-Za-z0-9_, ;:().]')
         df.columns = [pattern.sub('', x) for x in df.columns.values ]
         # Also, make sure gene names are uppercase
         df.index = [pattern.sub('', x).upper() for x in df.index.values ]
@@ -496,6 +508,14 @@ class Expr(Camoco):
         self.log('Updating values')
         assert np.all(np.isnan(expr) == np.isnan(quan_expr))
         self._update_values(quan_expr, 'quantile')
+
+
+    def _row_average(self):
+        '''
+           Perform row averaging over expression DataFrame for cases
+           where gene expression might have been measured more than once.
+        '''
+        pass
 
     @property
     def _parent_refgen(self):

@@ -322,9 +322,11 @@ class Family(object):
                     in keepfile[['geo_accession','title']].iterrows()
                 ]
                 # Filter based on the keepfile
-                groups = series_matrix[series_matrix.columns[keepfile.Keep]].groupby(
-                    keepfile[keepfile.Keep].Group.values, axis=1
-                )
+                groups = series_matrix[
+                        series_matrix.columns[keepfile.Keep]
+                    ].groupby(
+                        keepfile[keepfile.Keep].Group.values, axis=1
+                    )
                 # Average the group values
                 series_matrix = groups.apply(
                     lambda group: group.mean(skipna=True,axis=1)
