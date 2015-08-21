@@ -3,8 +3,8 @@ from collections import defaultdict
 import re
 
 class Locus(object):
-    def __init__(self, chrom, start, end=None, name=None, window=0, sub_loci=None, **kwargs):
-        self.name = name
+    def __init__(self, chrom, start, end=None, id=None, window=0, sub_loci=None, **kwargs):
+        self.id = id
         self.chrom = chrom
         self._start = int(start)
         self._end = int(end) if end is not None else int(start)
@@ -68,8 +68,8 @@ class Locus(object):
         return self.end + self.window
 
     @property
-    def id(self):
-        return self.name
+    def name(self):
+        return self.id
         # Make sure this doesn't break anything
         # return "{}:{}:{}:{}".format(self.name,self.chrom,self.start,self.end)
 
@@ -86,7 +86,7 @@ class Locus(object):
         new_id = str(self.id)+';'+str(locus.id)
         new_sub_loci = self.sub_loci | locus.sub_loci | set([self, locus])
         return Locus(self.chrom,new_start,new_end,window=new_window,sub_loci=new_sub_loci)
-    
+
     def __eq__(self,locus):
         if (self.chrom == locus.chrom and
             self.start == locus.start and
@@ -121,7 +121,7 @@ class Locus(object):
 
     def __lt__(self,locus):
         if self.chrom == locus.chrom:
-            return self.start < locus.start    
+            return self.start < locus.start
         else:
             return self.chrom < locus.chrom
     def __gt__(self,locus):
