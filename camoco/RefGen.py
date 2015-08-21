@@ -1,15 +1,14 @@
 #!/usr/bin/python3
-import pyximport; pyximport.install()
 import camoco.RefGenDist as RefGenDist
 
 from collections import defaultdict
 import matplotlib.pylab as plt
 
-from camoco.Camoco import Camoco
-from camoco.Locus import Gene,Locus
-from camoco.Chrom import Chrom
-from camoco.Genome import Genome
-from camoco.Tools import memoize
+from .Camoco import Camoco
+from .Locus import Gene,Locus
+from .Chrom import Chrom
+from .Genome import Genome
+from .Tools import memoize
 
 import itertools
 import collections
@@ -17,6 +16,7 @@ import random
 import pandas as pd
 import numpy as np
 import math
+import gzip
 
 class RefGen(Camoco):
     def __init__(self,name):
@@ -571,26 +571,30 @@ class RefGen(Camoco):
         self._global('build',build)
         self._global('organism',organism)
         genes = list()
-        with open(filename,'r') as IN:
-            for line in IN:
-                #skip comment lines
-                if line.startswith('#'):
-                    continue
-                (chrom,source,feature,start,
-                 end,score,strand,frame,attributes) = line.strip().split('\t')
-                attributes = dict([(field.strip().split('=')) \
-                    for field in attributes.strip(';').split(';')])
-                if feature == 'chromosome':
-                    self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
-                    self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
-                if feature == 'gene':
-                    genes.append(
-                        Gene(
-                            chrom,int(start),int(end),
-                            attributes['ID'].upper().strip('"'),strand=strand,
-                            build=build,organism=organism
-                        ).update(attributes)
-                    )
+        if filename.endswith('.gz'):
+            IN = gzip.open(filename,'rt')
+        else:
+            IN = open(filename,'r')
+        for line in IN:
+            #skip comment lines
+            if line.startswith('#'):
+                continue
+            (chrom,source,feature,start,
+             end,score,strand,frame,attributes) = line.strip().split('\t')
+            attributes = dict([(field.strip().split('=')) \
+                for field in attributes.strip(';').split(';')])
+            if feature == 'chromosome':
+                self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
+                self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
+            if feature == 'gene':
+                genes.append(
+                    Gene(
+                        chrom,int(start),int(end),
+                        attributes['ID'].upper().strip('"'),strand=strand,
+                        build=build,organism=organism
+                    ).update(attributes)
+                )
+        IN.close()
         self.add_gene(genes)
         self._build_indices()
         return self

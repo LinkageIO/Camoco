@@ -4,7 +4,6 @@ import os
 import configparser
 
 
-
 global cf
 
 
@@ -15,13 +14,14 @@ cf_file = os.path.expanduser('~/.camoco.conf')
 
 default_config = '''
 [options]
-basedir = /heap/camoco
-testdir = /heap/camoco
+basedir = ~/.camoco/
+testdir = ~/.camoco/
 
 [logging]
 log_level = verbose
 
 [test]
+force    = True
 refgen   = Zm5bFGS
 cob      = NewRoot
 ontology = ZmIonome
@@ -31,7 +31,7 @@ gene     = GRMZM2G000014
 
 # Check to see if
 if not os.path.isfile(cf_file):
-    with open(cf_file,'w') as CF:
+    with open(cf_file, 'w') as CF:
         print(default_config,file=CF)
 
 cf.read(os.path.expanduser('~/.camoco.conf'))

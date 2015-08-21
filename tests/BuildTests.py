@@ -15,34 +15,6 @@ import unittest
 
 # write test case to import refgen from GFF
 
-class RefGen(unittest.TestCase):
-
-    def Tair10(self):
-        gff = os.path.join(
-            cf['options']['testdir'],
-            'raw','TAIR10_GFF3_genes.gff'
-        )
-        co.del_dataset('RefGen','T10',safe=False)
-        T10 = co.RefGen.from_gff(gff,'T10','Tair 10','10','Arabidopsis')
-        self.assertIsInstance(T10,co.RefGen)
-
-    def Zm5bFGS(self):
-        gff = os.path.join(
-            cf['options']['testdir'],
-            'raw','ZmB73_5b_FGS.gff'
-        )
-        co.del_dataset('RefGen','Zm5bFGS',safe=False)
-        ZM = co.RefGen.from_gff(
-            gff,'Zm5bFGS','Maize 5b Filtered Gene Set','5b','Zea Mays'
-        )
-        self.assertIsInstance(ZM,co.RefGen)
-
-def RefGenSuite():
-    suite = unittest.TestSuite()
-    suite.addTest(RefGen('Tair10'))
-    suite.addTest(RefGen('Zm5bFGS'))
-    return suite
-
 class Ontology(unittest.TestCase):
 
     def AtSeedIonome(self):
@@ -170,110 +142,6 @@ class COB(unittest.TestCase):
         self.tdir = pjoin(cf['options']['testdir'])
         self.rawdir = pjoin(cf['options']['testdir'],'raw')
 
-    def AtLeaf(self):
-        co.del_dataset('Expr','AtLeaf',safe=False)
-        Leaf = ['GSE14578','GSE5630','GSE13739', #'GSE26199',
-                'GSE5686','GSE5615','GSE5620','GSE5628',
-                'GSE5624','GSE5626','GSE5621','GSE5622',
-                'GSE5623','GSE5625','GSE5688']
-        LeafFam = sum(
-            [co.Family.from_file(
-                pjoin(
-                    self.rawdir,'GSE','{}_family.soft'.format(x)
-                )
-            )
-            for x in Leaf ]
-        )
-        # Generate the LeafKeep file
-        #LeafFam.to_keepfile("LeafKeep.tsv",keep_hint="lea")
-        AtLeaf = co.COB.from_DataFrame(
-            LeafFam.series_matrix(
-                keepfile=pjoin(self.rawdir,'GSE','LeafKeep.tsv')
-            ),
-            'AtLeaf','Arabidopsis Leaf',
-            co.RefGen('T10'),rawtype='MICROARRAY',
-            max_gene_missing_data=0.3,
-            min_expr=0.01,
-            quantile=True,
-        )
-        self.assertIsInstance(AtLeaf,co.COB)
-
-    def AtSeed(self):
-        co.del_dataset('Expr','AtSeed',safe=False)
-        Seed = ['GSE12404',#'GSE30223',
-                'GSE1051','GSE11852','GSE5634']
-        SeedFam = sum(
-            [co.Family.from_file(
-                pjoin(
-                    self.rawdir,'GSE','{}_family.soft'.format(x)
-                )
-            )
-            for x in Seed ]
-        )
-        #SeedFam.to_keepfile("SeedKeep.tsv",keep_hint='seed')
-        AtSeed = co.COB.from_DataFrame(
-            SeedFam.series_matrix(
-                keepfile=pjoin(self.rawdir,'GSE','SeedKeep.tsv')
-            ),
-            'AtSeed','Arabidopsis Seed',
-            co.RefGen('T10'),rawtype='MICROARRAY',
-            quantile=True
-
-        )
-        self.assertIsInstance(AtSeed,co.COB)
-
-    def AtRoot(self):
-        co.del_dataset('Expr','AtRoot',safe=False)
-        Root = ['GSE14578','GSE46205','GSE7631','GSE10576','GSE42007',
-                'GSE34130','GSE21611','GSE22966','GSE7641','GSE5620',
-                'GSE8934','GSE5628','GSE30095','GSE30097','GSE5624',
-                'GSE5626','GSE5749','GSE5621','GSE5622',
-                'GSE5623','GSE5625','GSE5688']
-        RootFam = sum(
-            [co.Family.from_file(
-                os.path.join(
-                    cf['options']['testdir'],
-                    'raw','GSE','{}_family.soft'.format(x)
-                )
-            )
-            for x in Root ]
-        )
-        #RootFam.to_keepfile("RootKeep.tsv",keep_hint='root')
-        AtRoot = co.COB.from_DataFrame(
-            RootFam.series_matrix(
-                keepfile=pjoin(self.rawdir,'GSE','RootKeep.tsv')
-            ),
-            'AtRoot','Arab Root',
-            co.RefGen('T10'),
-            rawtype='MICROARRAY',
-            quantile=True
-        )
-        self.assertIsInstance(AtRoot,co.COB)
-
-
-    def AtGen(self):
-        General = ['GSE18975','GSE39384','GSE19271','GSE5632','GSE39385',
-                   'GSE5630','GSE15617','GSE5617','GSE5686','GSE2473',
-                   'GSE5633','GSE5620','GSE5628','GSE5624',
-                   'GSE5626','GSE5621','GSE5622','GSE5623','GSE5625','GSE5688']
-        GenFam = sum(
-            [co.Family.from_file(
-                pjoin(
-                    self.rawdir,'GSE','{}_family.soft'.format(x)
-                )
-            )
-            for x in General ]
-        )
-        #GenFam.to_keepfile("GenKeep.tsv")
-        AtGen = co.COB.from_DataFrame(
-            GenFam.series_matrix(
-                keepfile=pjoin(self.rawdir,'GSE','GenKeep.tsv')
-            ),
-            'AtGen','Arab General',
-            co.RefGen('T10'),
-            rawtype='MICROARRAY'
-        )
-        self.assertIsInstance(AtGen,co.COB)
 
     def ZmSAM(self):
         co.del_dataset('Expr','ZmSAM',safe=False)
@@ -350,6 +218,7 @@ def COBAtSuite():
     suite = unittest.TestSuite()
     suite.addTest(COB('AtLeaf'))
     suite.addTest(COB('AtRoot'))
+    suite.addTest(COB('AtSeed'))
     suite.addTest(COB('AtGen'))
     return suite
 
