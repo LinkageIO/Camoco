@@ -20,3 +20,5 @@ install:
 # command to run tests, e.g. python setup.py test
 script:  
   - py.test -v tests/BaseTest.py
+  - py.test -v tests/test_RefGen.py
+  - py.test -v tests/test_COB::test_build

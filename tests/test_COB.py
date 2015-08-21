@@ -5,7 +5,7 @@
 import pytest
 import camoco as co
 
-def test_init(ZmRNASeqTissueAtlas):
+def test_build(ZmRNASeqTissueAtlas):
     assert ZmRNASeqTissueAtlas
 
 def test_AtSeed(AtSeed):
