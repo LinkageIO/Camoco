@@ -128,7 +128,7 @@ class CompCOB(Camoco):
         ans = DataFrame.from_items(dens.items(),columns=[self.cob.name+' Density','Random Density Mean','Random STD','Items >= '+self.cob.name, 'Significant'],orient='index')
 
         self.log('Number of Significant Terms: '+ str(significant_terms))
-        self.log('Number Random Significants Expected: '+str(len(dens)*0.05))
+        self.log('Number Random Significants Expected: '+str(len(dens)*sig_threshold))
         return ans
 
     def to_cytoscape(self,obo_file,out_file):
