@@ -59,7 +59,8 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
             min_single_sample_expr=1,
             min_expr=0.001,
             quantile=False,
-            max_val=300
+            max_val=300,
+            dry_run=True
         )
     else:
         return co.COB('ZmTissueAtlas')
