@@ -1,5 +1,6 @@
 .*
 camoco/*.c
+*.so
 *egg-info*
 analyses/*
 build/*
