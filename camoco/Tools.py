@@ -43,14 +43,20 @@ def available_datasets(type=None, name=None):
         return False
 
 def del_dataset(type, name, safe=True):
-    c = co.Camoco("Camoco")
+    try:
+        c = co.Camoco("Camoco")
+    except CantOpenError:
+        return True
     if safe:
         c.log("Are you sure you want to delete {}", name)
         if input("[Y/n]:") != 'Y':
             c.log("Nothing Deleted")
             return
     c.log("Deleting {}", name)
-    c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name, type))
+    try:
+        c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name, type))
+    except CantOpenError:
+        pass
     try:
         os.remove(
             os.path.expanduser(os.path.join(

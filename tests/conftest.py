@@ -11,9 +11,11 @@ def Zm5bFGS():
         co.del_dataset('RefGen','Zm5bFGS',safe=False)
     if not co.available_datasets('RefGen','Zm5bFGS'):
         # We have to build it
-        gff = os.path.join(
-            cf['options']['testdir'],
-            'raw','RefGen','ZmB73_5b_FGS.gff.gz'
+        gff = os.path.expanduser(
+            os.path.join(
+                cf['options']['testdir'],
+                'raw','RefGen','ZmB73_5b_FGS.gff.gz'
+            )
         )
         # This is stupid and necessary because pytables wont let me open
         # more than one table
