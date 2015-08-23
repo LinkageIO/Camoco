@@ -6,8 +6,13 @@ python:
 
 # Setup anaconda
 before_install:
+  - echo $PATH
+  # Install apsw which refuses to by on pypi
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
   - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install && cd ..
+  # Install MCL
+  - wget http://micans.org/mcl/src/mcl-latest.tar.gz && tar xvvf mcl-latest.tar.gz
+  - cd mcl-* && ./configure --prefix=~/.local && make && make install && cd ..
   # upgrade to new pip with wheels
   - pip install pip --upgrade
   - PIP_ARGS="-I --trusted-host lovelace.cs.umn.edu --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
@@ -21,4 +26,4 @@ install:
 script:  
   - py.test -v tests/BaseTest.py
 #  - py.test -v tests/test_RefGen.py
-  - py.test -v tests/test_COB.py::test_build
+#  - py.test -v tests/test_COB.py::test_build
