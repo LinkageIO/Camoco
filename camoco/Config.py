@@ -15,7 +15,7 @@ cf_file = os.path.expanduser('~/.camoco.conf')
 default_config = '''
 [options]
 basedir = ~/.camoco/
-testdir = ~/.camoco/
+testdir = ~/.camoco/tests/
 
 [logging]
 log_level = verbose
@@ -32,6 +32,6 @@ gene     = GRMZM2G000014
 # Check to see if
 if not os.path.isfile(cf_file):
     with open(cf_file, 'w') as CF:
-        print(default_config,file=CF)
+        print(default_config, file=CF)
 
 cf.read(os.path.expanduser('~/.camoco.conf'))

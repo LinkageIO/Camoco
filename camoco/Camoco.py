@@ -72,9 +72,11 @@ class Camoco(object):
     def _tmpfile(self):
         # returns a handle to a tmp file
         return tempfile.NamedTemporaryFile(
-            dir=os.path.join(
-                cf.get('options', 'basedir'),
-                "tmp"
+            dir=os.path.expanduser(
+                os.path.join(
+                    cf.get('options', 'basedir'),
+                    "tmp"
+                )   
             )
         )
 
@@ -86,9 +88,9 @@ class Camoco(object):
                 (key, val)VALUES (?, ?)''', (key, val)
             )
         else:
-           return self.db.cursor().execute(
-               '''SELECT val FROM globals WHERE key = ?''', (key, )
-           ).fetchone()[0]
+            return self.db.cursor().execute(
+                '''SELECT val FROM globals WHERE key = ?''', (key, )
+            ).fetchone()[0]
 
     def __getattr__(self, name):
         return self._global(name)
