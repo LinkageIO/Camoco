@@ -17,7 +17,7 @@ class Locus(object):
 
     def as_dict(self):
         return {
-            'name'    : self.name,
+            'name'  : self.name,
             'chrom' : self.chrom,
             'start' : self.start,
             'end'   : self.end
