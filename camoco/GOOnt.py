@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
-from camoco.Ontology import Term,Ontology
-from camoco.Camoco import Camoco
-from camoco.RefGen import RefGen
-from camoco.Locus import Locus
-from camoco.Tools import log
+from .Ontology import Ontology
+from .Term import Term
+from .Camoco import Camoco
+from .RefGen import RefGen
+from .Locus import Locus
+from .Tools import log
 
 from collections import defaultdict
 import networkx as nx
