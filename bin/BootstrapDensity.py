@@ -40,7 +40,7 @@ def main(args):
         ))
     
         emp = cob.trans_locus_density(
-            term.effective_snps(window_size=args.candidate_window_size),
+            term.effective_loci(window_size=args.candidate_window_size),
             gene_limit=args.candidate_gene_limit,
             bootstrap=False
         )
@@ -54,7 +54,7 @@ def main(args):
     
         bootstraps = np.array([
             cob.trans_locus_density(
-                term.effective_snps(window_size=args.candidate_window_size),
+                term.effective_loci(window_size=args.candidate_window_size),
                 gene_limit=args.candidate_gene_limit,
                 bootstrap=True
             ) for x in range(args.num_bootstraps)

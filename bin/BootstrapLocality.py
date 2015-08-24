@@ -106,11 +106,11 @@ def generate_data(cob,term,args):
         Generates the data according to parameters in args
     '''
 
-    effective_snps = term.effective_snps(
+    effective_loci = term.effective_loci(
             window_size=args.candidate_window_size
     ) 
     candidate_genes = cob.refgen.candidate_genes(
-        effective_snps,
+        effective_loci,
         gene_limit=args.candidate_gene_limit
     )
     # Find the empirical Locality
@@ -123,7 +123,7 @@ def generate_data(cob,term,args):
     bsloc = pd.concat(
             [cob.locality(
                 cob.refgen.bootstrap_candidate_genes(
-                    term.effective_snps(
+                    term.effective_loci(
                         window_size=args.candidate_window_size
                     ),
                     gene_limit=args.candidate_gene_limit
@@ -201,7 +201,7 @@ def generate_data(cob,term,args):
     fdr = pd.concat(
             [cob.locality(
                 cob.refgen.bootstrap_candidate_genes(
-                    term.effective_snps(
+                    term.effective_loci(
                         window_size=args.candidate_window_size
                     ),
                     gene_limit=args.candidate_gene_limit
@@ -366,7 +366,7 @@ def plot_data(args,loc,bsloc,fdr,ax):
         args.ontology,
         args.term,
         len(term.locus_list),
-        len(effective_snps),
+        len(effective_loci),
         len(candidate_genes),
         args.window_size,
         args.num_bootstraps,

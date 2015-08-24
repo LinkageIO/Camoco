@@ -17,48 +17,6 @@ import unittest
 
 class Ontology(unittest.TestCase):
 
-    def AtSeedIonome(self):
-        co.del_dataset('Ontology','AtSeedIonome',safe=False)
-        # glob glob is god
-        csvs = glob.glob(os.path.join(
-            cf.get('options','testdir'),
-            'raw','GWAS','AtLeaf',
-            '*.sigsnps.csv'
-        ))
-        # Read in each table individually then concat for GIANT table
-        df = pd.concat([pd.read_table(x,sep=',') for x in csvs])
-        # Add 'Chr' to chromosome column
-        df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
-        # Chase dat refgen
-        T10 = co.RefGen('T10')
-        # Import class from dataframe
-        AtSeedIonome = co.Ontology.from_DataFrame(
-            df,'AtSeedIonome','Arabidopsis 1.6M EmmaX GWAS',
-            T10,term_col='Trait',chr_col='CHR',pos_col='BP'
-        )
-        self.assertIsInstance(AtSeedIonome,co.Ontology)
-
-
-    def AtLeafIonome(self):
-        co.del_dataset('Ontology','AtLeafIonome',safe=False)
-        # glob glob is god
-        csvs = glob.glob(os.path.join(
-            cf.get('options','testdir'),
-            'raw','GWAS','AtLeaf',
-            '*.sigsnps.csv'
-        ))
-        # Read in each table individually then concat for GIANT table
-        df = pd.concat([pd.read_table(x,sep=',') for x in csvs])
-        # Add 'Chr' to chromosome column
-        df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
-        # Chase dat refgen
-        T10 = co.RefGen('T10')
-        # Import class from dataframe
-        AtLeaf = co.Ontology.from_DataFrame(
-            df,'AtLeafIonome','Arabidopsis 1.6M EmmaX GWAS',
-            T10,term_col='Trait',chr_col='CHR',pos_col='BP'
-        )
-        self.assertIsInstance(AtLeaf,co.Ontology)
 
     def AtLeafHydroIonome(self):
         co.del_dataset('Ontology','AtLeafHydroIonome',safe=False)
