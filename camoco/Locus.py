@@ -4,7 +4,10 @@ import re
 
 class Locus(object):
     def __init__(self, chrom, start, end=None, id=None, window=0, sub_loci=None, **kwargs):
-        self.id = id
+        if id is None or id.startswith('<None>'):
+            self._id = None
+        else:
+            self._id = id
         self.chrom = chrom
         self._start = int(start)
         self._end = int(end) if end is not None else int(start)
@@ -22,6 +25,13 @@ class Locus(object):
             'start' : self.start,
             'end'   : self.end
         }
+
+    @property
+    def id(self):
+        if self._id is None:
+            return str(self)
+        else:
+            return self._id
 
     def update(self,dict):
         '''
@@ -135,7 +145,7 @@ class Locus(object):
         else:
             return self.start - other.start
     def __str__(self):
-        return '''<{}>{}:{}-{}+{}'''.format(self.id,self.chrom,self.start,self.end,self.window)
+        return '''<{}>{}:{}-{}+{}'''.format(self._id,self.chrom,self.start,self.end,self.window)
     def __repr__(self):
         return str(self)
     def __hash__(self):
