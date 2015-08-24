@@ -19,6 +19,7 @@ from .Expr import Expr
 from .COB import COB
 from .RefGen import RefGen
 from .Ontology import Ontology,Term
+from .GWAS import GWAS
 from .HapMap import HapMap
 from .Locus import Locus
 from .Tools import available_datasets,del_dataset
