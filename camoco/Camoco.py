@@ -82,15 +82,20 @@ class Camoco(object):
 
     def _global(self, key, val=None):
         # set the global for the dataset
-        if val is not None:
-            self.db.cursor().execute('''
-                INSERT OR REPLACE INTO globals
-                (key, val)VALUES (?, ?)''', (key, val)
-            )
-        else:
-            return self.db.cursor().execute(
-                '''SELECT val FROM globals WHERE key = ?''', (key, )
-            ).fetchone()[0]
+        try:
+            if val is not None:
+                self.db.cursor().execute('''
+                    INSERT OR REPLACE INTO globals
+                    (key, val)VALUES (?, ?)''', (key, val)
+                )
+            else:
+                return self.db.cursor().execute(
+                    '''SELECT val FROM globals WHERE key = ?''', (key, )
+                ).fetchone()[0]
+        except TypeError:
+            # It pains me to do, but but return none if key isn't in global
+            # TODO: replace returning None with an exception
+            return None
 
     def __getattr__(self, name):
         return self._global(name)
@@ -128,9 +133,9 @@ class Camoco(object):
                     PRIMARY KEY(name, type)
                 );
                 INSERT OR IGNORE INTO datasets (name, description, type)
-                VALUES ('Camoco', 'Camoco base', 'Camoco');
+                    VALUES ('Camoco', 'Camoco base', 'Camoco');
                 INSERT OR IGNORE INTO datasets (name, description, type)
-                VALUES (?, ?, ?)''', (name, description, type)
+                    VALUES (?, ?, ?)''', (name, description, type)
             )
         except ConstraintError:
             raise CamocoExistsError(
