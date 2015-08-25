@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# This script will fail if you try to commit a file larger than
+# 20 Megs.
+
+for file in $(git ls-files --cached); do 
+    echo $(du --block-size=1M $file)
+    filesize=$(du --block-size=1M $file | awk '{print $1}')
+    if [ $filesize -gt 20 ]; then
+        echo "Cannot commit $file since $filesize > 20MB"
+        echo "You can either up the filesize in the hook,"
+        echo "or you can commit with --no-verify."
+        exit 1
+    fi
+done
+
+exit 0
+
+
