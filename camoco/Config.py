@@ -63,5 +63,5 @@ cf_file = os.path.expanduser('~/.camoco.conf')
 if not os.path.isfile(cf_file):
     with open(cf_file, 'w') as CF:
         print(default_config, file=CF)
-else:
-    cf = Config(cf_file)
+
+cf = Config(cf_file)
