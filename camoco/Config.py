@@ -44,10 +44,15 @@ class Level(dict):
             return self[item]
 
 class Config(object):
+
     def __init__(self,filename):
         filename = os.path.expanduser(filename)
         self.data = Level(yaml.load(open(filename,'r')))
+
     def __getattr__(self,item):
+        return Level(self.data[item])
+
+    def __getitem__(self,item):
         return Level(self.data[item])
 
     def __repr__(self):
