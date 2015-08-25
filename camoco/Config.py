@@ -5,7 +5,6 @@ import configparser
 import yaml
 import pprint
 
-
 global cf
 
 default_config = '''--- # YAML Camoco Configuration File

@@ -14,6 +14,7 @@ __license__ = """
 import pyximport
 pyximport.install()
 
+from .Config import cf
 from .Camoco import Camoco
 from .Expr import Expr
 from .COB import COB
@@ -24,5 +25,4 @@ from .HapMap import HapMap
 from .Locus import Locus
 from .Tools import available_datasets,del_dataset
 from .Tools import mv_dataset,redescribe_dataset
-from .Config import cf
 from .GEO import Family
