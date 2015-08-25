@@ -71,7 +71,7 @@ def del_dataset(type, name, safe=True):
     try:
         os.remove(
             os.path.expanduser(os.path.join(
-                cf.options,basedir,
+                cf.options.basedir,
                 'databases',
                 '{}.{}.hd5'.format(type, name)
                 )

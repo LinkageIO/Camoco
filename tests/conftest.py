@@ -81,7 +81,7 @@ def AtSeed(AtTair10):
             [co.Family.from_file(
                 os.path.join(
                     cf.get('options', 'testdir'),
-                    'raw', 'GSE', '{}_family.soft'.format(x)
+                    'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
             for x in Seed ]
@@ -117,7 +117,7 @@ def AtGen(AtTair10):
             [co.Family.from_file(
                 os.path.join(
                     cf.get('options', 'testdir'),
-                    'raw', 'GSE', '{}_family.soft'.format(x)
+                    'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
             for x in General ]
@@ -151,7 +151,7 @@ def AtLeaf(AtTair10):
             [co.Family.from_file(
                 os.path.join(
                     cf.get('options', 'testdir'),
-                    'raw', 'GSE', '{}_family.soft'.format(x)
+                    'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
             for x in Leaf ]
@@ -188,7 +188,7 @@ def AtRoot(AtTair10):
             [co.Family.from_file(
                 os.path.join(
                     cf['options']['testdir'],
-                    'raw', 'GSE', '{}_family.soft'.format(x)
+                    'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
             for x in Root ]
