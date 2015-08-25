@@ -3,8 +3,8 @@
 # This script will fail if you try to commit a file larger than
 # 20 Megs.
 
+echo "Checking file sizes..."
 for file in $(git ls-files --cached); do 
-    echo $(du --block-size=1M $file)
     filesize=$(du --block-size=1M $file | awk '{print $1}')
     if [ $filesize -gt 20 ]; then
         echo "Cannot commit $file since $filesize > 20MB"
