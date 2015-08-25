@@ -1,11 +1,10 @@
 #!/usr/bin/python3
 
-from .Ontology import Ontology
-from .Term import Term
-from .Camoco import Camoco
-from .RefGen import RefGen
-from .Locus import Locus
-from .Tools import log
+from camoco.Ontology import Term,Ontology
+from camoco.Camoco import Camoco
+from camoco.RefGen import RefGen
+from camoco.Locus import Locus
+from camoco.Tools import log
 
 from collections import defaultdict
 import networkx as nx
@@ -16,7 +15,7 @@ class GOTerm(Term):
     '''
         Subclass to handle the intricacies of GO Terms
     '''
-    def __init__(self, id, name='', desc='', alt_id=None, is_a=None,locus_list=None, **kwargs):
+    def __init__(self, id, name='', desc='', alt_id=None, is_a=None, locus_list=None, **kwargs):
         super().__init__(id, desc=desc, locus_list=locus_list, **kwargs)
         self.name = name
         self.is_a = set(is_a) if is_a else set()
@@ -26,17 +25,79 @@ class GOTerm(Term):
         return "Term: {}, Name: {}, Desc: {}, {} Loci".format(self.id, self.name, self.desc, len(self))
 
     def add_parent(self,termname):
-        self.is_a.add(termname)
+        'Add parent to term'
+	self.is_a.add(termname)
 
-class GOOnt(Ontology):
+    def add_alt(self, altID):
+	'Add alternate name to term'
+	self.alt_id.add(altID)
+
+class GOnt(Ontology):
     '''Ontology extension for GO'''
-    def __init__(self, name, type='GOOnt'):
+    def __init__(self, name, type='GOnt'):
         super().__init__(name, type=type)
         if self.refgen:
             self.refgen = RefGen(self.refgen)
 
+    def __getitem__(self, id):
+        ''' retrieve a term by id '''
+        try:
+            id = self.db.cursor().execute(
+                'SELECT primary FROM alts WHERE alt = ?', (id, )).fetchone()
+        except TypeError as e:
+            id = id
+
+        try:
+            # Get the term information
+            (id, desc, name) = self.db.cursor().execute(
+                'SELECT * from terms WHERE id = ?', (id, )).fetchone()
+        except TypeError as e: # Not in database
+            raise
+
+        # Get the loci associated with the term
+        term_loci = [self.refgen[gene_id] for gene_id in self.db.cursor().execute(
+            'SELECT id FROM term_loci WHERE term = ?', (id, )).fetchall()]
+
+        # Get the isa relationships
+        is_a = set(termID for termID in self.db.cursor().execute(
+            'SELECT parent FROM rels WHERE child = ?', (id, )).fetchall())
+
+        # Get the alternate ids of the term
+        alts = set(termID for termID in self.db.cursor().execute(
+            'SELECT alt FROM alts WHERE primary = ?', (id, )).fetchall())
+
+        return GOTerm(id, name=name, desc=desc, alt_id=alts, is_a=is_a, locus_list=term_loci)
+
+    def add_term(self, term, overwrite=True):
+        ''' This will add a single term to the ontology '''
+        cur = self.db.cursor()
+        if overwrite:
+            self.del_term(term.name)
+        cur.execute('BEGIN TRANSACTION')
+
+        # Add the term name and description
+        cur.execute('INSERT OR REPLACE INTO terms (id, desc, name) VALUES (?, ?, ?)',
+            (term.id, term.desc, term.name))
+
+        # Add the term loci
+	if term.locus_list:
+            cur.executemany('INSERT OR REPLACE INTO term_loci (term, id) VALUES (?, ?)',
+                [(term.id, locus.id) for locus in term.locus_list])
+
+	# Add the is_a relationships if they are there
+	if term.is_a:    
+            cur.executemany('INSERT OR REPLACE INTO rels (parent, child) VALUES (?, ?)',
+                [(parent, term.id) for parent in term.is_a])
+
+        # Add the alternate ids to their database
+	if term.alt_id:
+            cur.executemany('INSERT OR REPLACE INTO alts (alt, primary) VALUES (?,?)',
+                [(altID, term.id) for altID in term.alt_id])
+
+        cur.execute('END TRANSACTION')
+
     @classmethod
-    def create(cls, name, description, refgen, type='GOOnt'):
+    def create(cls, name, description, refgen, type='GOnt'):
         '''
             This method creates a fresh GO Ontology with nothing it it.
         '''
@@ -46,8 +107,8 @@ class GOOnt(Ontology):
         # Alter the tables as needed
         cur = self.db.cursor()
         cur.execute('ALTER TABLE terms ADD COLUMN name TEXT;')
-        cur.execute('CREATE TABLE IF NOT EXISTS rels (parent TEXT, child TEXT);')
-        cur.execute('CREATE TABLE IF NOT EXISTS alts (primary TEXT, alt TEXT UNIQUE);')
+        cur.execute('CREATE TABLE IF NOT EXISTS rels (parent TEXT, child TEXT, PRIMARY KEY(parent, child));')
+        cur.execute('CREATE TABLE IF NOT EXISTS alts (alt TEXT UNIQUE, primary TEXT, PRIMARY KEY(alt, primary));')
         return self
 
     @classmethod
@@ -97,8 +158,7 @@ class GOOnt(Ontology):
         # Propagating the relationships using the embeded function
         self.log('Propagating is_a relationships.')
         for cur_term in terms:
-            parents = getISA(terms,cur_term)
-            terms[cur_term]['is_a'] = parents
+            terms[cur_term]['is_a'] = getISA(terms,cur_term)
 
         # Importing gene map information, and cross referencing with obo information
         self.log('Importing Gene Map: {}', gene_map_file)
