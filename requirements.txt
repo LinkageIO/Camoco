@@ -16,3 +16,4 @@ statsmodels==0.6.1
 termcolor==1.1.0
 matplotlib==1.4.3
 networkx==1.10
+pyaml==15.6.3
