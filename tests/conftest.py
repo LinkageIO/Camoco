@@ -8,15 +8,21 @@ from camoco.Config import cf
 import camoco as co
 import pandas as pd
 
+
+''' -------------------------------------------------------------------------
+            RefGen Fixtures
+'''
+
+
 @pytest.fixture
 def Zm5bFGS():
-    if cf['test'].getboolean('force'):
+    if cf.test.force.RefGen:
         co.del_dataset('RefGen', 'Zm5bFGS', safe=False)
     if not co.available_datasets('RefGen', 'Zm5bFGS'):
         # We have to build it
         gff = os.path.expanduser(
             os.path.join(
-                cf['options']['testdir'],
+                cf.options.testdir,
                 'raw', 'RefGen', 'ZmB73_5b_FGS.gff.gz'
             )
         )
@@ -29,12 +35,12 @@ def Zm5bFGS():
 
 @pytest.fixture
 def AtTair10():
-    if cf['test'].getboolean('force'):
+    if cf.test.force.RefGen:
         co.del_dataset('RefGen', 'AtTair10', safe=False)
     if not co.available_datasets('RefGen', 'AtTair10'):
         gff = os.path.expanduser(
             os.path.join(
-                cf['options']['testdir'],
+                cf.options.testdir,
                 'raw', 'RefGen', 'TAIR10_GFF3_genes.gff.gz'
             )
         )
@@ -44,15 +50,20 @@ def AtTair10():
     else:
         return co.RefGen('AtTair10')
 
+
+''' -------------------------------------------------------------------------
+            COB Fixtures
+'''
+
 @pytest.fixture
 def ZmRNASeqTissueAtlas(Zm5bFGS):
-    if cf['test'].getboolean('force'):
+    if cf.test.force.COB:
         co.del_dataset('COB', 'ZmRNASeqTissueAtlas', safe=False)
         co.del_dataset('Expr', 'ZmRNASeqTissueAtlas', safe=False)
     if not co.available_datasets('COB', 'ZmRNASeqTissueAtlas'):
         # Build it 
         return co.COB.from_table(
-            os.path.join(cf.get('options', 'testdir'),
+            os.path.join(cf.options.testdir,
                 'raw', 'Expr', 'MaizeRNASeqTissue.tsv.gz',
             ),
             'ZmRNASeqTissueAtlas',
@@ -72,7 +83,7 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
 
 @pytest.fixture
 def AtSeed(AtTair10):
-    if cf['test'].getboolean('force'):
+    if cf.test.force.COB:
         co.del_dataset('Expr', 'AtSeed', safe=False)
     if not co.available_datasets('COB', 'AtSeed'):
         Seed = ['GSE12404', #'GSE30223',
@@ -80,7 +91,7 @@ def AtSeed(AtTair10):
         SeedFam = sum(
             [co.Family.from_file(
                 os.path.join(
-                    cf.get('options', 'testdir'),
+                    cf.options.testdir,
                     'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
@@ -90,7 +101,7 @@ def AtSeed(AtTair10):
         return co.COB.from_DataFrame(
             SeedFam.series_matrix(
                 keepfile=os.path.join(
-                    cf.get('options', 'testdir'),
+                    cf.options.testdir,
                     'raw', 'GSE', 'SeedKeep.tsv'
                 )
             ),
@@ -106,7 +117,7 @@ def AtSeed(AtTair10):
 
 @pytest.fixture
 def AtGen(AtTair10):
-    if cf['test'].getboolean('force'):
+    if cf.test.force.COB:
         co.del_dataset('Expr', 'AtGen', safe=False)
     if not co.available_datasets('COB', 'AtGen'):
         General = ['GSE18975', 'GSE39384', 'GSE19271', 'GSE5632', 'GSE39385',
@@ -116,7 +127,7 @@ def AtGen(AtTair10):
         GenFam = sum(
             [co.Family.from_file(
                 os.path.join(
-                    cf.get('options', 'testdir'),
+                    cf.options.testdir,
                     'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
@@ -126,7 +137,7 @@ def AtGen(AtTair10):
         return co.COB.from_DataFrame(
             GenFam.series_matrix(
                 keepfile=os.path.join(
-                    cf.get('options', 'testdir'),
+                    cf.options.testdir,
                     'raw', 'GSE', 'GenKeep.tsv'
                 )
             ),
@@ -140,7 +151,7 @@ def AtGen(AtTair10):
 
 @pytest.fixture
 def AtLeaf(AtTair10):
-    if cf['test'].getboolean('force'):
+    if cf.test.force.COB:
         co.del_dataset('Expr', 'AtLeaf', safe=False)
     if not co.available_datasets('COB', 'AtLeaf'):
         Leaf = ['GSE14578', 'GSE5630', 'GSE13739', #'GSE26199',
@@ -150,7 +161,7 @@ def AtLeaf(AtTair10):
         LeafFam = sum(
             [co.Family.from_file(
                 os.path.join(
-                    cf.get('options', 'testdir'),
+                    cf.options.testdir,
                     'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
@@ -160,7 +171,7 @@ def AtLeaf(AtTair10):
         return co.COB.from_DataFrame(
             LeafFam.series_matrix(
                 keepfile=os.path.join(
-                    cf.get('options', 'testdir'),
+                    cf.options.testdir,
                     'raw', 'GSE', 'LeafKeep.tsv'
                 )
             ),
@@ -176,7 +187,7 @@ def AtLeaf(AtTair10):
 
 @pytest.fixture
 def AtRoot(AtTair10):
-    if cf['test'].getboolean('force'):
+    if cf.test.force.COB:
         co.del_dataset('Expr', 'AtRoot', safe=False)
     if not co.available_datasets('COB', 'AtRoot'):
         Root = ['GSE14578', 'GSE46205', 'GSE7631', 'GSE10576', 'GSE42007',
@@ -187,7 +198,7 @@ def AtRoot(AtTair10):
         RootFam = sum(
             [co.Family.from_file(
                 os.path.join(
-                    cf['options']['testdir'],
+                    cf.options.testdir,
                     'raw', 'GSE', '{}_family.soft.gz'.format(x)
                 )
             )
@@ -197,7 +208,7 @@ def AtRoot(AtTair10):
         return co.COB.from_DataFrame(
             RootFam.series_matrix(
                 keepfile=os.path.join(
-                    cf.get('options', 'testdir'),
+                    cf.options.testdir,
                     'raw', 'GSE', 'RootKeep.tsv')
             ),
             'AtRoot', 'Arab Root',
@@ -208,15 +219,19 @@ def AtRoot(AtTair10):
     else:
         return co.COB('AtRoot')
 
+''' -------------------------------------------------------------------------
+            Ontology Fixtures
+'''
+
 @pytest.fixture
 def AtSeedIonome(AtTair10):
-    if cf['test'].getboolean('force'):
+    if cf.test.force.Ontology:
         co.del_dataset('GWAS', 'AtSeedIonome', safe=False)
     if not co.available_datasets('GWAS', 'AtSeedIonome'):
         # glob glob is god
         csvs = glob.glob(
             os.path.expanduser(os.path.join(
-                cf.get('options', 'testdir'),
+                cf.options.testdir,
                 'raw', 'GWAS', 'AtLeaf',
                 '*.sigsnps.csv.gz'
             ))
@@ -238,12 +253,12 @@ def AtSeedIonome(AtTair10):
 
 @pytest.fixture
 def AtLeafIonome(AtTair10):
-    if cf['test'].getboolean('force'):
+    if cf.test.force.Ontology:
         co.del_dataset('GWAS', 'AtLeafIonome', safe=False)
     if not co.available_datasets('GWAS', 'AtLeafIonome'):
         # glob glob is god
         csvs = glob.glob(os.path.join(
-            cf.get('options', 'testdir'),
+            cf.options.testdir,
             'raw', 'GWAS', 'AtLeaf',
             '*.sigsnps.csv.gz'
         ))
@@ -260,9 +275,3 @@ def AtLeafIonome(AtTair10):
         )
     else:
         return co.GWAS('AtLeafIonome')
-
-
-
-
-
-
