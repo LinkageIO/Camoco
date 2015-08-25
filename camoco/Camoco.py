@@ -48,7 +48,7 @@ class Camoco(object):
         return lite.Connection(
             os.path.expanduser(
                 os.path.join(
-                    cf.get('options', 'basedir'),
+                    cf.options.basedir,
                     'databases',
                     "{}.{}.db".format(type, dbname)
                 )
@@ -62,7 +62,7 @@ class Camoco(object):
         return pd.HDFStore(
             os.path.expanduser(
                 os.path.join(
-                    cf.get('options', 'basedir'),
+                    cf.options.basedir,
                     'databases',
                     "{}.{}.hd5".format(type, dbname)
                 )
@@ -74,7 +74,7 @@ class Camoco(object):
         return tempfile.NamedTemporaryFile(
             dir=os.path.expanduser(
                 os.path.join(
-                    cf.get('options', 'basedir'),
+                    cf.options.basedir,
                     "tmp"
                 )   
             )
@@ -107,7 +107,7 @@ class Camoco(object):
             It initializes base directory hierarchy
         '''
         basedir = os.path.realpath(
-            os.path.expanduser(cf.get('options', 'basedir'))
+            os.path.expanduser(cf.options.basedir)
         )
 
         # Create the basedir if not exists

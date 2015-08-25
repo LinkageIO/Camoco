@@ -60,7 +60,7 @@ def del_dataset(type, name, safe=True):
     try:
         os.remove(
             os.path.expanduser(os.path.join(
-                cf.get('options', 'basedir'),
+                cf.options.basedir,
                 'databases',
                 '{}.{}.db'.format(type, name)
                 )
@@ -71,7 +71,7 @@ def del_dataset(type, name, safe=True):
     try:
         os.remove(
             os.path.expanduser(os.path.join(
-                cf.get('options', 'basedir'),
+                cf.options,basedir,
                 'databases',
                 '{}.{}.hd5'.format(type, name)
                 )
@@ -119,7 +119,7 @@ class log(object):
         cls(msg, *args, color='red')
 
     def __call__(self, msg, *args, color='green'):
-        if cf['logging']['log_level'] == 'verbose':
+        if cf.logging.log_level == 'verbose':
             print(colored(" ".join(["[LOG]", time.ctime(), '-', msg.format(*args)]), color=color), file=sys.stderr)
 
 
