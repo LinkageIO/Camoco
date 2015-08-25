@@ -218,7 +218,7 @@ def AtSeedIonome(AtTair10):
             os.path.expanduser(os.path.join(
                 cf.get('options', 'testdir'),
                 'raw', 'GWAS', 'AtLeaf',
-                '*.sigsnps.csv'
+                '*.sigsnps.csv.gz'
             ))
         )
         # Read in each table individually then concat for GIANT table
@@ -245,7 +245,7 @@ def AtLeafIonome(AtTair10):
         csvs = glob.glob(os.path.join(
             cf.get('options', 'testdir'),
             'raw', 'GWAS', 'AtLeaf',
-            '*.sigsnps.csv'
+            '*.sigsnps.csv.gz'
         ))
         # Read in each table individually then concat for GIANT table
         df = pd.concat([pd.read_table(x, sep=',') for x in csvs])
