@@ -7,6 +7,9 @@ python:
 # Setup anaconda
 before_install:
   - echo $PATH
+  - echo $PWD
+  - ls -la
+  - ls -la ./*
   # Install apsw which refuses to by on pypi
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
   - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install && cd ..
