@@ -1,0 +1,5 @@
+[lfs]
+    url = "https://lovelace.cs.umn.edu:8080/schae234/Camoco"
+
+[http]
+    sslverify = false

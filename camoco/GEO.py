@@ -1,10 +1,13 @@
+#! /usr/bin/python3
 import pandas as pd
 import numpy as np
 import urllib
 import itertools
 import os
-from camoco.Tools import log
 import warnings
+import gzip
+
+from .Tools import log
 
 class Soft(object):
     def __init__(self, name, type):

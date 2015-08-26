@@ -89,6 +89,7 @@ Required (install in this order to save pain):
 + matplotlib>=1.4.3
 + statsmodels>=0.6.1
 + termcolor>=1.1.0
++ pyaml==15.6.3
 
 
 Tests
