@@ -180,13 +180,10 @@ class Ontology(Camoco):
         cur = self.db.cursor()
         cur.execute('''
             BEGIN TRANSACTION;
-            DELETE FROM loci_attr WHERE loci_id IN (
-                SELECT id FROM term_loci WHERE term = ?
-            );
             DELETE FROM term_loci WHERE term = ?;
             DELETE FROM terms WHERE id = ?;
             END TRANSACTION;
-        ''', (id, id, id))
+        ''', (id, id))
 
     def add_term(self, term, overwrite=True):
         ''' This will add a single term to the ontology '''
