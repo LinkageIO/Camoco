@@ -145,7 +145,6 @@ class GOnt(Ontology):
                 return tot
 
         self = cls.create(name, description, refgen)
-
         if debug:
             self.log.warn('Debugging on, will not record all terms.')
 
