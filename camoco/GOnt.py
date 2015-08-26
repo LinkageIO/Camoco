@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
-from camoco.Ontology import Term,Ontology
-from camoco.Camoco import Camoco
-from camoco.RefGen import RefGen
-from camoco.Locus import Locus
-from camoco.Tools import log
+from .Ontology import Ontology
+from .Term import Term
+from .Camoco import Camoco
+from .RefGen import RefGen
+from .Locus import Locus
+from .Tools import log
 
 from collections import defaultdict
 import networkx as nx
@@ -69,51 +70,77 @@ class GOnt(Ontology):
 
         return GOTerm(id, name=name, desc=desc, alt_id=alts, is_a=is_a, locus_list=term_loci)
 
-    def add_term(self, term, overwrite=True):
+    def _build_indices(self):
+        cursor = self.db.cursor()
+        cursor.execute('''
+            BEGIN TRANSACTION;
+            CREATE INDEX IF NOT EXISTS termind ON terms (id);
+            CREATE INDEX IF NOT EXISTS lociind ON term_loci (term,id);
+            CREATE INDEX IF NOT EXISTS relsind ON rels (parent,child);
+            CREATE INDEX IF NOT EXISTS altsind ON alts (alt,main);
+            END TRANSACTION;
+            ''')
+
+    def _drop_indices(self):
+        cursor = self.db.cursor()
+        cursor.execute('''
+            BEGIN TRANSACTION;
+            DROP INDEX IF EXISTS termind;
+            DROP INDEX IF EXISTS lociind;
+            DROP INDEX IF EXISTS relsind;
+            DROP INDEX IF EXISTS altsind;
+            END TRANSACTION;
+            ''')
+
+    def _add_term(self, term, cursor):
         ''' This will add a single term to the ontology '''
-        cur = self.db.cursor()
-        if overwrite:
-            self.del_term(term.name)
-        cur.execute('BEGIN TRANSACTION')
 
         # Add the term name and description
-        cur.execute('INSERT OR REPLACE INTO terms (id, desc, name) VALUES (?, ?, ?)',
-            (term.id, term.desc, term.name))
+        cursor.execute('INSERT OR ABORT INTO terms (id, desc, name) VALUES (?, ?, ?)', (term.id, term.desc, term.name))
 
-        # Add the term loci
         if term.locus_list:
-            cur.executemany('INSERT OR REPLACE INTO term_loci (term, id) VALUES (?, ?)',
-                [(term.id, locus.id) for locus in term.locus_list])
+            cursor.executemany('INSERT OR ABORT INTO term_loci (term, id) VALUES (?, ?)', [(term.id, locus.id) for locus in term.locus_list])
 
-        # Add the is_a relationships if they are there
         if term.is_a:
-            cur.executemany('INSERT OR REPLACE INTO rels (parent, child) VALUES (?, ?)',
-                [(parent, term.id) for parent in term.is_a])
+            cursor.executemany('INSERT OR ABORT INTO rels (parent, child) VALUES (?, ?)', [(parent, term.id) for parent in term.is_a])
 
-        # Add the alternate ids to their database
         if term.alt_id:
-            cur.executemany('INSERT OR REPLACE INTO alts (alt, main) VALUES (?,?)',
-                [(altID, term.id) for altID in term.alt_id])
+            cursor.executemany('INSERT OR ABORT INTO alts (alt, main) VALUES (?,?)', [(altID, term.id) for altID in term.alt_id])
 
-        cur.execute('END TRANSACTION')
+    def _del_term(self, term, cursor):
+        '''This will remove a single term from the ontology.'''
+        main_id = cursor.execute('SELECT main FROM alts WHERE alt = ?', (term.id, )).fetchone()
+        if main_id:
+            id = main_id
+        else:
+            id = term.id
+        cursor.execute('''
+            DELETE FROM terms WHERE id = ?;
+            DELETE FROM term_loci WHERE term = ?;
+            DELETE FROM rels WHERE child = ?;
+            DELETE FROM rels WHERE parent = ?;
+            DELETE FROM alts WHERE main = ?;
+            ''', (id, id, id, id, id))
 
-        def del_term(self, id):
-            '''This will remove a single term from the ontology.'''
-            cur = self.db.cursor()
-            cur.execute('BEGIN TRANSACTION')
-            main_id = self.db.cursor().execute('SELECT main FROM alts WHERE alt = ?', (id, )).fetchone()
-            if main_id:
-                id = main_id
-            cur.execute('''
-                DELETE FROM terms WHERE id = ?;
-                DELETE FROM term_loci WHERE term = ?;
-                DELETE FROM rels WHERE child = ?;
-                DELETE FROM alts WHERE main = ?;
-                END TRANSACTION;
-            ''', (id, id, id, id))
+    def add_terms(self, terms, overwrite=False):
+        if overwrite:
+            self.del_terms(terms)
+
+        cursor = self.db.cursor()
+        cursor.execute('BEGIN TRANSACTION')
+        for term in terms:
+            self._add_term(term, cursor)
+        cursor.execute('END TRANSACTION')
+
+    def del_terms(self, terms):
+        cursor = self.db.cursor()
+        cursor.execute('BEGIN TRANSACTION')
+        for term in terms:
+            self._del_term(term, cursor)
+        cursor.execute('END TRANSACTION')
 
     @classmethod
-    def create(cls, name, description, refgen, type='GOnt'):
+    def create(cls, name, description, refgen, overwrite=True, type='GOnt'):
         '''This method creates a fresh GO Ontology with nothing it it.'''
 
         # run the inherited create method from Camoco
@@ -125,12 +152,22 @@ class GOnt(Ontology):
             cur.execute('ALTER TABLE terms ADD COLUMN name TEXT;')
         except lite.SQLError:
             pass
-        cur.execute('CREATE TABLE IF NOT EXISTS rels (parent TEXT, child TEXT, PRIMARY KEY(parent, child));')
-        cur.execute('CREATE TABLE IF NOT EXISTS alts (alt TEXT, main TEXT, PRIMARY KEY(alt, main));')
+        cur.execute('CREATE TABLE IF NOT EXISTS rels (parent TEXT, child TEXT);')
+        cur.execute('CREATE TABLE IF NOT EXISTS alts (alt TEXT UNIQUE, main TEXT);')
+
+        if overwrite:
+            self._drop_indices()
+            cur.execute('''
+                DELETE FROM terms;
+                DELETE FROM term_loci;
+                DELETE FROM rels;
+                DELETE FROM alts;
+            ''')
+
         return self
 
     @classmethod
-    def from_obo(cls, obo_file, gene_map_file ,name, description, refgen, go_col=1, debug=False):
+    def from_obo(cls, obo_file, gene_map_file ,name, description, refgen, go_col=1, overwrite=True):
         ''' Convenience function for importing GO obo files '''
 
         # Internal function to handle propagating is_a relationships
@@ -144,9 +181,7 @@ class GOnt(Ontology):
                     tot = tot | getISA(terms, item)
                 return tot
 
-        self = cls.create(name, description, refgen)
-        if debug:
-            self.log.warn('Debugging on, will not record all terms.')
+        self = cls.create(name, description, refgen, overwrite=overwrite)
 
         # Importing the obo information
         self.log('Importing OBO: {}', obo_file)
@@ -217,27 +252,22 @@ class GOnt(Ontology):
         termObjs = []
         for (term, info) in terms.items():
             if terms[term] == {}:
-                term = alt_map[term]
+                continue
             # Make the Gene Objects from the refgen
             geneObjs = refgen.from_ids(terms[term]['genes'])
-
             # Make the Term object and add it to the list
             termObjs.append(GOTerm(term, name=terms[term]['name'], alt_id=terms[term]['alt_id'], is_a=terms[term]['is_a'],
             desc=terms[term]['desc'], locus_list=geneObjs))
         del terms
 
-        if debug:
-            termObjs = termObjs[:100]
-
         # Add them all to the database
-        total = len(termObjs)
-        n = 0
-        for term in termObjs:
-            if n % 1000 == 0:
-                self.log('Added {}/{} terms.', n, total)
-            self.add_term(term)
-            print(term.id)
-            n += 1
-        self.log('Added all {} records to the databse.', n)
+        self.log('Adding {} terms to the database.',len(termObjs))
+        self.add_terms(termObjs, overwrite=False)
         del termObjs
+
+        # Build the indices
+        self.log('Building the indices.')
+        self._build_indices()
+
+        self.log('Ontology is built!')
         return self
