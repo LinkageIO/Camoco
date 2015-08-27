@@ -14,7 +14,7 @@ before_install:
   - cd $(find . -name 'mcl-*' -type d | head -n 1) && ./configure --prefix=$HOME/.local && make && make install && cd ..
   # Intall hdf5
   - wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.8.15-patch1.tar && tar xvvf hdf5-1.8.15-patch1.tar
-  - cd hdf5-1.8.15-patch1/ && ./configure --prefix=$HOME/.local && make &> /dev/null && make install && export HDF6_DIR=$HOME/.local/lib && cd ..
+  - cd hdf5-1.8.15-patch1/ && ./configure --prefix=$HOME/.local && make &> /dev/null && make install && export HDF5_DIR=$HOME/.local/lib && cd ..
   # upgrade to new pip with wheels
   - pip install pip --upgrade
   - PIP_ARGS="-I --trusted-host lovelace.cs.umn.edu --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
