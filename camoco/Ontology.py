@@ -63,48 +63,86 @@ class Ontology(Camoco):
 
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(
-            self.name, self.description, len(self), self.refgen
-        )
+            self.name, self.description, len(self), self.refgen)
 
-    def del_term(self, id):
-        '''
-        Remove a term from the dataset.
+    def add_term(self, term, cursor=None, overwrite=False):
+        ''' This will add a single term to the ontology
 
         Parameters
         ----------
-        id : string
-            The term id you wish to remove.
-
-        Returns
-        -------
-            bool indicating success
-        '''
-        cur = self.db.cursor()
-        cur.execute('''
-            BEGIN TRANSACTION;
-            DELETE FROM term_loci WHERE term = ?;
-            DELETE FROM terms WHERE id = ?;
-            END TRANSACTION;
-        ''', (id, id))
-
-    def add_term(self, term, overwrite=True):
-        ''' This will add a single term to the ontology '''
-        cur = self.db.cursor()
+        term : Term object
+            The term object you wish to remove.
+        cursor : apsw cursor object
+            A initialized cursor object, for batch operation.
+        overwrite : bool
+            Indication to delete any existing entry before writing'''
         if overwrite:
             self.del_term(term.id)
-        cur.execute('BEGIN TRANSACTION')
-        # Add the term name and description
+        if not cursor:
+            cur = self.db.cursor()
+            cur.execute('BEGIN TRANSACTION')
+        else:
+            cur = cursor
+
+        # Add the term id and description
         cur.execute('''
-            INSERT OR REPLACE INTO terms (id, desc)
-            VALUES (?, ?)''', (term.id, term.desc)
-        )
+            INSERT OR ABORT INTO terms (id, desc)
+            VALUES (?, ?)''', (term.id, term.desc))
+
         # Add the term loci
-        for locus in term.locus_list:
-            cur.execute('''
-                INSERT OR REPLACE INTO term_loci (term, id)
-                VALUES (?, ?)
-                ''', (term.id, locus.id)
-            )
+        if term.locus_list:
+            for locus in term.locus_list:
+                cur.execute('''
+                    INSERT OR ABORT INTO term_loci (term, id)
+                    VALUES (?, ?)
+                    ''', (term.id, locus.id))
+
+        if not cursor:
+            cur.execute('END TRANSACTION')
+
+    def del_term(self, term, cursor=None):
+        ''' This will add a single term to the ontology
+
+        Parameters
+        ----------
+        term : Term object or str
+            The term object or id you wish to remove.
+        cursor : apsw cursor object
+            A initialized cursor object, for batch operation.'''
+
+        if not cursor:
+            cur = self.db.cursor()
+            cur.execute('BEGIN TRANSACTION')
+        else:
+            cur = cursor
+
+        if not isinstance(term, str):
+            id = term.id
+        else:
+            id = term
+
+        cur.execute('''
+            DELETE FROM term_loci WHERE term = ?;
+            DELETE FROM terms WHERE id = ?;
+            ''', (id, id))
+        if not cursor:
+            cur.execute('END TRANSACTION')
+
+    def add_terms(self, terms, overwrite=True):
+        if overwrite:
+            self.del_terms(terms)
+
+        cur = self.db.cursor()
+        cur.execute('BEGIN TRANSACTION')
+        for term in terms:
+            self.add_term(term, cursor=cur, overwrite=False)
+        cur.execute('END TRANSACTION')
+
+    def del_terms(self, terms):
+        cur = self.db.cursor()
+        cur.execute('BEGIN TRANSACTION')
+        for term in terms:
+            self.del_term(term, cursor=cur)
         cur.execute('END TRANSACTION')
 
     @classmethod
@@ -124,24 +162,21 @@ class Ontology(Camoco):
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS terms (
-                id TEXT UNIQUE,
-                desc TEXT
-            );
-        ''')
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS term_loci (
-                term TEXT,
-                id TEXT
-            );
-        ''')
-        self._build_indices()
+        cur.execute('CREATE TABLE IF NOT EXISTS terms (id TEXT UNIQUE, desc TEXT)')
+        cur.execute('CREATE TABLE IF NOT EXISTS term_loci (term TEXT, id TEXT)')
 
-    # Unimplemented
+    def _clear_tables(self):
+        cur = self.db.cursor()
+        cur.execute('DELETE FROM terms; DELETE FROM term_loci;')
 
     def _build_indices(self):
-        pass
+        cursor = self.db.cursor()
+        cursor.execute('CREATE INDEX IF NOT EXISTS termIND ON terms (id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS lociIND ON term_loci (term,id)')
+
+    def _drop_indices(self):
+        cursor = self.db.cursor()
+        cursor.execute('DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;')
 
     def enrichment(self, gene_list, pval_cutoff=0.05, gene_filter=None, label=None, max_term_size=300):
         raise NotImplementedError('This is broken')

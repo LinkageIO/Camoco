@@ -70,74 +70,56 @@ class GOnt(Ontology):
 
         return GOTerm(id, name=name, desc=desc, alt_id=alts, is_a=is_a, locus_list=term_loci)
 
-    def _build_indices(self):
-        cursor = self.db.cursor()
-        cursor.execute('''
-            BEGIN TRANSACTION;
-            CREATE INDEX IF NOT EXISTS termind ON terms (id);
-            CREATE INDEX IF NOT EXISTS lociind ON term_loci (term,id);
-            CREATE INDEX IF NOT EXISTS relsind ON rels (parent,child);
-            CREATE INDEX IF NOT EXISTS altsind ON alts (alt,main);
-            END TRANSACTION;
-            ''')
-
-    def _drop_indices(self):
-        cursor = self.db.cursor()
-        cursor.execute('''
-            BEGIN TRANSACTION;
-            DROP INDEX IF EXISTS termind;
-            DROP INDEX IF EXISTS lociind;
-            DROP INDEX IF EXISTS relsind;
-            DROP INDEX IF EXISTS altsind;
-            END TRANSACTION;
-            ''')
-
-    def _add_term(self, term, cursor):
+    def add_term(self, term, cursor=None, overwrite=False):
         ''' This will add a single term to the ontology '''
+        if overwrite:
+            self.del_term(term.id)
+        if not cursor:
+            cur = self.db.cursor()
+            cur.execute('BEGIN TRANSACTION')
+        else:
+            cur = cursor
 
         # Add the term name and description
-        cursor.execute('INSERT OR ABORT INTO terms (id, desc, name) VALUES (?, ?, ?)', (term.id, term.desc, term.name))
+        cur.execute('INSERT OR ABORT INTO terms (id, desc, name) VALUES (?, ?, ?)', (term.id, term.desc, term.name))
 
         if term.locus_list:
-            cursor.executemany('INSERT OR ABORT INTO term_loci (term, id) VALUES (?, ?)', [(term.id, locus.id) for locus in term.locus_list])
+            cur.executemany('INSERT OR ABORT INTO term_loci (term, id) VALUES (?, ?)', [(term.id, locus.id) for locus in term.locus_list])
 
         if term.is_a:
-            cursor.executemany('INSERT OR ABORT INTO rels (parent, child) VALUES (?, ?)', [(parent, term.id) for parent in term.is_a])
+            cur.executemany('INSERT OR ABORT INTO rels (parent, child) VALUES (?, ?)', [(parent, term.id) for parent in term.is_a])
 
         if term.alt_id:
-            cursor.executemany('INSERT OR ABORT INTO alts (alt, main) VALUES (?,?)', [(altID, term.id) for altID in term.alt_id])
+            cur.executemany('INSERT OR ABORT INTO alts (alt, main) VALUES (?,?)', [(altID, term.id) for altID in term.alt_id])
 
-    def _del_term(self, term, cursor):
+        if not cursor:
+            cur.execute('END TRANSACTION')
+
+    def del_term(self, term, cursor=None):
         '''This will remove a single term from the ontology.'''
-        main_id = cursor.execute('SELECT main FROM alts WHERE alt = ?', (term.id, )).fetchone()
+        if not cursor:
+            cur = self.db.cursor()
+            cur.execute('BEGIN TRANSACTION')
+        else:
+            cur = cursor
+        if not isinstance(term, str):
+            id = term.id
+        else:
+            id = term
+        main_id = cur.execute('SELECT main FROM alts WHERE alt = ?', (id, )).fetchone()
         if main_id:
             id = main_id
         else:
             id = term.id
-        cursor.execute('''
+        cur.execute('''
             DELETE FROM terms WHERE id = ?;
             DELETE FROM term_loci WHERE term = ?;
             DELETE FROM rels WHERE child = ?;
             DELETE FROM rels WHERE parent = ?;
             DELETE FROM alts WHERE main = ?;
             ''', (id, id, id, id, id))
-
-    def add_terms(self, terms, overwrite=False):
-        if overwrite:
-            self.del_terms(terms)
-
-        cursor = self.db.cursor()
-        cursor.execute('BEGIN TRANSACTION')
-        for term in terms:
-            self._add_term(term, cursor)
-        cursor.execute('END TRANSACTION')
-
-    def del_terms(self, terms):
-        cursor = self.db.cursor()
-        cursor.execute('BEGIN TRANSACTION')
-        for term in terms:
-            self._del_term(term, cursor)
-        cursor.execute('END TRANSACTION')
+        if not cursor:
+            cur.execute('END TRANSACTION')
 
     @classmethod
     def create(cls, name, description, refgen, overwrite=True, type='GOnt'):
@@ -146,23 +128,9 @@ class GOnt(Ontology):
         # run the inherited create method from Camoco
         self = super().create(name, description, refgen, type=type)
 
-        # Alter the tables as needed
-        cur = self.db.cursor()
-        try:
-            cur.execute('ALTER TABLE terms ADD COLUMN name TEXT;')
-        except lite.SQLError:
-            pass
-        cur.execute('CREATE TABLE IF NOT EXISTS rels (parent TEXT, child TEXT);')
-        cur.execute('CREATE TABLE IF NOT EXISTS alts (alt TEXT UNIQUE, main TEXT);')
-
         if overwrite:
             self._drop_indices()
-            cur.execute('''
-                DELETE FROM terms;
-                DELETE FROM term_loci;
-                DELETE FROM rels;
-                DELETE FROM alts;
-            ''')
+            self._clear_tables()
 
         return self
 
@@ -269,5 +237,33 @@ class GOnt(Ontology):
         self.log('Building the indices.')
         self._build_indices()
 
-        self.log('Ontology is built!')
+        self.log('Your gene ontology is built.')
         return self
+
+    def _create_tables(self):
+        # Alter the tables as needed
+        super()._create_tables()
+        cur = self.db.cursor()
+        try:
+            cur.execute('ALTER TABLE terms ADD COLUMN name TEXT;')
+        except lite.SQLError:
+            pass
+        cur.execute('CREATE TABLE IF NOT EXISTS rels (parent TEXT, child TEXT);')
+        cur.execute('CREATE TABLE IF NOT EXISTS alts (alt TEXT UNIQUE, main TEXT);')
+
+    def _clear_tables(self):
+        super()._clear_tables()
+        cur = self.db.cursor()
+        cur.execute('DELETE FROM rels; DELETE FROM alts;')
+
+    def _build_indices(self):
+        super()._build_indices()
+        cursor = self.db.cursor()
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS relsIND ON rels (parent,child);
+            CREATE INDEX IF NOT EXISTS altsIND ON alts (alt,main);''')
+
+    def _drop_indices(self):
+        super()._drop_indices()
+        cursor = self.db.cursor()
+        cursor.execute('DROP INDEX IF EXISTS relsIND; DROP INDEX IF EXISTS altsIND;')
