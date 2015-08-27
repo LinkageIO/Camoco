@@ -64,7 +64,7 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
         # Build it 
         return co.COB.from_table(
             os.path.join(cf.options.testdir,
-                'raw', 'Expr',
+                'raw', 'Expr', 'RNASEQ',
                 'MaizeRNASeqTissue.tsv.gz',
             ),
             'ZmRNASeqTissueAtlas',
@@ -89,8 +89,8 @@ def ZmRoot(Zm5bFGS):
     if not co.available_datasets('COB','ZmRoot'):
         return co.COB.from_table(
             os.path.join(
-                cf.optionsi.testdir,
-                'raw','Expression',
+                cf.options.testdir,
+                'raw','Expr',
                 'RNASEQ','ROOTFPKM.tsv.gz'
             ),
             'ZmRoot',
@@ -115,7 +115,7 @@ def ZmSAM(Zm5bFGS):
         return co.COB.from_table(
             os.path.join(
                 cf.options.testdir,
-                'raw','Expression','RNASEQ',
+                'raw','Expr','RNASEQ',
                 'TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt.gz'
             ),
             'ZmSAM',
@@ -138,7 +138,8 @@ def ZmPAN(Zm5bFGS):
     if not co.available_datasets('COB','ZmPAN'):
         return co.COB.from_table(
             os.path.join(
-                cf.get('options','testdir'),'raw','Expression','RNASEQ',
+                cf.options.testdir,
+                'raw','Expr','RNASEQ',
                 'PANGenomeFPKM.txt.gz'
             ),
             'ZmPAN',
