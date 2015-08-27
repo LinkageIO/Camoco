@@ -17,8 +17,6 @@ import matplotlib.pylab as pylab
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from statsmodels.sandbox.regression.predstd import wls_prediction_std
-
 
 def available_datasets(type=None, name=None):
     try:
@@ -29,11 +27,19 @@ def available_datasets(type=None, name=None):
                 FROM datasets WHERE type = ?
                 ORDER BY type;''', (type, )).fetchall()
         else:
-            datasets = cur.execute("SELECT type, name, description, added FROM datasets ORDER BY type;").fetchall()
+            datasets = cur.execute('''
+                SELECT type, name, description, added 
+                FROM datasets ORDER BY type;'''
+            ).fetchall()
         if datasets:
-            datasets = pd.DataFrame(datasets, columns=["Type", "Name", "Description", "Date Added"])
+            datasets = pd.DataFrame(
+                datasets, 
+                columns=["Type", "Name", "Description", "Date Added"]
+                )
         else:
-            datasets = pd.DataFrame(columns=["Type", "Name", "Description", "Date Added"])
+            datasets = pd.DataFrame(
+                columns=["Type", "Name", "Description", "Date Added"]
+            )
         # Check to see if we are looking for a specific dataset
         if name is not None:
             return True if name in datasets['Name'].values else False
@@ -41,6 +47,10 @@ def available_datasets(type=None, name=None):
             return datasets
     except CantOpenError as e:
         return False
+
+def available(type=None,name=None):
+    # Laaaaaaaaazy
+    return available_datasets(type=type,name=name)
 
 def del_dataset(type, name, safe=True):
     try:
@@ -54,7 +64,11 @@ def del_dataset(type, name, safe=True):
             return
     c.log("Deleting {}", name)
     try:
-        c.db.cursor().execute(''' DELETE FROM datasets WHERE name = '{}' and type = '{}';'''.format(name, type))
+        c.db.cursor().execute('''
+            DELETE FROM datasets 
+            WHERE name = '{}' 
+            AND type = '{}';'''.format(name, type)
+        )
     except CantOpenError:
         pass
     try:
@@ -85,12 +99,23 @@ def del_dataset(type, name, safe=True):
 
 def mv_dataset(type,name,new_name):
     c = co.Camoco("Camoco")
-    c.db.cursor().execute("UPDATE datasets SET name = ? WHERE name = ? and type = ?",(new_name,name,type))
-    os.rename(c._resource('databases','.'.join([type,name])+".db"),c._resource('databases',".".join([type,new_name])+".db"))
+    c.db.cursor().execute('''
+        UPDATE datasets SET name = ? 
+        WHERE name = ? AND 
+        type = ?''',(new_name,name,type)
+    )
+    os.rename(
+        c._resource('databases','.'.join([type,name])+".db"),
+        c._resource('databases',".".join([type,new_name])+".db")
+    )
 
 def redescribe_dataset(type,name,new_desc):
     c = co.Camoco("Camoco")
-    c.db.cursor().execute("UPDATE datasets SET description = ? WHERE name = ? and type = ?",(new_desc,name,type))
+    c.db.cursor().execute('''
+        UPDATE datasets SET description = ? 
+        WHERE name = ? AND type = ?''',
+        (new_desc,name,type)
+    )
 
 def memoize(obj):
     cache = obj.cache = {}
@@ -110,8 +135,13 @@ def memoize(obj):
 class log(object):
 
     def __init__(self, msg=None, *args, color='green'):
-        if msg is not None:
-            print(colored(" ".join(["[LOG]", time.ctime(), '-', msg.format(*args)]), color=color), file=sys.stderr)
+        if msg is not None and cf.logging.log_level == 'verbose':
+            print(
+                colored(
+                    " ".join(["[LOG]", time.ctime(), '-', msg.format(*args)]), 
+                    color=color
+                ), file=sys.stderr
+            )
         self.quiet = False
 
     @classmethod
@@ -120,7 +150,13 @@ class log(object):
 
     def __call__(self, msg, *args, color='green'):
         if cf.logging.log_level == 'verbose':
-            print(colored(" ".join(["[LOG]", time.ctime(), '-', msg.format(*args)]), color=color), file=sys.stderr)
+            print(
+                colored(
+                    " ".join(["[LOG]", time.ctime(), '-', msg.format(*args)]), 
+                    color=color
+                ),
+            file=sys.stderr
+        )
 
 
 def plot_flanking_vs_inter(cob):

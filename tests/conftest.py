@@ -64,7 +64,8 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
         # Build it 
         return co.COB.from_table(
             os.path.join(cf.options.testdir,
-                'raw', 'Expr', 'MaizeRNASeqTissue.tsv.gz',
+                'raw', 'Expr',
+                'MaizeRNASeqTissue.tsv.gz',
             ),
             'ZmRNASeqTissueAtlas',
             'Maize RNASeq Tissue Atlas Network, Sekhon 2013, PLoS ONE',
@@ -80,6 +81,81 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
         )
     else:
         return co.COB('ZmTissueAtlas')
+
+@pytest.fixture
+def ZmRoot(Zm5bFGS):
+    if cf.test.force.COB:
+        co.del_dataset('Expr','ZmRoot',safe=False)
+    if not co.available_datasets('COB','ZmRoot'):
+        return co.COB.from_table(
+            os.path.join(
+                cf.optionsi.testdir,
+                'raw','Expression',
+                'RNASEQ','ROOTFPKM.tsv.gz'
+            ),
+            'ZmRoot',
+            'Maize Root Network',
+            Zm5bFGS,
+            rawtype='RNASEQ',
+            max_gene_missing_data=0.3,
+            max_accession_missing_data=0.08,
+            min_single_sample_expr=1,
+            min_expr=0.001,
+            quantile=False,
+            max_val=300
+        )
+    else:
+        return co.COB('ZmRoot')
+
+@pytest.fixture
+def ZmSAM(Zm5bFGS):
+    if cf.test.force.COB:
+        co.del_dataset('Expr','ZmSAM',safe=False)
+    if not co.available_datasets('COB','ZmSAM'):
+        return co.COB.from_table(
+            os.path.join(
+                cf.options.testdir,
+                'raw','Expression','RNASEQ',
+                'TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt.gz'
+            ),
+            'ZmSAM',
+            'Maize Root Network',
+            Zm5bFGS,
+            rawtype='RNASEQ',
+            max_gene_missing_data=0.4,
+            min_expr=0.1,
+            quantile=False,
+            dry_run=False,
+            max_val=250
+        )
+    else:
+        return co.COB('ZmSAM')
+
+@pytest.fixture
+def ZmPAN(Zm5bFGS):
+    if cf.test.force.COB:
+        co.del_dataset('Expr','ZmPAN',safe=False)
+    if not co.available_datasets('COB','ZmPAN'):
+        return co.COB.from_table(
+            os.path.join(
+                cf.get('options','testdir'),'raw','Expression','RNASEQ',
+                'PANGenomeFPKM.txt.gz'
+            ),
+            'ZmPAN',
+            'Maize Root Network',
+            Zm5bFGS,
+            rawtype='RNASEQ',
+            max_gene_missing_data=0.4,
+            min_expr=1,
+            quantile=False,
+            dry_run=False,
+            sep=',',
+            max_val=300
+        )
+    else:
+        return co.COB('ZmPAN')
+
+# Arabidopsis
 
 @pytest.fixture
 def AtSeed(AtTair10):
@@ -220,8 +296,36 @@ def AtRoot(AtTair10):
         return co.COB('AtRoot')
 
 ''' -------------------------------------------------------------------------
-            Ontology Fixtures
+            GWAS Fixtures
 '''
+
+@pytest.fixture
+def ZmIonome(Zm5bFGS):
+        # Delete the old dataset
+    if cf.test.force.Ontology:
+        co.del_dataset('GWAS','ZmIonome',safe=False)
+    if not co.available_datasets('GWAS','ZmIonome'):
+        # Grab path the csv
+        csv = os.path.join(
+            cf.options.testdir,
+            'raw','GWAS','Ionome',
+            'sigGWASsnpsCombinedIterations.longhorn.allLoc.csv.gz'
+        )
+        # Define our reference geneome
+        df = pd.DataFrame.from_csv(csv,index_col=None)
+        # Import class from dataframe
+        IONS  = co.GWAS.from_DataFrame(
+            df,'ZmIonome','Maize Ionome',
+            Zm5bFGS,
+            term_col='el',chr_col='chr',pos_col='pos'
+        )
+        # Get rid of pesky Cobalt
+        IONS.del_term('Co59')
+        # I guess we need a test in here too
+        return IONS
+    else:
+        return co.GWAS('ZmIonome')
+
 
 @pytest.fixture
 def AtSeedIonome(AtTair10):
@@ -275,3 +379,52 @@ def AtLeafIonome(AtTair10):
         )
     else:
         return co.GWAS('AtLeafIonome')
+
+@pytest.fixture
+def AtRootHydroIonome(AtTair10):
+    if cf.test.force.Ontology:
+        co.del_dataset('GWAS','AtRootHydroIonome',safe=False)
+    if not co.available_datasets('GWAS', 'AtRootHydroIonome'):
+        # glob glob is god
+        csvs = glob.glob(os.path.join(
+            cf.options.testdir,
+            'raw','GWAS','AtRootHydro',
+            '*.sigsnps.csv.gz'
+        ))
+        # Read in each table individually then concat for GIANT table
+        df = pd.concat([pd.read_table(x,sep=',') for x in csvs])
+        # Shorten the term name 
+        df.Trait = df.Trait.apply(lambda x: x.replace('RootHydro.',''))
+        # Add 'Chr' to chromosome column
+        df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
+        # Chase dat refgen
+        # Import class from dataframe
+        return co.GWAS.from_DataFrame(
+            df,'AtRootHydroIonome','Arabidopsis 1.6M EmmaX GWAS',
+            AtTair10, term_col='Trait', chr_col='CHR', pos_col='BP'
+        )
+    else:
+        return co.GWAS('AtRootHydroIonome')
+
+@pytest.fixture
+def AtLeafHydroIonome(AtTair10):
+    if cf.test.force.Ontology:
+        co.del_dataset('GWAS','AtLeafHydroIonome',safe=False)
+    if not co.available_datasets('GWAS', 'AtLeafHydroIonome'):
+        # glob glob is god
+        csvs = glob.glob(os.path.join(
+            cf.options.testdir,
+            'raw','GWAS','AtLeafHydro',
+            '*.sigsnps.csv.gz'
+        ))
+        # Read in each table individually then concat for GIANT table
+        df = pd.concat([pd.read_table(x,sep=',') for x in csvs])
+        # Add 'Chr' to chromosome column
+        df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
+        # Import class from dataframe
+        return co.GWAS.from_DataFrame(
+            df,'AtLeafHydroIonome','Arabidopsis 1.6M EmmaX GWAS',
+            AtTair10, term_col='Trait', chr_col='CHR', pos_col='BP'
+        )
+    else:
+        return co.GWAS('AtLeafHydroIonome')
