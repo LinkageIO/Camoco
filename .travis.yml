@@ -29,4 +29,4 @@ install:
 script:  
   - py.test -v tests/BaseTest.py
   - py.test -v tests/test_RefGen.py
-  - py.test -v tests/test_COB.py::test_build
+#  - py.test -v tests/test_COB.py::test_build
