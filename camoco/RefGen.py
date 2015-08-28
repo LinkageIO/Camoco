@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 import math
 import gzip
+import re
 
 class RefGen(Camoco):
     def __init__(self,name):
@@ -117,29 +118,42 @@ class RefGen(Camoco):
             otherwise a single gene
 
         '''
+        cur = self.db.cursor()
         if isinstance(gene_list,str):
             # Handle when we pass in a single id
-            gene_id = gene_list.upper()
-            try:
-                return self.Gene(
-                    *self.db.cursor().execute('''
-                        SELECT chromosome,start,end,id FROM genes WHERE id = ?
-                        ''',(gene_id,)
-                    ).fetchone(),
-                    build=self.build,
-                    organism=self.organism
-                )
-            except TypeError as e:
-                raise ValueError('{} not in {}'.format(gene_id,self.name))
-        genes = [
-            self.Gene(*x,build=self.build,organism=self.organism) \
-            for x in self.db.cursor().execute('''
-                SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
-            '''.format("','".join(map(str.upper,gene_list))))
-        ]
-        if check_shape and len(genes) != len(gene_list):
-            raise ValueError('Some input ids do not have genes in reference')
-        return genes
+            gene_id = gene_list
+            if gene_id not in self:
+                result = cur.execute('SELECT id FROM aliases WHERE alias = ?', [gene_id]).fetchone()
+                if not result:
+                    raise ValueError('{} not in {}'.format(gene_id,self.name))
+                gene_id = result[0]
+            info = cur.execute('SELECT chromosome,start,end,id FROM genes WHERE id = ?', [gene_id]).fetchone()
+            return self.Gene(*info,build=self.build,organism=self.organism)
+
+        else:
+            bad_ids = []
+            gene_info = []
+            for id in gene_list:
+                gene_id = id
+                if gene_id not in self:
+                    result = cur.execute('SELECT id FROM aliases WHERE alias = ?', [gene_id]).fetchone()
+                    if not result:
+                        bad_ids.append(gene_id)
+                        continue
+                    gene_id = result[0]
+                gene_info.append(cur.execute('SELECT chromosome,start,end,id FROM genes WHERE id = ?', [gene_id]).fetchone())
+
+            genes = [self.Gene(*x,build=self.build,organism=self.organism) \
+                    for x in gene_info]
+
+            if check_shape and len(genes) != len(gene_list):
+                err_msg = '\nThese input ids do not have genes in reference:'
+                for x in range(len(bad_ids)):
+                    if x % 5 == 0:
+                        err_msg += '\n'
+                    err_msg += bad_ids[x] + '\t'
+                raise ValueError(err_msg)
+            return genes
 
     def __getitem__(self,item):
         '''
@@ -523,23 +537,47 @@ class RefGen(Camoco):
             # support adding lists of genes
             genes = list(gene)
             self.log('Adding {} Gene base info to database'.format(len(genes)))
-            self.db.cursor().execute('BEGIN TRANSACTION')
-            self.db.cursor().executemany(
+            cur = self.db.cursor()
+            cur.execute('BEGIN TRANSACTION')
+            cur.executemany(
                 'INSERT OR IGNORE INTO genes VALUES (?,?,?,?)',
                 ((gene.name,gene.chrom,gene.start,gene.end) for gene in genes)
             )
             self.log('Adding Gene attr info to database')
-            self.db.cursor().executemany(
+            cur.executemany(
                 'INSERT OR IGNORE INTO gene_attrs VALUES (?,?,?)',
                 ((gene.id,key,val) for gene in genes for key,val in gene.attr.items())
             )
-            self.db.cursor().execute('END TRANSACTION')
+            cur.execute('END TRANSACTION')
 
     def add_chromosome(self,chrom):
         ''' adds a chromosome object to the class '''
         self.db.cursor().execute('''
             INSERT OR REPLACE INTO chromosomes VALUES (?,?)
         ''',(chrom.id,chrom.length))
+
+    def add_aliases(self, alias_file, id_col=0, alias_col=1, headers=True):
+        ''' Add alias map to the RefGen '''
+        IN = open(alias_file,'r')
+        if headers:
+            garb = IN.readline()
+
+        alias_map = dict()
+        self.log('Importing aliases from: {}',alias_file)
+        for line in IN.readlines():
+            row = re.split(',|\t',line)
+            if row[id_col].strip() in self:
+                alias_map[row[alias_col]] = row[id_col].strip()
+        cur = self.db.cursor()
+        self.log('Saving them in the alias table.')
+        cur.execute('BEGIN TRANSACTION')
+        cur.executemany(
+            'INSERT OR REPLACE INTO aliases VALUES (?,?)',
+            [(alias, id) for (alias, id) in alias_map.items()])
+        cur.execute('END TRANSACTION')
+
+    def aliases(self, gene_id):
+        return [alias[0] for alias in self.db.cursor().execute('SELECT alias FROM aliases WHERE id = ?',[gene_id.upper()])]
 
     @classmethod
     def from_gff(cls,filename,name,description,build,organism):
@@ -633,5 +671,8 @@ class RefGen(Camoco):
                 id TEXT NOT NULL,
                 key TEXT,
                 val TEXT
-            )
-        ''');
+            );
+            CREATE TABLE IF NOT EXISTS aliases (
+                alias TEXT UNIQUE,
+                id TEXT
+            );''');
