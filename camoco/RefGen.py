@@ -120,7 +120,7 @@ class RefGen(Camoco):
         '''
         cur = self.db.cursor()
         if isinstance(gene_list,str):
-            # Handle when we pass in a single id
+        # Handle when we pass in a single id
             gene_id = gene_list
             if gene_id not in self:
                 result = cur.execute('SELECT id FROM aliases WHERE alias = ?', [gene_id]).fetchone()
@@ -131,6 +131,7 @@ class RefGen(Camoco):
             return self.Gene(*info,build=self.build,organism=self.organism)
 
         else:
+        # Handle when we pass an iterable of gene ids
             bad_ids = []
             gene_info = []
             for id in gene_list:
