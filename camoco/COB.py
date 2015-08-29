@@ -344,7 +344,6 @@ class COB(Expr):
             ).items()),
             columns=['Gene', 'Degree']
         ).set_index('Gene')
-        print(local_degree)
         # We need to find genes not in the subnetwork and add them as degree 0
         degree_zero_genes = pd.DataFrame( # The code below is optimized
             [(gene.id, 0) for gene in genes if gene.id not in local_degree.index],
@@ -400,6 +399,7 @@ class COB(Expr):
             degree['bootstrap_name'] = bootstrap_name
         return degree
 
+
     ''' ----------------------------------------------------------------------
         Plotting Methods
     '''
@@ -408,16 +408,16 @@ class COB(Expr):
              gene_normalize=True, raw=False,
              cluster_method='mcl'):
         # Get leaves
-        dm = self.expr(genes=genes,accessions=accessions,raw=raw)
-        if gene_normalize:
-            dm = dm.apply(
-                lambda row: (row-row.mean())/row.std(), axis=1
-            )
+        dm = self.expr(genes=genes,accessions=accessions,
+                raw=raw,gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
             order = self.hdf5['leaves'].sort('index').index.values
         elif cluster_method == 'mcl':
             order = self.hdf5['clusters'].loc[dm.index].\
                     fillna(np.inf).sort('cluster').index.values
+        else:
+            # No cluster order
+            order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
         # Save plot if provided filename
