@@ -1,5 +1,4 @@
 #!/usr/env/python3
-
 import os
 import yaml
 import pprint
@@ -11,7 +10,7 @@ global cf
 default_config = '''--- # YAML Camoco Configuration File
 options:
     basedir: ~/.camoco/
-    testdir: ~/build/'''+getpass.getuser()+'''/Camoco/tests/
+    testdir: ~/Camoco/tests/
 
 logging:
     log_level: verbose
