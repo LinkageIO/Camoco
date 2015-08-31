@@ -10,7 +10,7 @@ global cf
 default_config = '''--- # YAML Camoco Configuration File
 options:
     basedir: ~/.camoco/
-    testdir: ~/Camoco/tests/
+    testdir: ~/build/'''+getpass.getuser()+'''/Camoco/tests/
 
 logging:
     log_level: verbose
