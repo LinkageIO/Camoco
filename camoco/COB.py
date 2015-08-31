@@ -120,6 +120,16 @@ class COB(Expr):
             Coexpression Z-Score
 
         '''
+        if gene_a.id == gene_b.id:
+            # We don't cache these results
+            score = self._coex_concordance(gene_a,gene_b)
+            significant = 0
+            distance = 0
+            return pd.Series(
+                [score,significant,distance],
+                name=(gene_a.id,gene_b.id),
+                index = ['score','significant','distance']
+            )
         # Grab the indices in the original expression matrix
         ids = np.array([self._expr_index[gene_a.id], self._expr_index[gene_b.id]])
         # We need the number of genes
