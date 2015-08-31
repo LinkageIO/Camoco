@@ -2,14 +2,8 @@
 
 from .Ontology import Ontology
 from .Term import Term
-from .RefGen import RefGen
 from .Locus import Locus
-from .Tools import log
 
-from collections import defaultdict
-import networkx as nx
-import pandas as pd
-import numpy as np
 
 class GWAS(Ontology):
     '''
@@ -116,7 +110,7 @@ class GWAS(Ontology):
     '''
 
     @classmethod
-    def create(cls, name, description, refgen, type='Ontology'):
+    def create(cls, name, description, refgen, type='GWAS'):
         return super().create(name, description, refgen, type='GWAS')
 
     @classmethod
@@ -143,7 +137,6 @@ class GWAS(Ontology):
                         if key not in Locus.__init__.__code__.co_varnames \
                         and key not in [chr_col,pos_col,start_col,end_col,id_col]
                     }
-                    import ipdb; 
                     snp = Locus(
                         row[chr_col], int(row[pos_col]), int(row[pos_col]), 
                         gene_build=self.refgen.build, **kwargs
