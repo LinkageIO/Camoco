@@ -259,6 +259,11 @@ class Expr(Camoco):
         except Exception as e:
             self.log('Unable to update expression table values: {}', e)
             raise e
+        # Set the index
+        self._expr_index = defaultdict(
+            lambda: None,
+            {gene:index for index, gene in enumerate(self._expr.index)}
+        )
         return self
 
     def _transformation_log(self, transform=None):

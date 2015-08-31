@@ -751,6 +751,10 @@ class COB(Expr):
         self.hdf5['degree'] = pd.DataFrame()
         self.hdf5['mcl_cluster'] = pd.DataFrame()
         self.hdf5['leaves'] = pd.DataFrame()
+        self._expr_index = defaultdict(
+            lambda: None,
+            {gene:index for index, gene in enumerate(self._expr.index)}
+        )
         return self
 
     @classmethod

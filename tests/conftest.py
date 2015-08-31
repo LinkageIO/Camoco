@@ -13,7 +13,7 @@ import pandas as pd
             RefGen Fixtures
 '''
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def Zm5bFGS():
     if cf.test.force.RefGen:
         co.del_dataset('RefGen', 'Zm5bFGS', safe=False)
@@ -32,7 +32,7 @@ def Zm5bFGS():
         )
     return co.RefGen('Zm5bFGS')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtTair10():
     if cf.test.force.RefGen:
         co.del_dataset('RefGen', 'AtTair10', safe=False)
@@ -54,7 +54,7 @@ def AtTair10():
             COB Fixtures
 '''
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ZmRNASeqTissueAtlas(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('COB', 'ZmRNASeqTissueAtlas', safe=False)
@@ -64,7 +64,7 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
         return co.COB.from_table(
             os.path.join(cf.options.testdir,
                 'raw', 'Expr', 'RNASEQ',
-                'MaizeRNASeqTissue.tsv.gz',
+                'MaizeRNASeqTissue.tsv.bz2',
             ),
             'ZmRNASeqTissueAtlas',
             'Maize RNASeq Tissue Atlas Network, Sekhon 2013, PLoS ONE',
@@ -81,7 +81,7 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
     else:
         return co.COB('ZmRNASeqTissueAtlas')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ZmRoot(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('Expr','ZmRoot',safe=False)
@@ -106,7 +106,7 @@ def ZmRoot(Zm5bFGS):
     else:
         return co.COB('ZmRoot')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ZmSAM(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('Expr','ZmSAM',safe=False)
@@ -130,7 +130,7 @@ def ZmSAM(Zm5bFGS):
     else:
         return co.COB('ZmSAM')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ZmPAN(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('Expr','ZmPAN',safe=False)
@@ -157,7 +157,7 @@ def ZmPAN(Zm5bFGS):
 
 # Arabidopsis
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtSeed(AtTair10):
     if cf.test.force.COB:
         co.del_dataset('Expr', 'AtSeed', safe=False)
@@ -191,7 +191,7 @@ def AtSeed(AtTair10):
         return co.COB('AtSeed')
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtGen(AtTair10):
     if cf.test.force.COB:
         co.del_dataset('Expr', 'AtGen', safe=False)
@@ -225,7 +225,7 @@ def AtGen(AtTair10):
     else:
         return co.COB('AtGen')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtLeaf(AtTair10):
     if cf.test.force.COB:
         co.del_dataset('Expr', 'AtLeaf', safe=False)
@@ -261,7 +261,7 @@ def AtLeaf(AtTair10):
     else:
         return co.COB('AtLeaf')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtRoot(AtTair10):
     if cf.test.force.COB:
         co.del_dataset('Expr', 'AtRoot', safe=False)
@@ -299,7 +299,7 @@ def AtRoot(AtTair10):
             GWAS Fixtures
 '''
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ZmIonome(Zm5bFGS):
         # Delete the old dataset
     if cf.test.force.Ontology:
@@ -327,7 +327,7 @@ def ZmIonome(Zm5bFGS):
         return co.GWAS('ZmIonome')
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtSeedIonome(AtTair10):
     if cf.test.force.Ontology:
         co.del_dataset('GWAS', 'AtSeedIonome', safe=False)
@@ -355,7 +355,7 @@ def AtSeedIonome(AtTair10):
         return co.GWAS('AtSeedIonome')
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtLeafIonome(AtTair10):
     if cf.test.force.Ontology:
         co.del_dataset('GWAS', 'AtLeafIonome', safe=False)
@@ -380,7 +380,7 @@ def AtLeafIonome(AtTair10):
     else:
         return co.GWAS('AtLeafIonome')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtRootHydroIonome(AtTair10):
     if cf.test.force.Ontology:
         co.del_dataset('GWAS','AtRootHydroIonome',safe=False)
@@ -406,7 +406,7 @@ def AtRootHydroIonome(AtTair10):
     else:
         return co.GWAS('AtRootHydroIonome')
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def AtLeafHydroIonome(AtTair10):
     if cf.test.force.Ontology:
         co.del_dataset('GWAS','AtLeafHydroIonome',safe=False)
