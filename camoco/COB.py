@@ -407,6 +407,9 @@ class COB(Expr):
     def plot(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
              cluster_method='mcl'):
+        '''
+            Plots a heatmap of genes x expression.
+        '''
         # Get leaves
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
@@ -421,23 +424,21 @@ class COB(Expr):
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
         # Save plot if provided filename
+        fig = plt.figure(
+            figsize=(100, 100),
+            facecolor='white'
+        )
+        nan_mask = np.ma.array(dm, mask=np.isnan(dm))
+        cmap = self._cmap
+        cmap.set_bad('grey', 1.0)
+        vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
+        vmin = vmax*-1
+        im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        # Save if you wish
         if filename is not None:
-            #filename = '{}_global_heatmap.png'.format(self.name)
-            f = plt.figure(
-                figsize=(100, 100),
-                facecolor='white'
-            )
-            nan_mask = np.ma.array(dm, mask=np.isnan(dm))
-            cmap = self._cmap
-            cmap.set_bad('grey', 1.0)
-            vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
-            vmin = vmax*-1
-            im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
-
             plt.savefig(filename)
             plt.close()
-
-        return dm
+        return fig
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         '''
@@ -452,7 +453,7 @@ class COB(Expr):
             bins : int (default: 50)
                 the number of bins in the histogram
         '''
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.figure(figsize=(8, 6))
         # grab the scores only and put in a
         # np array to save space (pandas DF was HUGE)
         scores = self.coex.score.values
@@ -524,65 +525,6 @@ class COB(Expr):
         ax.set_ylabel('Number Local Interactions')
         legend = ax.legend(loc='best')
         return plt
-
-    def plot_heatmap(self, genes=None, accessions=None,
-        filename=None, maskNaNs=True,
-        cluster_method='mcl', raw=False,
-        title=None, gene_normalize=True,
-        heatmap_unit_label='Expression'):
-        '''
-            Draw clustered heatmaps of an expression matrix
-        '''
-        # Sort the genes by id name
-        genes = set(sorted([x for x in genes if x in self], key=lambda x: x.id))
-        dm = self.expr(genes=genes, accessions=accessions, raw=raw)
-        # Get Z scores for the each genes
-        if gene_normalize:
-            dm = dm.apply(
-                lambda row: (row-row.mean())/row.std(), axis=1
-            )
-        f = plt.figure(
-            figsize=(100,100),
-            facecolor='white'
-        )
-        # add first dendrogram
-        if cluster_method == 'leaf':
-            order = self.hdf5['leaves'].loc[dm.index].sort('index').index.values
-        elif cluster_method == 'mcl':
-            order = self.hdf5['clusters'].loc[dm.index].fillna(np.inf).sort('cluster').index.values
-            # rearrange expression by leaf order
-        dm = dm.loc[order, :]
-
-        if title:
-            plt.title(title)
-        vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
-        vmin = vmax*-1
-        self.log("Extremem Values: {}", vmax)
-        # Handle NaNs
-        nan_mask = np.ma.array(dm, mask=np.isnan(dm))
-        cmap = self._cmap
-        cmap.set_bad('grey', 1.0)
-        im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
-        # Handle Axis Labels
-        #plt.set_xticks(np.arange(dm.shape[1]))
-        #plt.xaxis.tick_bottom()
-        #plt.tick_params(axis='x', labelsize='xx-small')
-        #plt.set_xticklabels(col_labels, rotation=90, ha='center')
-        #plt.yaxis.tick_right()
-        #plt.set_yticks(np.arange(dm.shape[0]))
-        #plt.set_yticklabels(row_labels)
-        #plt.tick_params(axis='y', labelsize='xx-small')
-        plt.gcf().subplots_adjust(right=0.15)
-        # Add color bar
-        axColorBar = f.add_axes([0.09, 0.75, 0.2, 0.05])
-        plt.colorbar(im, orientation='horizontal', cax=axColorBar,
-            ticks=np.arange(np.ceil(vmin), np.ceil(vmax), int((vmax-vmin)/2))
-        )
-        plt.title(heatmap_unit_label)
-        if filename:
-            plt.savefig(filename)
-            plt.close()
-        return dm
 
     def compare_degree(self, obj, diff_genes=10, score_cutoff=3):
         '''
