@@ -42,8 +42,16 @@ def main(args):
     # Initiate for args 
     # Generate output dirs
 
-    ont = co.Ontology(args.ontology)
-    term = ont[args.term]
+    ont = co.GWAS(args.GWAS)
+
+    # If all, grab a generater
+    if args.term == 'all':
+        terms = ont.iter_terms()
+    else:
+        # Otherwise get the term out of the GWAS
+        terms = [ont[args.term]] 
+
+    # Grab the COB object
     cob = co.COB(args.cob)
 
     # Create a plot comparing spread of specified shit
@@ -61,45 +69,43 @@ def main(args):
     possibles.update(locals())
 
     # Add in text for axes
-    for plot in args.plot:
-        for i,xaxis in enumerate(xaxes):
-            for j,yaxis in enumerate(yaxes):
-                ax = fig.add_subplot(gs[i,j]) 
-                print("Looking at {}:{} x {}:{}".format(
-                    xaxes_key,xaxis,
-                    yaxes_key,yaxis,
-                ))
-                perm_args = copy.deepcopy(args) 
-                # Set the values we aren't permuting to their first value
-                # I hate this
-                for arg in perm_args.permutable:
-                    if arg not in [xaxes_key,yaxes_key]:
-                        setattr(perm_args,arg,getattr(args,arg)[0])
-                # Change the relevent things in the permuted args 
-                setattr(perm_args,xaxes_key,xaxis)
-                setattr(perm_args,yaxes_key,yaxis)
-                # Generate data using permuted arguments
-                loc,bsloc,fdr = generate_data(cob,term,perm_args) 
-                # Get the plot function based on args
-                plot_function = possibles.get('plot_'+plot)
-                # Plot the data
-                plot_function(perm_args,loc,bsloc,fdr,ax)
-                if i == 0:
-                    ax.set_title(yaxis)
-                if j == 0:
-                    ax.set_ylabel(xaxis)
-                if i == 0 and j == 0:
-                    ax.set_title(str(yaxes_key)+' '+str(yaxis))
-                    ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
-        plt.tight_layout()
-        plt.savefig("{}_{}.png".format(
-            plot,
-            args.out.replace('.png','')
-        ))
-    
-    if args.debug:
-        import ipdb; ipdb.set_trace()
-
+    for term in terms:
+        for plot in args.plot:
+            for i,xaxis in enumerate(xaxes):
+                for j,yaxis in enumerate(yaxes):
+                    ax = fig.add_subplot(gs[i,j]) 
+                    print("Looking at {}:{} x {}:{}".format(
+                        xaxes_key,xaxis,
+                        yaxes_key,yaxis,
+                    ))
+                    perm_args = copy.deepcopy(args) 
+                    # Set the values we aren't permuting to their first value
+                    # I hate this
+                    # for arg in perm_args.permutable:
+                    #    if arg not in [xaxes_key,yaxes_key]:
+                    #        setattr(perm_args,arg,getattr(args,arg)[1])
+                    # Change the relevent things in the permuted args 
+                    setattr(perm_args,xaxes_key,xaxis)
+                    setattr(perm_args,yaxes_key,yaxis)
+                    # Generate data using permuted arguments
+                    loc,bsloc,fdr = generate_data(cob,term,perm_args) 
+                    # Get the plot function based on args
+                    plot_function = possibles.get('plot_'+plot)
+                    # Plot the data
+                    plot_function(perm_args,loc,bsloc,fdr,ax)
+                    if i == 0:
+                        ax.set_title(yaxis)
+                    if j == 0:
+                        ax.set_ylabel(xaxis)
+                    if i == 0 and j == 0:
+                        ax.set_title(str(yaxes_key)+' '+str(yaxis))
+                        ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
+            plt.tight_layout()
+            plt.savefig("Locality_{}_{}.png".format(
+                plot,
+                term.id
+            ))
+        
 
 def generate_data(cob,term,args):
     '''
@@ -109,23 +115,23 @@ def generate_data(cob,term,args):
     effective_loci = term.effective_loci(
             window_size=args.candidate_window_size
     ) 
+
     candidate_genes = cob.refgen.candidate_genes(
         effective_loci,
         gene_limit=args.candidate_gene_limit
     )
+
     # Find the empirical Locality
     loc = cob.locality(
         candidate_genes,
         include_regression=True
     )
-    
+   
     # Find the Bootstrapped Locality
     bsloc = pd.concat(
             [cob.locality(
                 cob.refgen.bootstrap_candidate_genes(
-                    term.effective_loci(
-                        window_size=args.candidate_window_size
-                    ),
+                    effective_loci,
                     gene_limit=args.candidate_gene_limit
                 ),
                 bootstrap_name=x
@@ -376,8 +382,6 @@ def plot_data(args,loc,bsloc,fdr,ax):
         args.num_snps)
     )
 
-
-
     out_string = '_'.join(map(str,[
         args.term,
         args.cob,
@@ -423,7 +427,7 @@ if __name__ == '__main__':
         '--cob', help='The camoco network to use.'
     )
     parser.add_argument(
-        '--ontology', help='The camoco ontology to use.'
+        '--GWAS', help='The camoco GWAS to use.'
     )
     parser.add_argument(
         '--term', help='The term within the ontology to use.'
@@ -458,20 +462,21 @@ if __name__ == '__main__':
     )
     # Permutation parameters
     parser.add_argument(
-       '--min-fdr-degree', default=2, nargs='*',
+       '--min-fdr-degree', default=[2], nargs='*',
        type=int, help='''The miniumum degree to be included 
        as true positive in FDR calculation.'''
     )
     parser.add_argument(
-       '--candidate-window-size',default=50000,
+       '--candidate-window-size',default=[50000],
        type=int, nargs='*',  
        help='The window size for mapping effective SNPs to genes.'
     )
     parser.add_argument(
-       '--candidate-gene-limit',default=2,
+       '--candidate-gene-limit',default=[2],
        type=int, nargs='*',
        help='The number of flanking genes included in SNP to gene mapping'
     )
+
     # Dont worry about this right now
     # parser.add_argument(
     #    '--num-snps',default=None, nargs='*',
@@ -480,13 +485,8 @@ if __name__ == '__main__':
 
     # Data Formatting Parameters
     parser.add_argument(
-       '--out',default='Output',
+       '--out',default='.',
        type=str,help='Name of output directory'
-    )
-    parser.add_argument(
-       '--debug',default=False,
-       action='store_true',
-       help='Drop into an ipdb debugger before quitting.'
     )
 
     # Make this a list  
@@ -496,10 +496,13 @@ if __name__ == '__main__':
         help=("Designates which item to plot. Must be in: ['fdr','scatter']")
     )
 
+    import sys
+    from IPython.core import ultratb
+    sys.excepthook = ultratb.FormattedTB(mode='Verbose',
+                 color_scheme='Linux', call_pdb=1)
+
     with open('command_log.txt','a') as LOG:
         print('{}'.format(' '.join(sys.argv)),file=LOG)
+
     args = parser.parse_args()
     sys.exit(main(args))
-
-
-
