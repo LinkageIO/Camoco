@@ -13,7 +13,6 @@ import pandas as pd
             RefGen Fixtures
 '''
 
-
 @pytest.fixture
 def Zm5bFGS():
     if cf.test.force.RefGen:
