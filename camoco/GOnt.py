@@ -135,7 +135,7 @@ class GOnt(Ontology):
         return self
 
     @classmethod
-    def from_obo(cls, obo_file, gene_map_file ,name, description, refgen, go_col=1, overwrite=True):
+    def from_obo(cls, obo_file, gene_map_file ,name, description, refgen, go_col=1, id_col=0, headers=True, overwrite=True):
         ''' Convenience function for importing GO obo files '''
 
         # Internal function to handle propagating is_a relationships
@@ -192,10 +192,11 @@ class GOnt(Ontology):
         gene = ''
         cur_term = ''
         INMAP = open(gene_map_file)
-        garb = INMAP.readline()
+        if headers:
+            garb = INMAP.readline()
         for line in INMAP.readlines():
             row = line.strip().split('\t')
-            gene = row[0].split('_')[0].strip()
+            gene = row[id_col].split('_')[0].strip()
             cur_term = row[go_col]
             if gene not in genes:
                 genes[gene] = set([cur_term])
