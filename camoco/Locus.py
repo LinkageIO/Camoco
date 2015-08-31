@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from collections import defaultdict
+from itertools import chain
 import re
 
 class Locus(object):
@@ -29,7 +30,10 @@ class Locus(object):
     @property
     def id(self):
         if self._id is None:
-            return str(self)
+            return '''<{}>{}:{}-{}'''.format(
+                self._id, self.chrom,
+                self.start, self.end
+            )
         else:
             return self._id
 
@@ -94,8 +98,21 @@ class Locus(object):
         new_end = int(max(self.end,locus.end))
         new_window = self.window
         new_id = str(self.id)+';'+str(locus.id)
-        new_sub_loci = self.sub_loci | locus.sub_loci | set([self, locus])
-        return Locus(self.chrom,new_start,new_end,window=new_window,sub_loci=new_sub_loci)
+        # This can be a list, since set gets called anyways
+        # new_sub_loci = self.sub_loci | locus.sub_loci | set([self, locus])
+
+        #new_sub_loci = self.sub_loci.union(locus.sub_loci)
+        #new_sub_loci.add(self)
+        #new_sub_loci.add(locus)
+
+        new_sub_loci = [self.id,locus.id]
+        new_sub_loci.extend(self.sub_loci)
+        new_sub_loci.extend(locus.sub_loci)
+
+        return Locus(
+            self.chrom, new_start, new_end,
+            window=new_window, sub_loci=new_sub_loci
+        )
 
     def __eq__(self,locus):
         if (self.chrom == locus.chrom and
@@ -134,20 +151,29 @@ class Locus(object):
             return self.start < locus.start
         else:
             return self.chrom < locus.chrom
+
     def __gt__(self,locus):
         if self.chrom == locus.chrom:
             return self.start > locus.start
         else:
             return self.chrom > locus.chrom
+
     def __sub__(self,other):
         if self.chrom != other.chrom:
             return float('Inf')
         else:
             return self.start - other.start
+
     def __str__(self):
-        return '''<{}>{}:{}-{}+{}'''.format(self._id,self.chrom,self.start,self.end,self.window)
+        return '''<{}>{}:{}-{}+{}(%{})'''.format(
+            self._id, self.chrom,
+            self.start, self.end,
+            self.window, len(self.sub_loci)
+        )
+
     def __repr__(self):
         return str(self)
+
     def __hash__(self):
         try:
             return int("{}{}".format(self.chrom,self.start))
