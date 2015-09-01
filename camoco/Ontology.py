@@ -71,9 +71,11 @@ class Ontology(Camoco):
         Parameters
         ----------
         term : Term object
-            The term object you wish to remove.
+            The term object you wish to add.
         cursor : apsw cursor object
-            A initialized cursor object, for batch operation.
+            A initialized cursor object, for batch operation. This will
+            allow for adding many terms in one transaction as long as the 
+            passed in cursor has executed the "BEGIN TRANSACTION" command.
         overwrite : bool
             Indication to delete any existing entry before writing'''
         if overwrite:
@@ -101,7 +103,7 @@ class Ontology(Camoco):
             cur.execute('END TRANSACTION')
 
     def del_term(self, term, cursor=None):
-        ''' This will add a single term to the ontology
+        ''' This will delete a single term to the ontology
 
         Parameters
         ----------
@@ -129,6 +131,13 @@ class Ontology(Camoco):
             cur.execute('END TRANSACTION')
 
     def add_terms(self, terms, overwrite=True):
+        '''
+            A Convenience function to add terms from an iterable.
+
+            Parameters
+            ----------
+            terms : iterable of camoco.Term objects
+        '''
         if overwrite:
             self.del_terms(terms)
 
@@ -139,6 +148,13 @@ class Ontology(Camoco):
         cur.execute('END TRANSACTION')
 
     def del_terms(self, terms):
+        '''
+            A Convenience function to delete many term object
+
+            Parameters
+            ----------
+            terms : iterable of camoco.Term objects.
+        '''
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
         for term in terms:
