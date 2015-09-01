@@ -292,8 +292,8 @@ class COB(Expr):
         nx.write_graphml(net,file)
         return
 
-    def to_treeview(self, filename, cluster_method='mcl'):
-        dm = self.expr()
+    def to_treeview(self, filename, cluster_method='mcl', gene_normalize=True):
+        dm = self.expr(gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
             order = self.hdf5['leaves'].sort('index').index.values
         elif cluster_method == 'mcl':
@@ -313,6 +313,7 @@ class COB(Expr):
         als = pd.Series(aliases)
         dm.insert(0,'Aliases',als)
         dm.to_csv(filename)
+
 
     def mcl(self, gene_list=None, I=2.0, scheme=7, min_distance=None,
             min_cluster_size=0, max_cluster_size=10e10):
