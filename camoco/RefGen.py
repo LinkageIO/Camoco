@@ -19,6 +19,7 @@ import math
 import gzip
 import re
 
+
 class RefGen(Camoco):
     def __init__(self,name):
         # initialize camoco instance
@@ -425,6 +426,7 @@ class RefGen(Camoco):
         plt.clf()
         # Each chromosome gets a plot
         chroms = set([x.chrom for x in loci])
+        # Create a figure with 
         f, axes = plt.subplots(len(chroms),figsize=(10,4*len(chroms)))
         # Loci Locations
         chromloci = defaultdict(list)
@@ -461,8 +463,13 @@ class RefGen(Camoco):
             cax.scatter(hoffset+locus.window+len(locus)+locus.window,voffset,marker='<')
 
             # place markers for sub snps
-            for subsnp in locus.sub_loci:
-                cax.scatter(hoffset+subsnp.start-locus.start+locus.window,voffset,marker='.',color='blue')
+            #for subsnp in locus.sub_loci:
+            #    cax.scatter(
+            #        hoffset + subsnp.start - locus.start + locus.window,
+            #        voffset,
+            #        marker='.',
+            #        color='blue'
+            #    )
 
             # place a block for interlocal distance
             cax.barh(
@@ -484,7 +491,7 @@ class RefGen(Camoco):
             voffset += 5
 
         plt.savefig(filename)
-        del f
+        return f
 
     def __repr__(self):
         return 'Reference Genome: {} - {} - {}'.format(

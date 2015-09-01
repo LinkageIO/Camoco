@@ -18,9 +18,9 @@ logging:
 
 test:
     force:
-        RefGen:   True
-        COB:      True
-        Ontology: True
+        RefGen:   False
+        COB:      False
+        Ontology: False
     refgen:   Zm5bFGS
     cob:      NewRoot
     ontology: ZmIonome

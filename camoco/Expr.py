@@ -119,7 +119,8 @@ class Expr(Camoco):
         '''
         return any(self._expr.apply(lambda col: all(np.isnan(col)), axis=0))
 
-    def expr(self, genes=None, accessions=None, raw=False):
+    def expr(self, genes=None, accessions=None, 
+             raw=False,gene_normalize=False):
         '''
             Access raw and QC'd expression data.
 
@@ -137,6 +138,8 @@ class Expr(Camoco):
                 Flag to indicate on using the raw table versus the current
                 expr table. See the transformation_log for more details on
                 the difference.
+            gene_normalize : bool (default: False)
+                Perform standard normalization on gene-wise data
             zscore : bool (default: False)
 
         '''
@@ -149,6 +152,10 @@ class Expr(Camoco):
             df = df.loc[[x.id for x in genes], :]
         if accessions is not None:
             df = df[accessions]
+        if gene_normalize:
+            df = df.apply(
+                lambda row: (row-row.mean())/row.std(), axis=1
+            )
         return df
 
     def plot_accession_histograms(self, bins=50, figsize=(16, 8)):
@@ -252,6 +259,11 @@ class Expr(Camoco):
         except Exception as e:
             self.log('Unable to update expression table values: {}', e)
             raise e
+        # Set the index
+        self._expr_index = defaultdict(
+            lambda: None,
+            {gene:index for index, gene in enumerate(self._expr.index)}
+        )
         return self
 
     def _transformation_log(self, transform=None):
@@ -563,7 +575,7 @@ class Expr(Camoco):
     '''
 
     @classmethod
-    def create(cls, name, description, refgen):
+    def create(cls, name, description, refgen, type='Expr'):
         '''
             Create an empty Expr instance. Overloads the Camoco
             create method. See Camoco.create(...)
@@ -586,7 +598,7 @@ class Expr(Camoco):
 
         '''
         # Piggy back on the super create method
-        self = super().create(name, description, type='Expr')
+        self = super().create(name, description,type=type)
         # Create appropriate HDF5 tables
         self.hdf5['expr'] = pd.DataFrame()
         self.hdf5['raw_expr'] = pd.DataFrame()
