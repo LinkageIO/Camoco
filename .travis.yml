@@ -12,6 +12,7 @@ before_install:
   # Install MCL
   - wget http://micans.org/mcl/src/mcl-latest.tar.gz && tar xvvf mcl-latest.tar.gz
   - cd $(find . -name 'mcl-*' -type d | head -n 1) && ./configure --prefix=$HOME/.local && make && make install && cd ..
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib/
   # Intall hdf5
   - wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.8.15-patch1.tar && tar xvvf hdf5-1.8.15-patch1.tar
   - cd hdf5-1.8.15-patch1/ && ./configure --prefix=$HOME/.local && make &> /dev/null && make install && export HDF5_DIR=$HOME/.local && cd ..
