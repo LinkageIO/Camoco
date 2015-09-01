@@ -130,7 +130,7 @@ class CompCOB(Camoco):
             else:
                 dens[term].append(0)
             n += 1
-        self.log('Compared all '+str(n)+' terms.')
+        self.log('Compared all {} terms.', n)
 
         # Convert the dict to a DataFrame
         ans = DataFrame.from_items(
