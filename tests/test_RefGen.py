@@ -32,9 +32,11 @@ def test_lowercase_get_item(testRefGen):
 def test_genes_within(testRefGen):
     random_gene = testRefGen.random_gene()
     bigger_locus = Locus(
-        random_gene.chrom,random_gene.start-100,random_gene.end+100
+        random_gene.chrom,
+        start=random_gene.start-100,
+        end=random_gene.end+100
     )
-    genes = testRefGen.genes_within(random_gene)
+    genes = testRefGen.genes_within(bigger_locus)
     assert random_gene == genes.pop()
 
 def test_locus_not_in_upstream_downstream(testRefGen):
@@ -80,7 +82,7 @@ def test_flanking_genes(testRefGen):
         random_gene, window=50e6, gene_limit=5
     )
     flanking = testRefGen.flanking_genes(
-        random_gene, window=50e6, gene_limit=10
+        random_gene, window=50e6, flank_limit=10
     )
     assert sorted(flanking) == sorted(upstream + downstream)
 
@@ -94,11 +96,21 @@ def test_flanking_genes_includes_within_genes_for_SNPS(testRefGen):
 def test_candidate_genes_from_SNP(testRefGen):
     random_gene = testRefGen.random_gene()
     # grab a bunch of downstream genes
-    downstream = testRefGen.downstream_genes(random_gene,gene_limit=10,window=50e6)
+    down1,down2 = testRefGen.downstream_genes(
+        random_gene,gene_limit=2,window=50e6
+    )
     # Create a Locus that is on gene 5
-    test_snp = Locus(downstream[5].chrom,downstream[5].start,window=50e6)
-    candidates = testRefGen.candidate_genes(test_snp,gene_limit=10)
-    assert sorted(downstream) == sorted(candidates)
+    test_snp = Locus(
+        down1.chrom,
+        down1.start-50,
+        end=down2.end+50,
+        window=50e6
+    )
+    up,within,down = testRefGen.candidate_genes(
+        test_snp,flank_limit=10,chain=False
+    )
+    assert (len(up)+len(down)) == 10
+    assert len(within) == 2
 
 def test_candidate_genes_from_gene_includes_gene(testRefGen):
     random_gene = testRefGen.random_gene()
@@ -108,22 +120,31 @@ def test_candidate_genes_from_gene_includes_gene(testRefGen):
     )
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        downstream[5],gene_limit=10,window=50e6
+        downstream[5],flank_limit=10,window=50e6
     )
-    assert downstream[5] in candidates
+    assert downstream[4] in candidates
 
-def test_gene_limit_for_candidate_genes(testRefGen):
+def test_no_overlap_in_non_chained_candidates(testRefGen):
+    random_gene = testRefGen.random_gene()
+    # Create a Locus that is on gene 5
+    up,within,down = testRefGen.candidate_genes(
+        random_gene,flank_limit=10,window=50e6,chain=False
+    )
+    assert len(set(up) & set(within) & set(down)) == 0
+   
+
+def test_flank_limit_for_candidate_genes(testRefGen):
     random_gene = testRefGen.random_gene()
     downstream = testRefGen.downstream_genes(
         random_gene,gene_limit=10,window=50e6
     )
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        downstream[5],gene_limit=10,window=50e6
+        downstream[5],flank_limit=10,window=50e6
     )
     assert len(candidates) == 10
 
-def test_gene_limit_for_candidate_genes_from_SNP(testRefGen):
+def test_flank_limit_for_candidate_genes_from_SNP(testRefGen):
     random_gene = testRefGen.random_gene()
     downstream = testRefGen.downstream_genes(
         random_gene,gene_limit=10,window=50e6
@@ -131,7 +152,7 @@ def test_gene_limit_for_candidate_genes_from_SNP(testRefGen):
     test_snp = Locus(downstream[5].chrom,downstream[5].start,window=50e6)
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        test_snp,gene_limit=10,window=50e6
+        test_snp,flank_limit=10,window=50e6
     )
     assert len(candidates) == 10
 

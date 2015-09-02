@@ -241,7 +241,7 @@ class RefGen(Camoco):
                 for x in self.db.cursor().execute('''
                     SELECT chromosome,start,end,id FROM genes
                     WHERE chromosome = ?
-                    AND start >= ? AND start <= ?
+                    AND start > ? AND start <= ?
                     ''',
                     (loci.chrom,loci.start,loci.end))
             ]
@@ -342,8 +342,8 @@ class RefGen(Camoco):
                     'Asking for upstream genes for {}',
                     locus.id
                 )
-            upstream_gene_limit = math.ceil(gene_limit/2)
-            downstream_gene_limit = math.floor(gene_limit/2)
+            upstream_gene_limit = math.ceil(flank_limit/2)
+            downstream_gene_limit = math.floor(flank_limit/2)
             up_genes = self.upstream_genes(
                 locus, gene_limit=upstream_gene_limit, window=window
             )
