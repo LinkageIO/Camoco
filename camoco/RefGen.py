@@ -225,7 +225,15 @@ class RefGen(Camoco):
 
     def genes_within(self,loci,chain=True):
         '''
-            Returns the genes within a locus
+            Returns the genes that START within a locus 
+            start/end boundry.
+
+            Looks like: (y=yes,returned; n=no,not returned)
+
+            nnn  nnnnnnn  yyyyyy   yyyyy  yyyyyy yyyyyyy
+                    start                        end
+                -----x****************************x-------------
+
         '''
         if isinstance(loci,Locus):
             return [
@@ -233,19 +241,9 @@ class RefGen(Camoco):
                 for x in self.db.cursor().execute('''
                     SELECT chromosome,start,end,id FROM genes
                     WHERE chromosome = ?
-                    AND (
-                           (start >= ? AND end <= ? )
-                        OR (start <= ? AND end >= ? )
-                        OR (start <= ? AND end >= ? )
-                        OR (start <= ? AND end >= ? )
-                    )
-                ''',
-                    (loci.chrom,
-                     loci.start,loci.end,   # Truly within
-                     loci.start,loci.start, # Start lands within
-                     loci.end,  loci.end,   # End lands within 
-                     loci.start,loci.end)   # Surrounds Locus 
-                )
+                    AND start >= ? AND start <= ?
+                    ''',
+                    (loci.chrom,loci.start,loci.end))
             ]
         else:
             iterator = iter(loci)
@@ -256,8 +254,21 @@ class RefGen(Camoco):
 
     def upstream_genes(self,locus,gene_limit=1000,window=None):
         '''
-            Find genes upstream of a locus. Genes are ordered so that the
-            nearest genes are at the beginning of the list.
+            Find genes that START upstream of a locus. 
+            Genes are ordered so that the nearest genes are 
+            at the beginning of the list.
+
+            Return Genes that overlap with the upstream window,
+            This includes partially overlapping genes, but NOT
+            genes that are returned by the genes_within method. 
+
+            Looks like: (y=yes,returned; n=no,not returned)
+
+            nnn  yyyyyyy   yyyyyy   yyyyy  yyyyyy nnnn nnnn nnnnnnnn
+                                             nnnn
+                                           start             end
+                -----------------------------x****************x--
+                   ^_________________________| Window (upstream)
         '''
         if locus.window == 0 and window is None:
             raise CamocoZeroWindowError(
@@ -273,8 +284,8 @@ class RefGen(Camoco):
             for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes
                 WHERE chromosome = ?
-                AND end < ?
-                AND end >= ?
+                AND start < ? -- Gene must start BEFORE locus
+                AND end >= ?  -- Gene must end AFTER locus window (upstream) 
                 ORDER BY start DESC
                 LIMIT ?
             ''',(locus.chrom, locus.start, upstream, gene_limit)
@@ -282,8 +293,19 @@ class RefGen(Camoco):
 
     def downstream_genes(self,locus,gene_limit=1000,window=None):
         '''
-            returns genes downstream of a locus. Genes are ordered so that the
-            nearest genes are at the beginning of the list.
+            Returns genes downstream of a locus. Genes are ordered 
+            so that the nearest genes are at the beginning of the list.
+
+            Return Genes that overlap with the downstream window,
+            This includes partially overlapping genes, but NOT
+            genes that are returned by the genes_within method. 
+
+            Looks like: (y=yes,returned; n=no,not returned)
+
+            nnn  nnnnnnn   nnnnnn nnnn  yyyy  yyyyyy yyyy yyyyyy  nnnnn
+               start             end
+              ---x****************x--------------------------------
+                                  |_______________________^ Window (downstream)
         '''
         if locus.window == 0 and window is None:
             raise CamocoZeroWindowError(
@@ -520,13 +542,12 @@ class RefGen(Camoco):
         plt.clf()
         # Each chromosome gets a plot
         chroms = set([x.chrom for x in loci])
-        # Create a figure with 
+        # Create a figure with a subplot for each chromosome 
         f, axes = plt.subplots(len(chroms),figsize=(10,4*len(chroms)))
-        # Loci Locations
+        # Split loci by chromosome
         chromloci = defaultdict(list)
         for locus in sorted(loci):
             chromloci[locus.chrom].append(locus)
-
         # iterate over Loci
         seen_chroms = set([loci[0].chrom])
         voffset = 1 # Vertical Offset
