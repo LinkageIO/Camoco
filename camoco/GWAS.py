@@ -34,7 +34,7 @@ class GWAS(Ontology):
                         WHERE term = ? AND id = ?
                         ''',(id,locus.id)).fetchall():
                     locus.attr[key] = val
-            return Term(id, desc=desc, locus_list=term_loci)
+            return Term(id, desc=desc, loci=term_loci)
         except TypeError as e: #Not in database
             raise e
 
@@ -53,7 +53,7 @@ class GWAS(Ontology):
             VALUES (?, ?)''', (term.id, term.desc)
         )
         # Add the term loci
-        for locus in term.locus_list:
+        for locus in term.loci:
             cur.execute('''
                 INSERT OR REPLACE INTO term_loci 
                 (term, id, chrom, start, end, window)
@@ -141,7 +141,7 @@ class GWAS(Ontology):
                         row[chr_col], int(row[pos_col]), int(row[pos_col]), 
                         gene_build=self.refgen.build, **kwargs
                     )
-                    term.locus_list.add(snp)
+                    term.loci.add(snp)
             self.log("Importing {}", term)
             self.add_term(term)
         return self
