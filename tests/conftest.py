@@ -14,8 +14,9 @@ import pandas as pd
 '''
 
 @pytest.fixture(scope='module')
-def testRefGen():
-    return co.RefGen(cf.test.refgen)
+def testRefGen(Zm5bFGS):
+    # This was a mistake
+    return Zm5bFGS
 
 @pytest.fixture(scope="module")
 def Zm5bFGS():
