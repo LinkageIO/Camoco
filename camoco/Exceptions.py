@@ -7,27 +7,35 @@ class CamocoExistsError(CamocoError):
         You tried to create a camoco object which already exists
         under the same name,type combination.
     '''
-    def __init__(self,expr,message=''):
+    def __init__(self,expr,message='',*args):
         self.expr = expr
         self.message = (
             'You are trying to create a Camoco based object'
-            'That already exists' + message
+            'That already exists' + message.format(*args)
         )
 
 class CamocoGeneNameError(CamocoError):
     '''
         Gene names must be beautiful snowflakes.
     '''
-    def __init__(self,expr,message=''):
+    def __init__(self,expr,message='',*args):
         self.expr = expr
-        self.message = 'Gene names must be unique:' + message
+        self.message = 'Gene names must be unique:' + message.format(args)
 
 class CamocoAccessionNameError(CamocoError):
     '''
         Accession names must be Unique.
     '''
-    def __init__(self,expr,message=''):
+    def __init__(self,expr,message='',*args):
         self.expr = expr
         self.message = (
-            'Accession names must be unique:' + message
+            'Accession names must be unique:' + message.format(args)
+        )
+
+class CamocoZeroWindowError(CamocoError):
+    def __init__(self,expr,message,*args):
+        self.expr = expr
+        self.message = (
+            'Operation requiring window, but window is 0:' + \
+            message.format(args)
         )
