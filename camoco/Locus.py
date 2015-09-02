@@ -97,7 +97,6 @@ class Locus(object):
         new_start = int(max(0,min(self.start,locus.start)))
         new_end = int(max(self.end,locus.end))
         new_window = self.window
-        new_id = str(self.id)+';'+str(locus.id)
         # This can be a list, since set gets called anyways
         # new_sub_loci = self.sub_loci | locus.sub_loci | set([self, locus])
 
@@ -162,7 +161,9 @@ class Locus(object):
         if self.chrom != other.chrom:
             return float('Inf')
         else:
-            return self.start - other.start
+            # sort them
+            a,b = sorted([self,other])
+            return b.start - a.end
 
     def __str__(self):
         return '''<{}>{}:{}-{}+{}(%{})'''.format(
