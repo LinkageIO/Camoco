@@ -329,7 +329,7 @@ class RefGen(Camoco):
             ''',(locus.chrom, locus.end, downstream, gene_limit)
         )]
 
-    def flanking_genes(self, loci, gene_limit=4,chain=True,window=None):
+    def flanking_genes(self, loci, flank_limit=4,chain=True,window=None):
         '''
             Returns genes upstream and downstream from a locus
             ** including genes locus is within **
@@ -356,24 +356,24 @@ class RefGen(Camoco):
         else:
             iterator = iter(loci)
             genes = [
-                self.flanking_genes(locus,gene_limit=gene_limit,window=window)\
+                self.flanking_genes(locus,flank_limit=flank_limit,window=window)\
                 for locus in iterator
             ]
             if chain:
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def candidate_genes(self, loci, gene_limit=4,chain=True,window=None):
+    def candidate_genes(self, loci, flank_limit=4,chain=True,window=None):
         '''
             SNP to Gene mapping.
             Return Genes between locus start and stop, plus additional
-            flanking genes (up to gene_limit)
+            flanking genes (up to flank_limit)
 
             Parameters
             ----------
             loci : camoco.Locus (also handles an iterable containing Loci)
                 a camoco locus or iterable of loci
-            gene_limit : int (default : 4)
+            flank_limit : int (default : 4)
                 The total number of flanking genes
                 considered a candidate surrounding a locus
             chain : bool (default : true)
@@ -394,17 +394,20 @@ class RefGen(Camoco):
             locus = loci
             genes_within = self.genes_within(locus)
             up_genes,down_genes = self.flanking_genes(
-                locus, gene_limit=gene_limit, chain=False,
+                locus, flank_limit=flank_limit, chain=False,
                 window=window
             )
-            return list(
-                itertools.chain(up_genes,genes_within,down_genes)
-            )[0:gene_limit]
+            if chain:
+                return list(
+                    itertools.chain(up_genes,genes_within,down_genes)
+                )
+            else:  
+                return up_genes,genes_within,down_genes
         else:
             iterator = iter(sorted(loci))
             genes = [
                 self.candidate_genes(
-                    locus, gene_limit=gene_limit,
+                    locus, flank_limit=flank_limit,
                     chain=chain, window=window
                 ) for locus in iterator
             ]
@@ -412,7 +415,7 @@ class RefGen(Camoco):
                 genes = list(set(itertools.chain(*genes)))
             return genes
 
-    def bootstrap_candidate_genes(self, loci, gene_limit=4, 
+    def bootstrap_candidate_genes(self, loci, flank_limit=4, 
         chain=True,window=None):
         '''
             Returns candidate genes which are random, but conserves
@@ -422,7 +425,7 @@ class RefGen(Camoco):
             ----------
             loci : camoco.Locus (also handles an iterable containing Loci)
                 a camoco locus or iterable of loci
-            gene_limit : int (default : 4)
+            flank_limit : int (default : 4)
                 The total number of flanking genes
                 considered a candidate surrounding a locus
             chain : bool (default : true)
@@ -438,7 +441,7 @@ class RefGen(Camoco):
             locus = loci
             # grab the actual candidate genes
             num_candidates = len(self.candidate_genes(
-                locus, gene_limit=gene_limit,
+                locus, flank_limit=flank_limit,
                 chain=True, window=window)
             )
             if num_candidates == 0:
@@ -455,7 +458,7 @@ class RefGen(Camoco):
                 # somehow we hit the end of a chromosome
                 # or something, just recurse
                 return self.bootstrap_candidate_genes(
-                    locus,gene_limit=gene_limit,chain=chain)
+                    locus,flank_limit=flank_limit,chain=chain)
             return random_candidates
         else:
             # Sort the loci so we can collapse down
@@ -465,15 +468,15 @@ class RefGen(Camoco):
             for locus in locus_list:
                 # compare downstream of last locus to current locus
                 target_len = len(self.candidate_genes(
-                    locus,gene_limit=gene_limit)
+                    locus,flank_limit=flank_limit)
                 )
                 genes = self.bootstrap_candidate_genes(
-                    locus, gene_limit=gene_limit, chain=chain
+                    locus, flank_limit=flank_limit, chain=chain
                 )
                 # If genes randomly overlap, resample
                 while np.any([x in seen for x in itertools.chain(genes,)]):
                     genes = self.bootstrap_candidate_genes(
-                        locus, gene_limit=gene_limit, chain=chain
+                        locus, flank_limit=flank_limit, chain=chain
                     )
                 # Add all new bootstrapped genes to the seen list
                 [seen.add(x) for x in itertools.chain(genes,)]
@@ -528,7 +531,7 @@ class RefGen(Camoco):
             )
         )
 
-    def plot_loci(self,loci,filename,gene_limit=4):
+    def plot_loci(self,loci,filename,flank_limit=4):
         '''
             Plots the loci, windows and candidate genes
 
@@ -595,7 +598,7 @@ class RefGen(Camoco):
                 color='red'
             )
             # grab the candidate genes
-            for gene in self.candidate_genes(locus,gene_limit=gene_limit):
+            for gene in self.candidate_genes(locus,flank_limit=flank_limit):
                 cax.barh(
                     bottom=voffset,
                     width = len(gene),

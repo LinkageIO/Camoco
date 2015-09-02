@@ -48,19 +48,6 @@ class Ontology(Camoco):
     def terms(self):
         return list(self.iter_terms())
 
-    def print_term_stats(
-        self, cob_list, filename=None, window_size=100000,
-        gene_limit=4, num_bootstrap=50, bootstrap_density=2):
-        '''
-            Print various statistics about a term
-        '''
-        for term in self.iter_terms():
-            term.print_stats(
-                cob_list, filename, window_size=window_size,
-                gene_limit=gene_limit, num_bootstraps=num_bootstraps,
-                bootstrap_density=boostrap_density
-            )
-
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(
             self.name, self.description, len(self), self.refgen)

@@ -184,7 +184,7 @@ class COB(Expr):
             df = df.loc[df.significant == 1, :]
         return df.copy()
 
-    def trans_locus_density(self, locus_list, return_mean=True, gene_limit=4,
+    def trans_locus_density(self, locus_list, return_mean=True, flank_limit=4,
         bootstrap=False):
         '''
             Calculates the density of edges which span loci
@@ -197,11 +197,11 @@ class COB(Expr):
         # convert to list of loci to lists of genes
         if not bootstrap:
             genes_list = self.refgen.candidate_genes(
-                locus_list, gene_limit=gene_limit, chain=False
+                locus_list, flank_limit=flank_limit, chain=False
             )
         else:
             genes_list = self.refgen.bootstrap_candidate_genes(
-                locus_list, gene_limit=gene_limit, chain=False
+                locus_list, flank_limit=flank_limit, chain=False
             )
         # create a dict of gene to locus mapping
         gene_origin = {}
