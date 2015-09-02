@@ -13,6 +13,10 @@ import pandas as pd
             RefGen Fixtures
 '''
 
+@pytest.fixture(scope='module')
+def testRefGen():
+    return co.RefGen(cf.test.refgen)
+
 @pytest.fixture(scope="module")
 def Zm5bFGS():
     if cf.test.force.RefGen:

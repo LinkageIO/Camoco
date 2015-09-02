@@ -9,6 +9,7 @@ from .Locus import Gene,Locus
 from .Chrom import Chrom
 from .Genome import Genome
 from .Tools import memoize
+from .Exceptions import CamocoZeroWindowError
 
 import itertools
 import collections
@@ -28,6 +29,9 @@ class RefGen(Camoco):
 
     @property
     def genome(self):
+        '''
+            Returns a list of chromosome object present in RefGen.
+        '''
         return Genome(
             self.type + self.name,
             chroms = [Chrom(*x) for x in  self.db.cursor().execute('''
@@ -36,6 +40,9 @@ class RefGen(Camoco):
         )
 
     def Gene(self,chrom,start,end,name,window=0,sub_loci=None,**kwargs):
+        '''
+            Returns a gene object including kwargs 
+        '''
         attrs = dict(self.db.cursor().execute('''
             SELECT key,val FROM gene_attrs WHERE id = ?
         ''',(name,)).fetchall())
@@ -67,7 +74,7 @@ class RefGen(Camoco):
 
             Returns
             -------
-            A locus object (Gene)
+            A Gene object (camoco.Locus based)
 
         '''
         return self.Gene(*self.db.cursor().execute('''
@@ -75,13 +82,30 @@ class RefGen(Camoco):
             ''',(random.randint(1,self.num_genes()),)).fetchone(),
             **kwargs
         )
-    def random_genes(self,count,**kwargs):
-        rand_nums = np.random.randint(1,high=self.num_genes(),size=count)
-        gene_info = self.db.cursor().executemany("SELECT chromosome,start,end,id from genes WHERE rowid = ?",[[int(rownum)] for rownum in rand_nums]).fetchall()
-        gene_list = []
+
+    def random_genes(self,n,**kwargs):
+        '''
+            Return random genes from the RefGen
+
+            Parameters
+            ----------
+            n : int
+
+            **kwargs : key,value pairs
+                Extra parameters passed onto the locus init method
+
+            Returns
+            -------
+            An iterable containing random genes
+
+        '''
+        rand_nums = np.random.randint(1,high=self.num_genes(),size=n)
+        gene_info = self.db.cursor().executemany(
+                "SELECT chromosome,start,end,id from genes WHERE rowid = ?",
+                [[int(rownum)] for rownum in rand_nums]
+        )
         for (chr,start,end,id) in gene_info:
-            gene_list.append(Gene(chr,start,end=end,name=id,**kwargs))
-        return gene_list
+            yield Gene(chr,start,end=end,id=id,**kwargs)
 
     def iter_chromosomes(self):
         ''' returns chrom object iterator '''
@@ -90,14 +114,17 @@ class RefGen(Camoco):
         '''))
 
     def iter_genes(self):
-        ''' iterates over genes in refgen,
-            only returns genes within gene filter '''
-        return (
-            self.Gene(*x,build=self.build,organism=self.organism) \
-            for x in self.db.cursor().execute('''
+        '''
+            Iterates over genes in RefGen.
+
+            Returns
+            -------
+            A generator containing genes
+        '''
+        for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes
-            ''')
-        )
+            '''):
+            yield self.Gene(*x,build=self.build,organism=self.organism)
 
     def from_ids(self, gene_list, check_shape=False):
         '''
@@ -119,6 +146,7 @@ class RefGen(Camoco):
             otherwise a single gene
 
         '''
+
         cur = self.db.cursor()
         if isinstance(gene_list,str):
         # Handle when we pass in a single id
@@ -161,7 +189,27 @@ class RefGen(Camoco):
         '''
             A convenience method to extract loci from the reference geneome.
         '''
-        return self.from_ids(item)
+        if isinstance(item,str):
+            # Handle when we pass in a single id
+            gene_id = item.upper()
+            try:
+                return self.Gene(
+                    *self.db.cursor().execute('''
+                        SELECT chromosome,start,end,id FROM genes WHERE id = ?
+                        ''',(gene_id,)
+                    ).fetchone(),
+                    build=self.build,
+                    organism=self.organism
+                )
+            except TypeError as e:
+                raise ValueError('{} not in {}'.format(gene_id,self.name))
+        genes = [
+            self.Gene(*x,build=self.build,organism=self.organism) \
+            for x in self.db.cursor().execute('''
+                SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
+            '''.format("','".join(map(str.upper,item))))
+        ]
+        return genes
 
     def chromosome(self,id):
         '''
@@ -177,7 +225,7 @@ class RefGen(Camoco):
 
     def genes_within(self,loci,chain=True):
         '''
-            Returns the genes within a locus, or None
+            Returns the genes within a locus
         '''
         if isinstance(loci,Locus):
             return [
@@ -185,9 +233,20 @@ class RefGen(Camoco):
                 for x in self.db.cursor().execute('''
                     SELECT chromosome,start,end,id FROM genes
                     WHERE chromosome = ?
-                    AND start > ?
-                    AND end < ?
-                ''',(loci.chrom,loci.start,loci.end))]
+                    AND (
+                           (start >= ? AND end <= ? )
+                        OR (start <= ? AND end >= ? )
+                        OR (start <= ? AND end >= ? )
+                        OR (start <= ? AND end >= ? )
+                    )
+                ''',
+                    (loci.chrom,
+                     loci.start,loci.end,   # Truly within
+                     loci.start,loci.start, # Start lands within
+                     loci.end,  loci.end,   # End lands within 
+                     loci.start,loci.end)   # Surrounds Locus 
+                )
+            ]
         else:
             iterator = iter(loci)
             genes = [self.genes_within(locus,chain=chain) for locus in iterator]
@@ -195,41 +254,60 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def upstream_genes(self,locus,gene_limit=1000):
+    def upstream_genes(self,locus,gene_limit=1000,window=None):
         '''
-            returns genes upstream of a locus. Genes are ordered so that the
+            Find genes upstream of a locus. Genes are ordered so that the
             nearest genes are at the beginning of the list.
         '''
+        if locus.window == 0 and window is None:
+            raise CamocoZeroWindowError(
+                'Asking for upstream genes for {}',
+                locus.id
+            )
+        if window is not None:
+            upstream = locus.start - window
+        else:
+            upstream = locus.upstream
         return [
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes
                 WHERE chromosome = ?
-                AND start <= ?
-                AND start >= ?
+                AND end < ?
+                AND end >= ?
                 ORDER BY start DESC
                 LIMIT ?
-            ''',(locus.chrom, locus.start, locus.upstream, gene_limit)
+            ''',(locus.chrom, locus.start, upstream, gene_limit)
         )]
 
-    def downstream_genes(self,locus,gene_limit=1000):
+    def downstream_genes(self,locus,gene_limit=1000,window=None):
         '''
             returns genes downstream of a locus. Genes are ordered so that the
             nearest genes are at the beginning of the list.
         '''
+        if locus.window == 0 and window is None:
+            raise CamocoZeroWindowError(
+                'Asking for upstream genes for {}',
+                locus.id
+            )
+        if window is not None:
+            downstream = locus.end + window
+        else:
+            downstream = locus.downstream
+
         return [
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes
                 WHERE chromosome = ?
                 AND start > ?
-                AND start < ?
+                AND start <= ?
                 ORDER BY start ASC
                 LIMIT ?
-            ''',(locus.chrom, locus.end, locus.downstream, gene_limit)
+            ''',(locus.chrom, locus.end, downstream, gene_limit)
         )]
 
-    def flanking_genes(self, loci, gene_limit=4,chain=True):
+    def flanking_genes(self, loci, gene_limit=4,chain=True,window=None):
         '''
             Returns genes upstream and downstream from a locus
             ** including genes locus is within **
@@ -237,27 +315,83 @@ class RefGen(Camoco):
         if isinstance(loci,Locus):
             # If we cant iterate, we have a single locus
             locus = loci
+            if locus.window == 0 and window is None:
+                raise CamocoZeroWindowError(
+                    'Asking for upstream genes for {}',
+                    locus.id
+                )
             upstream_gene_limit = math.ceil(gene_limit/2)
             downstream_gene_limit = math.floor(gene_limit/2)
             up_genes = self.upstream_genes(
-                locus, gene_limit=upstream_gene_limit
+                locus, gene_limit=upstream_gene_limit, window=window
             )
             down_genes = self.downstream_genes(
-                locus, gene_limit=downstream_gene_limit
+                locus, gene_limit=downstream_gene_limit, window=window
             )
             if chain:
                 return list(itertools.chain(up_genes,down_genes))
             return (up_genes,down_genes)
         else:
             iterator = iter(loci)
-            genes = [self.flanking_genes(locus,gene_limit=gene_limit) \
+            genes = [
+                self.flanking_genes(locus,gene_limit=gene_limit,window=window)\
                 for locus in iterator
             ]
             if chain:
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def bootstrap_candidate_genes(self,loci,gene_limit=4,chain=True):
+    def candidate_genes(self, loci, gene_limit=4,chain=True,window=None):
+        '''
+            SNP to Gene mapping.
+            Return Genes between locus start and stop, plus additional
+            flanking genes (up to gene_limit)
+
+            Parameters
+            ----------
+            loci : camoco.Locus (also handles an iterable containing Loci)
+                a camoco locus or iterable of loci
+            gene_limit : int (default : 4)
+                The total number of flanking genes
+                considered a candidate surrounding a locus
+            chain : bool (default : true)
+                Calls itertools chain on results before returning
+            window : int (default: None)
+                Optional parameter used to extend or shorten a locus
+                window from which to choose candidates from. If None,
+                the function will resort to what is available in the
+                window attribute of the Locus.
+
+            Returns
+            -------
+            a list of candidate genes (or list of lists if chain is False)
+
+        '''
+        if isinstance(loci,Locus):
+            # If not an iterator, its a single locus
+            locus = loci
+            genes_within = self.genes_within(locus)
+            up_genes,down_genes = self.flanking_genes(
+                locus, gene_limit=gene_limit, chain=False,
+                window=window
+            )
+            return list(
+                itertools.chain(up_genes,genes_within,down_genes)
+            )[0:gene_limit]
+        else:
+            iterator = iter(sorted(loci))
+            genes = [
+                self.candidate_genes(
+                    locus, gene_limit=gene_limit,
+                    chain=chain, window=window
+                ) for locus in iterator
+            ]
+            if chain:
+                genes = list(set(itertools.chain(*genes)))
+            return genes
+
+    def bootstrap_candidate_genes(self, loci, gene_limit=4, 
+        chain=True,window=None):
         '''
             Returns candidate genes which are random, but conserves
             total number of overall genes.
@@ -282,24 +416,24 @@ class RefGen(Camoco):
             locus = loci
             # grab the actual candidate genes
             num_candidates = len(self.candidate_genes(
-                locus,gene_limit=gene_limit,chain=True)
+                locus, gene_limit=gene_limit,
+                chain=True, window=window)
             )
             if num_candidates == 0:
                 return []
             # Snps a random genes from the genome
             random_gene = self.random_gene()
-            # Extend the window to something crazy
-            random_gene.window = 10e10
             # Snag the same number of candidates
             random_candidates = self.upstream_genes(
-                random_gene,gene_limit=num_candidates
+                random_gene, 
+                gene_limit=num_candidates,
+                window=10e10
             )
             if len(random_candidates) != num_candidates:
                 # somehow we hit the end of a chromosome
                 # or something, just recurse
                 return self.bootstrap_candidate_genes(
                     locus,gene_limit=gene_limit,chain=chain)
-            assert len(random_candidates) == num_candidates
             return random_candidates
         else:
             # Sort the loci so we can collapse down
@@ -327,46 +461,6 @@ class RefGen(Camoco):
                 bootstraps = list(set(itertools.chain(*bootstraps)))
             self.log("Found {} bootstraps",len(bootstraps))
             return bootstraps
-
-    def candidate_genes(self, loci, gene_limit=4,chain=True):
-        '''
-            SNP to Gene mapping.
-            Return Genes between locus start and stop, plus additional
-            flanking genes (up to gene_limit)
-
-            Parameters
-            ----------
-            loci : camoco.Locus (also handles an iterable containing Loci)
-                a camoco locus or iterable of loci
-            gene_limit : int (default : 4)
-                The total number of flanking genes
-                considered a candidate surrounding a locus
-            chain : bool (default : true)
-                Calls itertools chain on results before returning
-
-            Returns
-            -------
-            a list of candidate genes (or list of lists if chain is False)
-
-        '''
-        if isinstance(loci,Locus):
-            # If not an iterator, its a single locus
-            locus = loci
-            genes_within = self.genes_within(locus)
-            up_genes,down_genes = self.flanking_genes(
-                locus,gene_limit=gene_limit,chain=False
-            )
-            return list(itertools.chain(up_genes,genes_within,down_genes))
-        else:
-            iterator = iter(sorted(loci))
-            genes = [
-                self.candidate_genes(
-                    locus,gene_limit=gene_limit,chain=chain
-                ) for locus in iterator
-            ]
-            if chain:
-                genes = list(set(itertools.chain(*genes)))
-            return genes
 
 
     def pairwise_distance(self, gene_list=None):
@@ -536,10 +630,10 @@ class RefGen(Camoco):
     def add_gene(self,gene):
         if isinstance(gene,Locus):
             self.db.cursor().execute('''
-            INSERT OR IGNORE INTO genes VALUES (?,?,?,?)
+            INSERT OR REPLACE INTO genes VALUES (?,?,?,?)
             ''',(gene.name,gene.chrom,gene.start,gene.end))
             self.db.cursor().executemany('''
-            INSERT OR IGNORE INTO gene_attrs VALUES (?,?,?)
+            INSERT OR REPLACE INTO gene_attrs VALUES (?,?,?)
             ''',[(gene.id,key,val) for key,val in gene.attr.items()])
         else:
             # support adding lists of genes
@@ -548,12 +642,12 @@ class RefGen(Camoco):
             cur = self.db.cursor()
             cur.execute('BEGIN TRANSACTION')
             cur.executemany(
-                'INSERT OR IGNORE INTO genes VALUES (?,?,?,?)',
+                'INSERT OR REPLACE INTO genes VALUES (?,?,?,?)',
                 ((gene.name,gene.chrom,gene.start,gene.end) for gene in genes)
             )
             self.log('Adding Gene attr info to database')
             cur.executemany(
-                'INSERT OR IGNORE INTO gene_attrs VALUES (?,?,?)',
+                'INSERT OR REPLACE INTO gene_attrs VALUES (?,?,?)',
                 ((gene.id,key,val) for gene in genes for key,val in gene.attr.items())
             )
             cur.execute('END TRANSACTION')
