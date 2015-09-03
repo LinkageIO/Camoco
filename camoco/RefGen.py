@@ -497,7 +497,7 @@ class RefGen(Camoco):
         if gene_list is None:
             gene_list = list(self.iter_genes())
         query = '''
-                SELECT genes.id, chrom.rowid, start FROM genes
+                SELECT genes.id, chrom.rowid, start, end FROM genes
                 LEFT JOIN chromosomes chrom ON genes.chromosome = chrom.id
                 WHERE genes.id in ("{}")
                 ORDER BY genes.id
@@ -506,16 +506,19 @@ class RefGen(Camoco):
         positions = pd.DataFrame(
             # Grab the chromosomes rowid because its numeric
             self.db.cursor().execute(query).fetchall(),
-            columns=['gene','chrom','pos']
+            columns=['gene','chrom','start','end']
         ).sort('gene')
         # chromosome needs to be floats
         positions.chrom = positions.chrom.astype('float')
+        # Do a couple of checks
         assert len(positions) == len(gene_list), \
             'Some genes in dataset not if RefGen'
         assert all(positions.gene == [g.id for g in gene_list]), \
             'Genes are not in the correct order!'
         distances = RefGenDist.gene_distances(
-            positions.chrom.values,positions.pos.values
+            positions.chrom.values,
+            positions.start.values,
+            positions.end.values
         )
         return distances
 
