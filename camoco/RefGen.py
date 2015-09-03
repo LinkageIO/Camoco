@@ -241,7 +241,7 @@ class RefGen(Camoco):
                 for x in self.db.cursor().execute('''
                     SELECT chromosome,start,end,id FROM genes
                     WHERE chromosome = ?
-                    AND start > ? AND start <= ?
+                    AND start >= ? AND start <= ?
                     ''',
                     (loci.chrom,loci.start,loci.end))
             ]
@@ -329,10 +329,10 @@ class RefGen(Camoco):
             ''',(locus.chrom, locus.end, downstream, gene_limit)
         )]
 
-    def flanking_genes(self, loci, flank_limit=4,chain=True,window=None):
+    def flanking_genes(self, loci, flank_limit=2,chain=True,window=None):
         '''
             Returns genes upstream and downstream from a locus
-            ** including genes locus is within **
+            ** done NOT include genes within locus **
         '''
         if isinstance(loci,Locus):
             # If we cant iterate, we have a single locus
@@ -342,8 +342,8 @@ class RefGen(Camoco):
                     'Asking for upstream genes for {}',
                     locus.id
                 )
-            upstream_gene_limit = math.ceil(flank_limit/2)
-            downstream_gene_limit = math.floor(flank_limit/2)
+            upstream_gene_limit = int(flank_limit)
+            downstream_gene_limit = int(flank_limit)
             up_genes = self.upstream_genes(
                 locus, gene_limit=upstream_gene_limit, window=window
             )
@@ -363,7 +363,7 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def candidate_genes(self, loci, flank_limit=4,chain=True,window=None):
+    def candidate_genes(self, loci, flank_limit=2,chain=True,window=None):
         '''
             SNP to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -374,7 +374,7 @@ class RefGen(Camoco):
             loci : camoco.Locus (also handles an iterable containing Loci)
                 a camoco locus or iterable of loci
             flank_limit : int (default : 4)
-                The total number of flanking genes
+                The total number of flanking genes **on each side**
                 considered a candidate surrounding a locus
             chain : bool (default : true)
                 Calls itertools chain on results before returning
@@ -415,7 +415,7 @@ class RefGen(Camoco):
                 genes = list(set(itertools.chain(*genes)))
             return genes
 
-    def bootstrap_candidate_genes(self, loci, flank_limit=4, 
+    def bootstrap_candidate_genes(self, loci, flank_limit=2, 
         chain=True,window=None):
         '''
             Returns candidate genes which are random, but conserves
@@ -425,8 +425,8 @@ class RefGen(Camoco):
             ----------
             loci : camoco.Locus (also handles an iterable containing Loci)
                 a camoco locus or iterable of loci
-            flank_limit : int (default : 4)
-                The total number of flanking genes
+            flank_limit : int (default : 2)
+                The total number of flanking genes **on each side**
                 considered a candidate surrounding a locus
             chain : bool (default : true)
                 Calls itertools chain on results before returning
@@ -531,7 +531,7 @@ class RefGen(Camoco):
             )
         )
 
-    def plot_loci(self,loci,filename,flank_limit=4):
+    def plot_loci(self,loci,filename,flank_limit=2):
         '''
             Plots the loci, windows and candidate genes
 

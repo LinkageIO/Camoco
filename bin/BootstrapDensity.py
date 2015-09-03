@@ -128,7 +128,7 @@ if __name__ == '__main__':
         help='The camoco network to use.'
     )
     parser.add_argument(
-        '--GWAS', 
+        '--gwas', 
         help='The camoco GWAS to use.'
     )
     parser.add_argument(

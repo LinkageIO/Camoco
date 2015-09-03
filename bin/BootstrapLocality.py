@@ -427,7 +427,7 @@ if __name__ == '__main__':
         '--cob', help='The camoco network to use.'
     )
     parser.add_argument(
-        '--GWAS', help='The camoco GWAS to use.'
+        '--gwas', help='The camoco GWAS to use.'
     )
     parser.add_argument(
         '--term', help='The term within the ontology to use.'

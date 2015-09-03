@@ -37,7 +37,7 @@ def test_genes_within(testRefGen):
         end=random_gene.end+100
     )
     genes = testRefGen.genes_within(bigger_locus)
-    assert random_gene == genes.pop()
+    assert random_gene in genes
 
 def test_locus_not_in_upstream_downstream(testRefGen):
     '''
@@ -82,7 +82,7 @@ def test_flanking_genes(testRefGen):
         random_gene, window=50e6, gene_limit=5
     )
     flanking = testRefGen.flanking_genes(
-        random_gene, window=50e6, flank_limit=10
+        random_gene, window=50e6, flank_limit=5
     )
     assert sorted(flanking) == sorted(upstream + downstream)
 
@@ -107,7 +107,7 @@ def test_candidate_genes_from_SNP(testRefGen):
         window=50e6
     )
     up,within,down = testRefGen.candidate_genes(
-        test_snp,flank_limit=10,chain=False
+        test_snp,flank_limit=5,chain=False
     )
     assert (len(up)+len(down)) == 10
     assert len(within) == 2
@@ -135,14 +135,11 @@ def test_no_overlap_in_non_chained_candidates(testRefGen):
 
 def test_flank_limit_for_candidate_genes(testRefGen):
     random_gene = testRefGen.random_gene()
-    downstream = testRefGen.downstream_genes(
-        random_gene,gene_limit=10,window=50e6
-    )
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        downstream[5],flank_limit=10,window=50e6
+        random_gene,flank_limit=5,window=50e6,chain=True
     )
-    assert len(candidates) == 10
+    assert len(candidates) == 11
 
 def test_flank_limit_for_candidate_genes_from_SNP(testRefGen):
     random_gene = testRefGen.random_gene()
@@ -152,9 +149,9 @@ def test_flank_limit_for_candidate_genes_from_SNP(testRefGen):
     test_snp = Locus(downstream[5].chrom,downstream[5].start,window=50e6)
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        test_snp,flank_limit=10,window=50e6
+        test_snp,flank_limit=5,window=50e6
     )
-    assert len(candidates) == 10
+    assert len(candidates) == 11
 
 def test_bootstrap_candidate_length_equal_from_SNP(testRefGen):
     random_gene = testRefGen.random_gene()
