@@ -106,11 +106,10 @@ def test_candidate_genes_from_SNP(testRefGen):
         end=down2.end+50,
         window=50e6
     )
-    up,within,down = testRefGen.candidate_genes(
+    candidates = testRefGen.candidate_genes(
         test_snp,flank_limit=5,chain=False
     )
-    assert (len(up)+len(down)) == 10
-    assert len(within) == 2
+    assert len(candidates) == 12 
 
 def test_candidate_genes_from_gene_includes_gene(testRefGen):
     random_gene = testRefGen.random_gene()
