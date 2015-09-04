@@ -160,6 +160,8 @@ class Locus(object):
     def __sub__(self,other):
         if self.chrom != other.chrom:
             return float('Inf')
+        if self == other:
+            return 0
         else:
             # sort them
             a,b = sorted([self,other])

@@ -522,13 +522,6 @@ class Expr(Camoco):
         self._update_values(quan_expr, 'quantile')
 
 
-    def _row_average(self):
-        '''
-           Perform row averaging over expression DataFrame for cases
-           where gene expression might have been measured more than once.
-        '''
-        pass
-
     @property
     def _parent_refgen(self):
         return RefGen(self._global['parent_refgen'])

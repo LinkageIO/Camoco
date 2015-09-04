@@ -11,7 +11,7 @@ global cf
 default_config = '''--- # YAML Camoco Configuration File
 options:
     basedir: ~/.camoco/
-    testdir: ~/build/'''+getpass.getuser()+'''/Camoco/tests/
+    testdir: ~/build/{user}/Camoco/tests/
 
 logging:
     log_level: verbose
@@ -21,12 +21,14 @@ test:
         RefGen:   False
         COB:      False
         Ontology: False
+    num:      50
     refgen:   Zm5bFGS
     cob:      NewRoot
     ontology: ZmIonome
     term:     Fe57
     gene:     GRMZM2G000014
-'''
+    
+'''.format(**{'user':getpass.getuser()})
 
 class Level(dict):
     '''

@@ -104,8 +104,8 @@ class RefGen(Camoco):
                 "SELECT chromosome,start,end,id from genes WHERE rowid = ?",
                 [[int(rownum)] for rownum in rand_nums]
         )
-        for (chr,start,end,id) in gene_info:
-            yield Gene(chr,start,end=end,id=id,**kwargs)
+        return set([Gene(chr,start,end=end,id=id,**kwargs) for \
+            (chr,start,end,id) in gene_info])
 
     def iter_chromosomes(self):
         ''' returns chrom object iterator '''
@@ -397,12 +397,12 @@ class RefGen(Camoco):
                 locus, flank_limit=flank_limit, chain=False,
                 window=window
             )
-            if chain:
-                return list(
-                    itertools.chain(up_genes,genes_within,down_genes)
-                )
-            else:  
-                return up_genes,genes_within,down_genes
+            # This always returns candidates together, if 
+            # you want specific up,within and down genes
+            # use the specific methods
+            return list(
+                itertools.chain(up_genes,genes_within,down_genes)
+            )
         else:
             iterator = iter(sorted(loci))
             genes = [

@@ -8,15 +8,24 @@ from camoco.Config import cf
 import camoco as co
 import pandas as pd
 
-
 ''' -------------------------------------------------------------------------
-            RefGen Fixtures
+            'Test' Fixtures
 '''
 
 @pytest.fixture(scope='module')
 def testRefGen(Zm5bFGS):
     # This was a mistake
     return Zm5bFGS
+
+@pytest.fixture(scope='module')
+def testGWAS(AtLeafIonome):
+    return AtLeafIonome
+
+
+
+''' -------------------------------------------------------------------------
+            RefGen Fixtures
+'''
 
 @pytest.fixture(scope="module")
 def Zm5bFGS():

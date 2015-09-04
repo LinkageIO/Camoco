@@ -124,13 +124,14 @@ def test_candidate_genes_from_gene_includes_gene(testRefGen):
     )
     assert downstream[4] in candidates
 
-def test_no_overlap_in_non_chained_candidates(testRefGen):
-    random_gene = testRefGen.random_gene()
+def test_non_chained_candidates(testRefGen):
+    random_genes = testRefGen.random_genes(n=10)
     # Create a Locus that is on gene 5
-    up,within,down = testRefGen.candidate_genes(
-        random_gene,flank_limit=10,window=50e6,chain=False
+    candidates = testRefGen.candidate_genes(
+        random_genes,flank_limit=10,window=50e6,chain=False
     )
-    assert len(set(up) & set(within) & set(down)) == 0
+    # test that we got candidates for each random locus
+    assert len(candidates) == len(random_genes)
    
 
 def test_flank_limit_for_candidate_genes(testRefGen):

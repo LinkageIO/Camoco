@@ -28,6 +28,7 @@ class GWAS(Ontology):
                     term = ?
                 ''',(id,))
             ]
+            # Iterate through loci and get attrs
             for locus in term_loci:
                 for key,val in self.db.cursor().execute('''
                         SELECT key,val FROM loci_attr
