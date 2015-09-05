@@ -18,10 +18,12 @@ def testRefGen(Zm5bFGS):
     return Zm5bFGS
 
 @pytest.fixture(scope='module')
-def testGWAS(AtLeafIonome):
-    return AtLeafIonome
+def testGWAS(ZmIonome):
+    return ZmIonome
 
-
+@pytest.fixture(scope='module')
+def testCOB(ZmRNASeqTissueAtlas):
+    return ZmRNASeqTissueAtlas
 
 ''' -------------------------------------------------------------------------
             RefGen Fixtures
