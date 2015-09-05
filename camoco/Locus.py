@@ -138,7 +138,10 @@ class Locus(object):
 
     def __len__(self):
         ''' inclusive length of locus '''
-        return self.end - self.start + 1
+        if self.start == self.end:
+            return 1
+        else:
+            return self.end - self.start
 
     def __cmp__(self,locus):
         if self.chrom == locus.chrom:
