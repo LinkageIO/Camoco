@@ -472,7 +472,7 @@ if __name__ == '__main__':
        help='The window size for mapping effective SNPs to genes.'
     )
     parser.add_argument(
-       '--candidate-gene-limit',default=[2],
+       '--candidate-flank-limit',default=[2],
        type=int, nargs='*',
        help='The number of flanking genes included in SNP to gene mapping'
     )

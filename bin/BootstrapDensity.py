@@ -21,7 +21,7 @@ cf.logging.log_level = 'quiet'
 def main(args):
     
     cob = co.COB(args.cob)
-    ont = co.GWAS(args.GWAS)
+    ont = co.GWAS(args.gwas)
 
 
     if 'all' in args.terms:
@@ -55,7 +55,7 @@ def main(args):
             window_size=args.candidate_window_size
         )
         candidates = cob.refgen.candidate_genes(
-            effective_loci, gene_limit=args.candidate_gene_limit
+            effective_loci, flank_limit=args.candidate_flank_limit
         )
    
         print("Num SNPs:\t{}".format(len(term.locus_list)),file=sys.stderr)
@@ -68,12 +68,12 @@ def main(args):
 
         emp = cob.trans_locus_density(
             effective_loci,
-            gene_limit=args.candidate_gene_limit,
+            flank_limit=args.candidate_flank_limit,
             bootstrap=False
         )
 
         results['WindowSize'] = args.candidate_window_size
-        results['CandidateLimit'] = args.candidate_gene_limit
+        results['CandidateLimit'] = args.candidate_flank_limit
 
         results['EmpDensity'] = emp
     
@@ -90,7 +90,7 @@ def main(args):
             bootstraps = np.array([
                 cob.trans_locus_density(
                     term.effective_loci(window_size=args.candidate_window_size),
-                    gene_limit=args.candidate_gene_limit,
+                    flank_limit=args.candidate_flank_limit,
                     bootstrap=True
                 ) for x in range(args.num_bootstraps)
             ])
@@ -156,7 +156,7 @@ if __name__ == '__main__':
              'default: 50000')
     )
     parser.add_argument(
-       '--candidate-gene-limit',default=2,
+       '--candidate-flank-limit',default=2,
        type=int,
        help=('The number of flanking genes included in SNP to gene mapping. '
            'default: 2' )
