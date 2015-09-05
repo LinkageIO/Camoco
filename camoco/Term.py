@@ -30,17 +30,20 @@ class Term(object):
         '''
         return len(self.loci)
 
+    def __getitem__(self,key):
+        return self.attrs[key]
+
     def add_locus(self, locus):
         '''
             Adds a locus to the Term.
         '''
         self.loci.add(locus)
 
-    def flanking_loci(self, gene, window_size=100000):
+    def flanking_loci(self, locus, window_size=100000):
         '''
-            returns any nearby Term SNPs to a gene
+            returns any nearby Term SNPs to a locus
         '''
-        return [locus for locus in self.loci if abs(gene-locus) <= window_size]
+        return [flank for flank in self.loci if abs(locus-flank) <= window_size]
 
     
     def effective_loci(self, window_size=None):
@@ -79,7 +82,7 @@ class Term(object):
         )
         return collapsed
 
-    def strongest_loci(self, attr, window_size=None):
+    def strongest_loci(self, attr, window_size=None,lowest=True):
         '''
             Collapses down loci that have overlapping windows,
             then returns the locus with the strongest 'attr'
@@ -99,13 +102,16 @@ class Term(object):
                 The locus attribute to use to determine the 'strongest'
             window_size : int (default: None)
                 If not None, maps a new window size to each locus.      
+            lowest: bool (default: Treu)
+                When sorting by attr, lowest is strongest (i.e. p-vals) 
         '''
+        is_reverse = not lowest
         return [
             # sort by attr and take first item
             sorted(
                 locus.sub_loci,
                 key=lambda x: float(x.default_getitem(attr,np.inf)),
-                reverse=False
+                reverse=is_reverse
             )[0] for locus in self.effective_loci(window_size=window_size)
         ]
 
