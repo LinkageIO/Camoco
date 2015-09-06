@@ -363,7 +363,8 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def candidate_genes(self, loci, flank_limit=2,chain=True,window=None):
+    def candidate_genes(self, loci, flank_limit=2,
+        chain=True, window=None):
         '''
             SNP to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -415,7 +416,7 @@ class RefGen(Camoco):
                 genes = list(set(itertools.chain(*genes)))
             return genes
 
-    def bootstrap_candidate_genes(self, loci, flank_limit=2, 
+    def bootstrap_candidate_genes(self, loci, flank_limit=2,
         chain=True,window=None):
         '''
             Returns candidate genes which are random, but conserves
@@ -429,7 +430,7 @@ class RefGen(Camoco):
                 The total number of flanking genes **on each side**
                 considered a candidate surrounding a locus
             chain : bool (default : true)
-                Calls itertools chain on results before returning
+                Calls itertools chain on results before returning,
 
             Returns
             -------
@@ -440,9 +441,11 @@ class RefGen(Camoco):
             # We now have a single locus
             locus = loci
             # grab the actual candidate genes
-            num_candidates = len(self.candidate_genes(
-                locus, flank_limit=flank_limit,
-                chain=True, window=window)
+            num_candidates = len(
+                self.candidate_genes(
+                    locus, flank_limit=flank_limit,
+                    chain=True, window=window
+                )
             )
             if num_candidates == 0:
                 return []
@@ -452,38 +455,57 @@ class RefGen(Camoco):
             random_candidates = self.upstream_genes(
                 random_gene, 
                 gene_limit=num_candidates,
-                window=10e10
+                window=10e100
             )
             if len(random_candidates) != num_candidates:
                 # somehow we hit the end of a chromosome
                 # or something, just recurse
-                return self.bootstrap_candidate_genes(
-                    locus,flank_limit=flank_limit,chain=chain)
+                random_candidates = self.bootstrap_candidate_genes(
+                    locus,flank_limit=flank_limit,chain=True
+                )
             return random_candidates
         else:
             # Sort the loci so we can collapse down
             locus_list = sorted(loci)
             seen = set()
             bootstraps = list()
-            for locus in locus_list:
+            target = self.candidate_genes(
+                locus_list,flank_limit=flank_limit,
+                chain=False,window=window
+            )
+            target_accumulator = 0
+            candidate_accumulator = 0
+            self.log('target: {}, loci: {}',len(target),len(locus_list))
+            for i,(locus,targ) in enumerate(zip(locus_list,target)):
                 # compare downstream of last locus to current locus
-                target_len = len(self.candidate_genes(
-                    locus,flank_limit=flank_limit)
+                candidates = self.bootstrap_candidate_genes(
+                    locus, flank_limit=flank_limit, 
+                    chain=True, window=window
                 )
-                genes = self.bootstrap_candidate_genes(
-                    locus, flank_limit=flank_limit, chain=chain
-                )
+                self.log('target: {}, loci: {}, seen:{}',len(candidates),len(targ),len(seen))
+                self.log('targ: {}',targ)
+                self.log('cand: {}',candidates)
                 # If genes randomly overlap, resample
-                while np.any([x in seen for x in itertools.chain(genes,)]):
-                    genes = self.bootstrap_candidate_genes(
-                        locus, flank_limit=flank_limit, chain=chain
+                while len(seen.intersection(set(candidates))) > 0:
+                    self.log.warn('Overlap detected: {}',seen.intersection(candidates)) 
+                    candidates = self.bootstrap_candidate_genes(
+                        locus, flank_limit=flank_limit, chain=True
                     )
+                target_accumulator += len(targ)
+                candidate_accumulator += len(candidates)
+                assert target_accumulator == candidate_accumulator
+                self.log('Accumulated so far: targ({}) cand({}) ',target_accumulator,candidate_accumulator)
                 # Add all new bootstrapped genes to the seen list
-                [seen.add(x) for x in itertools.chain(genes,)]
-                assert target_len == len(genes)
-                bootstraps.append(genes)
+                assert len(seen.intersection(candidates)) == 0
+                seen |= set(candidates)
+                assert len(seen) == target_accumulator
+                bootstraps.append(candidates)
+            if len(list(itertools.chain(*bootstraps))) != len(list(itertools.chain(*target))):
+                import ipdb; ipdb.set_trace()
+            if len(list(itertools.chain(*bootstraps))) != len(set(itertools.chain(*bootstraps))):
+                import ipdb; ipdb.set_trace()
             if chain:
-                bootstraps = list(set(itertools.chain(*bootstraps)))
+                bootstraps = list(seen)
             self.log("Found {} bootstraps",len(bootstraps))
             return bootstraps
 
