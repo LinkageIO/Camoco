@@ -482,28 +482,15 @@ class RefGen(Camoco):
                     locus, flank_limit=flank_limit, 
                     chain=True, window=window
                 )
-                self.log('target: {}, loci: {}, seen:{}',len(candidates),len(targ),len(seen))
-                self.log('targ: {}',targ)
-                self.log('cand: {}',candidates)
                 # If genes randomly overlap, resample
-                while len(seen.intersection(set(candidates))) > 0:
-                    self.log.warn('Overlap detected: {}',seen.intersection(candidates)) 
+                while len(seen.intersection(candidates)) > 0:
                     candidates = self.bootstrap_candidate_genes(
-                        locus, flank_limit=flank_limit, chain=True
+                        locus, flank_limit=flank_limit,
+                        window=window, chain=True
                     )
-                target_accumulator += len(targ)
-                candidate_accumulator += len(candidates)
-                assert target_accumulator == candidate_accumulator
-                self.log('Accumulated so far: targ({}) cand({}) ',target_accumulator,candidate_accumulator)
                 # Add all new bootstrapped genes to the seen list
-                assert len(seen.intersection(candidates)) == 0
                 seen |= set(candidates)
-                assert len(seen) == target_accumulator
                 bootstraps.append(candidates)
-            if len(list(itertools.chain(*bootstraps))) != len(list(itertools.chain(*target))):
-                import ipdb; ipdb.set_trace()
-            if len(list(itertools.chain(*bootstraps))) != len(set(itertools.chain(*bootstraps))):
-                import ipdb; ipdb.set_trace()
             if chain:
                 bootstraps = list(seen)
             self.log("Found {} bootstraps",len(bootstraps))

@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 from collections import defaultdict
 from itertools import chain
+
+import hashlib
 import re
 
 class Locus(object):
@@ -198,10 +200,10 @@ class Locus(object):
         return str(self)
 
     def __hash__(self):
-        try:
-            return int("{}{}".format(self.chrom,self.start))
-        except ValueError as e:
-            return int("-{}".format(abs(self.start)))
+        digest = hashlib.md5(
+            str.encode(str(self))
+        ).hexdigest()
+        return int(digest,base=16)
 
 class Gene(Locus):
     def __init__(self,*args,**kwargs):
