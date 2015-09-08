@@ -352,20 +352,21 @@ def AtSeedIonome(AtTair10):
         csvs = glob.glob(
             os.path.expanduser(os.path.join(
                 cf.options.testdir,
-                'raw', 'GWAS', 'AtLeaf',
-                '*.sigsnps.csv.gz'
+                'raw', 'GWAS', 'AtRound2', 'AtSeedHydro',
+                'Hits.csv.gz'
             ))
         )
         # Read in each table individually then concat for GIANT table
         df = pd.concat([pd.read_table(x, sep=',') for x in csvs])
         # Add 'Chr' to chromosome column
-        df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
+        df.Chromosome = df.Chromosome.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
         AtTair10,
         # Import class from dataframe
         return co.GWAS.from_DataFrame(
             df, 'AtSeedIonome', 'Arabidopsis 1.6M EmmaX GWAS',
-            AtTair10, term_col='Trait', chr_col='CHR', pos_col='BP'
+            AtTair10, term_col='Trait', 
+            chr_col='Chromosome', pos_col='Start_bp'
         )
     else:
         return co.GWAS('AtSeedIonome')
