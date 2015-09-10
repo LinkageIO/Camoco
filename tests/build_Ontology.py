@@ -4,18 +4,24 @@ import pytest
     Init tests
 '''
 
-
-def test_ZmIonome(ZmIonome):
+def build_ZmIonome(ZmIonome):
     assert ZmIonome
 
-def test_AtLeafIonome(AtLeafIonome):
+def build_AtLeafIonome(AtLeafIonome):
     assert AtLeafIonome
     
-def test_AtSeedIonome(AtSeedIonome):
+def build_AtSeedIonome(AtSeedIonome):
     assert AtSeedIonome
 
-def test_AtLeafHydroIonome(AtLeafHydroIonome):
+def build_AtLeafHydroIonome(AtLeafHydroIonome):
     assert AtLeafHydroIonome
 
-def test_AtRootHydroIonome(AtRootHydroIonome):
+def build_AtRootHydroIonome(AtRootHydroIonome):
     assert AtRootHydroIonome
+
+def build_AtIonome(AtLeafIonome,AtSeedIonome,
+    AtLeafHydroIonome,AtRootHydroIonome):
+    assert AtRootHydroIonome
+    assert AtLeafHydroIonome
+    assert AtSeedIonome
+    assert AtLeafIonome
