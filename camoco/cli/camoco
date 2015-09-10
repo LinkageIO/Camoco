@@ -9,6 +9,7 @@ import argparse
 from camoco.cli.PlotGWAS import plot_gwas
 from camoco.cli.BootstrapDensity import density
 from camoco.cli.BootstrapLocality import locality
+from camoco import cf
 
 def list_command(args):
     print(co.available_datasets(args.type,args.name))
@@ -21,6 +22,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         epilog='Cache. Money. Corn.'
     )
+    parser.add_argument('--debug',help='Drop into a debugger on error')
     subparsers = parser.add_subparsers(
         title='Camoco CLI program.',
         metavar='Available Commands',
@@ -35,8 +37,8 @@ if __name__ == '__main__':
         list 
     --------------------------'''
     lstcmd = subparsers.add_parser('list',help='List camoco datasets.')
-    lstcmd.add_argument('--type',default=None,required=True)
-    lstcmd.add_argument('--name',default=None,required=True)
+    lstcmd.add_argument('--type',default=None)
+    lstcmd.add_argument('--name',default=None)
     lstcmd.set_defaults(func=list_command)
 
     ''' --------------------------
@@ -91,49 +93,49 @@ if __name__ == '__main__':
     ''' --------------------------
         density 
     --------------------------'''
-    density = subparsers.add_parser(
+    bootstrapdensity = subparsers.add_parser(
         'density',
         help='Calculate network density among GWAS results'
     )
     # Data Set Arguments
-    density.add_argument(
+    bootstrapdensity.add_argument(
         '--cob',
         required=True,
         help='The camoco network to use.'
     )
-    density.add_argument(
+    bootstrapdensity.add_argument(
         '--gwas', 
         required=True,
         help='The camoco GWAS to use.'
     )
-    density.add_argument(
+    bootstrapdensity.add_argument(
         '--terms',
         nargs='*', 
         help='The term within the ontology to use. default: all',
         default=['all']
     )
-    density.add_argument(
+    bootstrapdensity.add_argument(
        '--num-bootstraps', default=50,type=int, 
        help=('The number of bootstraps to perform in order '
            'to estimate a null distribution. default: 50')
     )
-    density.add_argument(
+    bootstrapdensity.add_argument(
        '--candidate-window-size',default=50000,
        type=int,
        help=('The window size (in bp) for mapping effective SNPs to genes. '
              'default: 50000')
     )
-    density.add_argument(
+    bootstrapdensity.add_argument(
        '--candidate-flank-limit',default=2,
        type=int,
        help=('The number of flanking genes included in SNP to gene mapping. '
            'default: 2' )
     )
-    density.add_argument(
+    bootstrapdensity.add_argument(
         '--out', default=sys.stdout,
         help='OutputFile Name (default: Standard Out)'
     )
-    density.set_defaults(func=density)
+    bootstrapdensity.set_defaults(func=density)
 
     
     ''' --------------------------
@@ -216,7 +218,7 @@ if __name__ == '__main__':
     # DO IT ----------
     from IPython.core import ultratb
     sys.excepthook = ultratb.FormattedTB(mode='Verbose',
-                 color_scheme='Linux', call_pdb=1)
+                    color_scheme='Linux', call_pdb=1)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
