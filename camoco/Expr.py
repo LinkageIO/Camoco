@@ -27,7 +27,7 @@ class Expr(Camoco):
         guy is a
     '''
     def __init__(self, name):
-        super().__init__(name=name, type='Expr') 
+        super().__init__(name=name, type='Expr')
         # Part I: Load the Expression dataset
         try:
             self.log('Loading Expr table')
@@ -42,7 +42,7 @@ class Expr(Camoco):
         self._expr_index = defaultdict(
             lambda: None,
             {gene:index for index, gene in enumerate(self._expr.index)}
-        ) 
+        )
         # Part II: Load the Reference Genome
         try:
             self.log('Loading RefGen')
@@ -86,7 +86,7 @@ class Expr(Camoco):
         return self._expr.columns
 
     def genes(self, raw=False):
-        # Returns a list of distinct genes 
+        # Returns a list of distinct genes
         if raw is False:
             return self.refgen.from_ids(self._expr.index)
         else:
@@ -111,7 +111,7 @@ class Expr(Camoco):
 
     def max_values(self, axis=0):
         return np.nanmax(self._expr, axis=axis)
-    
+
     def anynancol(self):
         '''
             A gut check method to make sure none of the expression columns
@@ -119,7 +119,7 @@ class Expr(Camoco):
         '''
         return any(self._expr.apply(lambda col: all(np.isnan(col)), axis=0))
 
-    def expr(self, genes=None, accessions=None, 
+    def expr(self, genes=None, accessions=None,
              raw=False,gene_normalize=False):
         '''
             Access raw and QC'd expression data.
@@ -145,7 +145,7 @@ class Expr(Camoco):
         '''
         if raw is True:
             self.log('Extracting raw expression values')
-            df = self.hdf5['raw_expr'] 
+            df = self.hdf5['raw_expr']
         else:
             df = self._expr
         if genes is not None:
@@ -159,7 +159,7 @@ class Expr(Camoco):
         return df
 
     def plot_accession_histograms(self, bins=50, figsize=(16, 8)):
-        ''' 
+        '''
             Plot histogram of accession expression values.
         '''
         raw = self.hdf5['raw_expr']
@@ -178,7 +178,7 @@ class Expr(Camoco):
             # Plot histograms
             f = plt.figure(figsize=figsize)
             plt.subplot(121)
-            plt.hist(raw_valid[~raw_valid.mask], bins=bins) 
+            plt.hist(raw_valid[~raw_valid.mask], bins=bins)
             plt.xlim(-15, 15)
             plt.title('{}:{}'.format(self.name, name))
             plt.ylabel('Frequency')
@@ -187,7 +187,7 @@ class Expr(Camoco):
             plt.xlabel('Expression')
             plt.xlim(-15, 15)
 
-            plt.savefig("ACC_HIST_{}:{}.png".format(self.name, name)) 
+            plt.savefig("ACC_HIST_{}:{}.png".format(self.name, name))
             plt.close(f)
 
 
@@ -224,19 +224,19 @@ class Expr(Camoco):
         '''
         # update the transformation log
         if len(set(df.columns)) != len(df.columns):
-            raise CamocoGeneNameError('Gene names not Unique.')        
+            raise CamocoGeneNameError('Gene names not Unique.')
         if len(set(df.index)) != len(df.index):
             raise CamocoAccessionNameError('Accession names not Unique')
         self._transformation_log(transform_name)
         if raw == True:
-            table = 'raw_expr' 
-            # If we are updating the raw table, remove the 
-            # normal table since it assumes it came from 
+            table = 'raw_expr'
+            # If we are updating the raw table, remove the
+            # normal table since it assumes it came from
             # the raw table.
             self._reset(raw=False)
         else:
             table = 'expr'
-            # Keep full names in raw, but compress the 
+            # Keep full names in raw, but compress the
             # names in the normed network
             def shorten(x):
                 if len(x) > 100:
@@ -277,11 +277,11 @@ class Expr(Camoco):
                 self._global('transformation_log') + '->' + str(transform)
             )
             self.log('Trans. Log: {}', self._global('transformation_log'))
- 
+
     def _reset(self, raw=False):
-        ''' 
-            resets the expression values to their raw 
-            state undoing any normalizations 
+        '''
+            resets the expression values to their raw
+            state undoing any normalizations
         '''
         if raw:
             # kill the raw table too
@@ -293,7 +293,7 @@ class Expr(Camoco):
 
 
     def _normalize(self, norm_method=None, is_raw=None, max_val=None, **kwargs):
-        ''' evaluates qc expression data and re-enters 
+        ''' evaluates qc expression data and re-enters
             normaized data into database '''
         self.log('------------ Normalizing')
         if all(self.is_normalized(max_val=max_val)):
@@ -413,7 +413,7 @@ class Expr(Camoco):
         qc_gene['PASS_ALL'] = qc_gene.apply(
             lambda row: np.all(row), axis=1
         )
-        df = df.loc[qc_gene['PASS_ALL'], :] 
+        df = df.loc[qc_gene['PASS_ALL'], :]
         # -----------------------------------------
         # Filter out ACCESSIONS with too much missing data
         self.log("Filtering out accessions with > {} missing data", max_accession_missing_data)
@@ -428,7 +428,7 @@ class Expr(Camoco):
         qc_accession['PASS_ALL'] = qc_accession.apply(
             lambda row: np.all(row), axis=1
         )
-        df = df.loc[:, qc_accession['PASS_ALL']] 
+        df = df.loc[:, qc_accession['PASS_ALL']]
         # Update the database
         self.hdf5['qc_accession'] = qc_accession
         self.hdf5['qc_gene'] = qc_gene
@@ -487,18 +487,16 @@ class Expr(Camoco):
                     )
                 )
         # assign ranks by accession (column)
-        expr_ranks = expr.rank(
-            axis=0, method='first',
-            na_option='keep'
-        )
+        expr_ranks = expr.rank(axis=0, method='first', na_option='keep')
+        assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
         # normalize rank to be percentage
         expr_ranks = expr_ranks.apply(
-            lambda col: col/np.nanmax(col.values), 
+            lambda col: col/np.nanmax(col.values),
             axis=0
         )
         # we need to know the number of non-nans so we can correct for their ranks later
         self.log('Sorting ranked data')
-        # Sort values by accession/column, lowest to highest 
+        # Sort values by accession/column, lowest to highest
         expr_sort = expr.apply(lambda col: self.inplace_nansort(col), axis=0)
         # make sure the nans weren't included in the sort or the rank
         assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
@@ -506,7 +504,7 @@ class Expr(Camoco):
         # calculate ranked averages
         self.log('Calculating averages')
         rank_average = expr_sort.apply(np.nanmean, axis=1)
-        # we need to apply the percentages to the lenght of the 
+        # we need to apply the percentages to the lenght of the
         rankmax = len(rank_average)
         self.log('Range of normalized values:{}..{} (n = {})'.format(
             min(rank_average), max(rank_average), len(rank_average))
@@ -539,7 +537,7 @@ class Expr(Camoco):
         '''
         # Keep a record of parent refgen
         self._global('parent_refgen', refgen.name)
-        # Filter down to only genes in 
+        # Filter down to only genes in
         if filter:
             refgen = refgen.filtered_refgen(
                 'Filtered{}'.format(self.name),
@@ -602,14 +600,14 @@ class Expr(Camoco):
         # Create appropriate HDF5 tables
         self.hdf5['expr'] = pd.DataFrame()
         self.hdf5['raw_expr'] = pd.DataFrame()
-        # Delete existing datasets 
+        # Delete existing datasets
         self._set_refgen(refgen, filter=False)
         return self
 
     @classmethod
     def from_table(cls, filename, name, description, refgen, rawtype=None,
             sep='\t', normalize=True, quality_control=True, **kwargs):
-        ''' 
+        '''
             Create a Expr instance from a file containing raw expression data.
             For instance FPKM or results from a microarray experiment. This
             is a convenience method which reads the table in to a pandas DataFrame
@@ -657,7 +655,7 @@ class Expr(Camoco):
     @classmethod
     def from_DataFrame(cls, df, name, description, refgen, rawtype=None,
         normalize=True, norm_method=None, quantile=False, quality_control=True, **kwargs):
-        ''' 
+        '''
             Creates an Expr instance from a pandas DataFrame. Expects that the DataFrame
             index is gene names and the column names are accessions (i.e. experiments).
             This is the preferred method for creating an Expr instance, in other words,
@@ -728,4 +726,3 @@ class Expr(Camoco):
         self.log('Filtering refgen: {}', refgen.name)
         self._set_refgen(refgen, filter=True)
         return self
-
