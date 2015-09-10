@@ -18,30 +18,26 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-def available_datasets(type=None, name=None):
+def available_datasets(type='%', name='%'):
     try:
         cur = co.Camoco("Camoco", type='Camoco').db.cursor()
-        if type:
-            datasets = cur.execute('''
-                SELECT type, name, description, added
-                FROM datasets WHERE type = ?
-                ORDER BY type;''', (type, )).fetchall()
-        else:
-            datasets = cur.execute('''
-                SELECT type, name, description, added 
-                FROM datasets ORDER BY type;'''
-            ).fetchall()
+        datasets = cur.execute('''
+            SELECT type, name, description, added
+            FROM datasets 
+            WHERE type LIKE ?
+            AND name LIKE ?
+            ORDER BY type;''', (type,name)).fetchall()
         if datasets:
             datasets = pd.DataFrame(
                 datasets, 
-                columns=["Type", "Name", "Description", "Date Added"]
-                )
+                columns=["Type", "Name", "Description", "Date Added"],
+            ).set_index('Type')
         else:
             datasets = pd.DataFrame(
                 columns=["Type", "Name", "Description", "Date Added"]
             )
         # Check to see if we are looking for a specific dataset
-        if name is not None:
+        if '%' not in type and '%' not in name:
             return True if name in datasets['Name'].values else False
         else:
             return datasets
@@ -58,16 +54,17 @@ def del_dataset(type, name, safe=True):
     except CantOpenError:
         return True
     if safe:
-        c.log("Are you sure you want to delete {}", name)
-        if input("[Y/n]:") != 'Y':
+        df = available(type=type,name=name)
+        c.log("Are you sure you want to delete:\n {}", df)
+        if input("(Notice CAPS)[Y/n]:") != 'Y':
             c.log("Nothing Deleted")
             return
     c.log("Deleting {}", name)
     try:
         c.db.cursor().execute('''
             DELETE FROM datasets 
-            WHERE name = '{}' 
-            AND type = '{}';'''.format(name, type)
+            WHERE name LIKE '{}' 
+            AND type LIKE '{}';'''.format(name, type)
         )
     except CantOpenError:
         pass
@@ -81,7 +78,8 @@ def del_dataset(type, name, safe=True):
             )
         )
     except FileNotFoundError as e:
-        c.log('Database Not Found: {}'.format(e))
+        pass
+        #c.log('Database Not Found: {}'.format(e))
     try:
         os.remove(
             os.path.expanduser(os.path.join(
@@ -92,10 +90,12 @@ def del_dataset(type, name, safe=True):
             )
         )
     except FileNotFoundError as e:
-        c.log('Database Not Found: {}'.format(e))
+        pass
+        #c.log('Database Not Found: {}'.format(e))
     if type == 'Expr':
         # also have to remove the COB specific refgen
         del_dataset('RefGen', 'Filtered'+name, safe=safe)
+    return True
 
 def mv_dataset(type,name,new_name):
     c = co.Camoco("Camoco")
