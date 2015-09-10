@@ -1,3 +1,6 @@
+#!/usr/bin/python3
+
+import numpy as np
 
 from .Tools import log
 
@@ -5,53 +8,113 @@ class Term(object):
     '''
         A Term is a just group of loci that are related.
     '''
-    def __init__(self, id, desc='', locus_list=None, **kwargs):
+    def __init__(self, id, desc='', loci=None, **kwargs):
         self.id = id
         self.desc = desc
-        self.attr = {}
-        self.locus_list = set()
-        if locus_list:
-            self.locus_list = set(locus_list)
+        self.attrs = {}
+        self.loci = set()
+        if loci:
+            self.loci = set(loci)
         for key, val in kwargs.items():
             self.attrs[key] = val
+
+    @property
+    def locus_list(self):
+        from warnings import warn
+        warn('Use self.loci instead of self.locus_list', DeprecationWarning)
+        return self.loci
 
     def __len__(self):
         '''
             Returns the number of loci in the term.
         '''
-        return len(self.locus_list)
+        return len(self.loci)
+
+    def __getitem__(self,key):
+        return self.attrs[key]
 
     def add_locus(self, locus):
         '''
             Adds a locus to the Term.
         '''
-        self.locus_list.add(locus)
+        self.loci.add(locus)
 
-    def flanking_loci(self, gene, window_size=100000):
+    def flanking_loci(self, locus, window_size=100000):
         '''
-            returns any nearby Term SNPs to a gene
+            returns any nearby Term SNPs to a locus
         '''
-        return [locus for locus in self.locus_list if abs(gene-locus) <= window_size]
+        return [flank for flank in self.loci if abs(locus-flank) <= window_size]
 
-    def effective_loci(self, window_size=None, max_genes_between=1):
+    
+    def effective_loci(self, window_size=None):
         '''
-            Collapse down loci that have overlapping windows.
-            Also collapses down snps that have
+            Collapse down loci that have overlapping windows into
+            'effective' loci. Looks like:
+
+            Locus1:    |--------o-------|
+            Locus2:        |--------o--------|
+            Locus3:                         |--------o--------|
+            Effective: |--------o---+----------------o--------|
+
+            Legend: '|' : Window edge, used to collapse
+                    'o' : 'Locus' edge (SNPs in this case)
+                    '+' : Sub loci, kept for downstream analysis
+
+            Parameters
+            ----------
+            window_size : int (default: None)
+                If not None, maps a new window size to each locus.      
         '''
-        locus_list = sorted(self.locus_list)
+        loci = sorted(self.loci)
         if window_size is not None:
-            for locus in locus_list:
+            for locus in loci:
                 locus.window = window_size
-        collapsed = [locus_list.pop(0)]
-        for locus in locus_list:
+        collapsed = [loci.pop(0)]
+        for locus in loci:
             # if they have overlapping windows, collapse
             if locus in collapsed[-1]:
                 # Collapse if the windows overlap
                 collapsed[-1] = collapsed[-1] + locus
             else:
                 collapsed.append(locus)
-        log('{}: Found {} SNPs -> {} effective SNPs', self.id, len(self.locus_list), len(collapsed))
+        log('{}: Found {} SNPs -> {} effective SNPs', 
+            self.id, len(self.loci), len(collapsed)
+        )
         return collapsed
+
+    def strongest_loci(self, attr, window_size=None,lowest=True):
+        '''
+            Collapses down loci that have overlapping windows,
+            then returns the locus with the strongest 'attr'
+            value. Looks like:
+
+            Locus1:    |--------o-------| (attr: 7)
+            Locus2:        |--------o--------| (attr: 2)
+            Locus3:                             |--------o--------| (attr: 8)
+            Strongest: |--------o-------|       |--------o--------|
+
+            Legend: '|' : Window edge, used to collapse
+                    'o' : 'Locus' edge (SNPs in this case)
+
+            Parameters
+            ----------
+            attr : str
+                The locus attribute to use to determine the 'strongest'
+            window_size : int (default: None)
+                If not None, maps a new window size to each locus.      
+            lowest: bool (default: Treu)
+                When sorting by attr, lowest is strongest (i.e. p-vals) 
+        '''
+        is_reverse = not lowest
+        return [
+            # sort by attr and take first item
+            sorted(
+                locus.sub_loci,
+                key=lambda x: float(x.default_getitem(attr,np.inf)),
+                reverse=is_reverse
+            )[0] for locus in self.effective_loci(window_size=window_size)
+        ]
+
 
     def __str__(self):
         return "Term: {}, Desc: {}, {} Loci".format(self.id, self.desc, len(self))

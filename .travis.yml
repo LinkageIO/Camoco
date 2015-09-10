@@ -28,4 +28,5 @@ install:
   - python -c 'import camoco as co;'
 # command to run tests, e.g. python setup.py test
 script:  
-  - py.test -v tests/test_COB.py
+  - py.test  tests/test_RefGen.py
+  - py.test  tests/test_COB.py

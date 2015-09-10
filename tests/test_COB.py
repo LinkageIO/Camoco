@@ -9,30 +9,54 @@ import itertools
 import numpy as np
 
 from scipy.misc import comb
+from camoco import cf
 
+def test_coordination_between_expr_and_expr_index(testCOB):
+    for i,x in enumerate(testCOB._expr.index):
+        assert i == testCOB._expr_index[x]
 
+def test_coordination_between_expr_index_and_coex_index(testCOB):
+    assert set(itertools.chain(*testCOB.coex.index.values)) \
+        == set(testCOB._expr.index.values)
 
-def test_shape(ZmRNASeqTissueAtlas):
-    cob = ZmRNASeqTissueAtlas
-    assert len(cob.coex) == comb(cob.num_genes(), 2)
+def test_expr_nans_in_same_place(testCOB):
+    pass
 
-def test_coexpress_concordance(ZmRNASeqTissueAtlas):
-    cob = ZmRNASeqTissueAtlas
+def test_shape(testCOB):
+    assert len(testCOB.coex) == comb(testCOB.num_genes(), 2)
+
+def test_coex_score_concordance(testCOB):
     for a, b in itertools.combinations(
-            [cob.refgen.random_gene() for x in range(50)], 2
+            [testCOB.refgen.random_gene() for x in range(cf.test.num)], 2
         ):
         assert (
             abs(
-                cob.coexpression(a, b).score \
-                - cob._coex_concordance(a, b)) < 0.001
-            ) or ( np.isnan(cob.coexpression(a, b).score) 
-                and np.isnan(cob._coex_concordance(a, b))
+                testCOB.coexpression(a, b).score \
+                - testCOB._coex_concordance(a, b)) < 0.001
+            ) or ( np.isnan(testCOB.coexpression(a, b).score) 
+                and np.isnan(testCOB._coex_concordance(a, b))
             )
-        dis_dif = abs(cob.coexpression(a, b).distance - abs(a-b))
+
+def test_coex_distance_concordance(testCOB):
+    for a, b in itertools.combinations(
+            [testCOB.refgen.random_gene() for x in range(cf.test.num)], 2
+        ):
+        dis_dif = abs(testCOB.coexpression(a, b).distance - abs(a-b))
         assert np.isnan(dis_dif) or dis_dif < 0.001
 
-def test_num_neighbors_equals_degree(ZmRNASeqTissueAtlas):
-    cob = ZmRNASeqTissueAtlas
-    random_gene = cob.refgen.random_gene()
-    assert len(cob.neighbors(random_gene)) \
-        == cob.global_degree(random_gene)
+def test_coex_id_concordance(testCOB):
+    for a, b in itertools.combinations(
+            [testCOB.refgen.random_gene() for x in range(cf.test.num)], 2
+        ):
+        assert testCOB.coexpression(a,b).name == tuple(sorted([a.id,b.id]))
+
+
+def test_num_neighbors_equals_degree(testCOB):
+    random_gene = testCOB.refgen.random_gene()
+    assert len(testCOB.neighbors(random_gene)) \
+        == testCOB.global_degree(random_gene)
+
+def test_subnetwork_contains_only_input_genes(testCOB):
+    random_genes = set(testCOB.refgen.random_genes(n=cf.test.num))
+    subnet = testCOB.subnetwork(random_genes,sig_only=False)
+    assert set(itertools.chain(*subnet.index.values)) == set([x.id for x in random_genes])

@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+
+import camoco as co
+import sys
+import os
+
+import argparse
+
+from camoco.cli.PlotGWAS import plot_gwas
+from camoco.cli.BootstrapDensity import density
+from camoco.cli.BootstrapLocality import locality
+
+def list_command(args):
+    print(co.available_datasets(args.type,args.name))
+
+def rm_command(args):
+    print(co.del_dataset(args.type,args.name,safe=args.force))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        epilog='Cache. Money. Corn.'
+    )
+    subparsers = parser.add_subparsers(
+        title='Camoco CLI program.',
+        metavar='Available Commands',
+        description='Use --help with each command for more info',
+    )
+
+    # Also allow the help message to be printed using the help command
+    helpcmd = subparsers.add_parser('help',help='Prints this help message')
+    helpcmd.set_defaults(func=lambda x: parser.print_help())
+
+    '''--------------------------
+        list 
+    --------------------------'''
+    lstcmd = subparsers.add_parser('list',help='List camoco datasets.')
+    lstcmd.add_argument('--type',default=None,required=True)
+    lstcmd.add_argument('--name',default=None,required=True)
+    lstcmd.set_defaults(func=list_command)
+
+    ''' --------------------------
+        rm 
+    --------------------------'''
+    rmcmd = subparsers.add_parser('rm',help='remove camoco dataset.')
+    rmcmd.add_argument('--type',default=None,required=True)
+    rmcmd.add_argument('--name',default=None,required=True)
+    rmcmd.add_argument('-f','--force',action='store_false',default=True)
+    rmcmd.set_defaults(func=rm_command)
+
+    ''' --------------------------
+        plotGWAS 
+    --------------------------'''
+    plotgwas = subparsers.add_parser('plotGWAS',help='Plot a GWAS dataset')
+    # Data Set Arguments
+    plotgwas.add_argument(
+        '--cob',
+        required=True,
+        help='The camoco network to use.'
+    )
+    plotgwas.add_argument(
+        '--gwas', 
+        required=True,
+        help='The camoco GWAS to use.'
+    )
+    plotgwas.add_argument(
+        '--terms',
+        nargs='*', 
+        help='The term within the GWAS ontology to use. default: all',
+        default=['all']
+    )
+    plotgwas.add_argument(
+       '--candidate-window-size',default=50000,
+       type=int,
+       help=('The window size (in bp) for mapping effective SNPs to genes. '
+             'default: 50000')
+    )
+    plotgwas.add_argument(
+       '--candidate-flank-limit',default=2,
+       type=int,
+       help=('The number of flanking genes included in SNP to gene mapping. '
+           'default: 2' )
+    )
+    plotgwas.add_argument(
+        '--out', default=sys.stdout,
+        help='OutputFile Name (default: Standard Out)'
+    )
+    plotgwas.set_defaults(func=plot_gwas) 
+
+
+    ''' --------------------------
+        density 
+    --------------------------'''
+    density = subparsers.add_parser(
+        'density',
+        help='Calculate network density among GWAS results'
+    )
+    # Data Set Arguments
+    density.add_argument(
+        '--cob',
+        required=True,
+        help='The camoco network to use.'
+    )
+    density.add_argument(
+        '--gwas', 
+        required=True,
+        help='The camoco GWAS to use.'
+    )
+    density.add_argument(
+        '--terms',
+        nargs='*', 
+        help='The term within the ontology to use. default: all',
+        default=['all']
+    )
+    density.add_argument(
+       '--num-bootstraps', default=50,type=int, 
+       help=('The number of bootstraps to perform in order '
+           'to estimate a null distribution. default: 50')
+    )
+    density.add_argument(
+       '--candidate-window-size',default=50000,
+       type=int,
+       help=('The window size (in bp) for mapping effective SNPs to genes. '
+             'default: 50000')
+    )
+    density.add_argument(
+       '--candidate-flank-limit',default=2,
+       type=int,
+       help=('The number of flanking genes included in SNP to gene mapping. '
+           'default: 2' )
+    )
+    density.add_argument(
+        '--out', default=sys.stdout,
+        help='OutputFile Name (default: Standard Out)'
+    )
+    density.set_defaults(func=density)
+
+    
+    ''' --------------------------
+        locality
+    --------------------------'''
+    locality = subparsers.add_parser(
+        'locality',
+        help='Calculate subnetwork locality.'
+    )
+    # Data Set Arguments
+    locality.add_argument(
+        '--cob', 
+        required=True,
+        help='The camoco network to use.'
+    )
+    locality.add_argument(
+        '--gwas',
+        required=True,
+        help='The camoco GWAS to use.'
+    )
+    locality.add_argument(
+        '--term', 
+        required=True,
+        help='The term within the ontology to use.'
+    )
+    # Data Analysis parameters  
+    locality.add_argument(
+       '--axes', nargs='*',
+       help='This are the x and y axis for the plot, see permutation parameters'
+    )
+    locality.add_argument(
+       '--num-bootstraps', default=50,type=int, 
+       help='''The number of bootstraps to perform in order
+             to estimate a null distribution.'''
+    )
+    locality.add_argument(
+       '--sd-envelope', default=2, type=int,
+       help='''The number or standard deviations to 
+           use for the regression window.'''
+    )
+    locality.add_argument(
+       '--regression-window-size', default=15, 
+       type=int, help='The number of items within a window.'
+    )
+    locality.add_argument(
+       '--permutable', default=[
+            'min_fdr_degree',
+            'candidate_window_size',
+            'candidate_gene_limit'
+        ]        
+    )
+    # Permutation parameters
+    locality.add_argument(
+       '--min-fdr-degree', default=[2], nargs='*',
+       type=int, help='''The miniumum degree to be included 
+       as true positive in FDR calculation.'''
+    )
+    locality.add_argument(
+       '--candidate-window-size',default=[50000],
+       type=int, nargs='*',  
+       help='The window size for mapping effective SNPs to genes.'
+    )
+    locality.add_argument(
+       '--candidate-flank-limit',default=[2],
+       type=int, nargs='*',
+       help='The number of flanking genes included in SNP to gene mapping'
+    )
+    # Data Formatting Parameters
+    locality.add_argument(
+       '--out',default='.',
+       type=str,help='Name of output directory'
+    )
+    # Make this a list  
+    locality.add_argument(
+        '--plot',default='fdr',
+        action='store', nargs='*',
+        help=("Designates which item to plot. Must be in: ['fdr','scatter']")
+    )
+
+    # DO IT ----------
+    from IPython.core import ultratb
+    sys.excepthook = ultratb.FormattedTB(mode='Verbose',
+                 color_scheme='Linux', call_pdb=1)
+
+    args = parser.parse_args()
+    sys.exit(args.func(args))
