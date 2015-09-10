@@ -170,7 +170,7 @@ class COB(Expr):
         if gene_list is None:
             df = self.coex
         else:
-            ids = np.array([self._expr_index[x.id] for x in gene_list])
+            ids = np.array([self._expr_index[x.id] for x in set(gene_list)])
             if filter_missing_gene_ids:
                 # filter out the Nones
                 ids = np.array(list(filter(None, ids)))
@@ -205,12 +205,12 @@ class COB(Expr):
             )
         # create a dict of gene to locus mapping
         gene_origin = {}
-        full_gene_set = []
+        full_gene_set = set()
         for i, genes in enumerate(genes_list):
             # RefGen.candidate_genes returns u, w, d with chain == False
             for gene in genes:
                 gene_origin[gene.id] = i
-                full_gene_set.append(gene)
+                full_gene_set.add(gene)
         self.log("Found {} candidate genes", len(full_gene_set))
 
         edges = self.subnetwork(
