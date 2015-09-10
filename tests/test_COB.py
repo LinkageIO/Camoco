@@ -60,3 +60,10 @@ def test_subnetwork_contains_only_input_genes(testCOB):
     random_genes = set(testCOB.refgen.random_genes(n=cf.test.num))
     subnet = testCOB.subnetwork(random_genes,sig_only=False)
     assert set(itertools.chain(*subnet.index.values)) == set([x.id for x in random_genes])
+
+def test_subnetwork_contains_only_input_when_duplicates(testCOB):
+    random_genes = list(testCOB.refgen.random_genes(n=cf.test.num))
+    # Add duplicates
+    random_genes = random_genes + random_genes[-10:-1]
+    subnet = testCOB.subnetwork(random_genes,sig_only=False)
+    assert set(itertools.chain(*subnet.index.values)) == set([x.id for x in random_genes])
