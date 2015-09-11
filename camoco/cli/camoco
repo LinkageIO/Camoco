@@ -22,9 +22,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         epilog='Cache. Money. Corn.'
     )
-    parser.add_argument('--debug',help='Drop into a debugger on error')
+    parser.add_argument('--debug',action='store_true',default=False)
+
     subparsers = parser.add_subparsers(
-        title='Camoco CLI program.',
+        title='Camoco CLI program',
         metavar='Available Commands',
         description='Use --help with each command for more info',
     )
@@ -37,8 +38,8 @@ if __name__ == '__main__':
         list 
     --------------------------'''
     lstcmd = subparsers.add_parser('list',help='List camoco datasets.')
-    lstcmd.add_argument('--type',default=None)
-    lstcmd.add_argument('--name',default=None)
+    lstcmd.add_argument('type',default=None)
+    lstcmd.add_argument('name',default=None)
     lstcmd.set_defaults(func=list_command)
 
     ''' --------------------------
@@ -84,6 +85,31 @@ if __name__ == '__main__':
            'default: 2' )
     )
     plotgwas.add_argument(
+        '--snp2gene', default='strongest',
+        type=str,metavar='strongest',
+        help=(
+            'The SNP to gene mapping to use. Specifying multiple mappings '
+            ' will result in multiple results. Must be one of: '
+            "['effective','strongest'] "
+            "default:'strongest' "
+        )
+    )
+    plotgwas.add_argument(
+        '--strongest-attr', default='pval', type=str,
+        help=(
+            'The locus attr used to determine which locus is the'
+            'strongest locus. (defualt=pval).'
+        )
+    )
+    plotgwas.add_argument(
+        '--strongest-higher',action='store_false',default=True,
+        help=(
+            'Flag indicating the value in --strongest-attr is'
+            'stronger if higher. Default behavior is to treat'
+            'lower values as stronger (i.e. p-vals)'
+        )
+    )
+    plotgwas.add_argument(
         '--out', default=sys.stdout,
         help='OutputFile Name (default: Standard Out)'
     )
@@ -93,132 +119,175 @@ if __name__ == '__main__':
     ''' --------------------------
         density 
     --------------------------'''
-    bootstrapdensity = subparsers.add_parser(
+    densityCLI = subparsers.add_parser(
         'density',
         help='Calculate network density among GWAS results'
     )
     # Data Set Arguments
-    bootstrapdensity.add_argument(
-        '--cob',
-        required=True,
+    densityCLI.add_argument(
+        'cob',
         help='The camoco network to use.'
     )
-    bootstrapdensity.add_argument(
-        '--gwas', 
-        required=True,
+    densityCLI.add_argument(
+        'gwas', 
         help='The camoco GWAS to use.'
     )
-    bootstrapdensity.add_argument(
+    densityCLI.add_argument(
         '--terms',
         nargs='*', 
-        help='The term within the ontology to use. default: all',
+        help=(
+            'The term within the ontology to use. If all, '
+            'terms in gwas will be iteratively analyzed. '
+            '(default: all)'
+        ),
         default=['all']
     )
-    bootstrapdensity.add_argument(
-       '--num-bootstraps', default=50,type=int, 
-       help=('The number of bootstraps to perform in order '
-           'to estimate a null distribution. default: 50')
+    densityCLI.add_argument(
+        '--num-bootstraps', default=50,type=int, metavar=50,
+        help=('The number of bootstraps to perform in order '
+           'to estimate a null distribution. (default: 50)')
     )
-    bootstrapdensity.add_argument(
-       '--candidate-window-size',default=50000,
-       type=int,
-       help=('The window size (in bp) for mapping effective SNPs to genes. '
-             'default: 50000')
+    densityCLI.add_argument(
+        '--candidate-window-size',default=10000, metavar=10000,
+        type=int,
+        help=('The window size, in bp, for mapping effective SNPs to genes. '
+             '(default: 10000)')
     )
-    bootstrapdensity.add_argument(
-       '--candidate-flank-limit',default=2,
-       type=int,
-       help=('The number of flanking genes included in SNP to gene mapping. '
-           'default: 2' )
+    densityCLI.add_argument(
+        '--candidate-flank-limit',default=1, 
+        metavar=1,type=int,
+        help=(
+            'The number of flanking genes included in SNP to gene mapping. '
+            'on each side of the locus. (default: 2)' 
+        )
     )
-    bootstrapdensity.add_argument(
+    densityCLI.add_argument(
+        '--snp2gene', default='strongest',
+        choices=['strongest','effective'],
+        type=str, metavar='strongest',
+        help=(
+            'The SNP to gene mapping to use. Specifying multiple mappings '
+            ' will result in multiple results. Must be in: '
+            "['effective','strongest'] "
+            "(default: strongest)"
+        )
+    )
+    densityCLI.add_argument(
+        '--strongest-attr', default='pval', type=str, metavar='pval',
+        help=(
+            'The locus attr used to determine which locus is the'
+            'strongest locus. (defualt=pval).'
+        )
+    )
+    densityCLI.add_argument(
+        '--strongest-higher',action='store_false',default=True,
+        help=(
+            'Flag indicating the value in --strongest-attr is'
+            'stronger if higher. Default behavior is to treat'
+            'lower values as stronger (i.e. p-vals)'
+        )
+    )
+    densityCLI.add_argument(
         '--out', default=sys.stdout,
         help='OutputFile Name (default: Standard Out)'
     )
-    bootstrapdensity.set_defaults(func=density)
+    densityCLI.set_defaults(func=density)
 
-    
     ''' --------------------------
         locality
     --------------------------'''
-    locality = subparsers.add_parser(
+    localityCLI = subparsers.add_parser(
         'locality',
-        help='Calculate subnetwork locality.'
+        help='Calculate subnetwork locality',
+        description=(
+            'Calculate subnetwork locality. Creates a grid using permutable '
+            'parameters (see --permutable) which interrogates locality.'
+        )
     )
     # Data Set Arguments
-    locality.add_argument(
-        '--cob', 
-        required=True,
+    localityCLI.add_argument(
+        'cob', 
         help='The camoco network to use.'
     )
-    locality.add_argument(
-        '--gwas',
-        required=True,
+    localityCLI.add_argument(
+        'gwas',
         help='The camoco GWAS to use.'
     )
-    locality.add_argument(
-        '--term', 
-        required=True,
-        help='The term within the ontology to use.'
+    localityCLI.add_argument(
+        '--terms',
+        nargs='*', 
+        metavar='TERM',
+        help='The term within the ontology to use. (default: all)',
+        default=['all']
     )
-    # Data Analysis parameters  
-    locality.add_argument(
-       '--axes', nargs='*',
-       help='This are the x and y axis for the plot, see permutation parameters'
-    )
-    locality.add_argument(
-       '--num-bootstraps', default=50,type=int, 
+    localityCLI.add_argument(
+       '--num-bootstraps', default=50,type=int,metavar=50, 
        help='''The number of bootstraps to perform in order
              to estimate a null distribution.'''
     )
-    locality.add_argument(
-       '--sd-envelope', default=2, type=int,
+    localityCLI.add_argument(
+       '--sd-envelope', default=2, type=int,metavar=2,
        help='''The number or standard deviations to 
            use for the regression window.'''
     )
-    locality.add_argument(
-       '--regression-window-size', default=15, 
+    localityCLI.add_argument(
+       '--regression-window-size', default=50, metavar=50,
        type=int, help='The number of items within a window.'
     )
-    locality.add_argument(
-       '--permutable', default=[
-            'min_fdr_degree',
-            'candidate_window_size',
-            'candidate_gene_limit'
-        ]        
+    # SNP2Gene Mapping
+    localityCLI.add_argument(
+        '--snp2gene', default='strongest', type=str,
+        metavar='strongest', choices=['strongest','effective'],
+        help=(
+            'The SNP to gene mapping to use. Specifying multiple mappings '
+            ' will result in multiple results. Must be in: '
+            "['effective','strongest'] "
+            "(default:strongest)"
+        )
+    )
+    localityCLI.add_argument(
+        '--strongest-attr', default='pval', type=str,metavar='pval',
+        help=(
+            'The locus attribute used to determine which locus is the'
+            'strongest locus. (defualt=pval).'
+        )
+    )
+    localityCLI.add_argument(
+        '--strongest-higher',action='store_false',default=True,
+        help=(
+            'Flag indicating the value in --strongest-attr is'
+            'stronger if higher. Default behavior is to treat'
+            'lower values as stronger (i.e. p-vals)'
+        )
     )
     # Permutation parameters
-    locality.add_argument(
-       '--min-fdr-degree', default=[2], nargs='*',
+    localityCLI.add_argument(
+       '--min-fdr-degree', default=2,metavar=2,
        type=int, help='''The miniumum degree to be included 
        as true positive in FDR calculation.'''
     )
-    locality.add_argument(
-       '--candidate-window-size',default=[50000],
-       type=int, nargs='*',  
+    localityCLI.add_argument(
+       '--candidate-window-size',default=10000,metavar=10000,
+       type=int,  
        help='The window size for mapping effective SNPs to genes.'
     )
-    locality.add_argument(
-       '--candidate-flank-limit',default=[2],
-       type=int, nargs='*',
-       help='The number of flanking genes included in SNP to gene mapping'
+    localityCLI.add_argument(
+       '--candidate-flank-limit',default=1,metavar=1,
+       type=int,
+       help='The number of flanking genes (each side) included in SNP to gene mapping'
     )
     # Data Formatting Parameters
-    locality.add_argument(
+    localityCLI.add_argument(
        '--out',default='.',
        type=str,help='Name of output directory'
     )
-    # Make this a list  
-    locality.add_argument(
-        '--plot',default='fdr',
-        action='store', nargs='*',
-        help=("Designates which item to plot. Must be in: ['fdr','scatter']")
-    )
+    localityCLI.set_defaults(func=locality)
 
     # DO IT ----------
-    from IPython.core import ultratb
-    sys.excepthook = ultratb.FormattedTB(mode='Verbose',
-                    color_scheme='Linux', call_pdb=1)
-
     args = parser.parse_args()
+
+    if args.debug is True:
+        from IPython.core import ultratb
+        sys.excepthook = ultratb.FormattedTB(mode='Verbose',
+                            color_scheme='Linux', call_pdb=1)
     sys.exit(args.func(args))
