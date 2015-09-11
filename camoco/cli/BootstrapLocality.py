@@ -16,6 +16,7 @@ import matplotlib.pylab as plt
 import statsmodels.api as sm
 
 lowess = sm.nonparametric.lowess
+co.cf.logging.log_level = 'quiet'
 
 def mean_confidence_interval(data):
     return np.mean(data), confidence_interval(data)
@@ -41,83 +42,54 @@ def locality(args):
     # Initiate for args 
     # Generate output dirs
 
-    ont = co.GWAS(args.GWAS)
-
-    # If all, grab a generater
-    if args.term == 'all':
-        terms = ont.iter_terms()
-    else:
-        # Otherwise get the term out of the GWAS
-        terms = [ont[args.term]] 
-
     # Grab the COB object
     cob = co.COB(args.cob)
+    gwas = co.GWAS(args.gwas)
 
-    # Create a plot comparing spread of specified shit
-    xaxes_key,yaxes_key = [x.replace('-','_') for x in args.axes]
-    xaxes = getattr(args,xaxes_key)
-    yaxes = getattr(args,yaxes_key)
-
-    #Open a log file
-    gs = plt.GridSpec(len(xaxes),len(yaxes))
-    fig = plt.figure(figsize=(4*len(yaxes),4*len(xaxes)))
-
-    # This gets a list of functions so we can map the string passed into
-    # args.plot to a plotting function
-    possibles = globals().copy()
-    possibles.update(locals())
+    # If all, grab a generater
+    if 'all' in args.terms:
+        terms = gwas.iter_terms()
+    else:
+        # Otherwise get the term out of the GWAS
+        terms = [gwas[x] for x in args.terms] 
 
     # Add in text for axes
     for term in terms:
-        for plot in args.plot:
-            for i,xaxis in enumerate(xaxes):
-                for j,yaxis in enumerate(yaxes):
-                    ax = fig.add_subplot(gs[i,j]) 
-                    print("Looking at {}:{} x {}:{}".format(
-                        xaxes_key,xaxis,
-                        yaxes_key,yaxis,
-                    ))
-                    perm_args = copy.deepcopy(args) 
-                    # Set the values we aren't permuting to their first value
-                    # I hate this
-                    # for arg in perm_args.permutable:
-                    #    if arg not in [xaxes_key,yaxes_key]:
-                    #        setattr(perm_args,arg,getattr(args,arg)[1])
-                    # Change the relevent things in the permuted args 
-                    setattr(perm_args,xaxes_key,xaxis)
-                    setattr(perm_args,yaxes_key,yaxis)
-                    # Generate data using permuted arguments
-                    loc,bsloc,fdr = generate_data(cob,term,perm_args) 
-                    # Get the plot function based on args
-                    plot_function = possibles.get('plot_'+plot)
-                    # Plot the data
-                    plot_function(perm_args,loc,bsloc,fdr,ax)
-                    if i == 0:
-                        ax.set_title(yaxis)
-                    if j == 0:
-                        ax.set_ylabel(xaxis)
-                    if i == 0 and j == 0:
-                        ax.set_title(str(yaxes_key)+' '+str(yaxis))
-                        ax.set_ylabel(str(xaxes_key)+' '+str(xaxis))
-            plt.tight_layout()
-            plt.savefig("Locality_{}_{}.png".format(
-                plot,
-                term.id
-            ))
+        fig,(ax1,ax2,ax3) = plt.subplots(1,3)
+        # Change the relevent things in the permuted args 
+        # Generate data using permuted arguments
+        loc,bsloc,fdr = generate_data(cob,term,args) 
+        # Plot the data
+        plot_data(args,loc,bsloc,fdr,ax1)
+        plot_scatter(args,loc,bsloc,fdr,ax2)
+        plot_fdr(args,loc,bsloc,fdr,ax3)
+        plt.tight_layout()
+        plt.savefig("{}_{}.png".format(
+            args.out,
+            term.id
+        ))
+        plt.close()
         
-
 def generate_data(cob,term,args):
     '''
         Generates the data according to parameters in args
     '''
-
-    effective_loci = term.effective_loci(
+    if args.snp2gene == 'effective':
+        loci = sorted(term.effective_loci(
             window_size=args.candidate_window_size
-    ) 
+        ))
+    elif args.snp2gene == 'strongest':
+        loci = term.strongest_loci(
+            window_size=args.candidate_window_size,
+            attr=args.strongest_attr,
+            lowest=args.strongest_higher
+        )
+    else:
+        raise ValueError('{} not valid snp2gene mapping'.format(args.snp2gene))
 
     candidate_genes = cob.refgen.candidate_genes(
-        effective_loci,
-        gene_limit=args.candidate_gene_limit
+        loci,
+        flank_limit=args.candidate_flank_limit
     )
 
     # Find the empirical Locality
@@ -130,8 +102,8 @@ def generate_data(cob,term,args):
     bsloc = pd.concat(
             [cob.locality(
                 cob.refgen.bootstrap_candidate_genes(
-                    effective_loci,
-                    gene_limit=args.candidate_gene_limit
+                    loci,
+                    flank_limit=args.candidate_flank_limit
                 ),
                 bootstrap_name=x
             ) for x in range(args.num_bootstraps)]
@@ -158,12 +130,12 @@ def generate_data(cob,term,args):
     # Windowing
     bsloc = bsloc.sort('fitted')
     # Find out how many tick there are with X items per window
-    num_windows = len(bsloc)//args.window_size
+    num_windows = len(bsloc)//args.regression_window_size
     window_ticks = len(bsloc)//num_windows
     bsloc['window'] = [int(i/window_ticks) for i in range(len(bsloc))]
     # If there are not many in the last window, change it second to last
     max_window = max(bsloc['window'])
-    if sum(bsloc['window'] == max_window) < args.window_size / 2:
+    if sum(bsloc['window'] == max_window) < args.regression_window_size / 2:
         bsloc.loc[bsloc['window'] == max_window, 'window'] = max_window-1
     # create a dictionary so we can map the empirical data later
     win_map = NearestDict({
@@ -206,10 +178,8 @@ def generate_data(cob,term,args):
     fdr = pd.concat(
             [cob.locality(
                 cob.refgen.bootstrap_candidate_genes(
-                    term.effective_loci(
-                        window_size=args.candidate_window_size
-                    ),
-                    gene_limit=args.candidate_gene_limit
+                    loci,
+                    flank_limit=args.candidate_flank_limit
                 ),
                 bootstrap_name=x,
                 include_regression=True
@@ -296,10 +266,6 @@ def plot_fdr(args,loc,bsloc,fdr,ax):
         ) for x in zscores ],
         columns=['mean','ci']
     )
-    #zcdf['emp'] = zloc
-    #zcdf['el'] = args.term
-    #zcdf['min_fdr_degree'] = args.min_fdr_degree
-    #zcdf['can_gene_limit'] = args.candidate_gene_limit
     ax.errorbar(
         zscores,
         zcdf['mean'],
@@ -312,80 +278,15 @@ def plot_fdr(args,loc,bsloc,fdr,ax):
     ax.set_title('Z Score FDR')
 
 
-def plot_resid(args,loc,bsloc,fdr,ax):
-    resids = list(range(0,int(max(loc['resid'])+2)))
-    rcdf = [sum(loc['resid'] >= x) for x in resids]
-    ax.plot(resids,rcdf,'bo',label='Empirical Residuals')
-    rcdf = pd.DataFrame(
-         [ mean_confidence_interval(
-            fdr.groupby('bootstrap_name').apply(
-                lambda df: sum(df['resid'] >= x )
-            )
-        ) for x in resids ],
-        columns=['mean','ci']
-    )
-    ax.errorbar(
-        resids,
-        rcdf['mean'],
-        yerr=rcdf['ci'],
-        label='Bootstrap Residuals',
-        color='red'
-    )  
-    ax.set_xlabel('Residual')
-    ax.set_ylabel('Number of Genes > X')
-    ax.set_title('Residual FDR')
-    legend = ax.legend(loc='best')
-
-    # Plot the predicted vs residuals
-
-    '''---------------------------------------------------
-        Residual Plotting
-    '''
-
-    ax.set_xlabel('Fitted')
-    ax.set_ylabel('Residual')
-    ax.set_title('Model Fitting')
-    ax.plot(loc['fitted'],loc['resid'],'bo')
-    # plot the Z-scores for the std
-    ax.plot(list(fit_std.keys()),list(fit_std.values()),'g.',marker='.')
-    # plot where windows are
-
 def plot_data(args,loc,bsloc,fdr,ax):
-    ax.xaxis.set_visible(False)
-    ax.yaxis.set_visible(False)
-    ax.text(.1,.1,'''
+    ax.xaxis.set_visible(True)
+    ax.yaxis.set_visible(True)
+    ax.text(0,0,'''
         COB: {}
         Ontology: {}
         Term: {}
-        Num Raw SNPS: {}
-        Num Effective SNPS: {}
-        Num Genes: {}
-        CI Window Size: {}
-        Num. Bootstraps: {}
-        Min FDR Degree: {}
-        Candidate Gene Window Size: {}
-        Candidate Gene Limit: {}
-        Num SNPs: {}
     '''.format(
         args.cob,
-        args.ontology,
-        args.term,
-        len(term.locus_list),
-        len(effective_loci),
-        len(candidate_genes),
-        args.window_size,
-        args.num_bootstraps,
-        args.min_fdr_degree,
-        args.candidate_window_size,
-        args.candidate_gene_limit,
-        args.num_snps)
-    )
-
-    out_string = '_'.join(map(str,[
-        args.term,
-        args.cob,
-        args.window_size,
-        args.min_fdr_degree,
-        args.candidate_gene_limit,
-        args.candidate_window_size
-    ]))
+        args.gwas,
+        args.terms
+    ))
