@@ -76,7 +76,7 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
         co.del_dataset('COB', 'ZmRNASeqTissueAtlas', safe=False)
         co.del_dataset('Expr', 'ZmRNASeqTissueAtlas', safe=False)
     if not co.available_datasets('Expr', 'ZmRNASeqTissueAtlas'):
-        # Build it 
+        # Build it
         return co.COB.from_table(
             os.path.join(cf.options.testdir,
                 'raw', 'Expr', 'RNASEQ',
@@ -201,7 +201,7 @@ def AtSeed(AtTair10):
             AtTair10,
             rawtype='MICROARRAY',
             quantile=True
-    
+
         )
     else:
         return co.COB('AtSeed')
@@ -450,3 +450,14 @@ def AtLeafHydroIonome(AtTair10):
         )
     else:
         return co.GWAS('AtLeafHydroIonome')
+
+'''----------------------------------------------------------------------------
+    GOnt Fixtures
+----------------------------------------------------------------------------'''
+@pytest.fixture(scope="module")
+def MaizeGO(Zm5bFGS):
+    pass
+
+@pytest.fixture(scope="module")
+def AthGO(AtTair10):
+    pass
