@@ -663,7 +663,7 @@ class RefGen(Camoco):
             CREATE INDEX IF NOT EXISTS geneattr ON gene_attrs (id);
         ''')
 
-    def add_gene(self,gene):
+    def add_gene(self,gene,refgen=None):
         if isinstance(gene,Locus):
             self.db.cursor().execute('''
             INSERT OR REPLACE INTO genes VALUES (?,?,?,?)
@@ -671,6 +671,12 @@ class RefGen(Camoco):
             self.db.cursor().executemany('''
             INSERT OR REPLACE INTO gene_attrs VALUES (?,?,?)
             ''',[(gene.id,key,val) for key,val in gene.attr.items()])
+            if refgen:
+                aliases = refgen.aliases(gene.id)
+                if aliases:
+                    self.db.cursor().executemany('''
+                    INSERT OR IGNORE INTO aliases VALUES (?,?)''',
+                    [(al,id) for al in aliases])
         else:
             # support adding lists of genes
             genes = list(gene)
@@ -686,6 +692,14 @@ class RefGen(Camoco):
                 'INSERT OR REPLACE INTO gene_attrs VALUES (?,?,?)',
                 ((gene.id,key,val) for gene in genes for key,val in gene.attr.items())
             )
+            if refgen:
+                al_map = refgen.aliases([gene.id for gene in genes])
+                als = []
+                for id,al_list in al_map.items():
+                    for al in al_list:
+                        als.append([al,id])
+                cur.executemany('INSERT OR REPLACE INTO aliases VALUES (?,?)',als)
+
             cur.execute('END TRANSACTION')
 
     def add_chromosome(self,chrom):
@@ -715,7 +729,19 @@ class RefGen(Camoco):
         cur.execute('END TRANSACTION')
 
     def aliases(self, gene_id):
-        return [alias[0] for alias in self.db.cursor().execute('SELECT alias FROM aliases WHERE id = ?',[gene_id.upper()])]
+        if isinstance(gene_id,str):
+            return [alias[0] for alias in self.db.cursor().execute('SELECT alias FROM aliases WHERE id = ?',[gene_id.upper()])]
+        else:
+            cur = self.db.cursor()
+            al_list = cur.executemany('SELECT alias,id FROM aliases WHERE id = ?',
+            [[id] for id in gene_id])
+            als = dict()
+            for al,id in al_list:
+                if id in als:
+                    als[id].append(al)
+                else:
+                    als[id] = [al]
+            return als
 
     @classmethod
     def from_gff(cls,filename,name,description,build,organism):
@@ -788,7 +814,7 @@ class RefGen(Camoco):
         for chrom in refgen.iter_chromosomes():
             self.add_chromosome(chrom)
         # Add the genes from genelist
-        self.add_gene(gene_list)
+        self.add_gene(gene_list,refgen=refgen)
         self._build_indices()
         return self
 
