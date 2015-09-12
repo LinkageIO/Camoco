@@ -184,8 +184,8 @@ class COB(Expr):
             df = df.loc[df.significant == 1, :]
         return df.copy()
 
-    def trans_locus_density(self, locus_list, return_mean=True, flank_limit=4,
-        bootstrap=False):
+    def trans_locus_density(self, locus_list,flank_limit, 
+        return_mean=True, bootstrap=False):
         '''
             Calculates the density of edges which span loci
 
