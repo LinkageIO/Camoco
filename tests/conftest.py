@@ -455,9 +455,44 @@ def AtLeafHydroIonome(AtTair10):
     GOnt Fixtures
 ----------------------------------------------------------------------------'''
 @pytest.fixture(scope="module")
-def MaizeGO(Zm5bFGS):
-    pass
+def ZmGO(Zm5bFGS):
+    if cf.test.force.Ontology:
+        co.del_dataset('GOnt','ZmGO',safe=False)
+    if not co.available_datasets('GOnt','ZmGO'):
+        obo = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.obo.bz2'
+        )
+        gene_map_file = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','zm_go.tsv.bz2'
+        )
+        return co.GOnt.from_obo(
+           obo, gene_map_file, 'ZmGO',
+           'Maize Gene Ontology', Zm5bFGS
+        )
+    else:
+        return co.GOnt('ZmGO')
+
 
 @pytest.fixture(scope="module")
-def AthGO(AtTair10):
-    pass
+def AtGO(AtTair10):
+    if cf.test.force.Ontology:
+        co.del_dataset('GOnt','AtGO',safe=False)
+    if not co.available_datasets('GOnt','AtGO'):
+        obo = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.obo.bz2'
+        )
+        gene_map_file = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','ath_go.tsv.bz2'
+        )
+        return co.GOnt.from_obo(
+           obo, gene_map_file, 'AtGO',
+           'Arabidopsis Gene Ontology', AtTair10
+        )
+    else:
+        return co.GOnt('AtGO')
+
+
