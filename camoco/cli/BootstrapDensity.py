@@ -15,8 +15,7 @@ import camoco as co
 import pandas as pd
 import matplotlib.pylab as plt
 
-from camoco.Config import cf
-cf.logging.log_level = 'quiet'
+co.cf.logging.log_level = 'quiet'
 
 def density(args):
     
@@ -28,24 +27,10 @@ def density(args):
     else:
         terms = [ont[term] for term in args.terms]
     
-    all_results = pd.DataFrame(
-        columns=[
-            'Term','Ontology','COB','NumSNPs',
-            'WindowSize','FlankLimit',
-            'NumCollapsedSNPs','NumBootstraps',
-            # All the Effective Things
-            'NumEffectiveCandidates',
-            'EffectiveDensity',
-            'EffectivePValue','EffectiveBSMean','EffectiveBSStd',
-            # All of the Strongest Things
-            'NumStrongestCandidates',
-            'StrongestDensity',
-            'StrongestPValue','StrongestBSMean','StrongestBSStd'
-        ]
-    )
+    all_results = list()
 
     for term in terms:
-        results = {}
+        results = OrderedDict()
 
         print('-'*90,file=sys.stderr)
         print("Boostrapping Density for {} of {} in {}".format(
@@ -56,9 +41,9 @@ def density(args):
    
         print("Num SNPs:\t{}".format(len(term.locus_list)),file=sys.stderr)
 
-        results['Term'] = term.id
         results['Ontology'] = ont.name
         results['COB'] = cob.name
+        results['Term'] = term.id
         results['NumSNPs'] = len(term.locus_list)
         results['WindowSize'] = args.candidate_window_size
         results['FlankLimit'] = args.candidate_flank_limit
@@ -172,9 +157,10 @@ def density(args):
             results['StrongestPValue'] = strongest_pval
             results['StrongestBSMean'] = strongest_bootstraps.mean()
             results['StrongestBSStd'] = strongest_bootstraps.std()
+        all_results.append(results)
     
-        # Return the results 
-        all_results = all_results.append(pd.Series(results),ignore_index=True)
+    # Return the results 
+    all_results = pd.DataFrame(all_results,columns=all_results[0].keys())
     all_results.to_csv(args.out,index=None,sep='\t')
 
 
