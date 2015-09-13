@@ -5,7 +5,7 @@ from .Term import Term
 from .Camoco import Camoco
 from .RefGen import RefGen
 from .Locus import Locus
-from .Tools import log
+from .Tools import log,rawFile
 
 from collections import defaultdict
 import networkx as nx
@@ -45,16 +45,18 @@ class GOnt(Ontology):
 
     def __getitem__(self, id):
         ''' retrieve a term by id '''
-        main_id = self.db.cursor().execute('SELECT main FROM alts WHERE alt = ?', (id, )).fetchone()
+        main_id = self.db.cursor().execute(
+            'SELECT main FROM alts WHERE alt = ?',
+            (id, )
+        ).fetchone()
         if main_id:
-            id = main_id
-
+            (id,) = main_id
         try:
             # Get the term information
             (id, desc, name) = self.db.cursor().execute(
                 'SELECT * from terms WHERE id = ?', (id, )).fetchone()
         except TypeError: # Not in database
-            raise ValueError('This term is not in the database.')
+            raise KeyError('This term is not in the database.')
 
         # Get the loci associated with the term
         term_loci = [self.refgen[gene_id] for gene_id in self.db.cursor().execute(
@@ -68,7 +70,10 @@ class GOnt(Ontology):
         alts = set(termID for termID in self.db.cursor().execute(
             'SELECT alt FROM alts WHERE main = ?', (id, )).fetchall())
 
-        return GOTerm(id, name=name, desc=desc, alt_id=alts, is_a=is_a, locus_list=term_loci)
+        return GOTerm(
+            id, name=name, desc=desc, alt_id=alts, 
+            is_a=is_a, locus_list=term_loci
+        )
 
     def add_term(self, term, cursor=None, overwrite=False):
         ''' This will add a single term to the ontology '''
@@ -81,17 +86,25 @@ class GOnt(Ontology):
             cur = cursor
 
         # Add the term name and description
-        cur.execute('INSERT OR ABORT INTO terms (id, desc, name) VALUES (?, ?, ?)', (term.id, term.desc, term.name))
-
+        cur.execute(
+            'INSERT OR ABORT INTO terms (id, desc, name) VALUES (?, ?, ?)', 
+            (term.id, term.desc, term.name)
+        )
         if term.locus_list:
-            cur.executemany('INSERT OR ABORT INTO term_loci (term, id) VALUES (?, ?)', [(term.id, locus.id) for locus in term.locus_list])
-
+            cur.executemany(
+                'INSERT OR REPLACE INTO term_loci (term, id) VALUES (?, ?)', 
+                [(term.id, locus.id) for locus in term.locus_list]
+            )
         if term.is_a:
-            cur.executemany('INSERT OR ABORT INTO rels (parent, child) VALUES (?, ?)', [(parent, term.id) for parent in term.is_a])
-
+            cur.executemany(
+                'INSERT OR REPLACE INTO rels (parent, child) VALUES (?, ?)',
+                [(parent, term.id) for parent in term.is_a]
+            )
         if term.alt_id:
-            cur.executemany('INSERT OR ABORT INTO alts (alt, main) VALUES (?,?)', [(altID, term.id) for altID in term.alt_id])
-
+            cur.executemany(
+                'INSERT OR REPLACE INTO alts (alt, main) VALUES (?,?)',
+                [(altID, term.id) for altID in term.alt_id]
+            )
         if not cursor:
             cur.execute('END TRANSACTION')
 
@@ -121,6 +134,20 @@ class GOnt(Ontology):
         if not cursor:
             cur.execute('END TRANSACTION')
 
+    @staticmethod
+    def getISA(terms, term):
+        '''
+            Internal function to handle propagating is_a relationships
+        '''
+        tot = set()
+        if not terms[term]['is_a']:
+            return tot
+        else:
+            for item in terms[term]['is_a']:
+                tot.add(item)
+                tot = tot | GOnt.getISA(terms, item)
+            return tot
+
     @classmethod
     def create(cls, name, description, refgen, overwrite=True, type='GOnt'):
         '''This method creates a fresh GO Ontology with nothing it it.'''
@@ -134,30 +161,20 @@ class GOnt(Ontology):
 
         return self
 
-    @classmethod
-    def from_obo(cls, obo_file, gene_map_file ,name, description, refgen, go_col=1, id_col=0, headers=True, overwrite=True):
-        ''' Convenience function for importing GO obo files '''
-
-        # Internal function to handle propagating is_a relationships
-        def getISA(terms, term):
-            tot = set()
-            if not terms[term]['is_a']:
-                return tot
-            else:
-                for item in terms[term]['is_a']:
-                    tot.add(item)
-                    tot = tot | getISA(terms, item)
-                return tot
-
-        self = cls.create(name, description, refgen, overwrite=overwrite)
-
+    def _parse_obo(self,obo_file):
+        '''
+            Parses a GO obo file
+            
+            Returns
+            -------
+            A dictionary containing id:fields for the tersm  
+        '''
         # Importing the obo information
         self.log('Importing OBO: {}', obo_file)
         terms = defaultdict(dict)
-        alt_map = dict()
         cur_term = ''
         isa_re = re.compile('is_a: (.*) !.*')
-        with open(obo_file, 'r') as INOBO:
+        with rawFile(obo_file) as INOBO:
             for line in INOBO:
                 line = line.strip()
                 if line.startswith('id: '):
@@ -173,7 +190,7 @@ class GOnt(Ontology):
                 elif line.startswith('alt_id: '):
                     the_id = line.replace('alt_id: ', '')
                     terms[cur_term]['alt_id'].add(the_id)
-                    alt_map[the_id] = cur_term
+                    terms[the_id] = terms[cur_term]
                 elif line.startswith('def: '):
                     terms[cur_term]['desc'] += line.replace('def: ', '')
                 elif line.startswith('comment: '):
@@ -184,33 +201,72 @@ class GOnt(Ontology):
         # Propagating the relationships using the embeded function
         self.log('Propagating is_a relationships.')
         for cur_term in terms:
-            terms[cur_term]['is_a'] = getISA(terms,cur_term)
+            terms[cur_term]['is_a'] = self.getISA(terms,cur_term)
+        return terms
 
+    def _parse_gene_term_map(self,gene_map_file,headers=True,
+            go_col=1,id_col=0):
         # Importing gene map information, and cross referencing with obo information
         self.log('Importing Gene Map: {}', gene_map_file)
         genes = dict()
         gene = ''
         cur_term = ''
-        INMAP = open(gene_map_file)
-        if headers:
-            garb = INMAP.readline()
-        for line in INMAP.readlines():
-            row = line.strip().split('\t')
-            gene = row[id_col].split('_')[0].strip()
-            cur_term = row[go_col]
-            if gene not in genes:
-                genes[gene] = set([cur_term])
-            else:
-                genes[gene].add(cur_term)
-        del cur_term
-        INMAP.close()
+        with rawFile(gene_map_file) as INMAP:
+            if headers:
+                garb = INMAP.readline()
+            for line in INMAP.readlines():
+                row = line.strip().split('\t')
+                gene = row[id_col].split('_')[0].strip()
+                cur_term = row[go_col]
+                if gene not in genes:
+                    genes[gene] = set([cur_term])
+                else:
+                    genes[gene].add(cur_term)
+        return genes
+
+    @classmethod
+    def from_obo(cls, obo_file, gene_map_file ,name, description, 
+            refgen, go_col=1, id_col=0, headers=True, overwrite=True):
+        ''' 
+            Convenience function for importing GOnt from obo files 
+
+            Parameters
+            ----------
+            obo_file : str
+                Path to the obo file
+            gene_map_file : str
+                Path to the file which specifies what GO term each 
+                gene is a part of.
+            name : str
+                The name of the camoco object to be stored in the database.
+            description : str
+                A short message describing the dataset.
+            refgen : camoco.RefGen
+                A RefGen object describing the genes in the dataset
+            go_col : int (default: 1)
+                The index column for GO term in the gene_map_file
+            id_col : int (default: 0)
+                The index column for gene id in the gene_map_file
+            headers : bool (default: True)
+                A flag indicating whether or not there is a header line
+                in the gene_map_file
+            overwrite : bool (default: True)
+                Kill old instances.
+        '''
+        self = cls.create(name, description, refgen, overwrite=overwrite)
+        # Parse the input files
+        terms = self._parse_obo(obo_file)
+        genes = self._parse_gene_term_map(gene_map_file,
+            headers=headers,go_col=go_col,id_col=id_col
+        )
 
         # Get the requisite gene objects
         self.log('Mixing genes and term data.')
         for (cur_gene, cur_terms) in genes.items():
             for cur_term in cur_terms:
                 if terms[cur_term] == {}:
-                    cur_term = alt_map[cur_term]
+                    self.log('Could not find term for {}',cur_term)
+                    continue
                 terms[cur_term]['genes'].add(cur_gene)
                 for parent in terms[cur_term]['is_a']:
                     terms[parent]['genes'].add(cur_gene)
@@ -225,8 +281,12 @@ class GOnt(Ontology):
             # Make the Gene Objects from the refgen
             geneObjs = refgen.from_ids(terms[term]['genes'])
             # Make the Term object and add it to the list
-            termObjs.append(GOTerm(term, name=terms[term]['name'], alt_id=terms[term]['alt_id'], is_a=terms[term]['is_a'],
-            desc=terms[term]['desc'], locus_list=geneObjs))
+            termObjs.append(
+                GOTerm(term, name=terms[term]['name'], 
+                    alt_id=terms[term]['alt_id'], is_a=terms[term]['is_a'],
+                    desc=terms[term]['desc'], locus_list=geneObjs
+                )
+            )
         del terms
 
         # Add them all to the database
@@ -261,8 +321,10 @@ class GOnt(Ontology):
         super()._build_indices()
         cursor = self.db.cursor()
         cursor.execute('''
-            CREATE INDEX IF NOT EXISTS relsIND ON rels (parent,child);
-            CREATE INDEX IF NOT EXISTS altsIND ON alts (alt,main);''')
+            CREATE INDEX IF NOT EXISTS relsIND ON rels (child);
+            CREATE INDEX IF NOT EXISTS altsIND ON alts (main);
+            CREATE INDEX IF NOT EXISTS term_loci_ID ON term_loci (term)
+        ''')
 
     def _drop_indices(self):
         super()._drop_indices()
