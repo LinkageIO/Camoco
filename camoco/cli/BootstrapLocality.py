@@ -55,10 +55,14 @@ def locality(args):
 
     # Add in text for axes
     for term in terms:
-        fig,(ax1,ax2,ax3) = plt.subplots(1,3)
+        fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(24,8))
         # Change the relevent things in the permuted args 
         # Generate data using permuted arguments
         loc,bsloc,fdr = generate_data(cob,term,args) 
+        # Add extra Columns 
+        loc.insert(0,'COB',cob.name)
+        loc.insert(0,'Ontology',term.name)
+        loc.insert(0,'COB',gwas.name)
         # Plot the data
         plot_data(args,loc,bsloc,fdr,ax1)
         plot_scatter(args,loc,bsloc,fdr,ax2)
@@ -69,6 +73,13 @@ def locality(args):
             term.id
         ))
         plt.close()
+        # Output the Locality Measures
+        loc.to_csv(
+            "{}_{}.csv".format(
+                args.out,
+                term.id
+            )        
+        )
         
 def generate_data(cob,term,args):
     '''
@@ -170,6 +181,7 @@ def generate_data(cob,term,args):
     # divide empirical residuals by the s.d. in their respective window
     loc['bs_std'] = [fit_std[x] for x in loc['fitted']]
     loc['zscore'] = [x['resid']/x['bs_std'] for i,x in loc.iterrows()]
+    loc = loc.sort('zscore',ascending=False)
 
     '''---------------------------------------------------
         FDR Calculations
@@ -279,8 +291,8 @@ def plot_fdr(args,loc,bsloc,fdr,ax):
 
 
 def plot_data(args,loc,bsloc,fdr,ax):
-    ax.xaxis.set_visible(True)
-    ax.yaxis.set_visible(True)
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
     ax.text(0,0,'''
         COB: {}
         Ontology: {}
