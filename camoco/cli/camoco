@@ -279,7 +279,7 @@ if __name__ == '__main__':
     # Data Formatting Parameters
     localityCLI.add_argument(
        '--out',default='.',
-       type=str,help='Name of output directory'
+       type=str,help='Basename of output file (pngs and csvs will be produced.)'
     )
     localityCLI.set_defaults(func=locality)
 
