@@ -397,7 +397,7 @@ class COB(Expr):
         except KeyError as e:
             return 0
 
-    def locality(self, gene_list, bootstrap_name=None, include_regression=False):
+    def locality(self, gene_list, iter_name=None, include_regression=False):
         '''
             Computes the merged local vs global degree table
 
@@ -405,7 +405,7 @@ class COB(Expr):
             ----------
             gene_list : iterable of camoco.Loci
                 A list or equivalent of loci
-            bootstrap_name : object (default: none)
+            iter_name : object (default: none)
                 This will be added as a column. Useful for
                 generating bootstraps of locality and keeping
                 track of which one a row came from after catting
@@ -428,8 +428,8 @@ class COB(Expr):
             ols = sm.OLS(degree['local'], degree['global']).fit()
             degree['resid'] = ols.resid
             degree['fitted'] = ols.fittedvalues
-        if bootstrap_name is not None:
-            degree['bootstrap_name'] = bootstrap_name
+        if iter_name is not None:
+            degree['iter_name'] = iter_name
         return degree
 
 
