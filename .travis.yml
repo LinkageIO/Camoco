@@ -21,6 +21,7 @@ before_install:
   - PIP_ARGS="-I --trusted-host lovelace.cs.umn.edu --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
   - pip install $PIP_ARGS -r requirements.txt
   - pip install tables
+  - pip install pytest --upgrade
 # Install packages
 install:
   - python setup.py install
