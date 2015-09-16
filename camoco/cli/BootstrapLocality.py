@@ -53,16 +53,14 @@ def locality(args):
         # Otherwise get the term out of the GWAS
         terms = [gwas[x] for x in args.terms] 
 
+    term_localities = []
     # Add in text for axes
     for term in terms:
         fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(24,8))
         # Change the relevent things in the permuted args 
         # Generate data using permuted arguments
-        loc,bsloc,fdr = generate_data(cob,term,args) 
+        loc,bsloc,fdr = generate_data(cob,gwas,term,args) 
         # Add extra Columns 
-        loc.insert(0,'COB',cob.name)
-        loc.insert(0,'Ontology',term.name)
-        loc.insert(0,'COB',gwas.name)
         # Plot the data
         plot_data(args,loc,bsloc,fdr,ax1)
         plot_scatter(args,loc,bsloc,fdr,ax2)
@@ -73,15 +71,52 @@ def locality(args):
             term.id
         ))
         plt.close()
-        # Output the Locality Measures
-        loc.to_csv(
-            "{}_{}.csv".format(
-                args.out,
-                term.id
-            )        
-        )
+        # Keep track of this shit
+        term_localities.append(loc)
+        term_localities.append(bsloc)
+        term_localities.append(fdr)
+    # Output the Locality Measures
+    term_localities = pd.concat(term_localities)
+    # Calculate global FDR and number of candidates discovered
+    global_fdr = []
+    for (gwas,cob,term),df in term_localities.groupby(['Ontology','COB','Term']):
+        # Get Z score
+        zscores = list(np.arange(0,8))
+        for zscore in zscores:
+            zdf = df[df.zscore >= zscore]
+            if len(zdf) > 0:
+                fdr_indices = [x.startswith('fdr') for x in zdf.iter_name]
+                if sum(fdr_indices) > 0:
+                    num_random = zdf.loc[
+                        fdr_indices     
+                    ].groupby('iter_name').apply(len).mean()
+                else:
+                    num_random = 0
+                emp_indices = [x.startswith('emp') for x in zdf.iter_name]
+                if sum(emp_indices) > 0:
+                    num_real = len(zdf.loc[
+                        emp_indices
+                    ])
+                if num_real != 0 and num_random != 0:
+                    fdr = num_random/num_real
+                else:
+                    fdr = 1
+                global_fdr.append([gwas,cob,term,zscore,num_random,num_real,fdr])
+    global_fdr  = pd.DataFrame(
+        global_fdr,
+        columns=['Ontology','COB','Term','zscore','numRandom','numReal','FDR']
+    )
+    
+    # output the data
+    term_localities.to_csv(
+        "{}_Locality.csv".format(args.out.replace('.csv',''))        
+    )
+    global_fdr.to_csv(
+        "{}_Locality_FDR.csv".format(args.out.replace('.csv','')),
+        index=None
+    )
         
-def generate_data(cob,term,args):
+def generate_data(cob,gwas,term,args):
     '''
         Generates the data according to parameters in args
     '''
@@ -108,6 +143,10 @@ def generate_data(cob,term,args):
         candidate_genes,
         include_regression=True
     )
+    loc.insert(0,'COB',cob.name)
+    loc.insert(0,'Ontology',gwas.name)
+    loc.insert(0,'Term',term.id)
+    loc['iter_name'] = 'emp' #cringe
    
     # Find the Bootstrapped Locality
     bsloc = pd.concat(
@@ -116,33 +155,27 @@ def generate_data(cob,term,args):
                     loci,
                     flank_limit=args.candidate_flank_limit
                 ),
-                bootstrap_name=x
+                iter_name='bs'+str(x),
+                include_regression=False
             ) for x in range(args.num_bootstraps)]
     )
+    bsloc.insert(0,'COB',cob.name)
+    bsloc.insert(0,'Ontology',gwas.name)
+    bsloc.insert(0,'Term',term.id)
 
     '''---------------------------------------------------
         Empirical and SD Calculations
     '''
-
     # We need to perform regression for the entire bootstrap dataset
     OLS = sm.OLS(bsloc['local'],bsloc['global']).fit()
     bsloc['fitted'] = OLS.fittedvalues
     bsloc['resid'] = OLS.resid
-    # Remove global degree larger than empirical
-    bslowess = lowess(
-            bsloc['resid'],
-            bsloc['fitted'],
-            frac=0.15,
-            it=5,
-            delta=0.1*len(bsloc),
-            is_sorted=False
-    )
 
     # Windowing
     bsloc = bsloc.sort('fitted')
     # Find out how many tick there are with X items per window
-    num_windows = len(bsloc)//args.regression_window_size
-    window_ticks = len(bsloc)//num_windows
+    num_windows = len(bsloc) // args.regression_window_size
+    window_ticks = len(bsloc) // num_windows
     bsloc['window'] = [int(i/window_ticks) for i in range(len(bsloc))]
     # If there are not many in the last window, change it second to last
     max_window = max(bsloc['window'])
@@ -165,7 +198,7 @@ def generate_data(cob,term,args):
     )
     fit_std = {f:win_std[w]for f,w in win_map.items()}
     
-    # Create a dict where keys are fitted valus and 
+    # Create a dict where keys are fitted values and 
     # values are that fitted values std
     fit_std = NearestDict(
         pd.DataFrame(
@@ -183,6 +216,10 @@ def generate_data(cob,term,args):
     loc['zscore'] = [x['resid']/x['bs_std'] for i,x in loc.iterrows()]
     loc = loc.sort('zscore',ascending=False)
 
+    bsloc['bs_std'] = [fit_std[x] for x in bsloc['fitted']]
+    bsloc['zscore'] = [x['resid']/x['bs_std'] for i,x in bsloc.iterrows()]
+    bsloc = bsloc.sort('zscore',ascending=False)
+
     '''---------------------------------------------------
         FDR Calculations
     '''
@@ -193,11 +230,17 @@ def generate_data(cob,term,args):
                     loci,
                     flank_limit=args.candidate_flank_limit
                 ),
-                bootstrap_name=x,
-                include_regression=True
+                iter_name='fdr'+str(x),
+                include_regression=False
             ) for x in range(args.num_bootstraps)]
     ).sort('global')
+    fdr.insert(0,'COB',cob.name)
+    fdr.insert(0,'Ontology',gwas.name)
+    fdr.insert(0,'Term',term.id)
+
     OLS = sm.OLS(fdr['local'],fdr['global']).fit()
+    fdr['fitted'] = OLS.fittedvalues
+    fdr['resid'] = OLS.resid
 
     # Remove global degree larger than empirical
     fdr = fdr[fdr['global'] <= max(loc['global'])]
@@ -206,13 +249,13 @@ def generate_data(cob,term,args):
     # calculate z-scores for the global 
     fdr['bs_std'] = [fit_std[x] for x in fdr['fitted']]
     fdr['zscore'] = [x['resid']/x['bs_std'] for i,x in fdr.iterrows()]
+    # Generate the ZScore vales
 
     # Give em the gold
     return loc,bsloc,fdr
 
 
 def plot_scatter(args,loc,bsloc,fdr,ax):
-
     ''' ---------------------------------------------------
         Plotting
     '''
@@ -235,7 +278,7 @@ def plot_scatter(args,loc,bsloc,fdr,ax):
         [np.mean,confidence_interval]
     )
     
-    #for win,df in fdr.groupby('bootstrap_name'):
+    #for win,df in fdr.groupby('iter_name'):
     #    ax.plot(df['global'],df['fitted'],alpha=1)
         
     ax.errorbar(
@@ -250,14 +293,12 @@ def plot_scatter(args,loc,bsloc,fdr,ax):
     # finish plots
     #legend = ax.legend(loc='best') 
 
+def plot_fdr(args,loc,bsloc,fdr,ax):
     '''---------------------------------------------------
         FDR Plotting
     '''
-    
-
-def plot_fdr(args,loc,bsloc,fdr,ax):
     # Plot the empirical Z-score distributions
-    zscores = list(range(1,8))
+    zscores = list(np.arange(1,8,0.5))
     zloc = [
         sum(np.logical_and(
             loc['zscore'] >= x ,
@@ -269,7 +310,7 @@ def plot_fdr(args,loc,bsloc,fdr,ax):
     # plot the fdr scores spread
     zcdf = pd.DataFrame(
         [ mean_confidence_interval(
-            fdr.groupby('bootstrap_name').apply(
+            fdr.groupby('iter_name').apply(
                 lambda df: sum(np.logical_and(
                     df['zscore'] >= x,
                     df['local'] >= args.min_fdr_degree 
@@ -288,7 +329,6 @@ def plot_fdr(args,loc,bsloc,fdr,ax):
     ax.set_xlabel('Z-Score')
     ax.set_ylabel('Number of Genes > Z')
     ax.set_title('Z Score FDR')
-
 
 def plot_data(args,loc,bsloc,fdr,ax):
     ax.xaxis.set_visible(False)
