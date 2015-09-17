@@ -22,7 +22,7 @@ def testGWAS(ZmIonome):
     return ZmIonome
 
 @pytest.fixture(scope='module')
-def testCOB(ZmRNASeqTissueAtlas):
+def testCOB(AtSeed):
     return ZmRNASeqTissueAtlas
 
 ''' -------------------------------------------------------------------------
@@ -189,6 +189,7 @@ def AtSeed(AtTair10):
             )
             for x in Seed ]
         )
+        import pdb; pdb.set_trace()
         #SeedFam.to_keepfile("SeedKeep.tsv", keep_hint='seed')
         return co.COB.from_DataFrame(
             SeedFam.series_matrix(
@@ -365,7 +366,7 @@ def AtSeedIonome(AtTair10):
         # Import class from dataframe
         return co.GWAS.from_DataFrame(
             df, 'AtSeedIonome', 'Arabidopsis 1.6M EmmaX GWAS',
-            AtTair10, term_col='Trait', 
+            AtTair10, term_col='Trait',
             chr_col='Chromosome', pos_col='Start_bp'
         )
     else:
