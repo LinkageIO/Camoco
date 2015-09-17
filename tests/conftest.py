@@ -22,8 +22,8 @@ def testGWAS(ZmIonome):
     return ZmIonome
 
 @pytest.fixture(scope='module')
-def testCOB(AtSeed):
-    return ZmRNASeqTissueAtlas
+def testCOB(AtGen):
+    return AtGen
 
 ''' -------------------------------------------------------------------------
             RefGen Fixtures
