@@ -21,12 +21,13 @@ before_install:
   - PIP_ARGS="-I --trusted-host lovelace.cs.umn.edu --find-links=http://lovelace.cs.umn.edu/schaefer/wheelhouse/ --use-wheel --allow-external --allow-insecure"
   - pip install $PIP_ARGS -r requirements.txt
   - pip install tables
+  - pip install pytest --upgrade
 # Install packages
 install:
   - python setup.py install
   # import camoco to compile the pyx modules
   - python -c 'import camoco as co;'
 # command to run tests, e.g. python setup.py test
-script:  
+script:
   - py.test  tests/test_RefGen.py
   - py.test  tests/test_COB.py
