@@ -20,7 +20,6 @@ def plot_gwas(args):
     cob = co.COB(args.cob)
     # snag the GWAS object
     gwas = co.GWAS(args.gwas)
-    gwas.refgen = co.RefGen(args.refgen)
 
     if 'all' in args.terms:
         terms = gwas.iter_terms()
@@ -32,10 +31,6 @@ def plot_gwas(args):
         loci = list(term.loci) 
         # create a dictionary of Loci which we can refer to using ids
         locus_lookup = {x.id:x for x in loci}
-        effective_loci = sorted(term.effective_loci(
-            window_size=args.candidate_window_size
-        ))
-
         # Each chromosome gets a plot
         chroms = set([x.chrom for x in loci])
 
@@ -45,6 +40,19 @@ def plot_gwas(args):
             figsize=(15,4*len(chroms))
         )
         plt.title('{} Term'.format(term.id))
+        # Pull out the snp to gene mappings
+        if args.snp2gene == 'effective':
+            loci = sorted(term.effective_loci(
+                window_size=args.candidate_window_size
+            ))
+        elif args.snp2gene == 'strongest':
+            loci = term.strongest_loci(
+                window_size=args.candidate_window_size,
+                attr=args.strongest_attr,
+                lowest=args.strongest_higher
+            )
+        else:
+            raise ValueError('{} not valid snp2gene mapping'.format(args.snp2gene))
 
         # iterate over Loci
         seen_chroms = set()
@@ -52,7 +60,7 @@ def plot_gwas(args):
         current_axis = 0
         y_labels = []
         y_ticks = []
-        for i,locus in enumerate(effective_loci):
+        for i,locus in enumerate(loci):
             hoffset = -1 * locus.window
             # Reset the temp variables in necessary
             if locus.chrom not in seen_chroms:
@@ -157,4 +165,4 @@ def plot_gwas(args):
         axes[current_axis].set_yticklabels(y_labels)
         # Save Plot
         plt.savefig(args.out.replace('.png','_{}.png'.format(term.id)))
-        f.close()
+        plt.close()

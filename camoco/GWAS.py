@@ -13,7 +13,6 @@ class GWAS(Ontology):
     def __init__(self,name):
         super().__init__(name,type='GWAS')
 
-
     def __getitem__(self, id):
         ''' retrieve a term by id '''
         try:
@@ -74,6 +73,10 @@ class GWAS(Ontology):
         self.db.cursor().execute(''' 
             DELETE FROM loci_attr WHERE term = ?
         ''',(id,))
+
+    ''' -----------------------------------------------------------------------
+            Internal Methods -- Factory Methods
+    '''
 
     def _create_tables(self):
         super()._create_tables()

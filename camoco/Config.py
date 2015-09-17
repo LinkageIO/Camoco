@@ -12,6 +12,8 @@ default_config = '''--- # YAML Camoco Configuration File
 options:
     basedir: ~/.camoco/
     testdir: ~/build/{user}/Camoco/tests/
+    alpha:   0.0001
+    debug:   False
 
 logging:
     log_level: verbose

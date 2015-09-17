@@ -102,7 +102,7 @@ class Term(object):
                 The locus attribute to use to determine the 'strongest'
             window_size : int (default: None)
                 If not None, maps a new window size to each locus.      
-            lowest: bool (default: Treu)
+            lowest: bool (default: True)
                 When sorting by attr, lowest is strongest (i.e. p-vals) 
         '''
         is_reverse = not lowest

@@ -353,21 +353,23 @@ def AtSeedIonome(AtTair10):
         csvs = glob.glob(
             os.path.expanduser(os.path.join(
                 cf.options.testdir,
-                'raw', 'GWAS', 'AtRound2', 'AtSeedHydro',
-                'Hits.csv.gz'
+                'raw', 'GWAS', 'AtIonome',
+                'AtSeedIonome','*.csv.gz'
             ))
         )
         # Read in each table individually then concat for GIANT table
-        df = pd.concat([pd.read_table(x, sep=',') for x in csvs])
+        df = pd.concat([pd.read_table(x, sep=' ') for x in csvs])
+        # Only keep significant pvals
+        df = df.loc[df.pval <= cf.options.alpha,:]
         # Add 'Chr' to chromosome column
-        df.Chromosome = df.Chromosome.apply(lambda x: 'Chr'+str(x))
+        df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
         AtTair10,
         # Import class from dataframe
         return co.GWAS.from_DataFrame(
-            df, 'AtSeedIonome', 'Arabidopsis 1.6M EmmaX GWAS',
+            df, 'AtSeedIonome', 'Arabidopsis second pass 1.6M',
             AtTair10, term_col='Trait',
-            chr_col='Chromosome', pos_col='Start_bp'
+            chr_col='CHR', pos_col='POS'
         )
     else:
         return co.GWAS('AtSeedIonome')
@@ -381,19 +383,21 @@ def AtLeafIonome(AtTair10):
         # glob glob is god
         csvs = glob.glob(os.path.join(
             cf.options.testdir,
-            'raw', 'GWAS', 'AtLeaf',
-            '*.sigsnps.csv.gz'
+            'raw', 'GWAS', 'AtIonome',
+            'AtLeafIonome','*.csv.gz'
         ))
         # Read in each table individually then concat for GIANT table
-        df = pd.concat([pd.read_table(x, sep=',') for x in csvs])
+        df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
+        # Only keep significant pvals
+        df = df.loc[df.pval <= cf.options.alpha,:]
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
         AtTair10,
         # Import class from dataframe
         return co.GWAS.from_DataFrame(
-            df, 'AtLeafIonome', 'Arabidopsis 1.6M EmmaX GWAS',
-            AtTair10, term_col='Trait', chr_col='CHR', pos_col='BP'
+            df, 'AtLeafIonome', 'Arabidopsis second pass 1.6M',
+            AtTair10, term_col='Trait', chr_col='CHR', pos_col='POS'
         )
     else:
         return co.GWAS('AtLeafIonome')
@@ -406,20 +410,20 @@ def AtRootHydroIonome(AtTair10):
         # glob glob is god
         csvs = glob.glob(os.path.join(
             cf.options.testdir,
-            'raw','GWAS','AtRootHydro',
-            '*.sigsnps.csv.gz'
+            'raw','GWAS','AtIonome',
+            'AtRootHydroIonome','*.csv.gz'
         ))
         # Read in each table individually then concat for GIANT table
-        df = pd.concat([pd.read_table(x,sep=',') for x in csvs])
-        # Shorten the term name
-        df.Trait = df.Trait.apply(lambda x: x.replace('RootHydro.',''))
+        df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
+        # Only keep significant pvals
+        df = df.loc[df.pval <= cf.options.alpha,:]
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
         # Import class from dataframe
         return co.GWAS.from_DataFrame(
-            df,'AtRootHydroIonome','Arabidopsis 1.6M EmmaX GWAS',
-            AtTair10, term_col='Trait', chr_col='CHR', pos_col='BP'
+            df,'AtRootHydroIonome','Arabidopsis second pass 1.6M',
+            AtTair10, term_col='Trait', chr_col='CHR', pos_col='POS'
         )
     else:
         return co.GWAS('AtRootHydroIonome')
@@ -432,17 +436,18 @@ def AtLeafHydroIonome(AtTair10):
         # glob glob is god
         csvs = glob.glob(os.path.join(
             cf.options.testdir,
-            'raw','GWAS','AtLeafHydro',
-            '*.sigsnps.csv.gz'
+            'raw','GWAS','AtIonome',
+            'AtLeafHydroIonome','*.csv.gz'
         ))
         # Read in each table individually then concat for GIANT table
-        df = pd.concat([pd.read_table(x,sep=',') for x in csvs])
+        df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
+        df = df.loc[df.pval <= cf.options.alpha,:]
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Import class from dataframe
         return co.GWAS.from_DataFrame(
-            df,'AtLeafHydroIonome','Arabidopsis 1.6M EmmaX GWAS',
-            AtTair10, term_col='Trait', chr_col='CHR', pos_col='BP'
+            df,'AtLeafHydroIonome','Arabidopsis second pass 1.6M',
+            AtTair10, term_col='Trait', chr_col='CHR', pos_col='POS'
         )
     else:
         return co.GWAS('AtLeafHydroIonome')
@@ -451,9 +456,42 @@ def AtLeafHydroIonome(AtTair10):
     GOnt Fixtures
 ----------------------------------------------------------------------------'''
 @pytest.fixture(scope="module")
-def MaizeGO(Zm5bFGS):
-    pass
+def ZmGO(Zm5bFGS):
+    if cf.test.force.Ontology:
+        co.del_dataset('GOnt','ZmGO',safe=False)
+    if not co.available_datasets('GOnt','ZmGO'):
+        obo = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.obo.bz2'
+        )
+        gene_map_file = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','zm_go.tsv.bz2'
+        )
+        return co.GOnt.from_obo(
+           obo, gene_map_file, 'ZmGO',
+           'Maize Gene Ontology', Zm5bFGS
+        )
+    else:
+        return co.GOnt('ZmGO')
+
 
 @pytest.fixture(scope="module")
-def AthGO(AtTair10):
-    pass
+def AtGO(AtTair10):
+    if cf.test.force.Ontology:
+        co.del_dataset('GOnt','AtGO',safe=False)
+    if not co.available_datasets('GOnt','AtGO'):
+        obo = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.obo.bz2'
+        )
+        gene_map_file = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','ath_go.tsv.bz2'
+        )
+        return co.GOnt.from_obo(
+           obo, gene_map_file, 'AtGO',
+           'Arabidopsis Gene Ontology', AtTair10
+        )
+    else:
+        return co.GOnt('AtGO')

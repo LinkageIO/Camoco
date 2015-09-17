@@ -170,7 +170,7 @@ class COB(Expr):
         if gene_list is None:
             df = self.coex
         else:
-            ids = np.array([self._expr_index[x.id] for x in gene_list])
+            ids = np.array([self._expr_index[x.id] for x in set(gene_list)])
             if filter_missing_gene_ids:
                 # filter out the Nones
                 ids = np.array(list(filter(None, ids)))
@@ -184,8 +184,8 @@ class COB(Expr):
             df = df.loc[df.significant == 1, :]
         return df.copy()
 
-    def trans_locus_density(self, locus_list, return_mean=True, flank_limit=4,
-        bootstrap=False):
+    def trans_locus_density(self, locus_list,flank_limit, 
+        return_mean=True, bootstrap=False):
         '''
             Calculates the density of edges which span loci
 
@@ -205,12 +205,12 @@ class COB(Expr):
             )
         # create a dict of gene to locus mapping
         gene_origin = {}
-        full_gene_set = []
+        full_gene_set = set()
         for i, genes in enumerate(genes_list):
             # RefGen.candidate_genes returns u, w, d with chain == False
             for gene in genes:
                 gene_origin[gene.id] = i
-                full_gene_set.append(gene)
+                full_gene_set.add(gene)
         self.log("Found {} candidate genes", len(full_gene_set))
 
         edges = self.subnetwork(
@@ -397,7 +397,7 @@ class COB(Expr):
         except KeyError as e:
             return 0
 
-    def locality(self, gene_list, bootstrap_name=None, include_regression=False):
+    def locality(self, gene_list, iter_name=None, include_regression=False):
         '''
             Computes the merged local vs global degree table
 
@@ -405,7 +405,7 @@ class COB(Expr):
             ----------
             gene_list : iterable of camoco.Loci
                 A list or equivalent of loci
-            bootstrap_name : object (default: none)
+            iter_name : object (default: none)
                 This will be added as a column. Useful for
                 generating bootstraps of locality and keeping
                 track of which one a row came from after catting
@@ -428,8 +428,8 @@ class COB(Expr):
             ols = sm.OLS(degree['local'], degree['global']).fit()
             degree['resid'] = ols.resid
             degree['fitted'] = ols.fittedvalues
-        if bootstrap_name is not None:
-            degree['bootstrap_name'] = bootstrap_name
+        if iter_name is not None:
+            degree['iter_name'] = iter_name
         return degree
 
 
