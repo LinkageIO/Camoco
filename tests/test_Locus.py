@@ -16,7 +16,7 @@ def test_locus_initialization(simple_Locus):
     assert len(simple_Locus) == 100
 
 def test_candidate_vs_bootstrap_length(testRefGen,testGWAS):
-    Term = testGWAS[cf.test.term]
+    Term = next(testGWAS.iter_terms())
     snps = Term.effective_loci(window_size=50000)
     candidates = testRefGen.candidate_genes(snps,chain=False)
     bootstraps = testRefGen.bootstrap_candidate_genes(snps,chain=False)

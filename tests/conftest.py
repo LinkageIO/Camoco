@@ -18,8 +18,8 @@ def testRefGen(Zm5bFGS):
     return Zm5bFGS
 
 @pytest.fixture(scope='module')
-def testGWAS(ZmIonome):
-    return ZmIonome
+def testGWAS(ZmWallace):
+    return ZmWallace
 
 @pytest.fixture(scope='module')
 def testCOB(ZmRNASeqTissueAtlas):
@@ -314,6 +314,30 @@ def AtRoot(AtTair10):
 ''' -------------------------------------------------------------------------
             GWAS Fixtures
 '''
+
+@pytest.fixture(scope='module')
+def ZmWallace(Zm5bFGS):
+    if cf.test.force.Ontology:
+        co.del_dataset('GWAS','ZmWallace',safe=False)
+    if not co.available_datasets('GWAS','ZmWallace'):
+        # Grab path the csv
+        csv = os.path.join(
+            cf.options.testdir,
+            'raw','GWAS','WallacePLoSGenet',
+            'Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.bz2'
+        )
+        # Define our reference geneome
+        df = pd.DataFrame.from_csv(csv,index_col=None,sep='\t')
+        # Import class from dataframe
+        gwas  = co.GWAS.from_DataFrame(
+            df, 'ZmIonome', 'Maize Ionome',
+            Zm5bFGS,
+            term_col='trait', chr_col='chr', pos_col='pos'
+        )
+        return gwas
+    else:
+        return co.GWAS('ZmIonome')
+
 
 @pytest.fixture(scope="module")
 def ZmIonome(Zm5bFGS):
