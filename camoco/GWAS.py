@@ -97,7 +97,7 @@ class GWAS(Ontology):
                 PRIMARY KEY(term,id)
             );
             -- Keep track of 
-            CREATE TABLE loci_attr (
+            CREATE TABLE IF NOT EXISTS loci_attr (
                 -- Some loci may be associated with multiple terms, so term
                 -- key is necessary
                 term TEXT,
