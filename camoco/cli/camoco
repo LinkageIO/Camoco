@@ -3,6 +3,7 @@
 import camoco as co
 import sys
 import os
+import glob
 
 import argparse
 
@@ -22,7 +23,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         epilog='Cache. Money. Corn.'
     )
-    parser.add_argument('--debug',action='store_true',default=False)
+    parser.add_argument(
+        '--debug',action='store_true',default=False,
+        help='Drop into ipdb when something bad happens.'
+    )
+    parser.add_argument(
+        '--overlook',action='store_true',default=False,
+        help='Skip analysis if files produced by --out exist.'
+    )
 
     subparsers = parser.add_subparsers(
         title='Camoco CLI program',
@@ -288,6 +296,11 @@ if __name__ == '__main__':
 
     if args.debug is True:
         from IPython.core import ultratb
-        sys.excepthook = ultratb.FormattedTB(mode='Verbose',
-                            color_scheme='Linux', call_pdb=1)
-    sys.exit(args.func(args))
+        sys.excepthook = ultratb.FormattedTB(
+            mode='Verbose', color_scheme='Linux', call_pdb=1
+        )
+    # SKip analyses that already happened (if --overlook is provided)
+    if args.overlook is True and len(glob.glob(args.out+'*')):
+        print("Skipping {}* because files already exist.".format(args.out))
+    else:
+        sys.exit(args.func(args))
