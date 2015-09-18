@@ -4,7 +4,7 @@ import pytest
           Maize
 '''
 
-def build_build(ZmRNASeqTissueAtlas):
+def build_ZmRNASeqTissueAtlas(ZmRNASeqTissueAtlas):
     assert ZmRNASeqTissueAtlas
 
 def build_ZmRoot(ZmRoot):
