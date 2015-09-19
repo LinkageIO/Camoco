@@ -75,8 +75,13 @@ def locality(args):
         term_localities.append(loc)
         term_localities.append(bsloc)
         term_localities.append(fdr)
-    # Output the Locality Measures
+    # Add parameters to the data frame
     term_localities = pd.concat(term_localities)
+    term_localities.insert(0,'COB',cob.name)
+    term_localities.insert(0,'Ontology',gwas.name)
+    term_localities.insert(0,'WindowSize',args.candidate_window_size)
+    term_localities.insert(0,'FlankLimit',args.candidate_flank_limit)
+
     # Calculate global FDR and number of candidates discovered
     global_fdr = []
     for (gwas,cob,term),df in term_localities.groupby(['Ontology','COB','Term']):
@@ -106,8 +111,8 @@ def locality(args):
         global_fdr,
         columns=['Ontology','COB','Term','zscore','numRandom','numReal','FDR']
     )
-    
-    # output the data
+
+    # Output the Locality Measures
     term_localities.to_csv(
         "{}_Locality.csv".format(args.out.replace('.csv',''))        
     )
@@ -143,8 +148,6 @@ def generate_data(cob,gwas,term,args):
         candidate_genes,
         include_regression=True
     )
-    loc.insert(0,'COB',cob.name)
-    loc.insert(0,'Ontology',gwas.name)
     loc.insert(0,'Term',term.id)
     loc['iter_name'] = 'emp' #cringe
    
@@ -159,8 +162,6 @@ def generate_data(cob,gwas,term,args):
                 include_regression=False
             ) for x in range(args.num_bootstraps)]
     )
-    bsloc.insert(0,'COB',cob.name)
-    bsloc.insert(0,'Ontology',gwas.name)
     bsloc.insert(0,'Term',term.id)
 
     '''---------------------------------------------------
@@ -234,8 +235,6 @@ def generate_data(cob,gwas,term,args):
                 include_regression=False
             ) for x in range(args.num_bootstraps)]
     ).sort('global')
-    fdr.insert(0,'COB',cob.name)
-    fdr.insert(0,'Ontology',gwas.name)
     fdr.insert(0,'Term',term.id)
 
     OLS = sm.OLS(fdr['local'],fdr['global']).fit()
@@ -253,7 +252,6 @@ def generate_data(cob,gwas,term,args):
 
     # Give em the gold
     return loc,bsloc,fdr
-
 
 def plot_scatter(args,loc,bsloc,fdr,ax):
     ''' ---------------------------------------------------
