@@ -2,6 +2,7 @@ import camoco as co
 import glob
 import pandas as pd
 import os
+import numpy as np
 
 def read_FDR(glob_path):
     dfs = []
@@ -21,15 +22,20 @@ def read_FDR(glob_path):
     df.loc[[x.startswith('Trans') for x in df.Term],'TraitType'] = 'Trans'
     return df
 
+def zmax(a):
+    if len(a) == 0:
+        return 0
+    else:
+        return np.max(a)
 
 def groupedFDR(df,by='term'):
     def grouped_agg(x):
         return pd.DataFrame(
             {
                 'Tot':  sum(x.numReal),
-                'FDR10':sum(x[x.FDR<=0.1].numReal),
-                'FDR35':sum(x[x.FDR<=0.35].numReal),
-                'FDR50':sum(x[x.FDR<=.5].numReal)
+                'FDR10':zmax(x[x.FDR<=0.1].numReal),
+                'FDR35':zmax(x[x.FDR<=0.35].numReal),
+                'FDR50':zmax(x[x.FDR<=.5].numReal)
             },index=[None]
         )
     if by == 'term':
