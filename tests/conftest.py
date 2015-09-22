@@ -384,6 +384,8 @@ def AtSeedIonome(AtTair10):
         df = pd.concat([pd.read_table(x, sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -413,6 +415,8 @@ def AtLeafIonome(AtTair10):
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -440,6 +444,8 @@ def AtRootHydroIonome(AtTair10):
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -465,6 +471,8 @@ def AtLeafHydroIonome(AtTair10):
         # Read in each table individually then concat for GIANT table
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Import class from dataframe
