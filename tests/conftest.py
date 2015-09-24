@@ -18,8 +18,8 @@ def testRefGen(Zm5bFGS):
     return Zm5bFGS
 
 @pytest.fixture(scope='module')
-def testGWAS(ZmIonome):
-    return ZmIonome
+def testGWAS(ZmWallace):
+    return ZmWallace
 
 @pytest.fixture(scope='module')
 def testCOB(AtGen):
@@ -316,6 +316,30 @@ def AtRoot(AtTair10):
             GWAS Fixtures
 '''
 
+@pytest.fixture(scope='module')
+def ZmWallace(Zm5bFGS):
+    if cf.test.force.Ontology:
+        co.del_dataset('GWAS','ZmWallace',safe=False)
+    if not co.available_datasets('GWAS','ZmWallace'):
+        # Grab path the csv
+        csv = os.path.join(
+            cf.options.testdir,
+            'raw','GWAS','WallacePLoSGenet',
+            'Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.bz2'
+        )
+        # Define our reference geneome
+        df = pd.DataFrame.from_csv(csv,index_col=None,sep='\t')
+        # Import class from dataframe
+        gwas  = co.GWAS.from_DataFrame(
+            df, 'ZmIonome', 'Maize Ionome',
+            Zm5bFGS,
+            term_col='trait', chr_col='chr', pos_col='pos'
+        )
+        return gwas
+    else:
+        return co.GWAS('ZmIonome')
+
+
 @pytest.fixture(scope="module")
 def ZmIonome(Zm5bFGS):
         # Delete the old dataset
@@ -361,6 +385,8 @@ def AtSeedIonome(AtTair10):
         df = pd.concat([pd.read_table(x, sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -390,6 +416,8 @@ def AtLeafIonome(AtTair10):
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -417,6 +445,8 @@ def AtRootHydroIonome(AtTair10):
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -442,6 +472,8 @@ def AtLeafHydroIonome(AtTair10):
         # Read in each table individually then concat for GIANT table
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Import class from dataframe
