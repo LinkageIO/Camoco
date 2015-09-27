@@ -28,18 +28,15 @@ def zmax(a):
     else:
         return np.max(a)
 
-def groupedFDR(df,by='term'):
+def groupedFDR(df):
     def grouped_agg(x):
-        return pd.DataFrame(
+        return pd.Series(
             {
                 'Tot':  sum(x.numReal),
                 'FDR10':zmax(x[x.FDR<=0.1].numReal),
                 'FDR35':zmax(x[x.FDR<=0.35].numReal),
                 'FDR50':zmax(x[x.FDR<=.5].numReal)
-            },index=[None]
+            }
         )
-    if by == 'term':
-        groups = ['Ontology','COB','WindowSize','NumFlank','TraitType','Term']
-    elif by == 'trait':
-        groups = ['Ontology','COB','WindowSize','NumFlank','TraitType']
+    groups = ['Ontology','COB','WindowSize','NumFlank','TraitType','Term']
     return df.reset_index().groupby(groups).apply(grouped_agg)
