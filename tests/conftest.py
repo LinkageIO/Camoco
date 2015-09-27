@@ -147,6 +147,57 @@ def ZmSAM(Zm5bFGS):
         return co.COB('ZmSAM')
 
 @pytest.fixture(scope="module")
+def ZmSAM2(Zm5bFGS):
+    if cf.test.force.COB:
+        co.del_dataset('Expr','ZmSAM2',safe=False)
+    if not co.available_datasets('Expr','ZmSAM'):
+        return co.COB.from_table(
+            os.path.join(
+                cf.options.testdir,
+                'raw','Expr','RNASEQ',
+                'TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt.gz'
+            ),
+            'ZmSAM2',
+            'Maize Root Network, but loose',
+            Zm5bFGS,
+            rawtype='RNASEQ',
+            max_gene_missing_data=0.4,
+            min_expr=0.01,
+            quantile=False,
+            dry_run=False,
+            max_val=250
+        )
+    else:
+        return co.COB('ZmSAM')
+
+
+@pytest.fixture(scope="module")
+def ZmPAN2(Zm5bFGS):
+    if cf.test.force.COB:
+        co.del_dataset('Expr','ZmPAN2',safe=False)
+    if not co.available_datasets('Expr','ZmPAN'):
+        return co.COB.from_table(
+            os.path.join(
+                cf.options.testdir,
+                'raw','Expr','RNASEQ',
+                'PANGenomeFPKM.txt.gz'
+            ),
+            'ZmPAN2',
+            'Maize Root Network but extra loose',
+            Zm5bFGS,
+            rawtype='RNASEQ',
+            max_gene_missing_data=0.4,
+            min_expr=0.01,
+            quantile=False,
+            dry_run=False,
+            sep=',',
+            max_val=300
+        )
+    else:
+        return co.COB('ZmPAN')
+
+
+@pytest.fixture(scope="module")
 def ZmPAN(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('Expr','ZmPAN',safe=False)
@@ -330,13 +381,13 @@ def ZmWallace(Zm5bFGS):
         df = pd.DataFrame.from_csv(csv,index_col=None,sep='\t')
         # Import class from dataframe
         gwas  = co.GWAS.from_DataFrame(
-            df, 'ZmIonome', 'Maize Ionome',
+            df, 'ZmWallace', 'Wallace PLoS ONE Dataset.',
             Zm5bFGS,
             term_col='trait', chr_col='chr', pos_col='pos'
         )
         return gwas
     else:
-        return co.GWAS('ZmIonome')
+        return co.GWAS('ZmWallace')
 
 
 @pytest.fixture(scope="module")
@@ -522,7 +573,8 @@ def AtGO(AtTair10):
         )
         return co.GOnt.from_obo(
            obo, gene_map_file, 'AtGO',
-           'Arabidopsis Gene Ontology', AtTair10
+           'Arabidopsis Gene Ontology', AtTair10,
+           id_col=0, go_col=5 
         )
     else:
         return co.GOnt('AtGO')
