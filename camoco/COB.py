@@ -57,8 +57,9 @@ class COB(Expr):
                 Desc: {}
                 RawType: {}
                 TransformationLog: {}
-                Num Genes: {}
+                Num Genes: {:,}
                 Num Accessions: {}
+                Num Edges: {:,}
                 Edge FDR: {}
         '''.format(
                 self.name,
@@ -67,8 +68,20 @@ class COB(Expr):
                 self._transformation_log(),
                 self.num_genes(),
                 self.num_accessions(),
+                len(self.coex),
                 self.edge_FDR
         ))
+    def raw_summary(self):
+        print('''
+            Num Raw Genes: {}     
+        '''.format(
+            self.expr(raw=True)      
+        ))
+
+    def qc_gene(self):
+        qc_gene = self.hdf5['qc_gene']
+        qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index]
+        return qc_gene.groupby('chrom').aggregate(sum, axis=0)
 
     @property
     @memoize
@@ -458,7 +471,6 @@ class COB(Expr):
         dm = dm.loc[order, :]
         # Save plot if provided filename
         fig = plt.figure(
-            figsize=(100, 100),
             facecolor='white'
         )
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
@@ -469,7 +481,7 @@ class COB(Expr):
         im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
         # Save if you wish
         if filename is not None:
-            plt.savefig(filename)
+            plt.savefig(filename,figsize=(5,10))
             plt.close()
         return fig
 
@@ -486,7 +498,7 @@ class COB(Expr):
             bins : int (default: 50)
                 the number of bins in the histogram
         '''
-        fig, ax = plt.figure(figsize=(8, 6))
+        fig = plt.figure(figsize=(8, 6))
         # grab the scores only and put in a
         # np array to save space (pandas DF was HUGE)
         scores = self.coex.score.values
@@ -496,11 +508,12 @@ class COB(Expr):
                 + float(self._global('pcc_mean'))
             # Transform Z-scores to pcc scores (inverse fisher transform)
             scores = np.tanh(scores)
-        ax.hist(scores, bins=bins)
-        ax.set_xlabel('PCC') if pcc else ax.set_xlabel('Z-Score')
-        ax.set_ylabel('Freq')
+        plt.hist(scores, bins=bins)
+        plt.xlabel('PCC') if pcc else plt.xlabel('Z-Score')
+        plt.ylabel('Freq')
         if filename is not None:
-            fig.savefig(filename)
+            plt.savefig(filename)
+            plt.close()
         else:
             return fig
 
