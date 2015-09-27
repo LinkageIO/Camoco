@@ -32,14 +32,12 @@ def density(args):
     for term in terms:
         results = OrderedDict()
 
-        print('-'*90,file=sys.stderr)
         print("Boostrapping Density for {} of {} in {}".format(
             term.id,
             ont.name,
             cob.name
         ),file=sys.stderr)
    
-        print("Num SNPs:\t{}".format(len(term.locus_list)),file=sys.stderr)
 
         results['Ontology'] = ont.name
         results['COB'] = cob.name
@@ -80,21 +78,6 @@ def density(args):
                 effective_pval = effective_pval / args.num_bootstraps
         
 
-            print("Num Collapsed SNPs:\t{}".format(len(effective_loci)),file=sys.stderr)
-            print('Num Effective Genes:\t{}'.format(len(effective_candidates)),file=sys.stderr)
-            print("Empirical effective density Z-score for {}:\t{}".format(
-                term.id,effective_emp
-            ),file=sys.stderr)
-            print("Effective p-value for {}:\t{} (n={})".format(
-                term.id,effective_pval,args.num_bootstraps),
-                file=sys.stderr
-            )
-            print("Effective Bootstrap mean/std:\t{},{} (n={})".format(
-                effective_bootstraps.mean(),
-                effective_bootstraps.std(),
-                args.num_bootstraps
-            ),file=sys.stderr)
-            print('{}'.format('-'*90))
        
             results['NumCollapsedSNPs'] = len(effective_loci)
             results['NumEffectiveCandidates'] = len(effective_candidates)
@@ -118,10 +101,6 @@ def density(args):
                 flank_limit=args.candidate_flank_limit,
                 bootstrap=False
             )
-            print("Empirical strongest density Z-score for {}:\t{}".format(
-                term.id,strongest_emp),file=sys.stderr
-            )
-            print('Num Strongest Genes:\t{}'.format(len(strongest_candidates)),file=sys.stderr)
             results['NumStrongestCandidates'] = len(strongest_candidates)
             results['StrongestDensity'] = strongest_emp
             # ----------------------------
@@ -140,17 +119,6 @@ def density(args):
         
             results['StrongestPValue'] = strongest_pval
         
-            print("Strongest p-value for {}:\t{} (n={})".format(
-                term.id,strongest_pval,args.num_bootstraps),
-                file=sys.stderr
-            )
-            print("Bootstrap mean/std:\t{},{} (n={})".format(
-                strongest_bootstraps.mean(),
-                strongest_bootstraps.std(),
-                args.num_bootstraps
-            ),file=sys.stderr)
-            print('{}'.format('-'*90))
-       
             results['NumCollapsedSNPs'] = len(strongest_loci)
             results['NumStrongestCandidates'] = len(strongest_candidates)
             results['StrongestDensity'] = strongest_emp
@@ -162,6 +130,3 @@ def density(args):
     # Return the results 
     all_results = pd.DataFrame(all_results,columns=all_results[0].keys())
     all_results.to_csv(args.out,index=None,sep='\t')
-
-
-
