@@ -42,6 +42,14 @@ def locality(args):
     # Initiate for args 
     # Generate output dirs
 
+    if os.path.exists("{}_Locality.csv".format(args.out.replace('.csv',''))):
+        print(
+            "{}_Locality.csv exist! Skipping!".format(
+                args.out.replace('.csv','')
+            )
+        )
+        return
+
     # Grab the COB object
     cob = co.COB(args.cob)
     gwas = co.GWAS(args.gwas)
@@ -56,21 +64,21 @@ def locality(args):
     term_localities = []
     # Add in text for axes
     for term in terms:
-        fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(24,8))
+        #fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(24,8))
         # Change the relevent things in the permuted args 
         # Generate data using permuted arguments
         loc,bsloc,fdr = generate_data(cob,gwas,term,args) 
         # Add extra Columns 
         # Plot the data
-        plot_data(args,loc,bsloc,fdr,ax1)
-        plot_scatter(args,loc,bsloc,fdr,ax2)
-        plot_fdr(args,loc,bsloc,fdr,ax3)
-        plt.tight_layout()
-        plt.savefig("{}_{}.png".format(
-            args.out,
-            term.id
-        ))
-        plt.close()
+        #plot_data(args,loc,bsloc,fdr,ax1)
+        #plot_scatter(args,loc,bsloc,fdr,ax2)
+        #plot_fdr(args,loc,bsloc,fdr,ax3)
+        #plt.tight_layout()
+        #plt.savefig("{}_{}.png".format(
+        #    args.out,
+        #    term.id
+        #))
+        #plt.close()
         # Keep track of this shit
         term_localities.append(loc)
         term_localities.append(bsloc)
