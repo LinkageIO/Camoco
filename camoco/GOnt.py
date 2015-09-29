@@ -18,14 +18,20 @@ class GOTerm(Term):
     '''
         Subclass to handle the intricacies of GO Terms
     '''
-    def __init__(self, id, name='', desc='', alt_id=None, is_a=None, locus_list=None, **kwargs):
-        super().__init__(id, desc=desc, locus_list=locus_list, **kwargs)
+    def __init__(self, id, name='', desc='', alt_id=None, 
+        is_a=None, loci=None, **kwargs):
+        '''
+            Initialize a GOTerm
+        '''
+        super().__init__(id, desc=desc, loci=loci, **kwargs)
         self.name = name
         self.is_a = set(is_a) if is_a else set()
         self.alt_id = set(alt_id) if alt_id else set()
 
     def __str__(self):
-        return "Term: {}, Name: {}, Desc: {}, {} Loci".format(self.id, self.name, self.desc, len(self))
+        return "Term: {}, Name: {}, Desc: {}, {} Loci".format(
+            self.id, self.name, self.desc, len(self)
+        )
 
     def __repr__(self):
         return str(self)
@@ -59,8 +65,10 @@ class GOnt(Ontology):
             raise KeyError('This term is not in the database.')
 
         # Get the loci associated with the term
-        term_loci = [self.refgen[gene_id] for gene_id in self.db.cursor().execute(
-            'SELECT id FROM term_loci WHERE term = ?', (id, )).fetchall()]
+        term_loci = self.refgen.from_ids([
+            gene_id[0] for gene_id in self.db.cursor().execute(
+            'SELECT id FROM term_loci WHERE term = ?', (id, )).fetchall()
+        ])
 
         # Get the isa relationships
         is_a = set(termID for termID in self.db.cursor().execute(
@@ -72,7 +80,7 @@ class GOnt(Ontology):
 
         return GOTerm(
             id, name=name, desc=desc, alt_id=alts, 
-            is_a=is_a, locus_list=term_loci
+            is_a=is_a, loci=term_loci
         )
 
     def add_term(self, term, cursor=None, overwrite=False):
@@ -90,10 +98,10 @@ class GOnt(Ontology):
             'INSERT OR ABORT INTO terms (id, desc, name) VALUES (?, ?, ?)', 
             (term.id, term.desc, term.name)
         )
-        if term.locus_list:
+        if term.loci:
             cur.executemany(
                 'INSERT OR REPLACE INTO term_loci (term, id) VALUES (?, ?)', 
-                [(term.id, locus.id) for locus in term.locus_list]
+                [(term.id, locus.id) for locus in term.loci]
             )
         if term.is_a:
             cur.executemany(
@@ -218,6 +226,7 @@ class GOnt(Ontology):
                 row = line.strip().split('\t')
                 gene = row[id_col].split('_')[0].strip()
                 cur_term = row[go_col]
+                # Make a map between genes and associated GO terms
                 if gene not in genes:
                     genes[gene] = set([cur_term])
                 else:
@@ -265,7 +274,7 @@ class GOnt(Ontology):
         for (cur_gene, cur_terms) in genes.items():
             for cur_term in cur_terms:
                 if terms[cur_term] == {}:
-                    self.log('Could not find term for {}',cur_term)
+                    #self.log('Could not find term for {}',cur_term)
                     continue
                 terms[cur_term]['genes'].add(cur_gene)
                 for parent in terms[cur_term]['is_a']:
@@ -284,7 +293,7 @@ class GOnt(Ontology):
             termObjs.append(
                 GOTerm(term, name=terms[term]['name'], 
                     alt_id=terms[term]['alt_id'], is_a=terms[term]['is_a'],
-                    desc=terms[term]['desc'], locus_list=geneObjs
+                    desc=terms[term]['desc'], loci=geneObjs
                 )
             )
         del terms
@@ -323,10 +332,14 @@ class GOnt(Ontology):
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS relsIND ON rels (child);
             CREATE INDEX IF NOT EXISTS altsIND ON alts (main);
-            CREATE INDEX IF NOT EXISTS term_loci_ID ON term_loci (term)
+            CREATE INDEX IF NOT EXISTS term_loci_ID 
+                ON term_loci (term);
         ''')
 
     def _drop_indices(self):
         super()._drop_indices()
         cursor = self.db.cursor()
-        cursor.execute('DROP INDEX IF EXISTS relsIND; DROP INDEX IF EXISTS altsIND;')
+        cursor.execute('''
+            DROP INDEX IF EXISTS relsIND; 
+            DROP INDEX IF EXISTS altsIND;
+        ''')

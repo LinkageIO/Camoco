@@ -4,7 +4,6 @@ import os
 import yaml
 import pprint
 import getpass
-import configparser
 
 global cf
 
@@ -38,15 +37,24 @@ class Level(dict):
         everything like an object.
     '''
     def __init__(self,*args,**kwargs):
+        # Create the dict
         super().__init__(*args,**kwargs)
+        # Convert to Levels
+
+        for k,v in self.items():
+            if isinstance(v,dict):
+                self[k] = Level(v)
+            else:
+                self[k] = v
 
     def __getattr__(self,item):
-        if isinstance(self[item],dict):
-            return Level(self[item])
-        else:
-            if 'dir' in item and '~' in self[item]:
-                return os.path.expanduser(self[item])
-            return self[item]
+        if 'dir' in item and '~' in self[item]:
+            return os.path.expanduser(self[item])
+        return self[item]
+    def __setattr__(self,item,val):
+        self[item] = val
+
+
 
 class Config(object):
 
@@ -55,10 +63,10 @@ class Config(object):
         self.data = Level(yaml.load(open(filename,'r')))
 
     def __getattr__(self,item):
-        return Level(self.data[item])
+        return self.data[item]
 
     def __getitem__(self,item):
-        return Level(self.data[item])
+        return self.data[item]
 
     def __repr__(self):
         return pprint.pformat(self.data)

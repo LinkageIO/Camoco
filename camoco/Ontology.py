@@ -5,7 +5,6 @@ from .RefGen import RefGen
 from .Locus import Locus
 from .Term import Term
 
-
 from pandas import DataFrame
 from scipy.stats import hypergeom
 
@@ -127,7 +126,6 @@ class Ontology(Camoco):
         '''
         if overwrite:
             self.del_terms(terms)
-
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
         for term in terms:
@@ -165,8 +163,18 @@ class Ontology(Camoco):
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute('CREATE TABLE IF NOT EXISTS terms (id TEXT UNIQUE, desc TEXT)')
-        cur.execute('CREATE TABLE IF NOT EXISTS term_loci (term TEXT, id TEXT)')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS terms (
+                id TEXT UNIQUE,
+                desc TEXT
+            )'''
+        )
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS term_loci (
+                term TEXT, 
+                id TEXT
+            )'''
+        )
 
     def _clear_tables(self):
         cur = self.db.cursor()
@@ -181,6 +189,7 @@ class Ontology(Camoco):
         cursor = self.db.cursor()
         cursor.execute('DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;')
 
-    def enrichment(self, gene_list, pval_cutoff=0.05, gene_filter=None,
-        label=None, max_term_size=300):
+    def enrichment(self, locus_list, pval_cutoff=0.05, gene_filter=None,
+            label=None, max_term_size=300):
         raise NotImplementedError('This is broken')
+        

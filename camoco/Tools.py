@@ -151,7 +151,6 @@ def memoize(obj):
 
 
 class log(object):
-
     def __init__(self, msg=None, *args, color='green'):
         if msg is not None and cf.logging.log_level == 'verbose':
             print(
@@ -160,7 +159,6 @@ class log(object):
                     color=color
                 ), file=sys.stderr
             )
-        self.quiet = False
 
     @classmethod
     def warn(cls, msg, *args):

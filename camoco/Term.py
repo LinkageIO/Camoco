@@ -20,9 +20,7 @@ class Term(object):
 
     @property
     def locus_list(self):
-        from warnings import warn
-        warn('Use self.loci instead of self.locus_list', DeprecationWarning)
-        return self.loci
+        raise Exception('This is deprecated')
 
     def __len__(self):
         '''

@@ -10,6 +10,7 @@ import argparse
 from camoco.cli.PlotGWAS import plot_gwas
 from camoco.cli.BootstrapDensity import density
 from camoco.cli.BootstrapLocality import locality
+from camoco.cli.Health import cob_health
 from camoco import cf
 
 def list_command(args):
@@ -291,7 +292,34 @@ if __name__ == '__main__':
     )
     localityCLI.set_defaults(func=locality)
 
-    # DO IT ----------
+
+    ''' --------------------------
+        Health
+    --------------------------'''
+    health = subparsers.add_parser('health',help='Generate COB Health Stats')
+    health.add_argument('cob',default=None)
+    health.add_argument('--out',default=None,help='Output file prefix.')
+    health.add_argument(
+        '--RefGen',
+        default=None,
+        help='Global Refgen is necessary for some stats'        
+    )
+    health.add_argument(
+        '--GO',
+        default=None,
+        help='Perform Gene Ontology Statistics. (default: None)'
+    )
+    health.add_argument(
+        '--num_bootstraps',
+        default=50,
+        type=int,
+        help='Number of Bootstraps for pvalue stats.'
+    )
+    health.set_defaults(func=cob_health)
+
+
+
+    # DO IT ------------------------------------------------------------------
     args = parser.parse_args()
 
     if args.debug is True:
