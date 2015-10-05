@@ -39,4 +39,3 @@ def build_AtRoot(AtRoot):
 def build_AtLeaf(AtLeaf):
     assert AtLeaf
 
-
