@@ -51,32 +51,46 @@ class COB(Expr):
     def __str__(self):
         return self.__repr__()
 
-    def summary(self):
+    def summary(self,file=sys.stdout):
         print( '''
             COB Dataset: {}
                 Desc: {}
                 RawType: {}
                 TransformationLog: {}
-                Num Genes: {:,}
+                Num Genes: {:,}({:.2g}%)
                 Num Accessions: {}
                 Num Edges: {:,}
-                Edge FDR: {}
+
+            Raw
+            ------------------
+            Num Raw Genes: {:,}     
+            Num Raw Accessions: {}
+
+            QC
+            ------------------
+            min expr level: {}
+            max gene missing data: {}
+            min single sample expr: {}
+            max accession missing data: {}
+
+
         '''.format(
-                self.name,
-                self.description,
-                self.rawtype,
-                self._transformation_log(),
-                self.num_genes(),
-                self.num_accessions(),
-                len(self.coex),
-                self.edge_FDR
-        ))
-    def raw_summary(self):
-        print('''
-            Num Raw Genes: {}     
-        '''.format(
-            self.expr(raw=True)      
-        ))
+            self.name,
+            self.description,
+            self.rawtype,
+            self._transformation_log(),
+            self.num_genes(),
+            (self.num_genes()/self.num_genes(raw=True))*100,
+            self.num_accessions(),
+            len(self.coex),
+            # Raw
+            len(self.expr(raw=True)),
+            len(self.expr(raw=True).columns),
+            self._global('qc_min_expr'),
+            self._global('qc_max_gene_missing_data'),
+            self._global('qc_min_single_sample_expr'),
+            self._global('qc_max_accession_missing_data')
+        ), file=file)
 
     def qc_gene(self):
         qc_gene = self.hdf5['qc_gene']
@@ -92,6 +106,9 @@ class COB(Expr):
         num_exp = 1-norm.cdf(int(self._global('significance_threshold')))
         # FDR is the percentage expected over the percentage found
         return num_exp/num_sig
+
+    def set_sig_edge_zscore(self,zscore):
+        self.coex.significant = self.coex.score >= zscore
 
     def neighbors(self, gene, sig_only=True):
         '''
