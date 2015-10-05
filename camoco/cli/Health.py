@@ -1,5 +1,7 @@
 import camoco as co
 import numpy as np
+import powerlaw
+
 from os import path
 
 import matplotlib.pylab as plt
@@ -33,22 +35,60 @@ def cob_health(args):
             raw=False
         )
 
-    if args.RefGen is not None:
+    if not path.exists('{}.summary.txt'.format(args.out)):
+        with open('{}.summary.txt'.format(args.out),'w') as OUT:
+            # Print out the network summary
+            cob.summary(file=OUT)
+
+
+    if args.refgen is not None:
         if not path.exists('{}_qc_gene.txt'.format(args.out)):
-            with open('{}.summary.txt'.format(args.out)) as OUT:
-                # Print out the network summary
-                print(cob.summary,file=OUT)
                 # Print out the breakdown of QC Values
+                refgen = co.RefGen(args.refgen)
                 gene_qc = cob.hdf5['qc_gene']
                 gene_qc = gene_qc[gene_qc.pass_membership]
-                gene_qc['chrom'] = ['chr'+str(Zm5bFGS[x].chrom) for x in gene_qc.index]
-                x.groupby('chrom').agg(sum,axis=0).to_csv('{}_qc_gene.txt'.format(args.out))
-        
+                gene_qc['chrom'] = ['chr'+str(refgen[x].chrom) for x in gene_qc.index]
+                gene_qc = gene_qc.groupby('chrom').agg(sum,axis=0)
+                # Add totals at the bottom
+                totals = gene_qc.ix[:,slice(1,None)].apply(sum)
+                totals.name = 'TOTAL'
+                gene_qc = gene_qc.append(totals)
+                gene_qc.to_csv('{}_qc_gene.txt'.format(args.out),sep='\t')
+
+    #if not path.exists('{}_CisTrans.png'.format(args.out)):
+        # Get trans edges
+
+    cob.log('Plotting Degree Distribution')
+    if not path.exists('{}_DegreeDist.png'.format(args.out)):
+        degree = cob.degree['Degree'].values
+        fit = powerlaw.Fit(degree,discrete=True,xmin=1)
+        # get an axis
+        ax = plt.subplot()
+        # Calculate log ratios
+        t2p = fit.distribution_compare('truncated_power_law', 'power_law')
+        t2e = fit.distribution_compare('truncated_power_law', 'exponential')
+        p2e = fit.distribution_compare('power_law','exponential')
+        # Plot!
+        emp = fit.plot_ccdf(ax=ax,color='r',linewidth=3, label='Empirical Data')
+        pwr = fit.power_law.plot_ccdf(ax=ax, color='b', linestyle='--', label='Power law')
+        tpw = fit.truncated_power_law.plot_ccdf(ax=ax, color='k', linestyle='--', label='Truncated Power')
+        exp = fit.exponential.plot_ccdf(ax=ax, color='g', linestyle='--', label='Exponential')
+        ####
+        ax.set_ylabel("p(Degree≥x)")
+        ax.set_xlabel("Degree Frequency")
+        ax.legend(
+            loc='best'
+        )
+        plt.title('{} Degree Distribution'.format(cob.name))
+        # Save Fig
+        plt.savefig('{}_DegreeDist.png'.format(args.out))
+
+
 
     cob.log('Plotting GO') #------------------------------------------
-    if args.GO is not None: #-------------------------------------------------
+    if args.go is not None: #-------------------------------------------------
         if not path.exists('{}_GO.png'.format(args.out)):
-            go = co.GOnt(args.GO)
+            go = co.GOnt(args.go)
             emp_z = []
             pvals  = []
             terms_tested = 0
@@ -69,14 +109,16 @@ def cob_health(args):
                 else:
                     pval = sum(bs<=emp)/args.num_bootstraps
                 pvals.append(pval)
+            plt.clf()
             plt.scatter(emp_z,-1*np.log10(pvals))
             plt.xlabel('Empirical Z Score')
             plt.ylabel('Bootstraped -log10(p-value)')
             fold = sum(np.array(pvals)<=0.05)/(0.05 * terms_tested)
-            plt.title('{} x {}')
+            plt.title('{} x {}'.format(cob.name,go.name))
+            plt.axhline(y=-1*np.log10(0.05),color='red')
             plt.text(
-                'right', 'bottom',
-                '{} Fold Enrichement'.format(cob.name,go.name,fold),
+                1, 0.1,
+                '{:.3g} Fold Enrichement'.format(fold),
             )
             plt.savefig('{}_GO.png'.format(args.out))
             
