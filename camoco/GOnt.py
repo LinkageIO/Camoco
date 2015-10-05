@@ -44,6 +44,8 @@ class GOTerm(Term):
         'Add alternate name to term'
         self.alt_id.add(altID)
 
+        
+
 class GOnt(Ontology):
     '''Ontology extension for GO'''
     def __init__(self, name, type='GOnt'):
@@ -82,6 +84,7 @@ class GOnt(Ontology):
             id, name=name, desc=desc, alt_id=alts, 
             is_a=is_a, loci=term_loci
         )
+
 
     def add_term(self, term, cursor=None, overwrite=False):
         ''' This will add a single term to the ontology '''
