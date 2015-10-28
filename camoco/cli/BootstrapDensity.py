@@ -42,7 +42,7 @@ def density(args):
         results['Ontology'] = ont.name
         results['COB'] = cob.name
         results['Term'] = term.id
-        results['NumSNPs'] = len(term.locus_list)
+        results['NumSNPs'] = len(term.loci)
         results['WindowSize'] = args.candidate_window_size
         results['FlankLimit'] = args.candidate_flank_limit
         results['NumBootstraps'] = args.num_bootstraps
@@ -129,4 +129,6 @@ def density(args):
     
     # Return the results 
     all_results = pd.DataFrame(all_results,columns=all_results[0].keys())
+    # Make sure the output directory exists
+    os.makedirs(os.path.dirname(args.out),exist_ok=True)
     all_results.to_csv(args.out,index=None,sep='\t')

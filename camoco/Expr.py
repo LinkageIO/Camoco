@@ -70,11 +70,11 @@ class Expr(Camoco):
     def __str__(self):
         pass
 
-    def num_genes(self):
-        return len(self._expr.index)
+    def num_genes(self,raw=False):
+        return len(self.expr(raw=raw))
 
-    def num_accessions(self):
-        return len(self._expr.columns)
+    def num_accessions(self,raw=False):
+        return len(self.expr(raw=raw).columns)
 
     def shape(self):
         return self._expr.shape

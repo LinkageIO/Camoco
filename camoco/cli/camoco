@@ -230,7 +230,7 @@ if __name__ == '__main__':
         default=['all']
     )
     localityCLI.add_argument(
-       '--num-bootstraps', default=50,type=int,metavar=50, 
+       '--num-bootstraps', default=100,type=int,metavar=100, 
        help='''The number of bootstraps to perform in order
              to estimate a null distribution.'''
     )
@@ -287,8 +287,19 @@ if __name__ == '__main__':
     )
     # Data Formatting Parameters
     localityCLI.add_argument(
+        '--plot',action='store_true',
+        default=False,help='Flag indicating to plot data.'
+    )
+    localityCLI.add_argument(
        '--out',default='.',
        type=str,help='Basename of output file (pngs and csvs will be produced.)'
+    )
+    localityCLI.set_defaults(func=locality)
+
+    localityCLI.add_argument(
+       '--sig-edge-zscore',default=None,
+       type=float,
+       help='If not None, redefine what a significant interaction score is. (defaut: 3)'
     )
     localityCLI.set_defaults(func=locality)
 
@@ -300,23 +311,22 @@ if __name__ == '__main__':
     health.add_argument('cob',default=None)
     health.add_argument('--out',default=None,help='Output file prefix.')
     health.add_argument(
-        '--RefGen',
+        '--refgen',
         default=None,
         help='Global Refgen is necessary for some stats'        
     )
     health.add_argument(
-        '--GO',
+        '--go',
         default=None,
         help='Perform Gene Ontology Statistics. (default: None)'
     )
     health.add_argument(
-        '--num_bootstraps',
-        default=50,
+        '--num-bootstraps',
+        default=100,
         type=int,
         help='Number of Bootstraps for pvalue stats.'
     )
     health.set_defaults(func=cob_health)
-
 
 
     # DO IT ------------------------------------------------------------------

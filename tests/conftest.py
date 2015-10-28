@@ -150,7 +150,7 @@ def ZmSAM(Zm5bFGS):
 def ZmSAM2(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('Expr','ZmSAM2',safe=False)
-    if not co.available_datasets('Expr','ZmSAM'):
+    if not co.available_datasets('Expr','ZmSAM2'):
         return co.COB.from_table(
             os.path.join(
                 cf.options.testdir,
@@ -162,20 +162,21 @@ def ZmSAM2(Zm5bFGS):
             Zm5bFGS,
             rawtype='RNASEQ',
             max_gene_missing_data=0.4,
+            min_single_sample_expr=1,
             min_expr=0.01,
             quantile=False,
             dry_run=False,
             max_val=250
         )
     else:
-        return co.COB('ZmSAM')
+        return co.COB('ZmSAM2')
 
 
 @pytest.fixture(scope="module")
 def ZmPAN2(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('Expr','ZmPAN2',safe=False)
-    if not co.available_datasets('Expr','ZmPAN'):
+    if not co.available_datasets('Expr','ZmPAN2'):
         return co.COB.from_table(
             os.path.join(
                 cf.options.testdir,
@@ -187,6 +188,7 @@ def ZmPAN2(Zm5bFGS):
             Zm5bFGS,
             rawtype='RNASEQ',
             max_gene_missing_data=0.4,
+            min_single_sample_expr=1,
             min_expr=0.01,
             quantile=False,
             dry_run=False,
@@ -194,7 +196,7 @@ def ZmPAN2(Zm5bFGS):
             max_val=300
         )
     else:
-        return co.COB('ZmPAN')
+        return co.COB('ZmPAN2')
 
 
 @pytest.fixture(scope="module")
@@ -257,6 +259,7 @@ def AtSeed(AtTair10):
         )
     else:
         return co.COB('AtSeed')
+
 
 
 @pytest.fixture(scope="module")

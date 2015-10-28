@@ -3,6 +3,7 @@ import sys
 import time
 import re
 import functools
+import glob
 
 from termcolor import colored, cprint
 from itertools import chain
@@ -248,3 +249,44 @@ def plot_local_vs_cc(term, filename=None, bootstraps=1):
     if filename is None:
         filename = "{}_cc.png".format(term.id)
     pylab.savefig(filename)
+
+def read_FDR(glob_path):
+    dfs = []
+    for x in glob.glob(glob_path):
+        df = pd.read_table(x,sep=',')
+        dfs.append(df)
+    df = pd.concat(dfs)
+    # I guess we forgot this before
+    df.insert(4,'TraitType','Element')
+    df.loc[[x.startswith('Log') for x in df.Term],'TraitType'] = 'Log'
+    df.loc[[x.startswith('PCA') for x in df.Term],'TraitType'] = 'PCA'
+    df.loc[[x.startswith('Trans') for x in df.Term],'TraitType'] = 'Trans'
+    return df.set_index(['Ontology','COB','Term','WindowSize','FlankLimit'])
+
+def zmax(a):
+    if len(a) == 0:
+        return 0
+    else:
+        return np.max(a)
+
+def zmin(a):
+    if len(a) == 0:
+        return 0
+    else:
+        return np.min(a)
+
+def groupedFDR(df):
+    def grouped_agg(x):
+        return pd.Series(
+            {
+                'Tot':  sum(x.numReal),
+                'FDR10'   :zmax(x[x.FDR<=0.10].numReal),
+                'FDR10_Z' :zmin(x[x.FDR<=0.10].zscore),
+                'FDR35'   :zmax(x[x.FDR<=0.35].numReal),
+                'FDR35_Z' :zmin(x[x.FDR<=0.35].zscore),
+                'FDR50'   :zmax(x[x.FDR<=0.50].numReal),
+                'FDR50_Z' :zmin(x[x.FDR<=0.50].zscore)
+            }
+        )
+    groups = ['Ontology','COB','WindowSize','FlankLimit','TraitType','Term']
+    return df.reset_index().groupby(groups).apply(grouped_agg)

@@ -42,6 +42,8 @@ def locality(args):
     # Initiate for args 
     # Generate output dirs
 
+    if os.path.dirname(args.out) != '':
+        os.makedirs(os.path.dirname(args.out),exist_ok=True)
     if os.path.exists("{}_Locality.csv".format(args.out.replace('.csv',''))):
         print(
             "{}_Locality.csv exist! Skipping!".format(
@@ -52,6 +54,9 @@ def locality(args):
 
     # Grab the COB object
     cob = co.COB(args.cob)
+
+    if args.sig_edge_zscore is not None:
+        cob.set_sig_edge_zscore(args.sig_edge_zscore)
     gwas = co.GWAS(args.gwas)
 
     # If all, grab a generater
@@ -64,22 +69,23 @@ def locality(args):
     term_localities = []
     # Add in text for axes
     for term in terms:
-        #fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(24,8))
-        # Change the relevent things in the permuted args 
-        # Generate data using permuted arguments
         loc,bsloc,fdr = generate_data(cob,gwas,term,args) 
-        # Add extra Columns 
-        # Plot the data
-        #plot_data(args,loc,bsloc,fdr,ax1)
-        #plot_scatter(args,loc,bsloc,fdr,ax2)
-        #plot_fdr(args,loc,bsloc,fdr,ax3)
-        #plt.tight_layout()
-        #plt.savefig("{}_{}.png".format(
-        #    args.out,
-        #    term.id
-        #))
-        #plt.close()
-        # Keep track of this shit
+        if args.plot:
+            fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(24,8))
+            # Change the relevent things in the permuted args 
+            # Generate data using permuted arguments
+            # Add extra Columns 
+            # Plot the data
+            plot_data(args,loc,bsloc,fdr,ax1)
+            plot_scatter(args,loc,bsloc,fdr,ax2)
+            plot_fdr(args,loc,bsloc,fdr,ax3)
+            plt.tight_layout()
+            plt.savefig("{}_{}.png".format(
+                args.out,
+                term.id
+            ))
+            plt.close()
+            # Keep track of this shit
         term_localities.append(loc)
         term_localities.append(bsloc)
         term_localities.append(fdr)
@@ -110,19 +116,35 @@ def locality(args):
                     num_real = len(zdf.loc[
                         emp_indices
                     ])
+                else:
+                    num_real = 0
                 if num_real != 0 and num_random != 0:
                     fdr = num_random/num_real
                 else:
                     fdr = 1
-                global_fdr.append([gwas,cob,term,zscore,num_random,num_real,fdr])
+                global_fdr.append(
+                    [
+                        gwas, cob,
+                        args.candidate_window_size,
+                        args.candidate_flank_limit,
+                        term, zscore, num_random, num_real, fdr
+                    ]
+                )
     global_fdr  = pd.DataFrame(
         global_fdr,
-        columns=['Ontology','COB','Term','zscore','numRandom','numReal','FDR']
+        columns=[
+            'Ontology','COB','WindowSize','FlankLimit',
+            'Term','zscore','numRandom','numReal','FDR'
+        ]
     )
 
     # Output the Locality Measures
-    term_localities.to_csv(
+    term_localities[term_localities.iter_name=='emp'].to_csv(
         "{}_Locality.csv".format(args.out.replace('.csv',''))        
+    )
+    # Output the FDR 
+    term_localities[term_localities.iter_name=='fdr'].to_csv(
+        "{}_Locality_BS.csv".format(args.out.replace('.csv',''))        
     )
     global_fdr.to_csv(
         "{}_Locality_FDR.csv".format(args.out.replace('.csv','')),
