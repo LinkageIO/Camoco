@@ -250,10 +250,22 @@ def plot_local_vs_cc(term, filename=None, bootstraps=1):
         filename = "{}_cc.png".format(term.id)
     pylab.savefig(filename)
 
-def read_FDR(glob_path):
+def read_density(path):
+    dfs = []
+    for x in glob.glob(path):
+        df = pd.read_table(x,sep=',')
+        dfs.append(df)
+    df = pd.concat(dfs)
+    df.insert(4,'TraitType','Element')
+    df.loc[[x.startswith('Log') for x in df.Term],'TraitType'] = 'Log'
+    df.loc[[x.startswith('PCA') for x in df.Term],'TraitType'] = 'PCA'
+    df.loc[[x.startswith('Trans') for x in df.Term],'TraitType'] = 'Trans'
+    return df.set_index(['Ontology','COB','Term','WindowSize','FlankLimit'])
+
+def read_FDR(glob_path,sep=','):
     dfs = []
     for x in glob.glob(glob_path):
-        df = pd.read_table(x,sep=',')
+        df = pd.read_table(x,sep=sep)
         dfs.append(df)
     df = pd.concat(dfs)
     # I guess we forgot this before
