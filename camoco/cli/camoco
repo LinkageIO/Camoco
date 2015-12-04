@@ -11,6 +11,7 @@ from camoco.cli.PlotGWAS import plot_gwas
 from camoco.cli.BootstrapDensity import density
 from camoco.cli.BootstrapLocality import locality
 from camoco.cli.Health import cob_health
+from camoco.cli.CrossRef import crossref
 from camoco import cf
 
 def list_command(args):
@@ -327,6 +328,24 @@ if __name__ == '__main__':
         help='Number of Bootstraps for pvalue stats.'
     )
     health.set_defaults(func=cob_health)
+
+
+    '''----------------------------------
+        cross reference
+    -------------------------------------'''
+    crossref = subparsers.add_parser('crossref',
+        help=(
+            'cross reference a set of networks'
+            ' based on edge strength and go term density')
+    )
+    crossref.add_argument(
+        'cobs',
+        default=None,
+        nargs='*',
+        help='A list of COBs which to cross reference'
+    )
+    crossref.add_argument('--out',default=None,help='Output file name.')
+    crossref.set_defaults(func=crossref)
 
 
     # DO IT ------------------------------------------------------------------
