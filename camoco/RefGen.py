@@ -8,7 +8,7 @@ from .Camoco import Camoco
 from .Locus import Gene,Locus
 from .Chrom import Chrom
 from .Genome import Genome
-from .Tools import memoize
+from .Tools import memoize,rawFile
 from .Exceptions import CamocoZeroWindowError
 
 import itertools
@@ -364,9 +364,9 @@ class RefGen(Camoco):
             return genes
 
     def candidate_genes(self, loci, flank_limit=2,
-        chain=True, window=None):
+        chain=True, window=None, include_parent_locus=False):
         '''
-            SNP to Gene mapping.
+            Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
             flanking genes (up to flank_limit)
 
@@ -384,6 +384,11 @@ class RefGen(Camoco):
                 window from which to choose candidates from. If None,
                 the function will resort to what is available in the
                 window attribute of the Locus.
+            include_parent_locus : bool (default: False)
+                Optional parameter which will update candidate genes
+                'attr' attribute with the id of the parent locus
+                which contains it.
+            
 
             Returns
             -------
@@ -398,18 +403,25 @@ class RefGen(Camoco):
                 locus, flank_limit=flank_limit, chain=False,
                 window=window
             )
+
             # This always returns candidates together, if 
             # you want specific up,within and down genes
             # use the specific methods
-            return list(
-                itertools.chain(up_genes,genes_within,down_genes)
-            )
+            genes = list(itertools.chain(up_genes,genes_within,down_genes))
+
+            # include parent locus id if thats  
+            if include_parent_locus == True:
+                for gene in genes:
+                    gene.update({'parent_locus':locus.id})
+            return genes
+
         else:
             iterator = iter(sorted(loci))
             genes = [
                 self.candidate_genes(
                     locus, flank_limit=flank_limit,
-                    chain=chain, window=window
+                    chain=chain, window=window,
+                    include_parent_locus=include_parent_locus
                 ) for locus in iterator
             ]
             if chain:
@@ -709,32 +721,63 @@ class RefGen(Camoco):
         ''',(chrom.id,chrom.length))
 
     def add_aliases(self, alias_file, id_col=0, alias_col=1, headers=True):
-        ''' Add alias map to the RefGen '''
-        IN = open(alias_file,'r')
-        if headers:
-            garb = IN.readline()
-
-        alias_map = dict()
-        self.log('Importing aliases from: {}',alias_file)
-        for line in IN.readlines():
-            row = re.split(',|\t',line)
-            if row[id_col].strip() in self:
-                alias_map[row[alias_col]] = row[id_col].strip()
+        ''' 
+            Add alias map to the RefGen 
+            
+            Parameters
+            ----------
+            alias_file : string (path)
+                The path to the alias file
+            id_col : int (default: 0)
+                The column containing the gene identifier
+            alias_col : int (default: 1)
+                The columns containing the alias
+            header : bool (default: True)
+                A switch stating if there is a header row to ignore or not
+        '''
+        with rawFile(alias_file) as IN:
+            if headers:
+                garb = IN.readline()
+    
+            aliases = []
+            self.log('Importing aliases from: {}',alias_file)
+            for line in IN:
+                row = re.split(',|\t',line)
+                if row[id_col].strip() in self:
+                    aliases.append(
+                        (row[alias_col],row[id_col].strip())
+                    )
         cur = self.db.cursor()
         self.log('Saving them in the alias table.')
         cur.execute('BEGIN TRANSACTION')
         cur.executemany(
             'INSERT OR REPLACE INTO aliases VALUES (?,?)',
-            [(alias, id) for (alias, id) in alias_map.items()])
+            aliases
+        )
         cur.execute('END TRANSACTION')
+    def num_aliases(self):
+        '''
+            Returns the number of aliases currently in the database
+        '''
+        return self.db.cursor() \
+            .execute('SELECT COUNT(*) FROM aliases') \
+            .fetchone()[0]
 
     def aliases(self, gene_id):
         if isinstance(gene_id,str):
-            return [alias[0] for alias in self.db.cursor().execute('SELECT alias FROM aliases WHERE id = ?',[gene_id.upper()])]
+            return [alias[0] for alias in self.db.cursor().execute('''
+                    SELECT alias FROM aliases 
+                    WHERE id = ?
+                ''',
+                (gene_id.upper(),)
+            )]
         else:
             cur = self.db.cursor()
-            al_list = cur.executemany('SELECT alias,id FROM aliases WHERE id = ?',
-            [[id] for id in gene_id])
+            al_list = cur.executemany('''
+                SELECT alias,id FROM aliases WHERE id = ?
+                ''',
+                [(id,) for id in gene_id]
+            )
             als = dict()
             for al,id in al_list:
                 if id in als:
