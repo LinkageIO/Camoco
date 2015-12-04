@@ -21,6 +21,18 @@ def density(args):
     
     cob = co.COB(args.cob)
     ont = co.GWAS(args.gwas)
+    args.out = os.path.splitext(args.out)[0] + '_Density.csv'
+
+    if os.path.dirname(args.out) != '':
+        os.makedirs(os.path.dirname(args.out),exist_ok=True)
+    if os.path.exists(args.out):
+        print(
+            "{} exists! Skipping!".format(
+                args.out
+            )
+        )
+        return
+
 
     if 'all' in args.terms:
         terms = ont.iter_terms()
@@ -130,5 +142,4 @@ def density(args):
     # Return the results 
     all_results = pd.DataFrame(all_results,columns=all_results[0].keys())
     # Make sure the output directory exists
-    os.makedirs(os.path.dirname(args.out),exist_ok=True)
     all_results.to_csv(args.out,index=None,sep='\t')
