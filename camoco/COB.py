@@ -223,6 +223,15 @@ class COB(Expr):
             ----------
             locus_list : iter of Loci
                 an iterable of loci
+            flank_limit : int
+                The number of flanking genes passed to be pulled out 
+                for each locus (passed onto the refgen.candidate_genes method)
+            return_mean : bool (default: True)
+                If false, raw edges will be returned
+            bootstrap : bool (default: False)
+                If true, candidate genes will be bootstrapped from the COB
+                reference genome
+
         '''
         # convert to list of loci to lists of genes
         if not bootstrap:
