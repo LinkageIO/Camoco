@@ -46,7 +46,7 @@ def locality(args):
         os.makedirs(os.path.dirname(args.out),exist_ok=True)
     if os.path.exists("{}_Locality.csv".format(args.out.replace('.csv',''))):
         print(
-            "{}_Locality.csv exist! Skipping!".format(
+            "{}_Locality.csv exists! Skipping!".format(
                 args.out.replace('.csv','')
             )
         )
