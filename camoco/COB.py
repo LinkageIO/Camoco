@@ -217,7 +217,8 @@ class COB(Expr):
     def trans_locus_density(self, locus_list,flank_limit, 
         return_mean=True, bootstrap=False):
         '''
-            Calculates the density of edges which span loci
+            Calculates the density of edges which span loci. Must take in a locus
+            list so we can exlude cis-locus interactions.
 
             Parameters
             ----------
@@ -231,6 +232,11 @@ class COB(Expr):
             bootstrap : bool (default: False)
                 If true, candidate genes will be bootstrapped from the COB
                 reference genome
+
+            Returns
+            -------
+            Z-score of interactions if return_mean is True
+            otherwise a dataframe of trans edges 
 
         '''
         # convert to list of loci to lists of genes
@@ -257,7 +263,7 @@ class COB(Expr):
             min_distance=0,
             sig_only=False
         )
-        # iterate over
+        # iterate over and removes edges from the same locus
         edges['trans'] = [
             gene_origin[a]!=gene_origin[b] for a, b in edges.index.values
         ]
@@ -265,10 +271,10 @@ class COB(Expr):
             scores = edges.loc[edges['trans']==True, 'score']
             return np.nanmean(scores)/(1/np.sqrt(len(scores)))
         else:
-            return edges
+            return edges.loc[edges['trans']==True,]
 
 
-    def density(self, gene_list, min_distance=None):
+    def density(self, gene_list, min_distance=None, by_gene=False):
         '''
             Calculates the denisty of the non-thresholded network edges
             amongst genes within gene_list. Includes parameters to perform
@@ -283,25 +289,33 @@ class COB(Expr):
             min_distance : int (default: None)
                 Ignore edges between genes less than min_distance
                 in density calculation.
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
 
             Returns
             -------
-            A network density
+            A network density OR density on a gene-wise basis
         '''
         # filter for only genes within network
         edges = self.subnetwork(gene_list,
             min_distance=min_distance, sig_only=False
         )
-        if len(edges) == 0:
-            return np.nan
-        if len(edges) == 1:
-            return edges.score[0]
 
-        # old code worth a look ;)
-        #return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
-        #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
-        #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
-        return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
+        if by_gene == True:
+            x = pd.DataFrame.from_records(
+                chain(
+                    *[((gene_a,score),(gene_b,score)) \
+                     for gene_a,gene_b,score,sig,dis \
+                     in edges.reset_index().values]
+                ),columns=['gene','score']
+            )
+            return x.groupby('gene').agg(np.mean)
+        else:
+            if len(edges) == 0:
+                return np.nan
+            if len(edges) == 1:
+                return edges.score[0]
+            return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
 
     def to_dat(self, gene_list=None, filename=None, sig_only=False, min_distance=0):
         '''
@@ -459,7 +473,9 @@ class COB(Expr):
         self.log('Fetching Degree ... ')
         degree = self.local_degree(gene_list)
         # Add on the global degree
-        degree['global'] = self.global_degree(self.refgen.from_ids(degree.index.values))['Degree']
+        degree['global'] = self.global_degree(
+            self.refgen.from_ids(degree.index.values)
+        )['Degree']
         degree.columns = ['local', 'global']
         degree = degree.sort('global')
         if include_regression:
@@ -470,6 +486,7 @@ class COB(Expr):
         if iter_name is not None:
             degree['iter_name'] = iter_name
         return degree
+
 
 
     ''' ----------------------------------------------------------------------
