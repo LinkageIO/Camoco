@@ -254,7 +254,6 @@ def AtSeed(AtTair10):
             AtTair10,
             rawtype='MICROARRAY',
             quantile=True
-
         )
     else:
         return co.COB('AtSeed')
