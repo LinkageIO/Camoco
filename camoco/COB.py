@@ -215,7 +215,7 @@ class COB(Expr):
         return df.copy()
 
     def trans_locus_density(self, locus_list,flank_limit, 
-        return_mean=True, bootstrap=False):
+        return_mean=True, bootstrap=False, by_gene=False):
         '''
             Calculates the density of edges which span loci. Must take in a locus
             list so we can exlude cis-locus interactions.
@@ -232,6 +232,8 @@ class COB(Expr):
             bootstrap : bool (default: False)
                 If true, candidate genes will be bootstrapped from the COB
                 reference genome
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
 
             Returns
             -------
@@ -252,12 +254,13 @@ class COB(Expr):
         gene_origin = {}
         full_gene_set = set()
         for i, genes in enumerate(genes_list):
-            # RefGen.candidate_genes returns u, w, d with chain == False
+            # genes_list is a list of list of genes
             for gene in genes:
-                gene_origin[gene.id] = i
+                # track which locus a gene comes from
+                gene_origin[gene.id] = i 
                 full_gene_set.add(gene)
         self.log("Found {} candidate genes", len(full_gene_set))
-
+        # Extract the edges for the full set of genes
         edges = self.subnetwork(
             full_gene_set,
             min_distance=0,
@@ -267,11 +270,22 @@ class COB(Expr):
         edges['trans'] = [
             gene_origin[a]!=gene_origin[b] for a, b in edges.index.values
         ]
-        if return_mean:
-            scores = edges.loc[edges['trans']==True, 'score']
-            return np.nanmean(scores)/(1/np.sqrt(len(scores)))
+        if by_gene == True:
+            # 
+            x = pd.DataFrame.from_records(
+                chain(
+                    *[((gene_a,score),(gene_b,score)) \
+                     for gene_a,gene_b,score,*junk \
+                     in edges[edges.trans==True].reset_index().values]
+                ),columns=['gene','score']
+            )
+            return x.groupby('gene').agg(np.mean)
         else:
-            return edges.loc[edges['trans']==True,]
+            if return_mean:
+                scores = edges.loc[edges['trans']==True, 'score']
+                return np.nanmean(scores)/(1/np.sqrt(len(scores)))
+            else:
+                return edges.loc[edges['trans']==True,]
 
 
     def density(self, gene_list, min_distance=None, by_gene=False):
