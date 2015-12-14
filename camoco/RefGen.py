@@ -374,7 +374,7 @@ class RefGen(Camoco):
             ----------
             loci : camoco.Locus (also handles an iterable containing Loci)
                 a camoco locus or iterable of loci
-            flank_limit : int (default : 4)
+            flank_limit : int (default : 2)
                 The total number of flanking genes **on each side**
                 considered a candidate surrounding a locus
             chain : bool (default : true)
