@@ -198,6 +198,13 @@ if __name__ == '__main__':
         )
     )
     densityCLI.add_argument(
+        '--gene-specific',action='store_true',default=False,
+        help=(
+            'Flag indicating whether or not to perform'
+            'gene specific density.'
+        )
+    )
+    densityCLI.add_argument(
         '--out', default=sys.stdout,
         help='OutputFile Name (default: Standard Out)'
     )
