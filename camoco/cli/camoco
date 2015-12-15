@@ -30,6 +30,10 @@ if __name__ == '__main__':
         help='Drop into ipdb when something bad happens.'
     )
     parser.add_argument(
+        '--interactive',action='store_true',default=False,
+        help='Initiate an ipdb session right before exiting.'
+    )
+    parser.add_argument(
         '--overlook',action='store_true',default=False,
         help='Skip analysis if files produced by --out exist.'
     )
@@ -367,4 +371,14 @@ if __name__ == '__main__':
     if args.overlook is True and len(glob.glob(args.out+'*')):
         print("Skipping {}* because files already exist.".format(args.out))
     else:
-        sys.exit(args.func(args))
+        return_value = args.func(args)
+        if args.interactive is True:
+            from IPython.core import ultratb
+            sys.excepthook = ultratb.FormattedTB(
+                mode='Verbose', color_scheme='Linux', call_pdb=1
+            )
+            from camoco.Exceptions import CamocoInteractive
+            raise CamocoInteractive()
+        sys.exit(return_value)
+
+
