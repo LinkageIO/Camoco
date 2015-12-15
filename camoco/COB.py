@@ -215,7 +215,8 @@ class COB(Expr):
         return df.copy()
 
     def trans_locus_density(self, locus_list,flank_limit, 
-        return_mean=True, bootstrap=False, by_gene=False):
+        return_mean=True, bootstrap=False, by_gene=False,
+        iter_name=None):
         '''
             Calculates the density of edges which span loci. Must take in a locus
             list so we can exlude cis-locus interactions.
@@ -234,6 +235,9 @@ class COB(Expr):
                 reference genome
             by_gene : bool (default: False)
                 Return a per-gene breakdown of density within the subnetwork.
+            iter_name : str (default: None)
+                Optional string which will be added as a column. Useful for 
+                keeping track of bootstraps in an aggregated data frame.
 
             Returns
             -------
@@ -271,15 +275,18 @@ class COB(Expr):
             gene_origin[a]!=gene_origin[b] for a, b in edges.index.values
         ]
         if by_gene == True:
-            # 
-            x = pd.DataFrame.from_records(
+            # Filter out trans edges 
+            gene_split = pd.DataFrame.from_records(
                 chain(
                     *[((gene_a,score),(gene_b,score)) \
                      for gene_a,gene_b,score,*junk \
                      in edges[edges.trans==True].reset_index().values]
                 ),columns=['gene','score']
             )
-            return x.groupby('gene').agg(np.mean)
+            gene_split = gene_split.groupby('gene').agg(np.mean)
+            if iter_name is not None:
+                gene_split['iter'] = iter_name
+            return gene_split
         else:
             if return_mean:
                 scores = edges.loc[edges['trans']==True, 'score']
