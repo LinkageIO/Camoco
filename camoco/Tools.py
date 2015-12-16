@@ -7,6 +7,7 @@ import glob
 
 from termcolor import colored, cprint
 from itertools import chain
+from collections import OrderedDict
 
 from .Locus import Locus
 from .Config import cf
@@ -21,6 +22,37 @@ import statsmodels.api as sm
 
 import gzip
 import bz2
+
+def mean_confidence_interval(data):
+    '''
+        Convenience function to return both the mean as well as the 
+        confidence interval on data. Good for chaining so inline data
+        does not need to be evaluated twice (once for mean and another 
+        for cf)
+    '''
+    return np.mean(data), confidence_interval(data)
+
+def confidence_interval(data, confidence=0.95):
+    '''
+        Returns the confidence (default 95%) for data.
+    '''
+    a = 1.0*np.array(data)
+    n = len(a)
+    m, se = np.mean(a), scipy.stats.sem(a)
+    h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
+    return 1.96*se
+
+class NearestDict(OrderedDict):
+    '''
+        This extension overrides the get item method 
+        of dict where if a key does not exist, it returns
+        the nearst key which does exist.
+    '''
+    def __getitem__(self,key):
+        'Returns the nearest key which exists'
+        return dict.__getitem__(self,min(self.keys(),key=lambda x: abs(x-key)))
+
+
 
 def available_datasets(type='%', name='%'):
     try:

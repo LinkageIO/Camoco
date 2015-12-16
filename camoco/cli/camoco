@@ -7,21 +7,20 @@ import glob
 
 import argparse
 
-from camoco.cli.PlotGWAS import plot_gwas
-from camoco.cli.BootstrapDensity import density
-from camoco.cli.BootstrapLocality import locality
-from camoco.cli.Health import cob_health
-from camoco.cli.CrossRef import crossref
+from camoco.cli.commands.plotGWAS import plot_gwas
+from camoco.cli.commands.density import density
+from camoco.cli.commands.locality import locality
+from camoco.cli.commands.health import cob_health
+from camoco.cli.commands.crossRef import crossref
+from camoco.cli.commands.remove import remove 
+from camoco.cli.commands.list import list_command
 from camoco import cf
-
-def list_command(args):
-    print(co.available_datasets(args.type,args.name))
-
-def rm_command(args):
-    print(co.del_dataset(args.type,args.name,safe=args.force))
 
 
 if __name__ == '__main__':
+    '''--------------------------
+        Main Arguments 
+    --------------------------'''
     parser = argparse.ArgumentParser(
         epilog='Cache. Money. Corn.'
     )
@@ -37,33 +36,49 @@ if __name__ == '__main__':
         '--overlook',action='store_true',default=False,
         help='Skip analysis if files produced by --out exist.'
     )
-
     subparsers = parser.add_subparsers(
         title='Camoco CLI program',
         metavar='Available Commands',
         description='Use --help with each command for more info',
     )
-
     # Also allow the help message to be printed using the help command
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
+    parser.set_defaults(func=lambda x: parser.print_help())
+
 
     '''--------------------------
         list 
     --------------------------'''
-    lstcmd = subparsers.add_parser('list',help='List camoco datasets.')
-    lstcmd.add_argument('type',default=None)
-    lstcmd.add_argument('name',default=None)
+    lstcmd = subparsers.add_parser(
+        'list', 
+        aliases=['ls'],
+        help='List camoco datasets.' 
+    )
+    lstcmd.add_argument(
+        'type', default=None,
+        help=(
+            'The type of dataset you want to list. e.g. GWAS. '
+            'Also accepts SQLite wildcards.'    
+        )
+    )
+    lstcmd.add_argument(
+        'name', default=None,
+        help = (
+            'The name of the dataset you want to list. '
+            'Also accepts SQLite wildcards.' 
+        )
+    )
     lstcmd.set_defaults(func=list_command)
 
     ''' --------------------------
         rm 
     --------------------------'''
-    rmcmd = subparsers.add_parser('rm',help='remove camoco dataset.')
-    rmcmd.add_argument('type',default=None)
-    rmcmd.add_argument('name',default=None)
-    rmcmd.add_argument('-f','--force',action='store_false',default=True)
-    rmcmd.set_defaults(func=rm_command)
+    remove = subparsers.add_parser('rm',help='remove camoco dataset.')
+    remove.add_argument('type',default=None)
+    remove.add_argument('name',default=None)
+    remove.add_argument('-f','--force',action='store_false',default=True)
+    remove.set_defaults(func=remove)
 
     ''' --------------------------
         plotGWAS 
@@ -342,7 +357,7 @@ if __name__ == '__main__':
 
 
     '''----------------------------------
-        cross reference
+        Cross Reference
     -------------------------------------'''
     crossref = subparsers.add_parser('crossref',
         help=(
@@ -359,9 +374,11 @@ if __name__ == '__main__':
     crossref.set_defaults(func=crossref)
 
 
-    # DO IT ------------------------------------------------------------------
+    ''' -------------------------------------------------------------------
+    # DO IT ---------------------------------------------------------------
+    -----------------------------------------------------------------------'''
     args = parser.parse_args()
-
+    # Add debug options
     if args.debug is True:
         from IPython.core import ultratb
         sys.excepthook = ultratb.FormattedTB(
