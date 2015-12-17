@@ -23,6 +23,8 @@ co.cf.logging.log_level = 'quiet'
 
 def locality(args):
     # Generate output dirs
+    if args.out != sys.stdout:
+        args.out = "{}_Locality.csv".format(args.out.replace('.csv',''))        
     if os.path.dirname(args.out) != '':
         os.makedirs(os.path.dirname(args.out),exist_ok=True)
     if os.path.exists("{}_Locality.csv".format(args.out.replace('.csv',''))):
@@ -65,8 +67,8 @@ def locality(args):
             plt.close()
             # Keep track of this shit
         all_results.append(loc)
-        all_results.append(bsloc)
-        all_results.append(fdr)
+        #all_results.append(bsloc)
+        #all_results.append(fdr)
     # Add parameters to the data frame
     all_results = pd.concat(all_results)
     all_results.insert(0,'COB',cob.name)
@@ -74,60 +76,8 @@ def locality(args):
     all_results.insert(0,'WindowSize',args.candidate_window_size)
     all_results.insert(0,'FlankLimit',args.candidate_flank_limit)
 
-    # Calculate global FDR and number of candidates discovered
-    global_fdr = []
-    for (gwas,cob,term),df in all_results.groupby(['Ontology','COB','Term']):
-        # Get Z score
-        zscores = list(np.arange(0,8))
-        for zscore in zscores:
-            zdf = df[df.zscore >= zscore]
-            if len(zdf) > 0:
-                fdr_indices = [x.startswith('fdr') for x in zdf.iter_name]
-                if sum(fdr_indices) > 0:
-                    num_random = zdf.loc[
-                        fdr_indices     
-                    ].groupby('iter_name').apply(len).mean()
-                else:
-                    num_random = 0
-                emp_indices = [x.startswith('emp') for x in zdf.iter_name]
-                if sum(emp_indices) > 0:
-                    num_real = len(zdf.loc[
-                        emp_indices
-                    ])
-                else:
-                    num_real = 0
-                if num_real != 0 and num_random != 0:
-                    fdr = num_random/num_real
-                else:
-                    fdr = 1
-                global_fdr.append(
-                    [
-                        gwas, cob,
-                        args.candidate_window_size,
-                        args.candidate_flank_limit,
-                        term, zscore, num_random, num_real, fdr
-                    ]
-                )
-    global_fdr  = pd.DataFrame(
-        global_fdr,
-        columns=[
-            'Ontology','COB','WindowSize','FlankLimit',
-            'Term','zscore','numRandom','numReal','FDR'
-        ]
-    )
-
     # Output the Locality Measures
-    all_results[all_results.iter_name=='emp'].to_csv(
-        "{}_Locality.csv".format(args.out.replace('.csv',''))        
-    )
-    # Output the FDR 
-    all_results[all_results.iter_name=='fdr'].to_csv(
-        "{}_Locality_BS.csv".format(args.out.replace('.csv',''))        
-    )
-    global_fdr.to_csv(
-        "{}_Locality_FDR.csv".format(args.out.replace('.csv','')),
-        index=None
-    )
+    all_results.to_csv(args.out)
         
 def generate_data(cob,gwas,term,args):
     '''
@@ -161,14 +111,14 @@ def generate_data(cob,gwas,term,args):
    
     # Find the Bootstrapped Locality
     bsloc = pd.concat(
-            [cob.locality(
-                cob.refgen.bootstrap_candidate_genes(
-                    loci,
-                    flank_limit=args.candidate_flank_limit
-                ),
-                iter_name='bs'+str(x),
-                include_regression=False
-            ) for x in range(args.num_bootstraps)]
+        [cob.locality(
+            cob.refgen.bootstrap_candidate_genes(
+                loci,
+                flank_limit=args.candidate_flank_limit
+            ),
+            iter_name='bs'+str(x),
+            include_regression=False
+        ) for x in range(args.num_bootstraps)]
     )
     bsloc.insert(0,'Term',term.id)
 
@@ -194,7 +144,7 @@ def generate_data(cob,gwas,term,args):
     win_map = NearestDict({
         # Good god this is a hack -- 
         # group the pandas df by window and calculate the mean fitted value, 
-        # create dict from that and reverser keys and values
+        # create dict from that (via comprehension) and reverse keys and values
         fitted:window for window,fitted in bsloc.groupby('window').apply(
                 lambda df: np.max(df['fitted'])
             ).to_dict().items() 
@@ -257,7 +207,19 @@ def generate_data(cob,gwas,term,args):
     fdr['bs_std'] = [fit_std[x] for x in fdr['fitted']]
     fdr['zscore'] = [x['resid']/x['bs_std'] for i,x in fdr.iterrows()]
     # Generate the ZScore vales
-
+    for zscore in range(0,8):
+        fdr_indices = fdr[fdr.zscore >= zscore]
+        if len(fdr_indices) > 0:
+            num_random = fdr_indices.groupby('iter_name').apply(len).mean()
+        else:
+            num_random = 0
+        num_real = sum(loc.zscore >= zscore)
+        if num_real != 0 and num_random != 0:
+            zfdr = num_random/num_real
+        else:
+            zfdr = 1
+        loc.loc[loc.zscore>=zscore,'fdr'] = zfdr
+    import ipdb; ipdb.set_trace()
     # Give em the gold
     return loc,bsloc,fdr
 

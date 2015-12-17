@@ -44,7 +44,6 @@ if __name__ == '__main__':
     # Also allow the help message to be printed using the help command
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
-    parser.set_defaults(func=lambda x: parser.print_help())
 
 
     '''--------------------------
@@ -327,6 +326,13 @@ if __name__ == '__main__':
        '--sig-edge-zscore',default=None,
        type=float,
        help='If not None, redefine what a significant interaction score is. (defaut: 3)'
+    )
+    localityCLI.add_argument(
+        '--gene-specific',action='store_true',default=False,
+        help=(
+            'Flag indicating whether or not to perform'
+            'gene specific calculations.'
+        )
     )
     localityCLI.set_defaults(func=locality)
 
