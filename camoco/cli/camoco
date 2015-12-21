@@ -16,6 +16,14 @@ from camoco.cli.commands.remove import remove
 from camoco.cli.commands.list import list_command
 from camoco import cf
 
+from argparse import ArgumentParser
+
+class cli(ArgumentParser):
+    def __init__(self):
+        self = super().__init__(
+            epilog='Cache. Money. Corn.'        
+        )
+
 
 if __name__ == '__main__':
     '''--------------------------
@@ -25,15 +33,21 @@ if __name__ == '__main__':
         epilog='Cache. Money. Corn.'
     )
     parser.add_argument(
-        '--debug',action='store_true',default=False,
+        '--debug',
+        action='store_true',
+        default=False,
         help='Drop into ipdb when something bad happens.'
     )
     parser.add_argument(
-        '--interactive',action='store_true',default=False,
+        '--interactive',
+        action='store_true',
+        default=False,
         help='Initiate an ipdb session right before exiting.'
     )
     parser.add_argument(
-        '--overlook',action='store_true',default=False,
+        '--overlook',
+        action='store_true',
+        default=False,
         help='Skip analysis if files produced by --out exist.'
     )
     subparsers = parser.add_subparsers(
@@ -45,7 +59,6 @@ if __name__ == '__main__':
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
 
-
     '''--------------------------
         list 
     --------------------------'''
@@ -55,14 +68,16 @@ if __name__ == '__main__':
         help='List camoco datasets.' 
     )
     lstcmd.add_argument(
-        'type', default=None,
+        'type', 
+        default=None,
         help=(
             'The type of dataset you want to list. e.g. GWAS. '
             'Also accepts SQLite wildcards.'    
         )
     )
     lstcmd.add_argument(
-        'name', default=None,
+        'name', 
+        default=None,
         help = (
             'The name of the dataset you want to list. '
             'Also accepts SQLite wildcards.' 
@@ -73,7 +88,10 @@ if __name__ == '__main__':
     ''' --------------------------
         rm 
     --------------------------'''
-    remove = subparsers.add_parser('rm',help='remove camoco dataset.')
+    remove = subparsers.add_parser(
+        'rm',
+        help='remove camoco dataset.'
+    )
     remove.add_argument('type',default=None)
     remove.add_argument('name',default=None)
     remove.add_argument('-f','--force',action='store_false',default=True)
@@ -97,24 +115,32 @@ if __name__ == '__main__':
     plotgwas.add_argument(
         '--terms',
         nargs='*', 
-        help='The term within the GWAS ontology to use. default: all',
-        default=['all']
+        default=['all'],
+        help='The term within the GWAS ontology to use. default: all'
     )
     plotgwas.add_argument(
-       '--candidate-window-size',default=50000,
-       type=int,
-       help=('The window size (in bp) for mapping effective SNPs to genes. '
-             'default: 50000')
+        '--candidate-window-size',
+        default=50000,
+        type=int,
+        help=(
+            'The window size (in bp) for mapping effective SNPs to genes. '
+            'default: 50000'
+        )
     )
     plotgwas.add_argument(
-       '--candidate-flank-limit',default=2,
-       type=int,
-       help=('The number of flanking genes included in SNP to gene mapping. '
-           'default: 2' )
+        '--candidate-flank-limit',
+        type=int,
+        default=2,
+        help=(
+           'The number of flanking genes included in SNP to gene mapping. '
+           'default: 2' 
+        )
     )
     plotgwas.add_argument(
-        '--snp2gene', default='strongest',
-        type=str,metavar='strongest',
+        '--snp2gene', 
+        type=str,
+        default='strongest',
+        metavar='strongest',
         help=(
             'The SNP to gene mapping to use. Specifying multiple mappings '
             ' will result in multiple results. Must be one of: '
@@ -123,14 +149,18 @@ if __name__ == '__main__':
         )
     )
     plotgwas.add_argument(
-        '--strongest-attr', default='pval', type=str,
+        '--strongest-attr', 
+        default='pval', 
+        type=str,
         help=(
             'The locus attr used to determine which locus is the'
             'strongest locus. (defualt=pval).'
         )
     )
     plotgwas.add_argument(
-        '--strongest-higher',action='store_false',default=True,
+        '--strongest-higher',
+        action='store_false',
+        default=True,
         help=(
             'Flag indicating the value in --strongest-attr is '
             'stronger if higher. Default behavior is to treat '
@@ -138,11 +168,11 @@ if __name__ == '__main__':
         )
     )
     plotgwas.add_argument(
-        '--out', default=sys.stdout,
+        '--out', 
+        default=sys.stdout,
         help='OutputFile Name (default: Standard Out)'
     )
     plotgwas.set_defaults(func=plot_gwas) 
-
 
     ''' --------------------------
         density 
@@ -171,28 +201,41 @@ if __name__ == '__main__':
         default=['all']
     )
     densityCLI.add_argument(
-        '--num-bootstraps', default=50,type=int, metavar=50,
-        help=('The number of bootstraps to perform in order '
-           'to estimate a null distribution. (default: 50)')
+        '--num-bootstraps', 
+        default=50,
+        type=int, 
+        metavar=50,
+        help=(
+            'The number of bootstraps to perform in order '
+            'to estimate a null distribution. (default: 50)'
+        )
     )
     densityCLI.add_argument(
-        '--candidate-window-size',default=10000, metavar=10000,
+        '--candidate-window-size',
         type=int,
-        help=('The window size, in bp, for mapping effective SNPs to genes. '
-             '(default: 10000)')
+        default=10000, 
+        metavar=10000,
+        help=(
+            'The window size, in bp, for mapping effective SNPs to genes. '
+            '(default: 10000)'
+        )
     )
     densityCLI.add_argument(
-        '--candidate-flank-limit',default=1, 
-        metavar=1,type=int,
+        '--candidate-flank-limit',
+        default=1, 
+        metavar=1,
+        type=int,
         help=(
             'The number of flanking genes included in SNP to gene mapping. '
             'on each side of the locus. (default: 2)' 
         )
     )
     densityCLI.add_argument(
-        '--snp2gene', default='strongest',
+        '--snp2gene', 
+        type=str, 
+        default='strongest',
         choices=['strongest','effective'],
-        type=str, metavar='strongest',
+        metavar='strongest',
         help=(
             'The SNP to gene mapping to use. Specifying multiple mappings '
             ' will result in multiple results. Must be in: '
@@ -201,14 +244,19 @@ if __name__ == '__main__':
         )
     )
     densityCLI.add_argument(
-        '--strongest-attr', default='pval', type=str, metavar='pval',
+        '--strongest-attr', 
+        default='pval', 
+        type=str, 
+        metavar='pval',
         help=(
             'The locus attr used to determine which locus is the'
             'strongest locus. (defualt=pval).'
         )
     )
     densityCLI.add_argument(
-        '--strongest-higher',action='store_false',default=True,
+        '--strongest-higher',
+        action='store_false',
+        default=True,
         help=(
             'Flag indicating the value in --strongest-attr is'
             'stronger if higher. Default behavior is to treat'
@@ -216,30 +264,34 @@ if __name__ == '__main__':
         )
     )
     densityCLI.add_argument(
-        '--gene-specific',action='store_true',default=False,
+        '--gene-specific',
+        action='store_true',
+        default=False,
         help=(
             'Flag indicating whether or not to perform'
             'gene specific density.'
         )
     )
     densityCLI.add_argument(
-        '--out', default=sys.stdout,
+        '--out', 
+        default=sys.stdout,
         help='OutputFile Name (default: Standard Out)'
     )
     densityCLI.set_defaults(func=density)
 
-    ''' --------------------------
+
+    ''' --------------------------------------------------------------------
         locality
-    --------------------------'''
+        --------------------------------------------------------------------'''
     localityCLI = subparsers.add_parser(
         'locality',
-        help='Calculate subnetwork locality',
         description=(
             'Calculate subnetwork locality. Creates a grid using permutable '
             'parameters (see --permutable) which interrogates locality.'
-        )
+        ),
+        help='Calculate subnetwork locality'
     )
-    # Data Set Arguments
+    # -----------------Data Set Arguments -----------------------------------
     localityCLI.add_argument(
         'cob', 
         help='The camoco network to use.'
@@ -256,23 +308,35 @@ if __name__ == '__main__':
         default=['all']
     )
     localityCLI.add_argument(
-       '--num-bootstraps', default=100,type=int,metavar=100, 
+       '--num-bootstraps', 
+       type=int,
+       default=100,
+       metavar=100, 
        help='''The number of bootstraps to perform in order
              to estimate a null distribution.'''
     )
     localityCLI.add_argument(
-       '--sd-envelope', default=2, type=int,metavar=2,
+       '--sd-envelope', 
+       type=int,
+       default=2, 
+       metavar=2,
        help='''The number or standard deviations to 
            use for the regression window.'''
     )
     localityCLI.add_argument(
-       '--regression-window-size', default=50, metavar=50,
-       type=int, help='The number of items within a window.'
+       '--regression-window-size', 
+       type=int, 
+       default=50, 
+       metavar=50,
+       help='The number of items within a window.'
     )
     # SNP2Gene Mapping
     localityCLI.add_argument(
-        '--snp2gene', default='strongest', type=str,
-        metavar='strongest', choices=['strongest','effective'],
+        '--snp2gene', 
+        type=str,
+        default='strongest', 
+        metavar='strongest', 
+        choices=['strongest','effective'],
         help=(
             'The SNP to gene mapping to use. Specifying multiple mappings '
             ' will result in multiple results. Must be in: '
@@ -281,14 +345,19 @@ if __name__ == '__main__':
         )
     )
     localityCLI.add_argument(
-        '--strongest-attr', default='pval', type=str,metavar='pval',
+        '--strongest-attr', 
+        type=str,
+        default='pval', 
+        metavar='pval',
         help=(
             'The locus attribute used to determine which locus is the'
             'strongest locus. (defualt=pval).'
         )
     )
     localityCLI.add_argument(
-        '--strongest-higher',action='store_false',default=True,
+        '--strongest-higher',
+        action='store_false',
+        default=True,
         help=(
             'Flag indicating the value in --strongest-attr is'
             'stronger if higher. Default behavior is to treat'
@@ -297,38 +366,58 @@ if __name__ == '__main__':
     )
     # Permutation parameters
     localityCLI.add_argument(
-       '--min-fdr-degree', default=2,metavar=2,
-       type=int, help='''The miniumum degree to be included 
-       as true positive in FDR calculation.'''
+        '--min-fdr-degree', 
+        default=2,
+        metavar=2,
+        type=int, 
+        help=(
+            'The miniumum degree to be included '
+            'as true positive in FDR calculation.'
+        )
     )
     localityCLI.add_argument(
-       '--candidate-window-size',default=10000,metavar=10000,
-       type=int,  
-       help='The window size for mapping effective SNPs to genes.'
+        '--candidate-window-size',
+        type=int,  
+        default=10000,
+        metavar=10000,
+        help='The window size for mapping effective SNPs to genes.'
     )
     localityCLI.add_argument(
-       '--candidate-flank-limit',default=1,metavar=1,
-       type=int,
-       help='The number of flanking genes (each side) included in SNP to gene mapping'
+        '--candidate-flank-limit',
+        default=1,
+        metavar=1,
+        type=int,
+        help= (
+           'The number of flanking genes (each side) '
+            'included in SNP to gene mapping'
+            )
     )
     # Data Formatting Parameters
     localityCLI.add_argument(
-        '--plot',action='store_true',
-        default=False,help='Flag indicating to plot data.'
+        '--plot',
+        action='store_true',
+        default=False,
+        help='Flag indicating to plot data.'
     )
     localityCLI.add_argument(
-       '--out',default='.',
-       type=str,help='Basename of output file (pngs and csvs will be produced.)'
-    )
-    localityCLI.set_defaults(func=locality)
-
-    localityCLI.add_argument(
-       '--sig-edge-zscore',default=None,
-       type=float,
-       help='If not None, redefine what a significant interaction score is. (defaut: 3)'
+        '--out',
+        type=str,
+        default='.',
+        help='Basename of output file (pngs and csvs will be produced.)'
     )
     localityCLI.add_argument(
-        '--gene-specific',action='store_true',default=False,
+        '--sig-edge-zscore',
+        type=float,
+        default=None,
+        help=(
+           'If not None, redefine what a significant '
+           'interaction score is. (defaut: 3)'
+        )
+    )
+    localityCLI.add_argument(
+        '--gene-specific',
+        action='store_true',
+        default=False,
         help=(
             'Flag indicating whether or not to perform'
             'gene specific calculations.'
@@ -336,13 +425,23 @@ if __name__ == '__main__':
     )
     localityCLI.set_defaults(func=locality)
 
-
+    
     ''' --------------------------
         Health
     --------------------------'''
-    health = subparsers.add_parser('health',help='Generate COB Health Stats')
-    health.add_argument('cob',default=None)
-    health.add_argument('--out',default=None,help='Output file prefix.')
+    health = subparsers.add_parser(
+        'health',
+        help='Generate COB Health Stats'
+    )
+    health.add_argument(
+        'cob',
+        default=None
+    )
+    health.add_argument(
+        '--out',
+        default=None,
+        help='Output file prefix.'
+    )
     health.add_argument(
         '--refgen',
         default=None,
@@ -365,10 +464,12 @@ if __name__ == '__main__':
     '''----------------------------------
         Cross Reference
     -------------------------------------'''
-    crossref = subparsers.add_parser('crossref',
+    crossref = subparsers.add_parser(
+        'crossref',
         help=(
             'cross reference a set of networks'
-            ' based on edge strength and go term density')
+            ' based on edge strength and go term density'
+        )
     )
     crossref.add_argument(
         'cobs',
@@ -376,12 +477,33 @@ if __name__ == '__main__':
         nargs='*',
         help='A list of COBs which to cross reference'
     )
-    crossref.add_argument('--out',default=None,help='Output file name.')
+    crossref.add_argument(
+        '--out',
+        default=None,
+        help='Output file name.'
+    )
     crossref.set_defaults(func=crossref)
+
+    '''----------------------------------
+        Simulate GWAS
+    -------------------------------------'''
+    simulateGWAS = subparsers.add_parser(
+        'simulateGWAS',
+        help=(
+            'Simulate a GWAS dataset by adding candidate windows and '
+            'flanking limits to terms within an Ontology'
+        )
+    )
+    simulateGWAS.add_argument(
+        '',
+        type=,
+        default=,
+        help=''
+    )
 
 
     ''' -------------------------------------------------------------------
-    # DO IT ---------------------------------------------------------------
+    # DO IT 
     -----------------------------------------------------------------------'''
     args = parser.parse_args()
     # Add debug options
@@ -403,5 +525,3 @@ if __name__ == '__main__':
             from camoco.Exceptions import CamocoInteractive
             raise CamocoInteractive()
         sys.exit(return_value)
-
-
