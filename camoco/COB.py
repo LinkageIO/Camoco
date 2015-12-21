@@ -214,6 +214,41 @@ class COB(Expr):
             df = df.loc[df.significant == 1, :]
         return df.copy()
 
+    def cluster_coefficient(self, locus_list, flank_limit,
+        trans_locus=True, bootstrap=False, by_gene=True, iter_name=None):
+        ''' 
+            Calculates the clustering coefficient for genes which span loci.
+            
+            Parameters
+            ----------
+            locus_list : iter of Loci
+                an iterable of loci
+            flank_limit : int
+                The number of flanking genes passed to be pulled out 
+                for each locus (passed onto the refgen.candidate_genes method)
+            return_mean : bool (default: True)
+                If false, raw edges will be returned
+            bootstrap : bool (default: False)
+                If true, candidate genes will be bootstrapped from the COB
+                reference genome
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
+            iter_name : str (default: None)
+                Optional string which will be added as a column. Useful for 
+                keeping track of bootstraps in an aggregated data frame.
+
+            Returns
+            -------
+            Clustering coefficient of interactions if return_mean is True
+            otherwise a dataframe of trans edges 
+
+        '''
+        raise NotImplementedError() 
+
+
+
+
+
     def trans_locus_density(self, locus_list,flank_limit, 
         return_mean=True, bootstrap=False, by_gene=False,
         iter_name=None):
@@ -976,7 +1011,7 @@ class COB(Expr):
 
     def next_neighbors(self, gene_list):
         ''' returns a list containing the strongest connected neighbors '''
-        pass
+        raise NotImplementedError()
 
     def neighborhood(self, gene_list):
         ''' Input: A gene List
@@ -984,24 +1019,24 @@ class COB(Expr):
             one edge with another gene in the input list. Also returns
             global degree
         '''
-        pass
+        raise NotImplementedError()
 
     def lcc(self, gene_list, min_distance=None):
         ''' returns an igraph of the largest connected component in graph '''
-        pass
+        raise NotImplementedError()
 
     def seed(self, gene_list, limit=65):
         ''' Input: given a set of nodes, add on the next X strongest connected
             nodes '''
-        pass
+        raise NotImplementedError()
 
     def graph(self, gene_list, min_distance=None):
         ''' Input: a gene list
             Output: a iGraph object '''
-        pass
+        raise NotImplementedError()
 
     def coordinates(self, gene_list, layout=None):
         ''' returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene'''
-        pass
+        raise NotImplementedError()
