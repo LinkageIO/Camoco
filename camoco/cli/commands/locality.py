@@ -17,7 +17,6 @@ from camoco.Tools import confidence_interval, \
                          mean_confidence_interval,\
                          NearestDict
 
-
 lowess = sm.nonparametric.lowess
 co.cf.logging.log_level = 'quiet'
 
@@ -67,8 +66,6 @@ def locality(args):
             plt.close()
             # Keep track of this shit
         all_results.append(loc)
-        #all_results.append(bsloc)
-        #all_results.append(fdr)
     # Add parameters to the data frame
     all_results = pd.concat(all_results)
     all_results.insert(0,'COB',cob.name)
@@ -207,19 +204,28 @@ def generate_data(cob,gwas,term,args):
     fdr['bs_std'] = [fit_std[x] for x in fdr['fitted']]
     fdr['zscore'] = [x['resid']/x['bs_std'] for i,x in fdr.iterrows()]
     # Generate the ZScore vales
-    for zscore in range(0,8):
-        fdr_indices = fdr[fdr.zscore >= zscore]
-        if len(fdr_indices) > 0:
-            num_random = fdr_indices.groupby('iter_name').apply(len).mean()
-        else:
-            num_random = 0
-        num_real = sum(loc.zscore >= zscore)
-        if num_real != 0 and num_random != 0:
-            zfdr = num_random/num_real
-        else:
-            zfdr = 1
-        loc.loc[loc.zscore>=zscore,'fdr'] = zfdr
-    import ipdb; ipdb.set_trace()
+    if args.gene_specific == True:
+        for zscore in range(0,8):
+            fdr_indices = fdr[fdr.zscore >= zscore]
+            if len(fdr_indices) > 0:
+                num_random = fdr_indices.groupby('iter_name').apply(len).mean()
+            else:
+                num_random = 0
+            num_real = sum(loc.zscore >= zscore)
+            if num_real != 0 and num_random != 0:
+                zfdr = num_random/num_real
+            else:
+                zfdr = 1
+            loc.loc[loc.zscore>=zscore,'fdr'] = zfdr
+    else:
+        # aggregate locality for each term in loc and fdr
+        loc = loc.groupby('Term').apply(np.mean)
+        fdr = fdr.groupby('iter_name').apply(np.mean)
+        average_resid = loc.ix[term.id].resid
+        loc['pval'] = sum(
+            [x >= average_resid for x in fdr.resid.values]
+        )/len(fdr)
+
     # Give em the gold
     return loc,bsloc,fdr
 
