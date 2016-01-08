@@ -32,7 +32,7 @@ def locality(args):
                 args.out.replace('.csv','')
             )
         )
-        return
+        return None
     # Grab the COB object
     cob = co.COB(args.cob)
     gwas = co.GWAS(args.gwas)
