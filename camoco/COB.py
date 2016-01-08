@@ -246,9 +246,6 @@ class COB(Expr):
         raise NotImplementedError() 
 
 
-
-
-
     def trans_locus_density(self, locus_list,flank_limit, 
         return_mean=True, bootstrap=False, by_gene=False,
         iter_name=None):
