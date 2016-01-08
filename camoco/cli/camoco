@@ -16,6 +16,7 @@ from camoco.cli.commands.remove import remove
 from camoco.cli.commands.list import list_command
 from camoco.cli.commands.simulateGWAS import simulateGWAS
 from camoco.cli.commands.cistrans import cistrans
+from camoco.cli.commands.candidates import candidates
 from camoco import cf
 
 from argparse import ArgumentParser
@@ -105,13 +106,11 @@ if __name__ == '__main__':
     plotgwas = subparsers.add_parser('plotGWAS',help='Plot a GWAS dataset')
     # Data Set Arguments
     plotgwas.add_argument(
-        '--cob',
-        required=True,
+        'cob',
         help='The camoco network to use.'
     )
     plotgwas.add_argument(
-        '--gwas', 
-        required=True,
+        'gwas', 
         help='The camoco GWAS to use.'
     )
     plotgwas.add_argument(
@@ -577,6 +576,95 @@ if __name__ == '__main__':
         help='Output file prefix'
     )
     cis_trans.set_defaults(func=cistrans)
+
+    '''----------------------------------
+        Candidates
+    -------------------------------------'''
+    candidates_cmd = subparsers.add_parser(
+        'candidates',
+        help=(
+            'Generate candidate genes and accompanying '
+            'information from GWAS SNPs'    
+        )
+    )
+    candidates_cmd.add_argument(
+        'cob',
+        default=None
+    )
+    candidates_cmd.add_argument(
+        'gwas',
+        help='The camoco GWAS to generate candidates from.'
+    )
+    candidates_cmd.add_argument(
+        '--terms',
+        nargs='*',
+        type=str,
+        metavar='all',
+        help=(
+            'The term within the ontology to use. If all, '
+            'terms in gwas will be iteratively analyzed. '
+            'default: all'
+        ),
+        default=['all']
+    )
+    candidates_cmd.add_argument(
+        '--candidate-window-size',
+        type=int,
+        default=10000, 
+        metavar=10000,
+        help=(
+            'The window size, in bp, for mapping effective SNPs to genes. '
+            '(default: 10000)'
+        )
+    )
+    candidates_cmd.add_argument(
+        '--candidate-flank-limit',
+        type=int,
+        default=1, 
+        metavar=1,
+        help=(
+            'The number of flanking genes included in SNP to gene mapping. '
+            'on each side of the locus. (default: 2)' 
+        )
+    )
+    candidates_cmd.add_argument(
+        '--snp2gene', 
+        type=str, 
+        default='strongest',
+        choices=['strongest','effective'],
+        metavar='strongest',
+        help=(
+            'The SNP to gene mapping to use. Specifying multiple mappings '
+            ' will result in multiple results. Must be in: '
+            "['effective','strongest'] "
+            "(default: strongest)"
+        )
+    )
+    candidates_cmd.add_argument(
+        '--strongest-attr', 
+        default='pval', 
+        type=str, 
+        metavar='pval',
+        help=(
+            'The locus attr used to determine which locus is the'
+            'strongest locus. (defualt=pval).'
+        )
+    )
+    candidates_cmd.add_argument(
+        '--strongest-higher',
+        action='store_false',
+        default=True,
+        help=(
+            'Flag indicating the value in --strongest-attr is'
+            'stronger if higher. Default behavior is to treat'
+            'lower values as stronger (i.e. p-vals)'
+        )
+    )
+    candidates_cmd.add_argument(
+        '--out',
+        default=sys.stdout
+    )
+    candidates_cmd.set_defaults(func=candidates)
 
 
     ''' -------------------------------------------------------------------
