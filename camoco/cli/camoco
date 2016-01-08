@@ -14,6 +14,8 @@ from camoco.cli.commands.health import cob_health
 from camoco.cli.commands.crossRef import crossref
 from camoco.cli.commands.remove import remove 
 from camoco.cli.commands.list import list_command
+from camoco.cli.commands.simulateGWAS import simulateGWAS
+from camoco.cli.commands.cistrans import cistrans
 from camoco import cf
 
 from argparse import ArgumentParser
@@ -48,7 +50,7 @@ if __name__ == '__main__':
         '--overlook',
         action='store_true',
         default=False,
-        help='Skip analysis if files produced by --out exist.'
+        help='Skip analysis if files produced by --out exists.'
     )
     subparsers = parser.add_subparsers(
         title='Camoco CLI program',
@@ -222,9 +224,9 @@ if __name__ == '__main__':
     )
     densityCLI.add_argument(
         '--candidate-flank-limit',
+        type=int,
         default=1, 
         metavar=1,
-        type=int,
         help=(
             'The number of flanking genes included in SNP to gene mapping. '
             'on each side of the locus. (default: 2)' 
@@ -424,7 +426,6 @@ if __name__ == '__main__':
         )
     )
     localityCLI.set_defaults(func=locality)
-
     
     ''' --------------------------
         Health
@@ -487,19 +488,95 @@ if __name__ == '__main__':
     '''----------------------------------
         Simulate GWAS
     -------------------------------------'''
-    simulateGWAS = subparsers.add_parser(
+    simulateGWASCLI = subparsers.add_parser(
         'simulateGWAS',
         help=(
             'Simulate a GWAS dataset by adding candidate windows and '
             'flanking limits to terms within an Ontology'
         )
     )
-    simulateGWAS.add_argument(
-        '',
-        type=,
-        default=,
-        help=''
+    simulateGWASCLI.add_argument(
+        'cob',
+        help='The Coexpression network you want to use.'
     )
+    simulateGWASCLI.add_argument(
+        'GOnt',
+        help='The name of the GO Ontology you want to analyze.'
+    )
+    simulateGWASCLI.add_argument(
+        '--max-term-size',
+        type=int,
+        default=300,
+        help='Maximum number of genes allowed in a GO term'
+    )
+    simulateGWASCLI.add_argument(
+        '--min-term-size',
+        type=int,
+        default=5,
+        help='Minimum number of genes allowed in a GO term'
+    )
+    simulateGWASCLI.add_argument(
+        '--candidate-window-size',
+        type=int,
+        default=10000, 
+        metavar=10000,
+        help=(
+            'The window size, in bp, for mapping effective SNPs to genes. '
+        )
+    )
+    simulateGWASCLI.add_argument(
+        '--candidate-flank-limit',
+        type=int,
+        default=1, 
+        metavar=1,
+        help=(
+            'The number of flanking genes included in SNP to gene mapping. '
+            'on each side of the locus.' 
+        )
+    )
+    simulateGWASCLI.add_argument(
+        '--num-bootstraps', 
+        type=int, 
+        default=100,
+        metavar=100,
+        help=(
+            'The number of bootstraps to perform in order '
+            'to estimate a null distribution.'
+        )
+    )
+    simulateGWASCLI.add_argument(
+        '--out', 
+        default=sys.stdout,
+        help='OutputFile Name (default: Standard Out)'
+    )
+    simulateGWASCLI.set_defaults(func=simulateGWAS)
+
+    '''----------------------------------
+        CisTrans
+    -------------------------------------'''
+    cis_trans = subparsers.add_parser(
+        'cistrans',
+        help=(
+            'compare the density of interactions between cis interactions'
+            'to trans interactions'
+        )
+    )
+    cis_trans.add_argument(
+        'cob',
+        default=None
+    )
+    cis_trans.add_argument(
+        '--cis-distance',
+        default=50000,
+        type=int,
+        help='Distance used to determine if two genes are in cis.'
+    )
+    cis_trans.add_argument(
+        '--out',
+        default=None,
+        help='Output file prefix'
+    )
+    cis_trans.set_defaults(func=cistrans)
 
 
     ''' -------------------------------------------------------------------
