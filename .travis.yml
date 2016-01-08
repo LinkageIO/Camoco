@@ -8,7 +8,8 @@ python:
 before_install:
   # Install apsw which refuses to by on pypi
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
-  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install && cd ..
+#  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install && cd ..
+  - python setup.py fetch --all build --enable-all-extensions install test
   # Install MCL
   - wget http://micans.org/mcl/src/mcl-latest.tar.gz && tar xvvf mcl-latest.tar.gz
   - cd $(find . -name 'mcl-*' -type d | head -n 1) && ./configure --prefix=$HOME/.local && make && make install && cd ..
