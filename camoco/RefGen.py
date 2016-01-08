@@ -16,6 +16,7 @@ import collections
 import random
 import pandas as pd
 import numpy as np
+import scipy as sp
 import math
 import gzip
 import re
@@ -364,7 +365,9 @@ class RefGen(Camoco):
             return genes
 
     def candidate_genes(self, loci, flank_limit=2,
-        chain=True, window=None, include_parent_locus=False):
+        chain=True, window=None, include_parent_locus=False,
+        include_num_intervening=False, include_rank_intervening=False,
+        include_num_siblings=False,attrs=None):
         '''
             Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -388,7 +391,24 @@ class RefGen(Camoco):
                 Optional parameter which will update candidate genes
                 'attr' attribute with the id of the parent locus
                 which contains it.
-            
+            include_num_intervening : bool (default: False)
+                Optional argument which adds an attribute to each 
+                candidate genes containing the rank of each gene
+                as a function of distance away from the parent 
+                locus. (i.e. the closest candidate is 1 and the 
+                furthest candidate is n)
+            include_rank_intervening : bool (default: False)
+                Optional argument which adds the rank of each
+                candidatea as a funtion of distance from the parent
+                Locus. i.e. The closest gene is ranked 1 and the furthest
+                gene is ranked n.
+            include_num_siblings : bool (default: False)
+                Optional argument which adds an attribute to each
+                candidate gene containing the number of total 
+                candidates (siblings) identifies at the locus.
+            attrs : dict (default: None)
+                An optional dictionary which will be updated to each
+                candidate genes attr value.
 
             Returns
             -------
@@ -407,21 +427,51 @@ class RefGen(Camoco):
             # This always returns candidates together, if 
             # you want specific up,within and down genes
             # use the specific methods
-            genes = list(itertools.chain(up_genes,genes_within,down_genes))
+            genes = sorted(itertools.chain(up_genes,genes_within,down_genes))
 
             # include parent locus id if thats  
             if include_parent_locus == True:
                 for gene in genes:
                     gene.update({'parent_locus':locus.id})
+            if include_rank_intervening == True:
+                ranks = sp.stats.rankdata([locus-x for x in genes])
+                for rank,gene in zip(ranks,genes):
+                    gene.update({'intervening_rank':rank})
+            if include_num_intervening == True:
+                num_down = 0
+                num_up = 0
+                # Sort the genes by their distance from the locus
+                genes = sorted(genes,key=lambda x: x-locus)
+                for gene in genes:
+                    if locus in gene:
+                        gene.update({'num_intervening':-1})
+                    elif gene > locus:
+                        gene.update({'num_intervening':num_down})
+                        num_down += 1
+                    elif gene < locus:
+                        gene.update({'num_intervening':num_up})
+                        num_up += 1
+
+            if include_num_siblings == True:
+                for gene in genes:
+                    gene.update({'num_siblings':len(genes)})
+            if attrs is not None:
+                for gene in genes:
+                    gene.update(attrs)
             return genes
 
         else:
             iterator = iter(sorted(loci))
             genes = [
+                # This is becoming a pain in the ass
                 self.candidate_genes(
                     locus, flank_limit=flank_limit,
                     chain=chain, window=window,
-                    include_parent_locus=include_parent_locus
+                    include_parent_locus=include_parent_locus,
+                    include_num_intervening=include_num_intervening,
+                    include_rank_intervening=include_rank_intervening,
+                    include_num_siblings=include_num_siblings,
+                    attrs=attrs
                 ) for locus in iterator
             ]
             if chain:
