@@ -742,7 +742,7 @@ class RefGen(Camoco):
         else:
             # support adding lists of genes
             genes = list(gene)
-            self.log('Adding {} Gene base info to database'.format(len(genes)))
+            self.log('Adding {} Genes info to database'.format(len(genes)))
             cur = self.db.cursor()
             cur.execute('BEGIN TRANSACTION')
             cur.executemany(
@@ -837,7 +837,8 @@ class RefGen(Camoco):
             return als
 
     @classmethod
-    def from_gff(cls,filename,name,description,build,organism):
+    def from_gff(cls,filename,name,description,build,organism,
+        chrom_feature='chromosome',gene_feature='gene',ID_attr='ID'):
         '''
             Imports RefGen object from a gff (General Feature Format) file.
             See more about the format here:
@@ -860,6 +861,16 @@ class RefGen(Camoco):
                 A short string describing the organims this RefGen is coming
                 from. Again, is used in comparing equality among genes which
                 may have the same id or name.
+            chrom_feature : str (default: chromosome)
+                The name of the feature (in column 3) that designates a
+                a chromosome.
+            gene_feature : str (default: gene)
+                The name of the feature (in column 2) that designates a 
+                gene. These features will be the main object that the RefGen
+                encompasses. 
+            ID_attr : str (default: ID)
+                The key in the attribute column which designates the ID or 
+                name of the feature.
 
         '''
         self = cls.create(name,description,type='RefGen')
@@ -878,15 +889,15 @@ class RefGen(Camoco):
              end,score,strand,frame,attributes) = line.strip().split('\t')
             attributes = dict([(field.strip().split('=')) \
                 for field in attributes.strip(';').split(';')])
-            if feature == 'chromosome':
+            if feature == chrom_feature:
                 self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
                 self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
-            if feature == 'gene':
+            if feature == gene_feature:
                 genes.append(
                     Gene(
                         chrom,int(start),int(end),
-                        attributes['ID'].upper().strip('"'),strand=strand,
-                        build=build,organism=organism
+                        attributes[ID_attr].upper().strip('"'),strand=strand,
+                        build=build,organism=organism,**attributes
                     ).update(attributes)
                 )
         IN.close()
