@@ -36,6 +36,15 @@ def simulateGWAS(args):
         eloci = term.effective_loci(
             window_size=window_size
         )
+        if args.percent_fdr != None:                                            
+            # replace some loci with random genes if FDR specified              
+            num_fdr = int(len(eloci) * args.percent_fdr)                        
+            fdr_loci = cob.refgen.random_genes(num_fdr,window=window_size) 
+            # permute and truncate the loci then add fdr loci                   
+            eloci = np.concatenate([                                            
+                np.random.permutation(eloci)[0:-1*len(fdr_loci)],                   
+                np.array(list(fdr_loci))
+            ])   
         candidates = cob.refgen.candidate_genes(
             eloci,
             flank_limit=flank_limit
