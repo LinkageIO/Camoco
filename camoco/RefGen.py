@@ -838,7 +838,7 @@ class RefGen(Camoco):
 
     @classmethod
     def from_gff(cls,filename,name,description,build,organism,
-        chrom_feature='chromosome',gene_feature='gene',ID_attr='ID'):
+                 chrom_feature='chromosome',gene_feature='gene',ID_attr='ID'):
         '''
             Imports RefGen object from a gff (General Feature Format) file.
             See more about the format here:
@@ -877,6 +877,7 @@ class RefGen(Camoco):
         self._global('build',build)
         self._global('organism',organism)
         genes = list()
+        chroms = dict()
         if filename.endswith('.gz'):
             IN = gzip.open(filename,'rt')
         else:
@@ -900,6 +901,14 @@ class RefGen(Camoco):
                         build=build,organism=organism,**attributes
                     ).update(attributes)
                 )
+                # Keep track of seen chromosomes
+                if chrom not in chroms:
+                    chroms[chrom] = end
+                else:
+                    if end > chroms[chrom]:
+                        chroms[chrom] = end
+        for id,end in chroms.items():
+            self.add_chromosome(Chrom(id.strip('"'),end))
         IN.close()
         self.add_gene(genes)
         self._build_indices()
