@@ -543,6 +543,17 @@ if __name__ == '__main__':
             'to estimate a null distribution.'
         )
     )
+    simulateGWASCLI.add_argument(                                                  
+        '--percent-fdr',                                                        
+        type=float,                                                             
+        default=None,                                                           
+        metavar=0.0,                                                            
+        help=(                                                                  
+            'The percentage of the term loci to be replaced with '              
+            'random loci, simulating noise or false positives '                 
+            'within the term'                                                   
+        )                                                                       
+    )  
     simulateGWASCLI.add_argument(
         '--out', 
         default=sys.stdout,
