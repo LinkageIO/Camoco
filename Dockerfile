@@ -37,10 +37,6 @@ RUN mkdir -p /usr/src/ && \
 
 RUN git config --global credential.helper cache
 
-#RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
-#       apt-get install git-lfs && \
-#       git lfs install
-
 RUN cd /home/ && \
     wget https://github.com/github/git-lfs/releases/download/v0.5.4/git-lfs-linux-amd64-0.5.4.tar.gz && \
     tar xzf git-lfs-linux-amd64-0.5.4.tar.gz && \
