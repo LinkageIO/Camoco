@@ -214,15 +214,68 @@ class COB(Expr):
             df = df.loc[df.significant == 1, :]
         return df.copy()
 
-    def trans_locus_density(self, locus_list,flank_limit, 
-        return_mean=True, bootstrap=False):
+    def cluster_coefficient(self, locus_list, flank_limit,
+        trans_locus=True, bootstrap=False, by_gene=True, iter_name=None):
+        ''' 
+            Calculates the clustering coefficient for genes which span loci.
+            
+            Parameters
+            ----------
+            locus_list : iter of Loci
+                an iterable of loci
+            flank_limit : int
+                The number of flanking genes passed to be pulled out 
+                for each locus (passed onto the refgen.candidate_genes method)
+            return_mean : bool (default: True)
+                If false, raw edges will be returned
+            bootstrap : bool (default: False)
+                If true, candidate genes will be bootstrapped from the COB
+                reference genome
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
+            iter_name : str (default: None)
+                Optional string which will be added as a column. Useful for 
+                keeping track of bootstraps in an aggregated data frame.
+
+            Returns
+            -------
+            Clustering coefficient of interactions if return_mean is True
+            otherwise a dataframe of trans edges 
+
         '''
-            Calculates the density of edges which span loci
+        raise NotImplementedError() 
+
+
+    def trans_locus_density(self, locus_list,flank_limit, 
+        return_mean=True, bootstrap=False, by_gene=False,
+        iter_name=None):
+        '''
+            Calculates the density of edges which span loci. Must take in a locus
+            list so we can exlude cis-locus interactions.
 
             Parameters
             ----------
             locus_list : iter of Loci
                 an iterable of loci
+            flank_limit : int
+                The number of flanking genes passed to be pulled out 
+                for each locus (passed onto the refgen.candidate_genes method)
+            return_mean : bool (default: True)
+                If false, raw edges will be returned
+            bootstrap : bool (default: False)
+                If true, candidate genes will be bootstrapped from the COB
+                reference genome
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
+            iter_name : str (default: None)
+                Optional string which will be added as a column. Useful for 
+                keeping track of bootstraps in an aggregated data frame.
+
+            Returns
+            -------
+            Z-score of interactions if return_mean is True
+            otherwise a dataframe of trans edges 
+
         '''
         # convert to list of loci to lists of genes
         if not bootstrap:
@@ -237,29 +290,44 @@ class COB(Expr):
         gene_origin = {}
         full_gene_set = set()
         for i, genes in enumerate(genes_list):
-            # RefGen.candidate_genes returns u, w, d with chain == False
+            # genes_list is a list of list of genes
             for gene in genes:
-                gene_origin[gene.id] = i
+                # track which locus a gene comes from
+                gene_origin[gene.id] = i 
                 full_gene_set.add(gene)
         self.log("Found {} candidate genes", len(full_gene_set))
-
+        # Extract the edges for the full set of genes
         edges = self.subnetwork(
             full_gene_set,
             min_distance=0,
             sig_only=False
         )
-        # iterate over
+        # iterate over and removes edges from the same locus
         edges['trans'] = [
             gene_origin[a]!=gene_origin[b] for a, b in edges.index.values
         ]
-        if return_mean:
-            scores = edges.loc[edges['trans']==True, 'score']
-            return np.nanmean(scores)/(1/np.sqrt(len(scores)))
+        if by_gene == True:
+            # Filter out trans edges 
+            gene_split = pd.DataFrame.from_records(
+                chain(
+                    *[((gene_a,score),(gene_b,score)) \
+                     for gene_a,gene_b,score,*junk \
+                     in edges[edges.trans==True].reset_index().values]
+                ),columns=['gene','score']
+            )
+            gene_split = gene_split.groupby('gene').agg(np.mean)
+            if iter_name is not None:
+                gene_split['iter'] = iter_name
+            return gene_split
         else:
-            return edges
+            if return_mean:
+                scores = edges.loc[edges['trans']==True, 'score']
+                return np.nanmean(scores)/(1/np.sqrt(len(scores)))
+            else:
+                return edges.loc[edges['trans']==True,]
 
 
-    def density(self, gene_list, min_distance=None):
+    def density(self, gene_list, min_distance=None, by_gene=False):
         '''
             Calculates the denisty of the non-thresholded network edges
             amongst genes within gene_list. Includes parameters to perform
@@ -274,25 +342,33 @@ class COB(Expr):
             min_distance : int (default: None)
                 Ignore edges between genes less than min_distance
                 in density calculation.
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
 
             Returns
             -------
-            A network density
+            A network density OR density on a gene-wise basis
         '''
         # filter for only genes within network
         edges = self.subnetwork(gene_list,
             min_distance=min_distance, sig_only=False
         )
-        if len(edges) == 0:
-            return np.nan
-        if len(edges) == 1:
-            return edges.score[0]
 
-        # old code worth a look ;)
-        #return ((np.nanmean(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))),
-        #       (np.nanmean(edges.score)/(1/np.sqrt(len(edges)))),
-        #       (np.nanmedian(edges.score)/((np.nanstd(edges.score))/np.sqrt(len(edges)))))
-        return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
+        if by_gene == True:
+            x = pd.DataFrame.from_records(
+                chain(
+                    *[((gene_a,score),(gene_b,score)) \
+                     for gene_a,gene_b,score,sig,dis \
+                     in edges.reset_index().values]
+                ),columns=['gene','score']
+            )
+            return x.groupby('gene').agg(np.mean)
+        else:
+            if len(edges) == 0:
+                return np.nan
+            if len(edges) == 1:
+                return edges.score[0]
+            return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
 
     def to_dat(self, gene_list=None, filename=None, sig_only=False, min_distance=0):
         '''
@@ -450,7 +526,9 @@ class COB(Expr):
         self.log('Fetching Degree ... ')
         degree = self.local_degree(gene_list)
         # Add on the global degree
-        degree['global'] = self.global_degree(self.refgen.from_ids(degree.index.values))['Degree']
+        degree['global'] = self.global_degree(
+            self.refgen.from_ids(degree.index.values)
+        )['Degree']
         degree.columns = ['local', 'global']
         degree = degree.sort('global')
         if include_regression:
@@ -461,6 +539,7 @@ class COB(Expr):
         if iter_name is not None:
             degree['iter_name'] = iter_name
         return degree
+
 
 
     ''' ----------------------------------------------------------------------
@@ -877,7 +956,7 @@ class COB(Expr):
 
     @classmethod
     def from_table(cls, filename, name, description,
-                   refgen, rawtype=None, sep='\t', **kwargs):
+                   refgen, rawtype=None, sep='\t', index=None, **kwargs):
         '''
             Build a COB Object from an FPKM or Micrarray CSV. This is a
             convenience method which handles reading in of tables.
@@ -906,6 +985,10 @@ class COB(Expr):
             sep : str (default: \\t)
                 Specifies the delimiter of the file referenced by the
                 filename parameter.
+            index : str (default: None)
+                If not None, this column will be set as the gene index 
+                column. Useful if there is a column name in the text file
+                for gene names.
             **kwargs : key value pairs
                 additional parameters passed to subsequent methods.
 
@@ -916,7 +999,8 @@ class COB(Expr):
         return cls.from_DataFrame(
             pd.read_table(
                 filename,sep=sep,
-                compression='infer'
+                compression='infer',
+                index=index
             ),
             name,description,refgen,
             rawtype=rawtype,**kwargs
@@ -929,7 +1013,7 @@ class COB(Expr):
 
     def next_neighbors(self, gene_list):
         ''' returns a list containing the strongest connected neighbors '''
-        pass
+        raise NotImplementedError()
 
     def neighborhood(self, gene_list):
         ''' Input: A gene List
@@ -937,24 +1021,24 @@ class COB(Expr):
             one edge with another gene in the input list. Also returns
             global degree
         '''
-        pass
+        raise NotImplementedError()
 
     def lcc(self, gene_list, min_distance=None):
         ''' returns an igraph of the largest connected component in graph '''
-        pass
+        raise NotImplementedError()
 
     def seed(self, gene_list, limit=65):
         ''' Input: given a set of nodes, add on the next X strongest connected
             nodes '''
-        pass
+        raise NotImplementedError()
 
     def graph(self, gene_list, min_distance=None):
         ''' Input: a gene list
             Output: a iGraph object '''
-        pass
+        raise NotImplementedError()
 
     def coordinates(self, gene_list, layout=None):
         ''' returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene'''
-        pass
+        raise NotImplementedError()

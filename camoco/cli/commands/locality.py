@@ -8,56 +8,37 @@ import numpy as np
 import scipy as sp
 import scipy.stats
 
-from collections import OrderedDict
-
 import camoco as co
 import pandas as pd
 import matplotlib.pylab as plt
 import statsmodels.api as sm
 
+from camoco.Tools import confidence_interval, \
+                         mean_confidence_interval,\
+                         NearestDict
+
 lowess = sm.nonparametric.lowess
 co.cf.logging.log_level = 'quiet'
 
-def mean_confidence_interval(data):
-    return np.mean(data), confidence_interval(data)
-
-def confidence_interval(data, confidence=0.95):
-    a = 1.0*np.array(data)
-    n = len(a)
-    m, se = np.mean(a), scipy.stats.sem(a)
-    h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
-    return 1.96*se
-
-class NearestDict(OrderedDict):
-    '''
-        This extension overrides the get item method 
-        of dict where if a key does not exist, it returns
-        the nearst key which does exist.
-    '''
-    def __getitem__(self,key):
-        'Returns the nearest key which exists'
-        return dict.__getitem__(self,min(self.keys(),key=lambda x: abs(x-key)))
-
 def locality(args):
-    # Initiate for args 
     # Generate output dirs
-
+    if args.out != sys.stdout:
+        args.out = "{}_Locality.csv".format(args.out.replace('.csv',''))        
     if os.path.dirname(args.out) != '':
         os.makedirs(os.path.dirname(args.out),exist_ok=True)
     if os.path.exists("{}_Locality.csv".format(args.out.replace('.csv',''))):
         print(
-            "{}_Locality.csv exist! Skipping!".format(
+            "{}_Locality.csv exists! Skipping!".format(
                 args.out.replace('.csv','')
             )
         )
-        return
-
+        return None
     # Grab the COB object
     cob = co.COB(args.cob)
-
+    gwas = co.GWAS(args.gwas)
+    # If there is a different score for 'significant', update the COB object
     if args.sig_edge_zscore is not None:
         cob.set_sig_edge_zscore(args.sig_edge_zscore)
-    gwas = co.GWAS(args.gwas)
 
     # If all, grab a generater
     if 'all' in args.terms:
@@ -66,15 +47,13 @@ def locality(args):
         # Otherwise get the term out of the GWAS
         terms = [gwas[x] for x in args.terms] 
 
-    term_localities = []
+    all_results = []
     # Add in text for axes
     for term in terms:
+        # Generate data using permuted arguments
         loc,bsloc,fdr = generate_data(cob,gwas,term,args) 
         if args.plot:
             fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(24,8))
-            # Change the relevent things in the permuted args 
-            # Generate data using permuted arguments
-            # Add extra Columns 
             # Plot the data
             plot_data(args,loc,bsloc,fdr,ax1)
             plot_scatter(args,loc,bsloc,fdr,ax2)
@@ -86,70 +65,16 @@ def locality(args):
             ))
             plt.close()
             # Keep track of this shit
-        term_localities.append(loc)
-        term_localities.append(bsloc)
-        term_localities.append(fdr)
+        all_results.append(loc)
     # Add parameters to the data frame
-    term_localities = pd.concat(term_localities)
-    term_localities.insert(0,'COB',cob.name)
-    term_localities.insert(0,'Ontology',gwas.name)
-    term_localities.insert(0,'WindowSize',args.candidate_window_size)
-    term_localities.insert(0,'FlankLimit',args.candidate_flank_limit)
-
-    # Calculate global FDR and number of candidates discovered
-    global_fdr = []
-    for (gwas,cob,term),df in term_localities.groupby(['Ontology','COB','Term']):
-        # Get Z score
-        zscores = list(np.arange(0,8))
-        for zscore in zscores:
-            zdf = df[df.zscore >= zscore]
-            if len(zdf) > 0:
-                fdr_indices = [x.startswith('fdr') for x in zdf.iter_name]
-                if sum(fdr_indices) > 0:
-                    num_random = zdf.loc[
-                        fdr_indices     
-                    ].groupby('iter_name').apply(len).mean()
-                else:
-                    num_random = 0
-                emp_indices = [x.startswith('emp') for x in zdf.iter_name]
-                if sum(emp_indices) > 0:
-                    num_real = len(zdf.loc[
-                        emp_indices
-                    ])
-                else:
-                    num_real = 0
-                if num_real != 0 and num_random != 0:
-                    fdr = num_random/num_real
-                else:
-                    fdr = 1
-                global_fdr.append(
-                    [
-                        gwas, cob,
-                        args.candidate_window_size,
-                        args.candidate_flank_limit,
-                        term, zscore, num_random, num_real, fdr
-                    ]
-                )
-    global_fdr  = pd.DataFrame(
-        global_fdr,
-        columns=[
-            'Ontology','COB','WindowSize','FlankLimit',
-            'Term','zscore','numRandom','numReal','FDR'
-        ]
-    )
+    all_results = pd.concat(all_results)
+    all_results.insert(0,'COB',cob.name)
+    all_results.insert(0,'Ontology',gwas.name)
+    all_results.insert(0,'WindowSize',args.candidate_window_size)
+    all_results.insert(0,'FlankLimit',args.candidate_flank_limit)
 
     # Output the Locality Measures
-    term_localities[term_localities.iter_name=='emp'].to_csv(
-        "{}_Locality.csv".format(args.out.replace('.csv',''))        
-    )
-    # Output the FDR 
-    term_localities[term_localities.iter_name=='fdr'].to_csv(
-        "{}_Locality_BS.csv".format(args.out.replace('.csv',''))        
-    )
-    global_fdr.to_csv(
-        "{}_Locality_FDR.csv".format(args.out.replace('.csv','')),
-        index=None
-    )
+    all_results.to_csv(args.out)
         
 def generate_data(cob,gwas,term,args):
     '''
@@ -183,14 +108,14 @@ def generate_data(cob,gwas,term,args):
    
     # Find the Bootstrapped Locality
     bsloc = pd.concat(
-            [cob.locality(
-                cob.refgen.bootstrap_candidate_genes(
-                    loci,
-                    flank_limit=args.candidate_flank_limit
-                ),
-                iter_name='bs'+str(x),
-                include_regression=False
-            ) for x in range(args.num_bootstraps)]
+        [cob.locality(
+            cob.refgen.bootstrap_candidate_genes(
+                loci,
+                flank_limit=args.candidate_flank_limit
+            ),
+            iter_name='bs'+str(x),
+            include_regression=False
+        ) for x in range(args.num_bootstraps)]
     )
     bsloc.insert(0,'Term',term.id)
 
@@ -216,7 +141,7 @@ def generate_data(cob,gwas,term,args):
     win_map = NearestDict({
         # Good god this is a hack -- 
         # group the pandas df by window and calculate the mean fitted value, 
-        # create dict from that and reverser keys and values
+        # create dict from that (via comprehension) and reverse keys and values
         fitted:window for window,fitted in bsloc.groupby('window').apply(
                 lambda df: np.max(df['fitted'])
             ).to_dict().items() 
@@ -279,6 +204,27 @@ def generate_data(cob,gwas,term,args):
     fdr['bs_std'] = [fit_std[x] for x in fdr['fitted']]
     fdr['zscore'] = [x['resid']/x['bs_std'] for i,x in fdr.iterrows()]
     # Generate the ZScore vales
+    if args.gene_specific == True:
+        for zscore in range(0,8):
+            fdr_indices = fdr[fdr.zscore >= zscore]
+            if len(fdr_indices) > 0:
+                num_random = fdr_indices.groupby('iter_name').apply(len).mean()
+            else:
+                num_random = 0
+            num_real = sum(loc.zscore >= zscore)
+            if num_real != 0 and num_random != 0:
+                zfdr = num_random/num_real
+            else:
+                zfdr = 1
+            loc.loc[loc.zscore>=zscore,'fdr'] = zfdr
+    else:
+        # aggregate locality for each term in loc and fdr
+        loc = loc.groupby('Term').apply(np.mean)
+        fdr = fdr.groupby('iter_name').apply(np.mean)
+        average_resid = loc.ix[term.id].resid
+        loc['pval'] = sum(
+            [x >= average_resid for x in fdr.resid.values]
+        )/len(fdr)
 
     # Give em the gold
     return loc,bsloc,fdr

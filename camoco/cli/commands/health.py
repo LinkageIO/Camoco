@@ -1,3 +1,4 @@
+import pandas as pd
 import camoco as co
 import numpy as np
 import powerlaw
@@ -87,8 +88,9 @@ def cob_health(args):
 
     cob.log('Plotting GO') #------------------------------------------
     if args.go is not None: #-------------------------------------------------
-        if not path.exists('{}_GO.png'.format(args.out)):
+        if not path.exists('{}_GO.csv'.format(args.out)):
             go = co.GOnt(args.go)
+            term_ids = []
             emp_z = []
             pvals  = []
             terms_tested = 0
@@ -108,9 +110,22 @@ def cob_health(args):
                     pval = sum(bs>=emp)/args.num_bootstraps
                 else:
                     pval = sum(bs<=emp)/args.num_bootstraps
+                term_ids.append(term.id)
                 pvals.append(pval)
+            go_enrichment = pd.DataFrame({
+                'id':term_ids,
+                'density' : emp_z,
+                'pval':pvals
+            })
+            go_enrichment.sort('pval',ascending=True)\
+                .to_csv('{}_GO.csv'.format(args.out),index=False)
+        else:
+            go_enrichment = pd.read_table('{}_GO.csv'.format(args.out))
+
+
+        if not path.exists('{}_GO.png'.format(args.out)):
             plt.clf()
-            plt.scatter(emp_z,-1*np.log10(pvals))
+            plt.scatter(go_enrichment['density'],-1*np.log10(go_enrichment['pval']))
             plt.xlabel('Empirical Z Score')
             plt.ylabel('Bootstraped -log10(p-value)')
             fold = sum(np.array(pvals)<=0.05)/(0.05 * terms_tested)

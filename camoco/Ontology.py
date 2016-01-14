@@ -41,6 +41,9 @@ class Ontology(Camoco):
             raise e
 
     def iter_terms(self):
+        '''
+            Return a generator that iterates over each term in the ontology.
+        '''
         for id, in self.db.cursor().execute("SELECT id FROM terms"):
             yield self[id]
 
