@@ -5,6 +5,7 @@ RUN apt-get -y update && apt-get install -y \
         wget \
         mcl \
         git \
+	vim \
         python3 \
         python3-pip \
         python3-setuptools \
@@ -28,12 +29,34 @@ RUN apt-get -y update && apt-get install -y \
 
 RUN pip3 install statsmodels
 
-RUN mkdir -p /usr/src/ && \
-        cd /usr/src/ && \
+RUN echo "--- # YAML Camoco Configuration File
+	options:
+    		basedir: /data/.camoco/
+    		testdir: /data/.camoco/tests/
+    		alpha:   0.0001
+    		debug:   True
+	logging:
+    		log_level: verbose
+	test:
+    		force:
+        		RefGen:   True
+        		COB:      True
+        		Ontology: True
+    	num:      50
+	refgen:   Zm5bFGS
+	cob:      NewRoot
+	ontology: ZmIonome
+	term:     Fe57
+	gene:     GRMZM2G000014"  > /root/.camoco.conf && \
+	mkdir -p /src/ && \
+	mkdir -p /data/ && \
+        cd /src/ && \
         git clone https://github.com/monprin/Camoco.git && \
         cd Camoco && \
         python3 setup.py install && \
         python3 -c 'import camoco as co;'
+
+VOLUME /data
 
 RUN git config --global credential.helper cache
 
