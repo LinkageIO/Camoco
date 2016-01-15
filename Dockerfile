@@ -58,6 +58,8 @@ test: \n\
         python3 setup.py install && \
         python3 -c 'import camoco as co;'
 
+VOLUME /cobdata
+
 RUN git config --global credential.helper cache
 
 RUN cd /home/ && \
