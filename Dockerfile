@@ -28,35 +28,35 @@ RUN apt-get -y update && apt-get install -y \
         python3-ipdb
 
 RUN pip3 install statsmodels
+RUN pip3 install --no-deps -U pandas
 
-RUN echo "--- # YAML Camoco Configuration File
-	options:
-    		basedir: /data/.camoco/
-    		testdir: /data/.camoco/tests/
-    		alpha:   0.0001
-    		debug:   True
-	logging:
-    		log_level: verbose
-	test:
-    		force:
-        		RefGen:   True
-        		COB:      True
-        		Ontology: True
-    	num:      50
-	refgen:   Zm5bFGS
-	cob:      NewRoot
-	ontology: ZmIonome
-	term:     Fe57
-	gene:     GRMZM2G000014"  > /root/.camoco.conf && \
+RUN echo '--- # YAML Camoco Configuration File \n\
+logging: \n\
+  log_level: verbose \n\
+options: \n\
+  alpha: 0.0001 \n\
+  basedir: /cobdata/ \n\
+  debug: true \n\
+  testdir: /cobdata/tests/ \n\
+test: \n\
+  cob: NewRoot \n\
+  force: \n\
+    COB: true \n\
+    Ontology: true \n\
+    RefGen: true \n\
+  gene: GRMZM2G000014 \n\
+  num: 50 \n\
+  ontology: ZmIonome \n\
+  refgen: Zm5bFGS \n\
+  term: Fe57' > ~/.camoco.conf && \
 	mkdir -p /src/ && \
 	mkdir -p /data/ && \
+	mkdir -p /cobdata/ && \
         cd /src/ && \
         git clone https://github.com/monprin/Camoco.git && \
         cd Camoco && \
         python3 setup.py install && \
         python3 -c 'import camoco as co;'
-
-VOLUME /data
 
 RUN git config --global credential.helper cache
 
@@ -70,4 +70,4 @@ RUN cd /home/ && \
     rm -rf git-lfs-0.5.4/ && \
     git lfs init
 
-CMD ["ipython3"]
+ENTRYPOINT ["/bin/bash"]
