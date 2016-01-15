@@ -5,6 +5,43 @@ Camoco
 Co-Analysis of Molecular Components
 -----------------------------------
 
+## Docker Install
+
+Once you have docker installed and running on your computer (directions are
+availible on docker's website), you simply run this command (possibly as sudo):
+
+```
+$ docker run -it --name='camoco' -v cobdata:/cobdata -v <folder with data to analyse>:/data monprin/camoco
+```
+
+If you would like to change where the databases created by analysis is stored, 
+change 'cobdata' to a folder on your machine. Also replace the < > section to
+the folder with you data. This will appear in the folder /data/ inside of the
+container.
+
+This will download the image, set where all the data should be, and then drops
+into a shell, from here you can interact with camoco on the command line or type:
+
+```
+$ ipython3
+```
+
+And then you can interact with camoco in the interactive ipython shell. To end 
+this session simply hit Ctrl+d until you are back at your home shell prompt.
+
+To start the session again, just type:
+
+```
+$ docker start -ai camoco
+```
+
+And you will be right, where you left off!
+
+There will be more documentaion later once I can work out some more kinks and run
+this on a real computer.
+
+## Introduction
+
 Camoco is a python library modeled after the popular package pandas for
 building and analyzing co-expression networks. It exposes a nice API and is
 effecient for working with such large data structures. It was created to be
