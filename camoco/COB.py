@@ -1000,7 +1000,7 @@ class COB(Expr):
             pd.read_table(
                 filename,sep=sep,
                 compression='infer',
-                index=index
+                index_col=index
             ),
             name,description,refgen,
             rawtype=rawtype,**kwargs
