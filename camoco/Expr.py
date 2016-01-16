@@ -323,7 +323,7 @@ class Expr(Camoco):
             # update values
             self._update_values(df, method.__name__)
 
-    def _quality_control(self, min_expr=1, max_gene_missing_data=0.2, \
+    def _quality_control(self, min_expr=0.01, max_gene_missing_data=0.2, \
         min_single_sample_expr=5, max_accession_missing_data=0.3, \
         membership=None, dry_run=False, **kwargs):
         '''
