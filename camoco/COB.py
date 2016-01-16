@@ -956,7 +956,7 @@ class COB(Expr):
 
     @classmethod
     def from_table(cls, filename, name, description,
-                   refgen, rawtype=None, sep='\t', index=None, **kwargs):
+                   refgen, rawtype=None, sep='\t', index_col=None, **kwargs):
         '''
             Build a COB Object from an FPKM or Micrarray CSV. This is a
             convenience method which handles reading in of tables.
@@ -985,7 +985,7 @@ class COB(Expr):
             sep : str (default: \\t)
                 Specifies the delimiter of the file referenced by the
                 filename parameter.
-            index : str (default: None)
+            index_col : str (default: None)
                 If not None, this column will be set as the gene index 
                 column. Useful if there is a column name in the text file
                 for gene names.
@@ -1000,7 +1000,7 @@ class COB(Expr):
             pd.read_table(
                 filename,sep=sep,
                 compression='infer',
-                index_col=index
+                index_col=index_col
             ),
             name,description,refgen,
             rawtype=rawtype,**kwargs

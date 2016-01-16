@@ -22,6 +22,8 @@ class GOTerm(Term):
         is_a=None, loci=None, **kwargs):
         '''
             Initialize a GOTerm
+
+            Parameters
         '''
         super().__init__(id, desc=desc, loci=loci, **kwargs)
         self.name = name
@@ -235,6 +237,36 @@ class GOnt(Ontology):
                 else:
                     genes[gene].add(cur_term)
         return genes
+
+    @classmethod
+    def from_terms(cls, terms, name, description, refgen):
+        '''
+            Convenience function to create a GOnt from an iterable
+            terms object. 
+
+            Parameters
+            ----------
+            terms : iterable of camoco.GOTerm objects
+                Items to add to the ontology. The key being the name
+                of the term and the items being the loci.
+            name : str
+                The name of the camoco object to be stored in the database.
+            description : str
+                A short message describing the dataset.
+            refgen : camoco.RefGen
+                A RefGen object describing the genes in the dataset
+        '''
+        self = cls.create(name,description,refgen)
+        self.log('Adding {} terms to the database.',len(terms))
+        self.add_terms(terms, overwrite=False)
+        # Build the indices
+        self.log('Building the indices.')
+        self._build_indices()
+
+        self.log('Your gene ontology is built.')
+        return self
+
+         
 
     @classmethod
     def from_obo(cls, obo_file, gene_map_file ,name, description, 

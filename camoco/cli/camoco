@@ -91,14 +91,14 @@ if __name__ == '__main__':
     ''' --------------------------
         rm 
     --------------------------'''
-    remove = subparsers.add_parser(
+    removeCLI = subparsers.add_parser(
         'rm',
         help='remove camoco dataset.'
     )
-    remove.add_argument('type',default=None)
-    remove.add_argument('name',default=None)
-    remove.add_argument('-f','--force',action='store_false',default=True)
-    remove.set_defaults(func=remove)
+    removeCLI.add_argument('type',default=None)
+    removeCLI.add_argument('name',default=None)
+    removeCLI.add_argument('-f','--force',action='store_false',default=True)
+    removeCLI.set_defaults(func=remove)
 
     ''' --------------------------
         plotGWAS 
