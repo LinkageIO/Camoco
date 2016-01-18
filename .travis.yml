@@ -8,7 +8,6 @@ python:
 before_install:
   # Install apsw which refuses to by on pypi
   - git clone https://github.com/rogerbinns/apsw.git && cd apsw
-#  - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions  install && cd ..
   - python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions install && cd ..
   # Install MCL
   - wget http://micans.org/mcl/src/mcl-latest.tar.gz && tar xvvf mcl-latest.tar.gz
@@ -30,8 +29,10 @@ install:
   - python -c 'import camoco as co;'
 # command to run tests, e.g. python setup.py test
 script:  
-  - py.test  tests/test_Locus.py -v
-  - py.test  tests/test_RefGen.py -v
-  - py.test  tests/test_Term.py -v
-  - py.test  tests/test_Expr.py -v
-  - py.test  tests/test_COB.py -v
+  - py.test  tests -v -cov=camoco
+#  - py.test  tests/test_RefGen.py -v
+#  - py.test  tests/test_Term.py -v
+#  - py.test  tests/test_Expr.py -v
+#  - py.test  tests/test_COB.py -v
+after_sucess:
+  - coveralls
