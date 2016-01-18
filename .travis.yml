@@ -22,6 +22,7 @@ before_install:
   - pip install $PIP_ARGS -r requirements.txt
   - pip install tables
   - pip install pytest==2.7.3 -I
+  - pip install python-coveralls
 # Install packages
 install:
   - python setup.py install
