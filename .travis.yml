@@ -22,6 +22,7 @@ before_install:
   - pip install $PIP_ARGS -r requirements.txt
   - pip install tables
   - pip install pytest==2.7.3 -I
+  - pip install pytest-cov
   - pip install python-coveralls
 # Install packages
 install:
@@ -30,10 +31,6 @@ install:
   - python -c 'import camoco as co;'
 # command to run tests, e.g. python setup.py test
 script:  
-#  - py.test  tests -v --cov camoco
-  - py.test  tests/test_RefGen.py -v
-  - py.test  tests/test_Term.py -v
-  - py.test  tests/test_Expr.py -v
-  - py.test  tests/test_COB.py -v --cov camoco
+  - py.test  tests -v --cov camoco 
 after_sucess:
   - coveralls
