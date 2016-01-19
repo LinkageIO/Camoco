@@ -8,10 +8,7 @@ python:
 services:
   - docker
 
-# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
-#
-#
-before_install:
+install:
   - docker build -t camoco .
 
 script:
