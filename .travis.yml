@@ -13,14 +13,9 @@ services:
 #
 before_install:
   - docker build -t camoco .
-  - docker run -d -v cobdata:/cobdata camoco
-  - docker ps
-  - docker run -v cobdata:/cobdata camoco /bin/bash -c "cd /src/Camoco/; py.test-3 tests/test_RefGen.py -v"
-  - docker run -v cobdata:/cobdata camoco /bin/bash -c "cd /src/Camoco/; py.test-3 tests/test_Term.py -v"
-  - docker run -v cobdata:/cobdata camoco /bin/bash -c "cd /src/Camoco/; py.test-3 tests/test_Expr.py -v"
-  - docker run -v cobdata:/cobdata camoco /bin/bash -c "cd /src/Camoco/; py.test-3 tests/test_COB.py -v"
+
 script:
-  - py.test-3 tests/test_RefGen.py -v
-  - py.test-3 tests/test_Term.py -v
-  - py.test-3 tests/test_Expr.py -v
-  - py.test-3 tests/test_COB.py -v
+  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_RefGen.py"
+  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_Term.py"
+  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_Expr.py"
+  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_COB.py"

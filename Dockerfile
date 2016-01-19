@@ -37,7 +37,7 @@ options: \n\
   alpha: 0.0001 \n\
   basedir: /cobdata/ \n\
   debug: true \n\
-  testdir: /cobdata/tests/ \n\
+  testdir: /src/Camoco/tests/ \n\
 test: \n\
   cob: NewRoot \n\
   force: \n\
