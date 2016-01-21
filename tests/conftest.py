@@ -242,7 +242,6 @@ def AtSeed(AtTair10):
             )
             for x in Seed ]
         )
-        import pdb; pdb.set_trace()
         #SeedFam.to_keepfile("SeedKeep.tsv", keep_hint='seed')
         return co.COB.from_DataFrame(
             SeedFam.series_matrix(
