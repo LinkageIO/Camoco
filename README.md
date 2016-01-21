@@ -1,6 +1,6 @@
 Camoco
 ======
-[![Build Status](https://travis-ci.org/schae234/Camoco.svg?branch=master)](https://travis-ci.org/schae234/Camoco)
+[![Build Status](https://travis-ci.org/monprin/Camoco.svg?branch=master)](https://travis-ci.org/monprin/Camoco)
 
 Co-Analysis of Molecular Components
 -----------------------------------
