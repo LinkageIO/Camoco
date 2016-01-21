@@ -62,14 +62,4 @@ VOLUME /cobdata
 
 RUN git config --global credential.helper cache
 
-RUN cd /home/ && \
-    wget https://github.com/github/git-lfs/releases/download/v0.5.4/git-lfs-linux-amd64-0.5.4.tar.gz && \
-    tar xzf git-lfs-linux-amd64-0.5.4.tar.gz && \
-    rm -rf git-lfs-linux-amd64-0.5.4.tar.gz && \
-    cd git-lfs-0.5.4/ && \
-    mv git-lfs /bin/ && \
-    cd /home/ && \
-    rm -rf git-lfs-0.5.4/ && \
-    git lfs init
-
 ENTRYPOINT ["/bin/bash"]
