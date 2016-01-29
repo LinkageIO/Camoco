@@ -452,7 +452,10 @@ class COB(Expr):
         '''
         # output dat to tmpfile
         tmp = self._tmpfile()
-        self.to_dat(filename=tmp.name, gene_list=gene_list, min_distance=min_distance, sig_only=True)
+        self.to_dat(
+            filename=tmp.name, gene_list=gene_list, 
+            min_distance=min_distance, sig_only=True
+        )
         # build the mcl command
         cmd = "mcl {} --abc -scheme {} -I {} -o -".format(tmp.name, scheme, I)
         self.log("running MCL: {}", cmd)
@@ -464,10 +467,17 @@ class COB(Expr):
             self.log('...Done')
             if p.returncode==0:
                 # Filter out cluters who are smaller than the min size
-                return list(filter(lambda x: len(x) > min_cluster_size and len(x) < max_cluster_size,
-                    # Generate ids from the refgen
-                    [ self.refgen.from_ids([gene.decode('utf-8') for gene in line.split()]) for line in sout.splitlines() ]
-                ))
+                return list(
+                    filter(
+                        lambda x: len(x) > min_cluster_size and len(x) < max_cluster_size,
+                        # Generate ids from the refgen
+                        [ self.refgen.from_ids([gene.decode('utf-8') \
+                                for gene in line.split()]) \
+                                for line in sout.splitlines() 
+                        ]
+
+                    )
+                )
             else:
                 raise ValueError( "MCL failed: return code: {}".format(p.returncode))
         except FileNotFoundError as e:
