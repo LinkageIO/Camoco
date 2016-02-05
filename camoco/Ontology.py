@@ -5,9 +5,9 @@ from .RefGen import RefGen
 from .Locus import Locus
 from .Term import Term
 
-
 from pandas import DataFrame
 from scipy.stats import hypergeom
+from itertools import chain
 
 import sys
 
@@ -26,6 +26,7 @@ class Ontology(Camoco):
         return self.db.cursor().execute(
                 "SELECT COUNT(*) FROM terms;"
         ).fetchone()[0]
+    
 
     def __getitem__(self, id):
         ''' retrieve a term by id '''
@@ -41,7 +42,15 @@ class Ontology(Camoco):
         except TypeError as e: # Not in database
             raise e
 
+    def num_distinct_loci(self):
+        return self.db.cursor().execute(
+            'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
+        ).fetchone()[0]
+
     def iter_terms(self):
+        '''
+            Return a generator that iterates over each term in the ontology.
+        '''
         for id, in self.db.cursor().execute("SELECT id FROM terms"):
             yield self[id]
 
@@ -127,7 +136,6 @@ class Ontology(Camoco):
         '''
         if overwrite:
             self.del_terms(terms)
-
         cur = self.db.cursor()
         cur.execute('BEGIN TRANSACTION')
         for term in terms:
@@ -165,8 +173,18 @@ class Ontology(Camoco):
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute('CREATE TABLE IF NOT EXISTS terms (id TEXT UNIQUE, desc TEXT)')
-        cur.execute('CREATE TABLE IF NOT EXISTS term_loci (term TEXT, id TEXT)')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS terms (
+                id TEXT UNIQUE,
+                desc TEXT
+            )'''
+        )
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS term_loci (
+                term TEXT, 
+                id TEXT
+            )'''
+        )
 
     def _clear_tables(self):
         cur = self.db.cursor()
@@ -181,6 +199,52 @@ class Ontology(Camoco):
         cursor = self.db.cursor()
         cursor.execute('DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;')
 
-    def enrichment(self, gene_list, pval_cutoff=0.05, gene_filter=None,
-        label=None, max_term_size=300):
-        raise NotImplementedError('This is broken')
+    def enrichment(self, locus_list, pval_cutoff=0.05, max_term_size=300):
+        '''
+            Evaluates enrichment of loci within the locus list in terms within
+            the ontology. NOTE: this only tests terms that have at least one
+            locus that exists in locus_list.
+
+            Parameters
+            ----------
+            locus_list : list of co.Locus
+                A list of loci for which to test enrichment. i.e. is there
+                an over-representation of these loci within and the terms in
+                the Ontology.
+            pval_cutoff : float (default: 0.05)
+                Report terms with a pval lower than this value
+            max_term_size : int (default: 300)
+                The maximum term size for which to test enrichment. Useful
+                for filtering out large terms that would otherwise be 
+                uninformative (e.g. top level GO terms)
+        '''
+        terms = [self[name] for name, in  self.db.cursor().execute(
+            '''SELECT DISTINCT(term) 
+            FROM term_loci WHERE id IN ('{}')
+            '''.format(
+                "','".join([x.id for x in locus_list])
+            )
+        ).fetchall()]
+        significant_terms = []
+        for term in terms:
+            term_genes = set(self.refgen.from_ids(
+                chain(*self.db.cursor().execute('''
+                    SELECT id FROM term_loci 
+                    WHERE term = ?
+                    ''',(term.name,))
+                )
+            ))
+            if len(term_genes) > max_term_size:
+                continue
+            num_common = len(term_genes.intersection(locus_list))
+            num_in_term = len(term_genes)
+            num_sampled = len(locus_list)
+            num_universe = self.num_distinct_loci()
+            pval = hypergeom.sf(num_common,num_universe,num_in_term,num_sampled)
+            if pval <= pval_cutoff:
+                term.attrs['pval'] = pval
+                significant_terms.append(term)
+        return significant_terms
+
+
+

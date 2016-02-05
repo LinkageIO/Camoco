@@ -70,11 +70,11 @@ class Expr(Camoco):
     def __str__(self):
         pass
 
-    def num_genes(self):
-        return len(self._expr.index)
+    def num_genes(self,raw=False):
+        return len(self.expr(raw=raw))
 
-    def num_accessions(self):
-        return len(self._expr.columns)
+    def num_accessions(self,raw=False):
+        return len(self.expr(raw=raw).columns)
 
     def shape(self):
         return self._expr.shape
@@ -323,7 +323,7 @@ class Expr(Camoco):
             # update values
             self._update_values(df, method.__name__)
 
-    def _quality_control(self, min_expr=1, max_gene_missing_data=0.2, \
+    def _quality_control(self, min_expr=0.01, max_gene_missing_data=0.2, \
         min_single_sample_expr=5, max_accession_missing_data=0.3, \
         membership=None, dry_run=False, **kwargs):
         '''

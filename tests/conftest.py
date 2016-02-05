@@ -147,6 +147,59 @@ def ZmSAM(Zm5bFGS):
         return co.COB('ZmSAM')
 
 @pytest.fixture(scope="module")
+def ZmSAM2(Zm5bFGS):
+    if cf.test.force.COB:
+        co.del_dataset('Expr','ZmSAM2',safe=False)
+    if not co.available_datasets('Expr','ZmSAM2'):
+        return co.COB.from_table(
+            os.path.join(
+                cf.options.testdir,
+                'raw','Expr','RNASEQ',
+                'TranscriptomeProfiling_B73_Atlas_SAM_FGS_LiLin_20140316.txt.gz'
+            ),
+            'ZmSAM2',
+            'Maize Root Network, but loose',
+            Zm5bFGS,
+            rawtype='RNASEQ',
+            max_gene_missing_data=0.4,
+            min_single_sample_expr=1,
+            min_expr=0.01,
+            quantile=False,
+            dry_run=False,
+            max_val=250
+        )
+    else:
+        return co.COB('ZmSAM2')
+
+
+@pytest.fixture(scope="module")
+def ZmPAN2(Zm5bFGS):
+    if cf.test.force.COB:
+        co.del_dataset('Expr','ZmPAN2',safe=False)
+    if not co.available_datasets('Expr','ZmPAN2'):
+        return co.COB.from_table(
+            os.path.join(
+                cf.options.testdir,
+                'raw','Expr','RNASEQ',
+                'PANGenomeFPKM.txt.gz'
+            ),
+            'ZmPAN2',
+            'Maize Root Network but extra loose',
+            Zm5bFGS,
+            rawtype='RNASEQ',
+            max_gene_missing_data=0.4,
+            min_single_sample_expr=1,
+            min_expr=0.01,
+            quantile=False,
+            dry_run=False,
+            sep=',',
+            max_val=300
+        )
+    else:
+        return co.COB('ZmPAN2')
+
+
+@pytest.fixture(scope="module")
 def ZmPAN(Zm5bFGS):
     if cf.test.force.COB:
         co.del_dataset('Expr','ZmPAN',safe=False)
@@ -201,10 +254,10 @@ def AtSeed(AtTair10):
             AtTair10,
             rawtype='MICROARRAY',
             quantile=True
-
         )
     else:
         return co.COB('AtSeed')
+
 
 
 @pytest.fixture(scope="module")
@@ -330,13 +383,13 @@ def ZmWallace(Zm5bFGS):
         df = pd.DataFrame.from_csv(csv,index_col=None,sep='\t')
         # Import class from dataframe
         gwas  = co.GWAS.from_DataFrame(
-            df, 'ZmIonome', 'Maize Ionome',
+            df, 'ZmWallace', 'Wallace PLoS ONE Dataset.',
             Zm5bFGS,
             term_col='trait', chr_col='chr', pos_col='pos'
         )
         return gwas
     else:
-        return co.GWAS('ZmIonome')
+        return co.GWAS('ZmWallace')
 
 
 @pytest.fixture(scope="module")
@@ -384,6 +437,8 @@ def AtSeedIonome(AtTair10):
         df = pd.concat([pd.read_table(x, sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -413,6 +468,8 @@ def AtLeafIonome(AtTair10):
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -440,6 +497,8 @@ def AtRootHydroIonome(AtTair10):
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         # Only keep significant pvals
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Chase dat refgen
@@ -465,6 +524,8 @@ def AtLeafHydroIonome(AtTair10):
         # Read in each table individually then concat for GIANT table
         df = pd.concat([pd.read_table(x,sep=' ') for x in csvs])
         df = df.loc[df.pval <= cf.options.alpha,:]
+        # Kill groups of SNPs that have identical (beta,pval)s
+        df = df.groupby(['beta','pval']).filter(lambda x: len(x) < 5)
         # Add 'Chr' to chromosome column
         df.CHR = df.CHR.apply(lambda x: 'Chr'+str(x))
         # Import class from dataframe
@@ -514,7 +575,8 @@ def AtGO(AtTair10):
         )
         return co.GOnt.from_obo(
            obo, gene_map_file, 'AtGO',
-           'Arabidopsis Gene Ontology', AtTair10
+           'Arabidopsis Gene Ontology', AtTair10,
+           id_col=0, go_col=5 
         )
     else:
         return co.GOnt('AtGO')

@@ -4,6 +4,9 @@ import pytest
     Init tests
 '''
 
+def build_ZmWallace(ZmWallace):
+    assert ZmWallace 
+
 def build_ZmIonome(ZmIonome):
     assert ZmIonome
 

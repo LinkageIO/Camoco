@@ -8,7 +8,7 @@ from .Camoco import Camoco
 from .Locus import Gene,Locus
 from .Chrom import Chrom
 from .Genome import Genome
-from .Tools import memoize
+from .Tools import memoize,rawFile
 from .Exceptions import CamocoZeroWindowError
 
 import itertools
@@ -16,6 +16,7 @@ import collections
 import random
 import pandas as pd
 import numpy as np
+import scipy as sp
 import math
 import gzip
 import re
@@ -364,9 +365,11 @@ class RefGen(Camoco):
             return genes
 
     def candidate_genes(self, loci, flank_limit=2,
-        chain=True, window=None):
+        chain=True, window=None, include_parent_locus=False,
+        include_num_intervening=False, include_rank_intervening=False,
+        include_num_siblings=False,attrs=None):
         '''
-            SNP to Gene mapping.
+            Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
             flanking genes (up to flank_limit)
 
@@ -374,7 +377,7 @@ class RefGen(Camoco):
             ----------
             loci : camoco.Locus (also handles an iterable containing Loci)
                 a camoco locus or iterable of loci
-            flank_limit : int (default : 4)
+            flank_limit : int (default : 2)
                 The total number of flanking genes **on each side**
                 considered a candidate surrounding a locus
             chain : bool (default : true)
@@ -384,6 +387,28 @@ class RefGen(Camoco):
                 window from which to choose candidates from. If None,
                 the function will resort to what is available in the
                 window attribute of the Locus.
+            include_parent_locus : bool (default: False)
+                Optional parameter which will update candidate genes
+                'attr' attribute with the id of the parent locus
+                which contains it.
+            include_num_intervening : bool (default: False)
+                Optional argument which adds an attribute to each 
+                candidate genes containing the rank of each gene
+                as a function of distance away from the parent 
+                locus. (i.e. the closest candidate is 1 and the 
+                furthest candidate is n)
+            include_rank_intervening : bool (default: False)
+                Optional argument which adds the rank of each
+                candidatea as a funtion of distance from the parent
+                Locus. i.e. The closest gene is ranked 1 and the furthest
+                gene is ranked n.
+            include_num_siblings : bool (default: False)
+                Optional argument which adds an attribute to each
+                candidate gene containing the number of total 
+                candidates (siblings) identifies at the locus.
+            attrs : dict (default: None)
+                An optional dictionary which will be updated to each
+                candidate genes attr value.
 
             Returns
             -------
@@ -398,18 +423,55 @@ class RefGen(Camoco):
                 locus, flank_limit=flank_limit, chain=False,
                 window=window
             )
+
             # This always returns candidates together, if 
             # you want specific up,within and down genes
             # use the specific methods
-            return list(
-                itertools.chain(up_genes,genes_within,down_genes)
-            )
+            genes = sorted(itertools.chain(up_genes,genes_within,down_genes))
+
+            # include parent locus id if thats  
+            if include_parent_locus == True:
+                for gene in genes:
+                    gene.update({'parent_locus':locus.id})
+            if include_rank_intervening == True:
+                ranks = sp.stats.rankdata([locus-x for x in genes])
+                for rank,gene in zip(ranks,genes):
+                    gene.update({'intervening_rank':rank})
+            if include_num_intervening == True:
+                num_down = 0
+                num_up = 0
+                # Sort the genes by their distance from the locus
+                genes = sorted(genes,key=lambda x: x-locus)
+                for gene in genes:
+                    if locus in gene:
+                        gene.update({'num_intervening':-1})
+                    elif gene > locus:
+                        gene.update({'num_intervening':num_down})
+                        num_down += 1
+                    elif gene < locus:
+                        gene.update({'num_intervening':num_up})
+                        num_up += 1
+
+            if include_num_siblings == True:
+                for gene in genes:
+                    gene.update({'num_siblings':len(genes)})
+            if attrs is not None:
+                for gene in genes:
+                    gene.update(attrs)
+            return genes
+
         else:
             iterator = iter(sorted(loci))
             genes = [
+                # This is becoming a pain in the ass
                 self.candidate_genes(
                     locus, flank_limit=flank_limit,
-                    chain=chain, window=window
+                    chain=chain, window=window,
+                    include_parent_locus=include_parent_locus,
+                    include_num_intervening=include_num_intervening,
+                    include_rank_intervening=include_rank_intervening,
+                    include_num_siblings=include_num_siblings,
+                    attrs=attrs
                 ) for locus in iterator
             ]
             if chain:
@@ -680,7 +742,7 @@ class RefGen(Camoco):
         else:
             # support adding lists of genes
             genes = list(gene)
-            self.log('Adding {} Gene base info to database'.format(len(genes)))
+            self.log('Adding {} Genes info to database'.format(len(genes)))
             cur = self.db.cursor()
             cur.execute('BEGIN TRANSACTION')
             cur.executemany(
@@ -709,32 +771,63 @@ class RefGen(Camoco):
         ''',(chrom.id,chrom.length))
 
     def add_aliases(self, alias_file, id_col=0, alias_col=1, headers=True):
-        ''' Add alias map to the RefGen '''
-        IN = open(alias_file,'r')
-        if headers:
-            garb = IN.readline()
-
-        alias_map = dict()
-        self.log('Importing aliases from: {}',alias_file)
-        for line in IN.readlines():
-            row = re.split(',|\t',line)
-            if row[id_col].strip() in self:
-                alias_map[row[alias_col]] = row[id_col].strip()
+        ''' 
+            Add alias map to the RefGen 
+            
+            Parameters
+            ----------
+            alias_file : string (path)
+                The path to the alias file
+            id_col : int (default: 0)
+                The column containing the gene identifier
+            alias_col : int (default: 1)
+                The columns containing the alias
+            header : bool (default: True)
+                A switch stating if there is a header row to ignore or not
+        '''
+        with rawFile(alias_file) as IN:
+            if headers:
+                garb = IN.readline()
+    
+            aliases = []
+            self.log('Importing aliases from: {}',alias_file)
+            for line in IN:
+                row = re.split(',|\t',line)
+                if row[id_col].strip() in self:
+                    aliases.append(
+                        (row[alias_col],row[id_col].strip())
+                    )
         cur = self.db.cursor()
         self.log('Saving them in the alias table.')
         cur.execute('BEGIN TRANSACTION')
         cur.executemany(
             'INSERT OR REPLACE INTO aliases VALUES (?,?)',
-            [(alias, id) for (alias, id) in alias_map.items()])
+            aliases
+        )
         cur.execute('END TRANSACTION')
+    def num_aliases(self):
+        '''
+            Returns the number of aliases currently in the database
+        '''
+        return self.db.cursor() \
+            .execute('SELECT COUNT(*) FROM aliases') \
+            .fetchone()[0]
 
     def aliases(self, gene_id):
         if isinstance(gene_id,str):
-            return [alias[0] for alias in self.db.cursor().execute('SELECT alias FROM aliases WHERE id = ?',[gene_id.upper()])]
+            return [alias[0] for alias in self.db.cursor().execute('''
+                    SELECT alias FROM aliases 
+                    WHERE id = ?
+                ''',
+                (gene_id.upper(),)
+            )]
         else:
             cur = self.db.cursor()
-            al_list = cur.executemany('SELECT alias,id FROM aliases WHERE id = ?',
-            [[id] for id in gene_id])
+            al_list = cur.executemany('''
+                SELECT alias,id FROM aliases WHERE id = ?
+                ''',
+                [(id,) for id in gene_id]
+            )
             als = dict()
             for al,id in al_list:
                 if id in als:
@@ -744,7 +837,8 @@ class RefGen(Camoco):
             return als
 
     @classmethod
-    def from_gff(cls,filename,name,description,build,organism):
+    def from_gff(cls,filename,name,description,build,organism,
+                 chrom_feature='chromosome',gene_feature='gene',ID_attr='ID'):
         '''
             Imports RefGen object from a gff (General Feature Format) file.
             See more about the format here:
@@ -767,12 +861,23 @@ class RefGen(Camoco):
                 A short string describing the organims this RefGen is coming
                 from. Again, is used in comparing equality among genes which
                 may have the same id or name.
+            chrom_feature : str (default: chromosome)
+                The name of the feature (in column 3) that designates a
+                a chromosome.
+            gene_feature : str (default: gene)
+                The name of the feature (in column 2) that designates a 
+                gene. These features will be the main object that the RefGen
+                encompasses. 
+            ID_attr : str (default: ID)
+                The key in the attribute column which designates the ID or 
+                name of the feature.
 
         '''
         self = cls.create(name,description,type='RefGen')
         self._global('build',build)
         self._global('organism',organism)
         genes = list()
+        chroms = dict()
         if filename.endswith('.gz'):
             IN = gzip.open(filename,'rt')
         else:
@@ -785,17 +890,25 @@ class RefGen(Camoco):
              end,score,strand,frame,attributes) = line.strip().split('\t')
             attributes = dict([(field.strip().split('=')) \
                 for field in attributes.strip(';').split(';')])
-            if feature == 'chromosome':
+            if feature == chrom_feature:
                 self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
                 self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
-            if feature == 'gene':
+            if feature == gene_feature:
                 genes.append(
                     Gene(
                         chrom,int(start),int(end),
-                        attributes['ID'].upper().strip('"'),strand=strand,
-                        build=build,organism=organism
+                        attributes[ID_attr].upper().strip('"'),strand=strand,
+                        build=build,organism=organism,**attributes
                     ).update(attributes)
                 )
+                # Keep track of seen chromosomes
+                if chrom not in chroms:
+                    chroms[chrom] = end
+                else:
+                    if end > chroms[chrom]:
+                        chroms[chrom] = end
+        for id,end in chroms.items():
+            self.add_chromosome(Chrom(id.strip('"'),end))
         IN.close()
         self.add_gene(genes)
         self._build_indices()

@@ -39,3 +39,8 @@ class CamocoZeroWindowError(CamocoError):
             'Operation requiring window, but window is 0:' + \
             message.format(args)
         )
+
+class CamocoInteractive(CamocoError):
+    def __init__(self,expr=None,message='',*args):
+        self.expr = expr
+        self.message = 'Camoco interactive ipython session.'

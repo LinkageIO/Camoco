@@ -24,12 +24,14 @@ class Locus(object):
             raise ValueError("Wonky start and stop positions for: {}".format(self))
 
     def as_dict(self):
-        return {
+        a_dict = {
             'name'  : self.name,
             'chrom' : self.chrom,
             'start' : self.start,
             'end'   : self.end
         }
+        a_dict.update(self.attr)
+        return a_dict
 
     @property
     def id(self):
