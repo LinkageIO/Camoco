@@ -569,7 +569,7 @@ class COB(Expr):
             order = self.hdf5['leaves'].sort('index').index.values
         elif cluster_method == 'mcl':
             order = self.hdf5['clusters'].loc[dm.index].\
-                    fillna(np.inf).sort('cluster').index.values
+                    fillna(np.inf).sort_values(by='cluster').index.values
         else:
             # No cluster order
             order = dm.index
@@ -579,12 +579,21 @@ class COB(Expr):
         fig = plt.figure(
             facecolor='white'
         )
+        ax = fig.add_subplot(111)
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
         cmap = self._cmap
         cmap.set_bad('grey', 1.0)
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
-        im = plt.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        ax.set(
+            xticks=np.arange(len(dm.columns)),
+            xticklabels=dm.columns.values,
+            yticks=np.arange(len(dm.index)),
+            yticklabels=dm.index.values
+        )
+        ax.set_xticklabels(ax.xaxis.get_majorticklabels(), rotation=90)
+        fig.colorbar(im)
         # Save if you wish
         if filename is not None:
             plt.savefig(filename,figsize=(5,10))
