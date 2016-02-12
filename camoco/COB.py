@@ -616,7 +616,7 @@ class COB(Expr):
         fig = plt.figure(figsize=(8, 6))
         # grab the scores only and put in a
         # np array to save space (pandas DF was HUGE)
-        scores = self.coex.score.values
+        scores = self.coex.score.dropna().values
         if pcc:
             self.log('Transforming scores')
             scores = (scores * float(self._global('pcc_std'))) \
