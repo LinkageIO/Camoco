@@ -113,7 +113,6 @@ class Term(object):
             )[0] for locus in self.effective_loci(window_size=window_size)
         ]
 
-
     def __str__(self):
         return "Term: {}, Desc: {}, {} Loci".format(self.id, self.desc, len(self))
 
