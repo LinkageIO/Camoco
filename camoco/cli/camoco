@@ -7,6 +7,9 @@ import glob
 
 import argparse
 
+import matplotlib
+matplotlib.use('Agg')
+
 from camoco.cli.commands.plotGWAS import plot_gwas
 from camoco.cli.commands.density import density
 from camoco.cli.commands.locality import locality
@@ -692,7 +695,11 @@ if __name__ == '__main__':
     if args.overlook is True and len(glob.glob(args.out+'*')):
         print("Skipping {}* because files already exist.".format(args.out))
     else:
-        return_value = args.func(args)
+        try:
+            return_value = args.func(args)
+        except AttributeError as e:
+            print("No command found. Use --help or help command.")
+            sys.exit(1)
         if args.interactive is True:
             from IPython.core import ultratb
             sys.excepthook = ultratb.FormattedTB(
