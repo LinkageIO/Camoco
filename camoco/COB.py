@@ -558,7 +558,8 @@ class COB(Expr):
 
     def plot(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
-             cluster_method='mcl'):
+             cluster_method='mcl', include_accession_labels=None,
+             include_gene_labels=None):
         '''
             Plots a heatmap of genes x expression.
         '''
@@ -586,13 +587,19 @@ class COB(Expr):
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
         im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
-        ax.set(
-            xticks=np.arange(len(dm.columns)),
-            xticklabels=dm.columns.values,
-            yticks=np.arange(len(dm.index)),
-            yticklabels=dm.index.values
-        )
-        ax.set_xticklabels(ax.xaxis.get_majorticklabels(), rotation=90)
+        if (include_accession_labels is None and len(dm.columns) < 30) \
+            or include_accession_labels == True:
+                ax.set(
+                    xticks=np.arange(len(dm.columns)),
+                    xticklabels=dm.columns.values
+                )
+                ax.set_xticklabels(ax.xaxis.get_majorticklabels(), rotation=90)
+        if (include_gene_labels is None and len(dm.index) < 100) \
+            or include_gene_labels == True:
+                ax.set(
+                    yticks=np.arange(len(dm.index)),
+                    yticklabels=dm.index.values
+                )
         fig.colorbar(im)
         # Save if you wish
         if filename is not None:
