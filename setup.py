@@ -33,7 +33,8 @@ setup(
         'numpy>=1.9.1',		
         'pandas>=0.16',		
         'scipy>=0.15',		
-        'termcolor>=1.1.0'		
+        'termcolor>=1.1.0',
+        'powerlaw==1.3.5'
     ],
     include_package_data=True,
 
