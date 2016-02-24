@@ -1,6 +1,5 @@
 import sys
 import os
-import progressbar
 
 import pandas as pd
 import numpy as np
