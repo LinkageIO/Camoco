@@ -8,6 +8,7 @@ import camoco as co
 from collections import OrderedDict
 
 def simulateGWAS(args):
+    # Make sure that output files are handled correctly 
     if args.out != sys.stdout:
         args.out = "{}_GWASSim.csv".format(args.out.replace('.csv',''))        
     if os.path.dirname(args.out) != '':

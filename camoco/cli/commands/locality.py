@@ -39,7 +39,6 @@ def locality(args):
     # If there is a different score for 'significant', update the COB object
     if args.sig_edge_zscore is not None:
         cob.set_sig_edge_zscore(args.sig_edge_zscore)
-
     # If all, grab a generater
     if 'all' in args.terms:
         terms = gwas.iter_terms()
@@ -72,7 +71,6 @@ def locality(args):
     all_results.insert(0,'Ontology',gwas.name)
     all_results.insert(0,'WindowSize',args.candidate_window_size)
     all_results.insert(0,'FlankLimit',args.candidate_flank_limit)
-
     # Output the Locality Measures
     all_results.to_csv(args.out)
         
@@ -92,7 +90,7 @@ def generate_data(cob,gwas,term,args):
         )
     else:
         raise ValueError('{} not valid snp2gene mapping'.format(args.snp2gene))
-
+    
     candidate_genes = cob.refgen.candidate_genes(
         loci,
         flank_limit=args.candidate_flank_limit
