@@ -365,7 +365,7 @@ class RefGen(Camoco):
             return genes
 
     def candidate_genes(self, loci, flank_limit=2,
-        chain=True, window=None, include_parent_locus=False,
+        chain=True, window_size=None, include_parent_locus=False,
         include_num_intervening=False, include_rank_intervening=False,
         include_num_siblings=False,attrs=None):
         '''
@@ -382,7 +382,7 @@ class RefGen(Camoco):
                 considered a candidate surrounding a locus
             chain : bool (default : true)
                 Calls itertools chain on results before returning
-            window : int (default: None)
+            window_size : int (default: None)
                 Optional parameter used to extend or shorten a locus
                 window from which to choose candidates from. If None,
                 the function will resort to what is available in the
@@ -421,7 +421,7 @@ class RefGen(Camoco):
             genes_within = self.genes_within(locus)
             up_genes,down_genes = self.flanking_genes(
                 locus, flank_limit=flank_limit, chain=False,
-                window=window
+                window=window_size
             )
 
             # This always returns candidates together, if 
@@ -466,7 +466,7 @@ class RefGen(Camoco):
                 # This is becoming a pain in the ass
                 self.candidate_genes(
                     locus, flank_limit=flank_limit,
-                    chain=chain, window=window,
+                    chain=chain, window_size=window_size,
                     include_parent_locus=include_parent_locus,
                     include_num_intervening=include_num_intervening,
                     include_rank_intervening=include_rank_intervening,
