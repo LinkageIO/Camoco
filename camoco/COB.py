@@ -333,11 +333,40 @@ class COB(Expr):
             else:
                 return edges.loc[edges['trans']==True,]
 
-    def trans_locus_locality(self, locus_list,flank_limit, 
-        return_mean=True, bootstrap=False, by_gene=False,
-        iter_name=None):
+    def trans_locus_locality(self, locus_list, flank_limit, 
+        bootstrap=False, by_gene=False, iter_name=None, 
+        include_regression=False):
         '''
+            Computes a table comparing local degree to global degree
+            of genes COMPUTED from a set of loci. 
+            NOTE: interactions from genes originating from the same 
+            locus are not counted for global or local degree.
 
+            Parameters
+            ----------
+            locus_list : iterable of camoco.Loci
+                A list or equivalent of loci
+            flank_limit : int
+                The number of flanking genes passed to be pulled out 
+                for each locus (passed onto the refgen.candidate_genes method)
+            bootstrap : bool (default: False)
+                If true, candidate genes will be bootstrapped from the COB
+                reference genome
+            iter_name : object (default: none)
+                This will be added as a column. Useful for
+                generating bootstraps of locality and keeping
+                track of which one a row came from after catting
+                multiple bootstraps together.
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
+            include_regression : bool (default: False)
+                Include the OLS regression residuals and fitted values
+                on local ~ global.
+
+            Returns
+            -------
+            A pandas DataFrame with local, global and residual columns
+            based on linear regression of local on global degree.
         '''
         # convert to list of loci to lists of genes
         if not bootstrap:
@@ -351,14 +380,22 @@ class COB(Expr):
                 include_parent_locus=True
             )
         self.log("Found {} candidate genes", len(genes_list))
-        # Extract the edges for the full set of genes
-        edges = self.subnetwork(
-            genes_list,
-            min_distance=0,
-            sig_only=False,
-            trans_locus_only=True
-        )
-
+        # Get global and local degree for candidates
+        gdegree = self.global_degree(genes_list, trans_locus_only=True)
+        ldegree = self.local_degree(genes_list, trans_locus_only=True)
+        # Merge the columns
+        degree = ldegree.merge(gdegree,left_index=True,right_index=True)
+        degree.columns = ['local', 'global']
+        degree = degree.sort_values(by='global')
+        if include_regression:
+            # Add the regression lines
+            ols = sm.OLS(degree['local'], degree['global']).fit()
+            degree['resid'] = ols.resid
+            degree['fitted'] = ols.fittedvalues
+            degree = degree.sort_values(by='resid',ascending=False)
+        if iter_name is not None:
+            degree['iter_name'] = iter_name
+        return degree
 
     def density(self, gene_list, min_distance=None, by_gene=False):
         '''
@@ -555,9 +592,14 @@ class COB(Expr):
         '''
         try:
             if isinstance(gene_list, Locus):
+                if trans_locus_only:
+                    raise ValueError('Cannot calculate cis degree on one gene.')
                 return self.degree.ix[genes.id].Degree
             else:
-                return self.degree.ix[[x.id for x in gene_list]].fillna(0)
+                degree = self.degree.ix[[x.id for x in gene_list]].fillna(0)
+                if trans_locus_only:
+                    degree = degree - self.cis_degree(gene_list)
+                return degree 
         except KeyError as e:
             return 0
 
