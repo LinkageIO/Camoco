@@ -253,7 +253,7 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def upstream_genes(self,locus,gene_limit=1000,window=None):
+    def upstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Find genes that START upstream of a locus. 
             Genes are ordered so that the nearest genes are 
@@ -271,13 +271,13 @@ class RefGen(Camoco):
                 -----------------------------x****************x--
                    ^_________________________| Window (upstream)
         '''
-        if locus.window == 0 and window is None:
+        if locus.window == 0 and window_size is None:
             raise CamocoZeroWindowError(
                 'Asking for upstream genes for {}',
                 locus.id
             )
-        if window is not None:
-            upstream = locus.start - window
+        if window_size is not None:
+            upstream = locus.start - window_size
         else:
             upstream = locus.upstream
         return [
@@ -292,7 +292,7 @@ class RefGen(Camoco):
             ''',(locus.chrom, locus.start, upstream, gene_limit)
         )]
 
-    def downstream_genes(self,locus,gene_limit=1000,window=None):
+    def downstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Returns genes downstream of a locus. Genes are ordered 
             so that the nearest genes are at the beginning of the list.
@@ -308,13 +308,13 @@ class RefGen(Camoco):
               ---x****************x--------------------------------
                                   |_______________________^ Window (downstream)
         '''
-        if locus.window == 0 and window is None:
+        if locus.window == 0 and window_size is None:
             raise CamocoZeroWindowError(
                 'Asking for upstream genes for {}',
                 locus.id
             )
-        if window is not None:
-            downstream = locus.end + window
+        if window_size is not None:
+            downstream = locus.end + window_size
         else:
             downstream = locus.downstream
 
@@ -330,7 +330,7 @@ class RefGen(Camoco):
             ''',(locus.chrom, locus.end, downstream, gene_limit)
         )]
 
-    def flanking_genes(self, loci, flank_limit=2,chain=True,window=None):
+    def flanking_genes(self, loci, flank_limit=2,chain=True,window_size=None):
         '''
             Returns genes upstream and downstream from a locus
             ** done NOT include genes within locus **
@@ -338,7 +338,7 @@ class RefGen(Camoco):
         if isinstance(loci,Locus):
             # If we cant iterate, we have a single locus
             locus = loci
-            if locus.window == 0 and window is None:
+            if locus.window == 0 and window_size is None:
                 raise CamocoZeroWindowError(
                     'Asking for upstream genes for {}',
                     locus.id
@@ -346,10 +346,10 @@ class RefGen(Camoco):
             upstream_gene_limit = int(flank_limit)
             downstream_gene_limit = int(flank_limit)
             up_genes = self.upstream_genes(
-                locus, gene_limit=upstream_gene_limit, window=window
+                locus, gene_limit=upstream_gene_limit, window_size=window_size
             )
             down_genes = self.downstream_genes(
-                locus, gene_limit=downstream_gene_limit, window=window
+                locus, gene_limit=downstream_gene_limit, window_size=window_size
             )
             if chain:
                 return list(itertools.chain(up_genes,down_genes))
@@ -357,7 +357,7 @@ class RefGen(Camoco):
         else:
             iterator = iter(loci)
             genes = [
-                self.flanking_genes(locus,flank_limit=flank_limit,window=window)\
+                self.flanking_genes(locus,flank_limit=flank_limit,window_size=window_size)\
                 for locus in iterator
             ]
             if chain:
@@ -421,7 +421,7 @@ class RefGen(Camoco):
             genes_within = self.genes_within(locus)
             up_genes,down_genes = self.flanking_genes(
                 locus, flank_limit=flank_limit, chain=False,
-                window=window_size
+                window_size=window_size
             )
 
             # This always returns candidates together, if 
@@ -479,7 +479,7 @@ class RefGen(Camoco):
             return genes
 
     def bootstrap_candidate_genes(self, loci, flank_limit=2,
-        chain=True,window=None):
+        chain=True,window_size=None):
         '''
             Returns candidate genes which are random, but conserves
             total number of overall genes.
@@ -506,7 +506,7 @@ class RefGen(Camoco):
             num_candidates = len(
                 self.candidate_genes(
                     locus, flank_limit=flank_limit,
-                    chain=True, window=window
+                    chain=True, window_size=window_size
                 )
             )
             if num_candidates == 0:
@@ -517,7 +517,7 @@ class RefGen(Camoco):
             random_candidates = self.upstream_genes(
                 random_gene, 
                 gene_limit=num_candidates,
-                window=10e100
+                window_size=10e100
             )
             if len(random_candidates) != num_candidates:
                 # somehow we hit the end of a chromosome
@@ -533,7 +533,7 @@ class RefGen(Camoco):
             bootstraps = list()
             target = self.candidate_genes(
                 locus_list,flank_limit=flank_limit,
-                chain=False,window=window
+                chain=False,window_size=window_size
             )
             target_accumulator = 0
             candidate_accumulator = 0
@@ -542,13 +542,13 @@ class RefGen(Camoco):
                 # compare downstream of last locus to current locus
                 candidates = self.bootstrap_candidate_genes(
                     locus, flank_limit=flank_limit, 
-                    chain=True, window=window
+                    chain=True, window_size=window_size
                 )
                 # If genes randomly overlap, resample
                 while len(seen.intersection(candidates)) > 0:
                     candidates = self.bootstrap_candidate_genes(
                         locus, flank_limit=flank_limit,
-                        window=window, chain=True
+                        window_size=window_size, chain=True
                     )
                 # Add all new bootstrapped genes to the seen list
                 seen |= set(candidates)

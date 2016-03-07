@@ -594,7 +594,7 @@ class COB(Expr):
             if isinstance(gene_list, Locus):
                 if trans_locus_only:
                     raise ValueError('Cannot calculate cis degree on one gene.')
-                return self.degree.ix[genes.id].Degree
+                return self.degree.ix[gene_list.id].Degree
             else:
                 degree = self.degree.ix[[x.id for x in gene_list]].fillna(0)
                 if trans_locus_only:
