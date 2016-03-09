@@ -5,43 +5,65 @@ import powerlaw
 
 from os import path
 
+from camoco.Tools import log as coblog
+
 import matplotlib.pylab as plt
 
 def cob_health(args):
+    log = coblog()
+    log('\n'
+        '-----------------------\n'
+        '   Network Health      \n'
+        '-----------------------\n'
+    )
     cob = co.COB(args.cob)
     if args.out is None:
         args.out = '{}_Health'.format(cob.name)
 
-    cob.log('Plotting Scores') #----------------------------------------------
+    log('Plotting Scores ----------------------------------------------------') 
     if not path.exists('{}_CoexPCC_raw.png'.format(args.out)):
         cob.plot_scores(
             '{}_CoexPCC_raw.png'.format(args.out),
             pcc=True
         )
+    else:
+        log('Skipped Raw.')
+
     if not path.exists('{}_CoexScore_zscore.png'.format(args.out)):
         cob.plot_scores(
             '{}_CoexScore_zscore.png'.format(args.out),
             pcc=False
         )
-    cob.log('Plotting Expression') #------------------------------------------
+    else:
+        log('Skipped Norm.')
+
+    log('Plotting Expression ------------------------------------------------')
     if not path.exists('{}_Expr_raw.png'.format(args.out)):
         cob.plot(
             '{}_Expr_raw.png'.format(args.out),
             raw=True,
             cluster_method=None
         )
+    else:
+        log('Skipped raw.')
+
     if not path.exists('{}_Expr_norm.png'.format(args.out)):
         cob.plot(
             '{}_Expr_norm.png'.format(args.out),
             raw=False
         )
+    else:
+        log('Skipped norm.')
 
+    log('Printing Summary ---------------------------------------------------')
     if not path.exists('{}.summary.txt'.format(args.out)):
         with open('{}.summary.txt'.format(args.out),'w') as OUT:
             # Print out the network summary
             cob.summary(file=OUT)
+    else:
+        log('Skipped summary.')
 
-
+    log('Printing QC Statistics ---------------------------------------------')
     if args.refgen is not None:
         if not path.exists('{}_qc_gene.txt'.format(args.out)):
                 # Print out the breakdown of QC Values
@@ -55,11 +77,13 @@ def cob_health(args):
                 totals.name = 'TOTAL'
                 gene_qc = gene_qc.append(totals)
                 gene_qc.to_csv('{}_qc_gene.txt'.format(args.out),sep='\t')
+        else:
+            log('Skipped QC summary.')
 
     #if not path.exists('{}_CisTrans.png'.format(args.out)):
         # Get trans edges
 
-    cob.log('Plotting Degree Distribution')
+    log('Plotting Degree Distribution ---------------------------------------')
     if not path.exists('{}_DegreeDist.png'.format(args.out)):
         degree = cob.degree['Degree'].values
         fit = powerlaw.Fit(degree,discrete=True,xmin=1)
@@ -83,11 +107,11 @@ def cob_health(args):
         plt.title('{} Degree Distribution'.format(cob.name))
         # Save Fig
         plt.savefig('{}_DegreeDist.png'.format(args.out))
+    else:
+        log('Skipping Degree Dist.')
 
-
-
-    cob.log('Plotting GO') #------------------------------------------
-    if args.go is not None: #-------------------------------------------------
+    log('Plotting GO --------------------------------------------------------')
+    if args.go is not None:
         if not path.exists('{}_GO.csv'.format(args.out)):
             go = co.GOnt(args.go)
             term_ids = []
@@ -122,7 +146,6 @@ def cob_health(args):
         else:
             go_enrichment = pd.read_table('{}_GO.csv'.format(args.out))
 
-
         if not path.exists('{}_GO.png'.format(args.out)):
             plt.clf()
             plt.scatter(go_enrichment['density'],-1*np.log10(go_enrichment['pval']))
@@ -136,4 +159,6 @@ def cob_health(args):
                 '{:.3g} Fold Enrichement'.format(fold),
             )
             plt.savefig('{}_GO.png'.format(args.out))
+        else:
+            log('Skipping GO Volcano.')
             
