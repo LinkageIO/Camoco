@@ -168,7 +168,7 @@ class COB(Expr):
         return self.coex.iloc[index]
 
     def subnetwork(self, gene_list=None, sig_only=True, min_distance=None,
-        filter_missing_gene_ids=True):
+        filter_missing_gene_ids=True, trans_locus_only=False):
         '''
             Extract a subnetwork of edges exclusively between genes
             within the gene_list. Also includes various options for
@@ -189,6 +189,11 @@ class COB(Expr):
             filter_missing_gene_ids : bool (default: True)
                 Filter out gene ids that are not in the current
                 COB object (self).
+            trans_locus_only : bool (default: True)
+                Filter out gene interactions that are not in Trans,
+                this argument requires that locus attr object has
+                the 'parent_locus' key:val set to distinguish between
+                cis and trans elements.
 
             Returns
             -------
@@ -212,6 +217,18 @@ class COB(Expr):
             df = df.loc[df.distance >= min_distance, :]
         if sig_only:
             df = df.loc[df.significant == 1, :]
+        if trans_locus_only:
+            try:
+                parents = {x.id:x.attr['parent_locus'] for x in gene_list}
+            except KeyError as e:
+                raise KeyError(
+                    "Each locus must have 'parent_locus'"
+                    " attr set to calculate trans only"
+                )
+            df['trans'] = [
+                parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
+                zip(df.index.get_level_values(0),df.index.get_level_values(1))
+            ]
         return df.copy()
 
     def cluster_coefficient(self, locus_list, flank_limit,
@@ -280,32 +297,22 @@ class COB(Expr):
         # convert to list of loci to lists of genes
         if not bootstrap:
             genes_list = self.refgen.candidate_genes(
-                locus_list, flank_limit=flank_limit, chain=False
+                locus_list, flank_limit=flank_limit, chain=True,
+                include_parent_locus=True
             )
         else:
             genes_list = self.refgen.bootstrap_candidate_genes(
-                locus_list, flank_limit=flank_limit, chain=False
+                locus_list, flank_limit=flank_limit, chain=True,
+                include_parent_locus=True
             )
-        # create a dict of gene to locus mapping
-        gene_origin = {}
-        full_gene_set = set()
-        for i, genes in enumerate(genes_list):
-            # genes_list is a list of list of genes
-            for gene in genes:
-                # track which locus a gene comes from
-                gene_origin[gene.id] = i 
-                full_gene_set.add(gene)
-        self.log("Found {} candidate genes", len(full_gene_set))
+        self.log("Found {} candidate genes", len(genes_list))
         # Extract the edges for the full set of genes
         edges = self.subnetwork(
-            full_gene_set,
+            genes_list,
             min_distance=0,
-            sig_only=False
+            sig_only=False,
+            trans_locus_only=True
         )
-        # iterate over and removes edges from the same locus
-        edges['trans'] = [
-            gene_origin[a]!=gene_origin[b] for a, b in edges.index.values
-        ]
         if by_gene == True:
             # Filter out trans edges 
             gene_split = pd.DataFrame.from_records(
@@ -326,6 +333,69 @@ class COB(Expr):
             else:
                 return edges.loc[edges['trans']==True,]
 
+    def trans_locus_locality(self, locus_list, flank_limit, 
+        bootstrap=False, by_gene=False, iter_name=None, 
+        include_regression=False):
+        '''
+            Computes a table comparing local degree to global degree
+            of genes COMPUTED from a set of loci. 
+            NOTE: interactions from genes originating from the same 
+            locus are not counted for global or local degree.
+
+            Parameters
+            ----------
+            locus_list : iterable of camoco.Loci
+                A list or equivalent of loci
+            flank_limit : int
+                The number of flanking genes passed to be pulled out 
+                for each locus (passed onto the refgen.candidate_genes method)
+            bootstrap : bool (default: False)
+                If true, candidate genes will be bootstrapped from the COB
+                reference genome
+            iter_name : object (default: none)
+                This will be added as a column. Useful for
+                generating bootstraps of locality and keeping
+                track of which one a row came from after catting
+                multiple bootstraps together.
+            by_gene : bool (default: False)
+                Return a per-gene breakdown of density within the subnetwork.
+            include_regression : bool (default: False)
+                Include the OLS regression residuals and fitted values
+                on local ~ global.
+
+            Returns
+            -------
+            A pandas DataFrame with local, global and residual columns
+            based on linear regression of local on global degree.
+        '''
+        # convert to list of loci to lists of genes
+        if not bootstrap:
+            genes_list = self.refgen.candidate_genes(
+                locus_list, flank_limit=flank_limit, chain=True,
+                include_parent_locus=True
+            )
+        else:
+            genes_list = self.refgen.bootstrap_candidate_genes(
+                locus_list, flank_limit=flank_limit, chain=True,
+                include_parent_locus=True
+            )
+        self.log("Found {} candidate genes", len(genes_list))
+        # Get global and local degree for candidates
+        gdegree = self.global_degree(genes_list, trans_locus_only=True)
+        ldegree = self.local_degree(genes_list, trans_locus_only=True)
+        # Merge the columns
+        degree = ldegree.merge(gdegree,left_index=True,right_index=True)
+        degree.columns = ['local', 'global']
+        degree = degree.sort_values(by='global')
+        if include_regression:
+            # Add the regression lines
+            ols = sm.OLS(degree['local'], degree['global']).fit()
+            degree['resid'] = ols.resid
+            degree['fitted'] = ols.fittedvalues
+            degree = degree.sort_values(by='resid',ascending=False)
+        if iter_name is not None:
+            degree['iter_name'] = iter_name
+        return degree
 
     def density(self, gene_list, min_distance=None, by_gene=False):
         '''
@@ -483,35 +553,84 @@ class COB(Expr):
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
-    def local_degree(self, genes=None):
+    def local_degree(self, gene_list=None, trans_locus_only=False):
         '''
             Returns the local degree of a list of genes
+
+            gene_list : iterable (co.Locus object)
+                a list of genes for which to retrieve local degree for. The
+                genes must be in the COB object (of course)
+            trans_locus_only : bool (default: False)
+                only count edges if they are from genes originating from
+                different loci. Each gene MUST have 'parent_locus' set in
+                its attr object.
+
         '''
+        subnetwork = self.subnetwork(
+            gene_list, sig_only=True, trans_locus_only=trans_locus_only
+        )
+        if trans_locus_only:
+            subnetwork = subnetwork.ix[subnetwork.trans]
         local_degree = pd.DataFrame(
             list(Counter(
-                chain(*self.subnetwork(genes, sig_only=True).index.get_values())
+                chain(*subnetwork.index.get_values())
             ).items()),
             columns=['Gene', 'Degree']
         ).set_index('Gene')
         # We need to find genes not in the subnetwork and add them as degree 0
-        degree_zero_genes = pd.DataFrame( # The code below is optimized
-            [(gene.id, 0) for gene in genes if gene.id not in local_degree.index],
+        # The code below is ~optimized~ 
+        # DO NOT alter unless you know what you're doing
+        degree_zero_genes = pd.DataFrame( 
+            [(gene.id, 0) for gene in gene_list if gene.id not in local_degree.index],
             columns=['Gene', 'Degree']
         ).set_index('Gene')
-
         return pd.concat([local_degree, degree_zero_genes])
 
-    def global_degree(self, genes):
+    def global_degree(self, gene_list, trans_locus_only=False):
         '''
             Returns the global degree of a list of genes
         '''
         try:
-            if isinstance(genes, Locus):
-                return self.degree.ix[genes.id].Degree
+            if isinstance(gene_list, Locus):
+                if trans_locus_only:
+                    raise ValueError('Cannot calculate cis degree on one gene.')
+                return self.degree.ix[gene_list.id].Degree
             else:
-                return self.degree.ix[[x.id for x in genes]].fillna(0)
+                degree = self.degree.ix[[x.id for x in gene_list]].fillna(0)
+                if trans_locus_only:
+                    degree = degree - self.cis_degree(gene_list)
+                return degree 
         except KeyError as e:
             return 0
+
+    def cis_degree(self, gene_list):
+        '''
+            Returns the number of cis interactions for each gene in the gene
+            list. **each gene object MUST have its 'parent_locus' attr set!!
+
+            gene_list : iterable of co.Gene
+        '''
+        subnetwork = self.subnetwork(
+            gene_list, sig_only=True, trans_locus_only=True
+        )
+        # Invert the trans column
+        subnetwork['cis'] = np.logical_not(subnetwork.trans)
+        subnetwork = subnetwork.ix[subnetwork.cis]
+        local_degree = pd.DataFrame(
+            list(Counter(
+                chain(*subnetwork.index.get_values())
+            ).items()),
+            columns=['Gene', 'Degree']
+        ).set_index('Gene')
+        # We need to find genes not in the subnetwork and add them as degree 0
+        # The code below is ~optimized~ 
+        # DO NOT alter unless you know what you're doing
+        degree_zero_genes = pd.DataFrame( 
+            [(gene.id, 0) for gene in gene_list if gene.id not in local_degree.index],
+            columns=['Gene', 'Degree']
+        ).set_index('Gene')
+        return pd.concat([local_degree, degree_zero_genes])
+
 
     def locality(self, gene_list, iter_name=None, include_regression=False):
         '''
@@ -526,6 +645,9 @@ class COB(Expr):
                 generating bootstraps of locality and keeping
                 track of which one a row came from after catting
                 multiple bootstraps together.
+            include_regression : bool (default: False)
+                Include the OLS regression residuals and fitted values
+                on local ~ global.
 
             Returns
             -------
@@ -540,12 +662,13 @@ class COB(Expr):
             self.refgen.from_ids(degree.index.values)
         )['Degree']
         degree.columns = ['local', 'global']
-        degree = degree.sort('global')
+        degree = degree.sort_values(by='global')
         if include_regression:
             # Add the regression lines
             ols = sm.OLS(degree['local'], degree['global']).fit()
             degree['resid'] = ols.resid
             degree['fitted'] = ols.fittedvalues
+            degree = degree.sort_values(by='resid',ascending=False)
         if iter_name is not None:
             degree['iter_name'] = iter_name
         return degree
