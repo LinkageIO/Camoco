@@ -15,8 +15,6 @@ import camoco as co
 import pandas as pd
 import matplotlib.pylab as plt
 
-co.cf.logging.log_level = 'quiet'
-
 def density(args):
     args.out = os.path.splitext(args.out)[0] + '_Density.csv'
     if os.path.dirname(args.out) != '':
