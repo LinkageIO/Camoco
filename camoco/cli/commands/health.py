@@ -23,6 +23,7 @@ def cob_health(args):
             '{}_CoexScore_zscore.png'.format(args.out),
             pcc=False
         )
+
     cob.log('Plotting Expression') #------------------------------------------
     if not path.exists('{}_Expr_raw.png'.format(args.out)):
         cob.plot(
@@ -41,20 +42,19 @@ def cob_health(args):
             # Print out the network summary
             cob.summary(file=OUT)
 
-
     if args.refgen is not None:
         if not path.exists('{}_qc_gene.txt'.format(args.out)):
-                # Print out the breakdown of QC Values
-                refgen = co.RefGen(args.refgen)
-                gene_qc = cob.hdf5['qc_gene']
-                gene_qc = gene_qc[gene_qc.pass_membership]
-                gene_qc['chrom'] = ['chr'+str(refgen[x].chrom) for x in gene_qc.index]
-                gene_qc = gene_qc.groupby('chrom').agg(sum,axis=0)
-                # Add totals at the bottom
-                totals = gene_qc.ix[:,slice(1,None)].apply(sum)
-                totals.name = 'TOTAL'
-                gene_qc = gene_qc.append(totals)
-                gene_qc.to_csv('{}_qc_gene.txt'.format(args.out),sep='\t')
+            # Print out the breakdown of QC Values
+            refgen = co.RefGen(args.refgen)
+            gene_qc = cob.hdf5['qc_gene']
+            gene_qc = gene_qc[gene_qc.pass_membership]
+            gene_qc['chrom'] = ['chr'+str(refgen[x].chrom) for x in gene_qc.index]
+            gene_qc = gene_qc.groupby('chrom').agg(sum,axis=0)
+            # Add totals at the bottom
+            totals = gene_qc.ix[:,slice(1,None)].apply(sum)
+            totals.name = 'TOTAL'
+            gene_qc = gene_qc.append(totals)
+            gene_qc.to_csv('{}_qc_gene.txt'.format(args.out),sep='\t')
 
     #if not path.exists('{}_CisTrans.png'.format(args.out)):
         # Get trans edges
@@ -84,44 +84,68 @@ def cob_health(args):
         # Save Fig
         plt.savefig('{}_DegreeDist.png'.format(args.out))
 
-
-
     cob.log('Plotting GO') #------------------------------------------
     if args.go is not None: #-------------------------------------------------
         if not path.exists('{}_GO.csv'.format(args.out)):
             go = co.GOnt(args.go)
             term_ids = []
-            emp_z = []
-            pvals  = []
+            density_emp = []
+            density_pvals  = []
+            locality_emp = []
+            locality_pvals = []
             terms_tested = 0
             for term in go.iter_terms():
                 term.loci = list(filter(lambda x: x in cob, term.loci))
                 if len(term) < 3 or len(term) > 300:
                     continue
-                terms_tested += 1
-                emp = cob.density(term.loci)
-                emp_z.append(emp)
-                # Calculate PValue
-                bs = np.array([
+                term_ids.append(term.id)
+
+                # ------ Density 
+                density = cob.density(term.loci)
+                density_emp.append(density)
+                # Calculate PVals
+                density_bs = np.array([
                     cob.density(cob.refgen.random_genes(n=len(term.loci))) \
                     for x in range(args.num_bootstraps)
                 ])
-                if emp > 0:
-                    pval = sum(bs>=emp)/args.num_bootstraps
+                if density > 0:
+                    pval = sum(density_bs >= density)/args.num_bootstraps
                 else:
-                    pval = sum(bs<=emp)/args.num_bootstraps
-                term_ids.append(term.id)
-                pvals.append(pval)
+                    pval = sum(density_bs <= density)/args.num_bootstraps
+                density_pvals.append(pval)
+
+                # ------- Locality
+                locality = cob.locality(
+                    term.loci,include_regression=True
+                ).resid.mean()
+                locality_emp.append(locality)
+                # Calculate PVals
+                locality_bs = np.array([
+                    cob.locality(
+                        cob.refgen.random_genes(n=len(term.loci)),
+                        include_regression=True
+                    ).resid.mean() \
+                    for x in range(args.num_bootstraps)
+                ])
+                if locality > 0:
+                    pval = sum(locality_bs >= locality)/args.num_bootstraps
+                else:
+                    pval = sum(locality_bs <= locality)/args.num_bootstraps
+                locality_pvals.append(pval)
+                # -------------
+                terms_tested += 1
             go_enrichment = pd.DataFrame({
-                'id':term_ids,
-                'density' : emp_z,
-                'pval':pvals
+                'id' : term_ids,
+                'density' : density_emp,
+                'densitY_pval' : density_pvals,
+                'locality' : locality_emp,
+                'locality_pval' : locality_pvals
             })
+            import ipdb; ipdb.set_trace()
             go_enrichment.sort('pval',ascending=True)\
                 .to_csv('{}_GO.csv'.format(args.out),index=False)
         else:
             go_enrichment = pd.read_table('{}_GO.csv'.format(args.out))
-
 
         if not path.exists('{}_GO.png'.format(args.out)):
             plt.clf()
