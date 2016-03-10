@@ -18,7 +18,6 @@ from camoco.Tools import confidence_interval, \
                          NearestDict
 
 lowess = sm.nonparametric.lowess
-co.cf.logging.log_level = 'quiet'
 
 def locality(args):
     # Generate output dirs

@@ -698,7 +698,8 @@ if __name__ == '__main__':
         try:
             return_value = args.func(args)
         except AttributeError as e:
-            print("No command found. Use --help or help command.")
+            print("A bad thing happened.\n\n")
+            print(str(e))
             sys.exit(1)
         if args.interactive is True:
             from IPython.core import ultratb

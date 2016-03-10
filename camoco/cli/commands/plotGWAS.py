@@ -9,7 +9,6 @@ import camoco as co
 import matplotlib.pylab as plt
 
 from camoco.Config import cf
-cf.logging.log_level = 'quiet'
 
 def commify(value):
     ' Return the value with commas delimiting the thousands '
