@@ -456,6 +456,16 @@ if __name__ == '__main__':
         help='Perform Gene Ontology Statistics. (default: None)'
     )
     health.add_argument(
+        '--min-term-size',
+        default=10,
+        help='Minimum GO term size to consider in health (defualt: 10)'
+    )
+    health.add_argument(
+        '--max-term-size',
+        default=300,
+        help='Maximum GO term size to consider in health (defualt: 300)'
+    )
+    health.add_argument(
         '--num-bootstraps',
         default=100,
         type=int,
