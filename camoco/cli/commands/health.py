@@ -119,13 +119,14 @@ def cob_health(args):
             density_pvals  = []
             locality_emp = []
             locality_pvals = []
+            term_sizes = []
             terms_tested = 0
             for term in go.iter_terms():
                 term.loci = list(filter(lambda x: x in cob, term.loci))
-                if len(term) < 3 or len(term) > 300:
+                if len(term) < args.min_term_size or len(term) > args.max_term_size:
                     continue
                 term_ids.append(term.id)
-
+                term_sizes.append(len(term))
                 # ------ Density 
                 density = cob.density(term.loci)
                 density_emp.append(density)
@@ -160,31 +161,80 @@ def cob_health(args):
                 locality_pvals.append(pval)
                 # -------------
                 terms_tested += 1
+                if terms_tested % 100 == 0 and terms_tested > 0:
+                    log('Processed {} terms'.format(terms_tested)) 
             go_enrichment = pd.DataFrame({
                 'id' : term_ids,
+                'size' : term_sizes,
                 'density' : density_emp,
-                'densitY_pval' : density_pvals,
+                'density_pval' : density_pvals,
                 'locality' : locality_emp,
                 'locality_pval' : locality_pvals
             })
-            import ipdb; ipdb.set_trace()
-            go_enrichment.sort('pval',ascending=True)\
+            go_enrichment\
+                .sort_values(by='density_pval',ascending=True)\
                 .to_csv('{}_GO.csv'.format(args.out),index=False)
+            if terms_tested == 0:
+                log.warn('No GO terms met your min/max gene criteria!')
         else:
-            go_enrichment = pd.read_table('{}_GO.csv'.format(args.out))
+            go_enrichment = pd.read_table('{}_GO.csv'.format(args.out),sep=',')
 
         if not path.exists('{}_GO.png'.format(args.out)):
+            # Convert pvals to log10
+            go_enrichment['density_pval'] = -1*np.log10(go_enrichment['density_pval'])
+            go_enrichment['locality_pval'] = -1*np.log10(go_enrichment['locality_pval'])
             plt.clf()
-            plt.scatter(go_enrichment['density'],-1*np.log10(go_enrichment['pval']))
-            plt.xlabel('Empirical Z Score')
-            plt.ylabel('Bootstraped -log10(p-value)')
-            fold = sum(np.array(pvals)<=0.05)/(0.05 * terms_tested)
-            plt.title('{} x {}'.format(cob.name,go.name))
-            plt.axhline(y=-1*np.log10(0.05),color='red')
-            plt.text(
-                1, 0.1,
+            figure,axes = plt.subplots(3,2,figsize=(12,12))
+            # -----------
+            # Density
+            # ----------
+            axes[0,0].scatter(go_enrichment['density'],go_enrichment['density_pval'])
+            axes[0,0].set_xlabel('Empirical Density (Z-Score)')
+            axes[0,0].set_ylabel('Bootstraped -log10(p-value)')
+            fold = sum(np.array(go_enrichment['density_pval'])>1.3)/(0.05 * len(go_enrichment))
+            axes[0,0].axhline(y=-1*np.log10(0.05),color='red')
+            axes[0,0].text(
+                0, -0.2,
                 '{:.3g} Fold Enrichement'.format(fold),
             )
+            axes[1,0].scatter(go_enrichment['size'],go_enrichment['density_pval'])
+            axes[1,0].set_ylabel('Bootstrapped -log10(p-value)')
+            axes[1,0].set_xlabel('Term Size')
+            axes[1,0].axhline(y=-1*np.log10(0.05),color='red')
+            axes[2,0].scatter(go_enrichment['size'],go_enrichment['density'])
+            axes[2,0].scatter(
+                go_enrichment.query('density_pval>1.3')['size'],
+                go_enrichment.query('density_pval>1.3')['density'],
+                color='r'
+            )
+            axes[2,0].set_ylabel('Density')
+            axes[2,0].set_xlabel('Term Size')
+            # ------------
+            # Do Locality
+            # ------------
+            axes[0,1].scatter(go_enrichment['locality'],go_enrichment['locality_pval'])
+            axes[0,1].set_xlabel('Empirical Locality (Residual)')
+            axes[0,1].set_ylabel('Bootstraped -log10(p-value)')
+            fold = sum(np.array(go_enrichment['locality_pval'])>1.3)/(0.05 * len(go_enrichment))
+            axes[0,1].axhline(y=-1*np.log10(0.05),color='red')
+            axes[0,1].text(
+                0, -0.2,
+                '{:.3g} Fold Enrichement'.format(fold),
+            )
+            axes[1,1].scatter(go_enrichment['size'],go_enrichment['locality_pval'])
+            axes[1,1].set_xlabel('Term Size')
+            axes[1,1].set_ylabel('Bootstrapped -log10(p-value)')
+            axes[1,1].axhline(y=-1*np.log10(0.05),color='red')
+            axes[2,1].scatter(go_enrichment['size'],go_enrichment['locality'])
+            axes[2,1].scatter(
+                go_enrichment.query('locality_pval>1.3')['size'],
+                go_enrichment.query('locality_pval>1.3')['locality'],
+                color='r'
+            )
+            axes[2,1].set_ylabel('Density')
+            axes[2,1].set_xlabel('Term Size')
+            # Save Figure
+            plt.tight_layout()
             plt.savefig('{}_GO.png'.format(args.out))
         else:
             log('Skipping GO Volcano.')
