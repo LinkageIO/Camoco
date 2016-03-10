@@ -656,7 +656,6 @@ class COB(Expr):
             based on linear regression of local on global degree.
 
         '''
-        self.log('Fetching Degree ... ')
         global_degree = self.global_degree(gene_list)
         local_degree = self.local_degree(gene_list) 
         degree = global_degree.merge(
