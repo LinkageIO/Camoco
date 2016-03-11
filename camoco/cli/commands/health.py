@@ -7,6 +7,8 @@ from os import path
 
 from camoco.Tools import log as coblog
 
+import matplotlib
+matplotlib.style.use('ggplot')
 import matplotlib.pylab as plt
 
 def cob_health(args):
@@ -188,7 +190,11 @@ def cob_health(args):
             # -----------
             # Density
             # ----------
-            axes[0,0].scatter(go_enrichment['density'],go_enrichment['density_pval'])
+            axes[0,0].scatter(
+                go_enrichment['density'],
+                go_enrichment['density_pval'],
+                alpha=0.05
+            )
             axes[0,0].set_xlabel('Empirical Density (Z-Score)')
             axes[0,0].set_ylabel('Bootstraped -log10(p-value)')
             fold = sum(np.array(go_enrichment['density_pval'])>1.3)/(0.05 * len(go_enrichment))
@@ -197,14 +203,23 @@ def cob_health(args):
                 0, -0.2,
                 '{:.3g} Fold Enrichement'.format(fold),
             )
-            axes[1,0].scatter(go_enrichment['size'],go_enrichment['density_pval'])
+            axes[1,0].scatter(
+                go_enrichment['size'],
+                go_enrichment['density_pval'],
+                alpha=0.05
+            )
             axes[1,0].set_ylabel('Bootstrapped -log10(p-value)')
             axes[1,0].set_xlabel('Term Size')
             axes[1,0].axhline(y=-1*np.log10(0.05),color='red')
-            axes[2,0].scatter(go_enrichment['size'],go_enrichment['density'])
+            axes[2,0].scatter(
+                go_enrichment['size'],
+                go_enrichment['density'],
+                alpha=0.05
+            )
             axes[2,0].scatter(
                 go_enrichment.query('density_pval>1.3')['size'],
                 go_enrichment.query('density_pval>1.3')['density'],
+                alpha=0.05,
                 color='r'
             )
             axes[2,0].set_ylabel('Density')
@@ -212,7 +227,11 @@ def cob_health(args):
             # ------------
             # Do Locality
             # ------------
-            axes[0,1].scatter(go_enrichment['locality'],go_enrichment['locality_pval'])
+            axes[0,1].scatter(
+                go_enrichment['locality'],
+                go_enrichment['locality_pval'],
+                alpha=0.05
+            )
             axes[0,1].set_xlabel('Empirical Locality (Residual)')
             axes[0,1].set_ylabel('Bootstraped -log10(p-value)')
             fold = sum(np.array(go_enrichment['locality_pval'])>1.3)/(0.05 * len(go_enrichment))
@@ -221,14 +240,23 @@ def cob_health(args):
                 0, -0.2,
                 '{:.3g} Fold Enrichement'.format(fold),
             )
-            axes[1,1].scatter(go_enrichment['size'],go_enrichment['locality_pval'])
+            axes[1,1].scatter(
+                go_enrichment['size'],
+                go_enrichment['locality_pval'],
+                alpha=0.05
+            )
             axes[1,1].set_xlabel('Term Size')
             axes[1,1].set_ylabel('Bootstrapped -log10(p-value)')
             axes[1,1].axhline(y=-1*np.log10(0.05),color='red')
-            axes[2,1].scatter(go_enrichment['size'],go_enrichment['locality'])
+            axes[2,1].scatter(
+                go_enrichment['size'],
+                go_enrichment['locality'],
+                alpha=0.05
+            )
             axes[2,1].scatter(
                 go_enrichment.query('locality_pval>1.3')['size'],
                 go_enrichment.query('locality_pval>1.3')['locality'],
+                alpha=0.05,
                 color='r'
             )
             axes[2,1].set_ylabel('Density')
