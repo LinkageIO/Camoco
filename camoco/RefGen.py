@@ -479,7 +479,7 @@ class RefGen(Camoco):
             return genes
 
     def bootstrap_candidate_genes(self, loci, flank_limit=2,
-        chain=True,window_size=None):
+        chain=True, window_size=None, include_parent_locus=False):
         '''
             Returns candidate genes which are random, but conserves
             total number of overall genes.
@@ -493,6 +493,10 @@ class RefGen(Camoco):
                 considered a candidate surrounding a locus
             chain : bool (default : true)
                 Calls itertools chain on results before returning,
+            include_parent_locus : bool (default: False)
+                Optional parameter which will update candidate genes
+                'attr' attribute with the id of the parent locus
+                which contains it.
 
             Returns
             -------
@@ -525,6 +529,9 @@ class RefGen(Camoco):
                 random_candidates = self.bootstrap_candidate_genes(
                     locus,flank_limit=flank_limit,chain=True
                 )
+            if include_parent_locus == True:
+                for gene in random_candidates:
+                    gene.update({'parent_locus':random_gene.id})
             return random_candidates
         else:
             # Sort the loci so we can collapse down
@@ -542,13 +549,15 @@ class RefGen(Camoco):
                 # compare downstream of last locus to current locus
                 candidates = self.bootstrap_candidate_genes(
                     locus, flank_limit=flank_limit, 
-                    chain=True, window_size=window_size
+                    chain=True, window_size=window_size,
+                    include_parent_locus=include_parent_locus
                 )
                 # If genes randomly overlap, resample
                 while len(seen.intersection(candidates)) > 0:
                     candidates = self.bootstrap_candidate_genes(
                         locus, flank_limit=flank_limit,
-                        window_size=window_size, chain=True
+                        window_size=window_size, chain=True,
+                        include_parent_locus=include_parent_locus
                     )
                 # Add all new bootstrapped genes to the seen list
                 seen |= set(candidates)

@@ -335,7 +335,7 @@ class COB(Expr):
 
     def trans_locus_locality(self, locus_list, flank_limit, 
         bootstrap=False, by_gene=False, iter_name=None, 
-        include_regression=False):
+        include_regression=False, include_zscore=False):
         '''
             Computes a table comparing local degree to global degree
             of genes COMPUTED from a set of loci. 
@@ -553,7 +553,7 @@ class COB(Expr):
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
-    def local_degree(self, gene_list=None, trans_locus_only=False):
+    def local_degree(self, gene_list, trans_locus_only=False):
         '''
             Returns the local degree of a list of genes
 
@@ -580,6 +580,7 @@ class COB(Expr):
         # We need to find genes not in the subnetwork and add them as degree 0
         # The code below is ~optimized~ 
         # DO NOT alter unless you know what you're doing
+
         degree_zero_genes = pd.DataFrame( 
             [(gene.id, 0) for gene in gene_list if gene.id not in local_degree.index],
             columns=['Gene', 'Degree']
@@ -655,13 +656,12 @@ class COB(Expr):
             based on linear regression of local on global degree.
 
         '''
-        self.log('Fetching Degree ... ')
-        degree = self.local_degree(gene_list)
-        # Add on the global degree
-        degree['global'] = self.global_degree(
-            self.refgen.from_ids(degree.index.values)
-        )['Degree']
-        degree.columns = ['local', 'global']
+        global_degree = self.global_degree(gene_list)
+        local_degree = self.local_degree(gene_list) 
+        degree = global_degree.merge(
+            local_degree,left_index=True,right_index=True
+        )
+        degree.columns = ['global', 'local']
         degree = degree.sort_values(by='global')
         if include_regression:
             # Add the regression lines

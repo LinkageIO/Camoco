@@ -10,6 +10,11 @@ import glob
 
 import argparse
 
+from camoco.Tools import log 
+
+import pandas as pd
+pd.set_option('display.width',200)
+
 from camoco.cli.commands.plotGWAS import plot_gwas
 from camoco.cli.commands.density import density
 from camoco.cli.commands.locality import locality
@@ -23,13 +28,6 @@ from camoco.cli.commands.candidates import candidates
 from camoco import cf
 
 from argparse import ArgumentParser
-
-class cli(ArgumentParser):
-    def __init__(self):
-        self = super().__init__(
-            epilog='Cache. Money. Corn.'        
-        )
-
 
 if __name__ == '__main__':
     '''--------------------------
@@ -75,7 +73,7 @@ if __name__ == '__main__':
     )
     lstcmd.add_argument(
         'type', 
-        default=None,
+        nargs='?',
         help=(
             'The type of dataset you want to list. e.g. GWAS. '
             'Also accepts SQLite wildcards.'    
@@ -83,7 +81,7 @@ if __name__ == '__main__':
     )
     lstcmd.add_argument(
         'name', 
-        default=None,
+        nargs='?',
         help = (
             'The name of the dataset you want to list. '
             'Also accepts SQLite wildcards.' 
@@ -319,21 +317,6 @@ if __name__ == '__main__':
        help='''The number of bootstraps to perform in order
              to estimate a null distribution.'''
     )
-    localityCLI.add_argument(
-       '--sd-envelope', 
-       type=int,
-       default=2, 
-       metavar=2,
-       help='''The number or standard deviations to 
-           use for the regression window.'''
-    )
-    localityCLI.add_argument(
-       '--regression-window-size', 
-       type=int, 
-       default=50, 
-       metavar=50,
-       help='The number of items within a window.'
-    )
     # SNP2Gene Mapping
     localityCLI.add_argument(
         '--snp2gene', 
@@ -368,17 +351,6 @@ if __name__ == '__main__':
             'lower values as stronger (i.e. p-vals)'
         )
     )
-    # Permutation parameters
-    localityCLI.add_argument(
-        '--min-fdr-degree', 
-        default=2,
-        metavar=2,
-        type=int, 
-        help=(
-            'The miniumum degree to be included '
-            'as true positive in FDR calculation.'
-        )
-    )
     localityCLI.add_argument(
         '--candidate-window-size',
         type=int,  
@@ -396,13 +368,6 @@ if __name__ == '__main__':
             'included in SNP to gene mapping'
             )
     )
-    # Data Formatting Parameters
-    localityCLI.add_argument(
-        '--plot',
-        action='store_true',
-        default=False,
-        help='Flag indicating to plot data.'
-    )
     localityCLI.add_argument(
         '--out',
         type=str,
@@ -412,10 +377,11 @@ if __name__ == '__main__':
     localityCLI.add_argument(
         '--sig-edge-zscore',
         type=float,
+        metavar=3,
         default=None,
         help=(
-           'If not None, redefine what a significant '
-           'interaction score is. (defaut: 3)'
+           'Redefine what a significant zscore for an interaction. '
+           '(defaut: 3)'
         )
     )
     localityCLI.add_argument(
@@ -454,6 +420,16 @@ if __name__ == '__main__':
         '--go',
         default=None,
         help='Perform Gene Ontology Statistics. (default: None)'
+    )
+    health.add_argument(
+        '--min-term-size',
+        default=10,
+        help='Minimum GO term size to consider in health (defualt: 10)'
+    )
+    health.add_argument(
+        '--max-term-size',
+        default=300,
+        help='Maximum GO term size to consider in health (defualt: 300)'
     )
     health.add_argument(
         '--num-bootstraps',
@@ -698,8 +674,12 @@ if __name__ == '__main__':
         try:
             return_value = args.func(args)
         except AttributeError as e:
-            print("A bad thing happened.\n\n")
-            print(str(e))
+            log.warn('Command not found. Use --help to see available commands.')
+            sys.exit(1)
+        except Exception as e:
+            log.warn("A bad thing happened.\n\n" + str(e))
+            if args.debug:
+                raise e
             sys.exit(1)
         if args.interactive is True:
             from IPython.core import ultratb
