@@ -151,7 +151,7 @@ def cob_health(args):
             plt.scatter(go_enrichment['density'],-1*np.log10(go_enrichment['pval']))
             plt.xlabel('Empirical Z Score')
             plt.ylabel('Bootstraped -log10(p-value)')
-            fold = sum(np.array(pvals)<=0.05)/(0.05 * terms_tested)
+            fold = sum(np.array(pvals)<=0.05)/(0.05 * (go_enrichment.id.unique())
             plt.title('{} x {}'.format(cob.name,go.name))
             plt.axhline(y=-1*np.log10(0.05),color='red')
             plt.text(
