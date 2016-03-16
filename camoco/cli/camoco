@@ -482,6 +482,16 @@ if __name__ == '__main__':
         help='The name of the GO Ontology you want to analyze.'
     )
     simulateGWASCLI.add_argument(
+        '--terms',
+        type=str,
+        metavar='all',
+        default = ['all'],
+        nargs='*',
+        help=("Ontology term to simulate. If 'all', which is the default, "
+            "all terms will be tested."    
+        )
+    )
+    simulateGWASCLI.add_argument(
         '--max-term-size',
         type=int,
         default=300,
@@ -523,11 +533,12 @@ if __name__ == '__main__':
         )
     )
     simulateGWASCLI.add_argument(                                                  
-        '--percent-fdr',                                                        
+        '--percent-fcr',                                                        
         type=float,                                                             
         default=None,                                                           
         metavar=0.0,                                                            
         help=(                                                                  
+            'False Cadidate Rate: '
             'The percentage of the term loci to be replaced with '              
             'random loci, simulating noise or false positives '                 
             'within the term'                                                   
@@ -675,6 +686,8 @@ if __name__ == '__main__':
             return_value = args.func(args)
         except AttributeError as e:
             log.warn('Command not found. Use --help to see available commands.')
+            if args.debug:
+                raise e
             sys.exit(1)
         except Exception as e:
             log.warn("A bad thing happened.\n\n" + str(e))

@@ -5,6 +5,9 @@ def list_command(args):
         if args.type == 'GWAS':
             gwas = co.GWAS(args.name)
             print('\n'.join([x.id for x in gwas.iter_terms()]))
+        elif args.type =='GOnt':
+            gont = co.GOnt(args.name)
+            print('\n'.join([x.id for x in gont.iter_terms()]))
     else:
         args.type = '%'
         args.name = '%'
