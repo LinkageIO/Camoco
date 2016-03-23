@@ -3,16 +3,19 @@
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
 import os
+import numpy
 
 pccup = Extension(
     'PCCUP',
     sources=['camoco/PCCUP.pyx'],
-    extra_compile_args=['-ffast-math']
+    extra_compile_args=['-ffast-math'],
+    inlcude_dirs=[numpy.get_include()]
 )
 refgendist = Extension(
     'RefGenDist',
     sources=['camoco/RefGenDist.pyx'],
-    extra_compile_args=['-ffast-math']
+    extra_compile_args=['-ffast-math'],
+    inlcude_dirs=[numpy.get_include()]
 )
 
 setup(
