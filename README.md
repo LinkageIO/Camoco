@@ -7,11 +7,11 @@ Camoco
 Co-Analysis of Molecular Components
 -----------------------------------
 
-Camoco is a python library modeled after the popular package pandas for
+Camoco is a python library for
 building and analyzing co-expression networks. It exposes a nice API and is
 effecient for working with such large data structures. It was created to be
-used interactively through something like iPython or normal scripting. All it
-takes to get started is an import:
+used interactively through something like iPython or normal scripting. There
+is also a small CLI available (See below)! All it takes to get started is an import:
 
 ```python 
 import camoco as co 
