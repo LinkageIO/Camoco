@@ -847,7 +847,8 @@ class RefGen(Camoco):
 
     @classmethod
     def from_gff(cls,filename,name,description,build,organism,
-                 chrom_feature='chromosome',gene_feature='gene',ID_attr='ID'):
+                 chrom_feature='chromosome',gene_feature='gene',
+                 ID_attr='ID',attr_split='='):
         '''
             Imports RefGen object from a gff (General Feature Format) file.
             See more about the format here:
@@ -880,6 +881,8 @@ class RefGen(Camoco):
             ID_attr : str (default: ID)
                 The key in the attribute column which designates the ID or 
                 name of the feature.
+            attr_split : str (default: '=')
+                The delimiter for keys and values in the attribute column
 
         '''
         self = cls.create(name,description,type='RefGen')
@@ -897,7 +900,7 @@ class RefGen(Camoco):
                 continue
             (chrom,source,feature,start,
              end,score,strand,frame,attributes) = line.strip().split('\t')
-            attributes = dict([(field.strip().split('=')) \
+            attributes = dict([(field.strip().split(attr_split)) \
                 for field in attributes.strip(';').split(';')])
             if feature == chrom_feature:
                 self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
