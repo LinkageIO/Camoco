@@ -6,8 +6,9 @@ python:
 # Install packages
 install:
   - bash install.sh
-  # import camoco to compile the pyx modules
-  - python -c 'import camoco as co;'
+  - export LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH
+  - export PATH=/home/travis/.camoco/bin:$PATH
+  - source activate camoco
 # command to run tests, e.g. python setup.py test
 script:  
   - py.test  tests -v --cov camoco 
