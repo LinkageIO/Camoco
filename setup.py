@@ -8,14 +8,14 @@ import numpy
 pccup = Extension(
     'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
-    extra_compile_args=['-ffast-math'],
-    include_dirs=[numpy.get_include()]
+#    extra_compile_args=['-ffast-math'],
+#    include_dirs=[numpy.get_include()]
 )
 refgendist = Extension(
     'camoco.RefGenDist',
     sources=['camoco/RefGenDist.pyx'],
-    extra_compile_args=['-ffast-math'],
-    include_dirs=[numpy.get_include()]
+#    extra_compile_args=['-ffast-math'],
+#    include_dirs=[numpy.get_include()]
 )
 
 setup(

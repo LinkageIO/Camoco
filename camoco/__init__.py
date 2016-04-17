@@ -11,9 +11,6 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-#import pyximport
-#pyximport.install()
-
 import sys
 import os
 sys.path.insert(0,os.path.expanduser('~/.camoco/.conda/camoco/lib/python3.4/site-packages'))
