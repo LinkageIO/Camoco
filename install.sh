@@ -22,7 +22,18 @@ exit 0
 
 # Configurable variables
 GH_USER='schae234'
-BASE=~/.camoco/
+BASE=~/.camoco
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+function red(){
+    printf "${RED}$1${NC}\n"
+}
+function green(){
+    printf "${GREEN}$1${NC}\n"
+}
 
 while [[ $# > 0 ]]
 do
@@ -59,6 +70,10 @@ echo "Setting up the build environment"
 source $HOME/.bashrc
 mkdir -p $BASE
 cd $BASE
+
+export LOG=$BASE/install.log
+touch $LOG
+
 export LD_LIBRARY_PATH=$BASE/lib:$LD_LIBRARY_PATH
 export PATH=$BASE/bin:$PATH
 
@@ -69,9 +84,11 @@ export PATH=$BASE/bin:$PATH
 if [ ! -e $BASE/bin/conda ]
 then
     cd $BASE
-	wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+	wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 	bash miniconda.sh -b -f -p $BASE
 	rm -rf miniconda.sh
+else
+    green "Conda Already Installed" 
 fi
 
 #===================================================
@@ -90,6 +107,8 @@ if ! hash git-lfs 2>/dev/null ; then
     rm -rf git-lfs*
     git lfs install
     git lfs uninstall
+else
+    green "Git-lfs already installed"
 fi
 
 #===================================================
@@ -109,6 +128,8 @@ then
     make install
     cd $BASE
     rm -rf icu/
+else
+    green "icu already installed"
 fi
 if [ ! -e $BASE/lib/libqhull.so ]
 then
@@ -125,6 +146,8 @@ then
     ln -s $BASE/lib/libqhull.so $BASE/lib/libqhull.so.5
     cd $BASE
     rm -rf qhull-2012.1/
+else
+    green 'qhull already installed'
 fi
 
 #===================================================
@@ -144,6 +167,8 @@ then
     make install
     cd $BASE
     rm -rf $(find . -name 'mcl-*' -type d | head -n 1)
+else
+    green 'mcl already installed'
 fi
 
 #===================================================
@@ -157,17 +182,20 @@ then
     bin/conda remove -y --name $NAME --all
     bin/conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
         cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
-        scipy pandas matplotlib==1.4.3 numexpr patsy statsmodels pytables flask \
-        networkx ipython mpmath
+        scipy pandas matplotlib numexpr patsy statsmodels pytables flask \
+        networkx ipython mpmath pytest
     bin/conda remove -y -n $NAME libgfortran --force
     bin/conda install -y -n $NAME libgcc --force
     bin/conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/omnia termcolor
     bin/conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/cpcloud ipdb
+else
+    green 'conda already installed'
 fi
 
 #===================================================
 #----------Activate the Conda Environment-----------
 #===================================================
+
 source activate $NAME
 
 #==================================================
@@ -175,14 +203,26 @@ source activate $NAME
 #==================================================
 easy_install -U pip
 pip install pip --upgrade
-pip install powerlaw
-pip install sklearn
+python -c 'import powerlaw'
+if [ $? -eq 1  ]
+then
+    pip install powerlaw
+else
+    green "powerlaw installed"
+fi
+python -c 'import sklearn'
+if [ $? -eq 1 ]
+then
+    pip install sklearn
+else
+    green "sklearn installed"
+fi
 
 #===================================================
 #-----------------Install apsw----------------------
 #===================================================
-python -c 'import apws'
-if [ $# -eq 1 ]
+python -c 'import apsw'
+if [ $? -eq 1 ]
 then
     echo "Installing apsw into the conda environment"
     cd $BASE
@@ -192,6 +232,8 @@ then
     python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions install
     cd $BASE
     rm -rf apsw
+else
+    green "apsw installed"
 fi
 
 #==================================================
@@ -204,14 +246,24 @@ python setup.py install
 #===================================================
 #------------Update the bashrc----------------------
 #===================================================
-echo "Update your $HOME/.bashrc:"
-echo "export LD_LIBRARY_PATH=$BASE/lib:\$LD_LIBRARY_PATH"
-echo "export PATH=$BASE/bin:\$PATH"
+if [ $(grep $BASE/lib ~/.bashrc | wc -l) -eq 0 ]
+then 
+    red '-----------------------------------------------'
+    red "Update your $HOME/.bashrc:"
+    echo "export LD_LIBRARY_PATH=$BASE/lib:\$LD_LIBRARY_PATH"
+    echo "export PATH=$BASE/bin:\$PATH"
+    red '-----------------------------------------------'
+fi
 
 #===================================================
 #-------------Use Instructions----------------------
 #===================================================
-echo " "
-echo "All done, to use your new environment, first restart the shell."
+green '==============================================='
+echo "All done, to use camoco, first restart the shell."
 echo "Then type: source activate $NAME"
-echo "To leave it, type: source deactivate"
+echo 'Start with the Camoco manual page: camoco --help'
+echo "When finished, type: source deactivate"
+echo ""
+echo ""
+echo "Please report all bugs to: https://github.com/schae234/Camoco/issues"
+green '==============================================='
