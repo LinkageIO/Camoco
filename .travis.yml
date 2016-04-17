@@ -16,6 +16,6 @@ install:
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:  
-  - py.test  tests -v --cov camoco 
-after_sucess:
-  - coveralls
+  - py.test  tests -v  
+#after_sucess:
+#  - coverall
