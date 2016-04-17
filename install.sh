@@ -51,6 +51,7 @@ export NAME="camoco"
 [ -z "$BASE" ] && { usage; echo "Error: Set the --base option."; exit 1; }
 [ -z "$GH_USER" ] && { usage; echo "Error: Set the --github-user option"; exit 1; }
 
+export CWD=$(pwd)
 #===================================================
 #----------Setup the build Environment--------------
 #===================================================
@@ -90,18 +91,6 @@ if ! hash git-lfs 2>/dev/null ; then
     git lfs install
     git lfs uninstall
 fi
-
-#===================================================
-#--------------Get the Camoco Repo------------------
-#===================================================
-if [ ! -d $BASE/Camoco ]
-then
-    git config --global credential.helper cache
-    echo "Cloning the Camoco repo into $BASE"
-    cd $BASE
-    git clone https://github.com/$GH_USER/Camoco.git $BASE/Camoco
-fi
-export PYTHONPATH=$PYTHONPATH:$BASE/Camoco
 
 #===================================================
 #-----Install libraries to Ensure Smoothness--------
@@ -192,20 +181,24 @@ pip install sklearn
 #===================================================
 #-----------------Install apsw----------------------
 #===================================================
-echo "Installing apsw into the conda environment"
-cd $BASE
-rm -rf apsw
-git clone https://github.com/rogerbinns/apsw.git
-cd apsw
-python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions install
-cd $BASE
-rm -rf apsw
+python -c 'import apws'
+if [ $# -eq 1 ]
+then
+    echo "Installing apsw into the conda environment"
+    cd $BASE
+    rm -rf apsw
+    git clone https://github.com/rogerbinns/apsw.git
+    cd apsw
+    python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions install
+    cd $BASE
+    rm -rf apsw
+fi
 
 #==================================================
 #-----------------Install Camoco-------------------
 #=================================================
 echo "Installing Camoco"
-cd $BASE
+cd $CWD
 python setup.py install
 
 #===================================================
