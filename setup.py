@@ -6,16 +6,16 @@ import os
 import numpy
 
 pccup = Extension(
-    'PCCUP',
+    'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
     extra_compile_args=['-ffast-math'],
-    inlcude_dirs=[numpy.get_include()]
+    include_dirs=[numpy.get_include()]
 )
 refgendist = Extension(
-    'RefGenDist',
+    'camoco.RefGenDist',
     sources=['camoco/RefGenDist.pyx'],
     extra_compile_args=['-ffast-math'],
-    inlcude_dirs=[numpy.get_include()]
+    include_dirs=[numpy.get_include()]
 )
 
 setup(
