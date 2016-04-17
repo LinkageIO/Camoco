@@ -16,7 +16,8 @@ def pair_correlation(double[:, ::1] x):
     # Define a new memoryview on an empty gene X gene matrix
     cdef double[::1] pccs = np.empty(comb(x.shape[0],2,exact=True))
     cdef double u, v
-    cdef int i, j, k, count, num_rows, num_cols
+    cdef int i, j, k, count
+    cdef double num_rows, num_cols
     cdef double du, dv, d, n, r
     cdef double sum_u, sum_v, sum_u2, sum_v2, sum_uv
     cdef long index
