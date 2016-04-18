@@ -12,6 +12,8 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
+  - echo 'export LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+  - echo 'export PATH=/home/travis/.camoco/bin:$PATH' >> ~/.bashrc
   - source activate camoco
   - python setup.py install
 # command to run tests, e.g. python setup.py test
