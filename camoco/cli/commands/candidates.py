@@ -33,11 +33,15 @@ def candidates(args):
     else:
         terms = [ont[term] for term in args.terms]
 
+    data = pd.DataFrame()
     results = []
     for term in terms:
-        results.append(
+        effective_loci = term.effective_loci(
+            window_size=args.candidate_window_size
+        )
+        genes = pd.DataFrame([ x.attr for x in 
             cob.refgen.candidate_genes(
-                term.effective_loci(window_size=args.candidate_window_size),
+                effective_loci,
                 flank_limit=args.candidate_flank_limit,
                 attrs={'term':term.id},
                 include_parent_locus=True,
@@ -45,8 +49,16 @@ def candidates(args):
                 include_num_intervening=True,
                 include_rank_intervening=True
             )
-        )
-    pd.DataFrame(
-        [x.attr for x in chain(*results)]
-    ).to_csv(args.out,index=None,sep='\t')
+        ])
+        #densities = cob.trans_locus_density(
+        #    effective_loci,
+        #    flank_limit=args.candidate_flank_limit,
+        #    by_gene=True
+        #)
+        #densities.columns = ['TransDensity']
+        #genes = pd.merge(genes,densities,left_on='Name',right_index=True)
+        data = pd.concat([data,genes])
+    data['FlankLimit'] = args.candidate_flank_limit
+    data['WindowSize'] = args.candidate_window_size
+    data.to_csv(args.out,index=None,sep='\t')
         
