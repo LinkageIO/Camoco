@@ -1,15 +1,9 @@
 import numpy as np
-cimport numpy as np
 from scipy.misc import comb 
 
-cimport cython
-
-from libc.math cimport sqrt
-from libc.math cimport isnan
-
-#cdef extern from "math.h":
-#    bint isnan(double x)
-#    double sqrt(double x)
+cdef extern from "math.h":
+    bint isnan(double x)
+    double sqrt(double x)
 
 # input is a typed numpy memoryview (::1 means c contiguous array)
 def pair_correlation(double[:, ::1] x):
@@ -17,20 +11,16 @@ def pair_correlation(double[:, ::1] x):
     cdef double[:] pccs = np.empty(comb(x.shape[0],2,exact=True))
     cdef double u, v
     cdef int i, j, k, count
-    cdef long num_rows, num_cols
     cdef double du, dv, d, n, r
     cdef double sum_u, sum_v, sum_u2, sum_v2, sum_uv
     cdef long index
 
     index = 0
-    num_rows = x.shape[0]
-    num_cols = x.shape[1]
-    for i in range(num_rows):
-        for j in range(i+1, num_rows):
+    for i in range(x.shape[0]):
+        for j in range(i+1, x.shape[0]):
             sum_u = sum_v = sum_u2 = sum_v2 = sum_uv = 0.0
             count = 0            
-            # Iterate over the column values
-            for k in range(num_cols):
+            for k in range(x.shape[1]):
                 u = x[i, k]
                 v = x[j, k]
                 # skips if u or v are nans
@@ -80,20 +70,23 @@ def coex_index(long[:] ids, int mi):
     '''
     cdef long[::] indices = np.empty(comb(ids.shape[0],2,exact=True),dtype=np.long)
     cdef long count = 0
-    cdef long ix, jx, i, j
-    cdef long num_rows
-
-    num_rows = ids.shape[0]
-    for ix in range(num_rows):
-        for jx in range(ix+1,num_rows):
+   
+    for ix in range(ids.shape[0]):
+        for jx in range(ix+1,ids.shape[0]):
             i = min(ids[ix],ids[jx])
             j = max(ids[ix],ids[jx])
             # Calculate what the index would be if it were a square matrix
+            #k = ((i * mi) + j) 
+            # Calculate the number of cells in the lower diagonal
+            #ld = (((i+1)**2) - (i+1))/2
+            # Calculate the number of items on diagonal
+            #d = i + 1
+            #indices[count] = k-ld-d
             indices[count] = square_to_vector(i,j,mi)
             count += 1
     return indices.base 
 
-cdef square_to_vector(long i, long j, mi):
+def square_to_vector(long i, long j, mi):
     '''
         Convert an index from its square form
         to its vector form
