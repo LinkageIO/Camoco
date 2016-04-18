@@ -14,7 +14,7 @@ from libc.math cimport isnan
 # input is a typed numpy memoryview (::1 means c contiguous array)
 def pair_correlation(double[:, ::1] x):
     # Define a new memoryview on an empty gene X gene matrix
-    cdef double[::1] pccs = np.empty(comb(x.shape[0],2,exact=True))
+    cdef double[:] pccs = np.empty(comb(x.shape[0],2,exact=True))
     cdef double u, v
     cdef int i, j, k, count
     cdef long num_rows, num_cols
