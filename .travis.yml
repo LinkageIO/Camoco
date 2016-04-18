@@ -6,15 +6,13 @@ python:
 # Install packages
 install:
   - bash install.sh
-  - source activate camoco
   - export LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH
   - export PATH=/home/travis/.camoco/bin:$PATH
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - export LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH
-  - export PATH=/home/travis/.camoco/bin:$PATH
+  - source activate camoco
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:  
