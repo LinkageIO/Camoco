@@ -3,13 +3,6 @@
 # Make sure that the camoco install is always frist
 import sys
 import os
-sys.path.insert(
-    1,
-    os.path.expanduser(
-        '~/.camoco/.conda/camoco/lib/python3.4/site-packages'
-    )
-)
-
 import matplotlib
 # Force matplotlib to not use any Xwindows backend.
 matplotlib.use('Agg')
@@ -46,6 +39,7 @@ if __name__ == '__main__':
         Main Arguments 
     --------------------------'''
     parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog= "\n".join([
             'version: {}'.format(co.__version__),
             'src:{}'.format(co.__file__),

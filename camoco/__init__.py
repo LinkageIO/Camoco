@@ -16,8 +16,6 @@ __version__ = '0.1.8'
 import sys
 import os
 
-#sys.path.insert(0,os.path.expanduser('~/.camoco/.conda/camoco/lib/python3.4/site-packages'))
-
 from .Config import cf
 from .Camoco import Camoco
 from .Expr import Expr
