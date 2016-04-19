@@ -5,8 +5,7 @@ python:
 
 # Install packages
 env:
-  - LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH
-  - PATH=/home/travis/.camoco/bin:$PATH
+  - LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH PATH=/home/travis/.camoco/bin:$PATH
 install:
   - bash install.sh
   - hash -r
