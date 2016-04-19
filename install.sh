@@ -21,8 +21,8 @@ exit 0
 }
 
 # Configurable variables
-export GH_USER='schae234'
-export BASE=$HOME/.camoco
+GH_USER='schae234'
+BASE=$HOME/.camoco
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -58,9 +58,7 @@ esac
 shift
 done
 
-export NAME="camoco"
-[ -z "$BASE" ] && { usage; echo "Error: Set the --base option."; exit 1; }
-[ -z "$GH_USER" ] && { usage; echo "Error: Set the --github-user option"; exit 1; }
+NAME="camoco"
 
 export CWD=$(pwd)
 #===================================================
@@ -69,23 +67,21 @@ export CWD=$(pwd)
 echo "Setting up the build environment"
 source $HOME/.bashrc
 mkdir -p $BASE
+mkdir -p $BASE/conda
 cd $BASE
 
-export LOG=$BASE/install.log
-touch $LOG
-
 export LD_LIBRARY_PATH=$BASE/lib:$LD_LIBRARY_PATH
-export PATH=$BASE/bin:$PATH
+export PATH=$PATH:$BASE/bin:$BASE/conda/bin
 
 #===================================================
 #----------------Install conda ---------------------
 #===================================================
 # if ! hash conda 2>/dev/null
-if [ ! -e $BASE/bin/conda ]
+if [ ! -e $BASE/conda/bin/conda ]
 then
     cd $BASE
 	wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-	bash miniconda.sh -b -f -p $BASE
+	bash miniconda.sh -b -f -p $BASE/conda
 	rm -f miniconda.sh
 else
     green "Conda Already Installed" 
@@ -174,10 +170,10 @@ fi
 #===================================================
 #----------Build the Conda Environment--------------
 #===================================================
-if [ ! -d $BASE/envs/camoco ]
+if [ ! -d $BASE/conda/envs/camoco ]
 then
     echo "Making the conda virtual environment named $NAME in $BASE"
-    cd $BASE
+    conda config --add envs_dirs $BASE/conda
     conda remove -y --name $NAME --all
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
         cython nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
