@@ -16,4 +16,5 @@ install:
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:  
+  - export PATH=$HOME/.camoco/bin:$PATH
   - py.test  tests -v  
