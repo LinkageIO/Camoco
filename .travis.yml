@@ -4,20 +4,17 @@ python:
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 
 # Install packages
+env:
+  - LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH
+  - PATH=/home/travis/.camoco/bin:$PATH
 install:
   - bash install.sh
-  - export LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH
-  - export PATH=/home/travis/.camoco/bin:$PATH
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - echo 'export LD_LIBRARY_PATH=/home/travis/.camoco/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
-  - echo 'export PATH=/home/travis/.camoco/bin:$PATH' >> ~/.bashrc
   - source activate camoco
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:  
   - py.test  tests -v  
-#after_sucess:
-#  - coverall
