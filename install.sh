@@ -181,9 +181,9 @@ then
     conda config --add envs_dirs $BASE/.conda
     conda remove -y --name $NAME --all
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
-        cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
+        cython nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
         scipy pandas matplotlib numexpr patsy statsmodels pytables flask \
-        networkx ipython mpmath pytest
+        networkx ipython mpmath pytest 
     conda remove -y -n $NAME libgfortran --force
     conda install -y -n $NAME libgcc --force
     conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/omnia termcolor
