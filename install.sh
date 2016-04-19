@@ -21,8 +21,8 @@ exit 0
 }
 
 # Configurable variables
-GH_USER='schae234'
-BASE=$HOME/.camoco
+export GH_USER='schae234'
+export BASE=$HOME/.camoco
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -86,7 +86,7 @@ then
     cd $BASE
 	wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 	bash miniconda.sh -b -f -p $BASE
-	rm -rf miniconda.sh
+	rm -f miniconda.sh
 else
     green "Conda Already Installed" 
 fi
@@ -174,18 +174,17 @@ fi
 #===================================================
 #----------Build the Conda Environment--------------
 #===================================================
-if [ ! -d $BASE/.conda ]
+if [ ! -d $BASE/envs/camoco ]
 then
-    echo "Making the conda virtual environment named $NAME in $BASE/.conda"
+    echo "Making the conda virtual environment named $NAME in $BASE"
     cd $BASE
-    conda config --add envs_dirs $BASE/.conda
     conda remove -y --name $NAME --all
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
         cython nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
         scipy pandas matplotlib numexpr patsy statsmodels pytables flask \
         networkx ipython mpmath pytest 
-    conda remove -y -n $NAME libgfortran --force
-    conda install -y -n $NAME libgcc --force
+    #conda remove -y -n $NAME libgfortran --force
+    #conda install -y -n $NAME libgcc --force
     conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/omnia termcolor
     conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/cpcloud ipdb
 else
@@ -195,7 +194,6 @@ fi
 #===================================================
 #----------Activate the Conda Environment-----------
 #===================================================
-
 source activate $NAME
 
 #==================================================
