@@ -22,7 +22,7 @@ exit 0
 
 # Configurable variables
 GH_USER='schae234'
-BASE=~/.camoco
+BASE=$HOME/.camoco
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
