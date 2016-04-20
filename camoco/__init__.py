@@ -11,14 +11,18 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-import pyximport
-pyximport.install()
+__version__ = '0.1.8'
+
+import sys
+import os
 
 from .Config import cf
 from .Camoco import Camoco
 from .Expr import Expr
 from .COB import COB
 from .RefGen import RefGen
+from .RefGenDist import *
+from .PCCUP import *
 from .Ontology import Ontology,Term
 from .GWAS import GWAS
 from .HapMap import HapMap

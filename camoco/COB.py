@@ -335,7 +335,7 @@ class COB(Expr):
 
     def trans_locus_locality(self, locus_list, flank_limit, 
         bootstrap=False, by_gene=False, iter_name=None, 
-        include_regression=False, include_zscore=False):
+        include_regression=False):
         '''
             Computes a table comparing local degree to global degree
             of genes COMPUTED from a set of loci. 

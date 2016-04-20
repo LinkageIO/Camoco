@@ -7,11 +7,11 @@ Camoco
 Co-Analysis of Molecular Components
 -----------------------------------
 
-Camoco is a python library modeled after the popular package pandas for
+Camoco is a python library for
 building and analyzing co-expression networks. It exposes a nice API and is
 effecient for working with such large data structures. It was created to be
-used interactively through something like iPython or normal scripting. All it
-takes to get started is an import:
+used interactively through something like iPython or normal scripting. There
+is also a small CLI available (See below)! All it takes to get started is an import:
 
 ```python 
 import camoco as co 
@@ -23,13 +23,52 @@ many of the data structures the library implements are **expensive** to make
 and the library itself relies heavily on caching. sqlite3 and hdf5 files will
 be created from you input datasets in a directory specified in `~/.camoco.conf`
 
+
+Installation
+------------
+Tagged releases are available on PyPi: `pip install camoco`. Otherwise,
+you should be able to run `python setup.py install` once you have the following
+dependencies resolved:
+
+Required: python>=3.4
+
+Hints on how we routinely build camoco can be found in our Travis-CI
+configuration file, `.travis.yml`. Following these steps should result in a
+successful build (at least on our test platform).
+
+We decided to use APSW as an sqlite3 python wrapper, instructions on building
+apsw can be found
+[here](http://rogerbinns.github.io/apsw/build.html#recommended-build)
+
+Required (install in this order to save pain):
++ cython>=0.16    
++ numpy>=1.9.1
++ scipy>=0.15
++ ipython>=3.1.0
++ pandas>=0.16
++ numexpr>=2.0.0
++ tables>=3.0.0 (hdf5)
++ apsw>=3.8
++ matplotlib>=1.4.3
++ statsmodels>=0.6.1
++ termcolor>=1.1.0
++ pyaml==15.6.3
+
+Documentation
+-------------
+We acknowledge a lack of formal manual. We are writing this. However, the function definitions
+themselves are well commented throughout the code base. Questions and concerns about usage issued
+through github will be addressed! Contact us!
+
+
+CLI
+---
+Once installed, the `camoco` command will be available through the terminal. See `camoco --help` for options!
+
 Camoco 
 ------ 
-The base camoco class is almost entirely abstract. This means that you
-never really interact with a camoco class directly, instead many other classes
-inherit properties from the camoco class. This is nice because, as I said
-before, many of the data structures are expensive to compute. What camoco does
-is to require datasets to have names and descriptions, so after they are built,
+The base camoco class is almost entirely abstract. Camoco require datasets 
+to have names and descriptions, so after they are built,
 they can be cached on disk using sqlite and hdf5. This makes it fast to come
 back! On disk objects are stored in a directory specified as `basedir` in the
 configuration file: `~/.camoco.conf `. This is all done automatically, so if
@@ -61,44 +100,15 @@ RefGen and Locus
 Python has a fantastic range of built in data types. It lacks however in a data
 type which succinctly represents a locus. Loci cover a large range of
 biological data types; a gene is a locus, as is a SNP, or a QTL, or an entire
-chromosome. It all depends on context.
-
-Installation
-------------
-Tagged releases are available on PyPi: `pip install camoco`. Otherwise,
-you should be able to run `python setup.py install` once you have the following
-dependencies resolved:
-
-Required: python>=3.3
-
-Hints on how we routinely build camoco can be found in our Travis-CI
-configuration file, `.travis.yml`. Following these steps should result in a
-successful build (at least on our test platform).
-
-We decided to use APSW as an sqlite3 python wrapper, instructions on building
-apsw can be found
-[here](http://rogerbinns.github.io/apsw/build.html#recommended-build)
-
-Required (install in this order to save pain):
-+ cython>=0.16    
-+ numpy>=1.9.1
-+ scipy>=0.15
-+ ipython>=3.1.0
-+ pandas>=0.16
-+ numexpr>=2.0.0
-+ tables>=3.0.0 (hdf5)
-+ apsw>=3.8
-+ matplotlib>=1.4.3
-+ statsmodels>=0.6.1
-+ termcolor>=1.1.0
-+ pyaml==15.6.3
+chromosome. It all depends on context. The Locus and RefGen classes implement
+a basic locus data type in python. These objects are extensively used as parameters
+to functions throughout Camoco.
 
 
 Tests
 -----
 Unit tests within Camoco are implemented using the pytest framework. Unit tests
 as well as Build tests can be found in the test directory.
-
 
 
 CacheMoneyCorn

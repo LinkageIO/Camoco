@@ -3,24 +3,42 @@
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
 import os
+
+import io
+import re
 import numpy
 
+def read(*names, **kwargs):
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *names),
+        encoding=kwargs.get("encoding", "utf8")
+    ) as fp:
+        return fp.read()
+
+def find_version(*file_paths):
+    version_file = read(*file_paths)
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+                              version_file, re.M)
+    if version_match:
+        return version_match.group(1)
+    raise RuntimeError("Unable to find version string.")
+
 pccup = Extension(
-    'PCCUP',
+    'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
-    extra_compile_args=['-ffast-math'],
-    inlcude_dirs=[numpy.get_include()]
+#    extra_compile_args=['-ffast-math'],
+    include_dirs=[numpy.get_include()]
 )
 refgendist = Extension(
-    'RefGenDist',
+    'camoco.RefGenDist',
     sources=['camoco/RefGenDist.pyx'],
-    extra_compile_args=['-ffast-math'],
-    inlcude_dirs=[numpy.get_include()]
+#    extra_compile_args=['-ffast-math'],
+    include_dirs=[numpy.get_include()]
 )
 
 setup(
     name = 'camoco',
-    version = '0.1.8',
+    version = find_version('camoco','__init__.py'),
     packages = find_packages(),
     scripts = [
         'camoco/cli/camoco'
