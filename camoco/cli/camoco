@@ -30,6 +30,7 @@ from camoco.cli.commands.list import list_command
 from camoco.cli.commands.simulateGWAS import simulateGWAS
 from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.candidates import candidates
+from camoco.cli.commands.geneneighbors import geneneighbors
 from camoco import cf
 
 from argparse import ArgumentParser
@@ -676,7 +677,44 @@ if __name__ == '__main__':
         default=sys.stdout
     )
     candidates_cmd.set_defaults(func=candidates)
-
+    '''----------------------------------
+      gene neighbors
+    -------------------------------------'''
+    geneneighbors_cmd = subparsers.add_parser(
+      'geneneighbors',
+      help=(
+          'Generate significant gene neighbors'
+          'from largest to smallest Z-score'    
+      )
+    )
+    geneneighbors_cmd.add_argument(
+      'cob',
+      default=None
+    )
+    geneneighbors_cmd.add_argument(
+    '--numneighbors',
+    type=int,
+    default=10, 
+    metavar=10,
+    help=(
+      'The number of neighboring genes to return. '
+      'on each side of the locus. (default: 10)' 
+    )
+    )
+    geneneighbors_cmd.add_argument(
+    '--zscore',
+    type=int,
+    default=3, 
+    metavar=3,
+    help=(
+      'Z-score significance cutoff (default: 3). '
+      )
+    )
+    geneneighbors_cmd.add_argument(
+      '--out',
+      default=sys.stdout
+    )
+    geneneighbors_cmd.set_defaults(func=geneneighbors)
 
     ''' -------------------------------------------------------------------
     # DO IT 
