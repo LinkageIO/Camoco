@@ -12,7 +12,12 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
+  - echo $PATH
   - source activate camoco
+  - echo $PATH
+  - ls -la ~
+  - ls -la ~/.camoco
+  - ls -la ~/.camoco/conda
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:  
