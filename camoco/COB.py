@@ -530,7 +530,7 @@ class COB(Expr):
         cmd = "mcl {} --abc -scheme {} -I {} -o -".format(tmp.name, scheme, I)
         self.log("running MCL: {}", cmd)
         try:
-            p = Popen(cmd, stdout=PIPE, stderr=sys.stderr, shell=False)
+            p = Popen(cmd, stdout=PIPE, stderr=sys.stderr, shell=True)
             self.log('waiting for MCL to finish...')
             sout = p.communicate()[0]
             p.wait()
