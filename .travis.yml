@@ -13,13 +13,11 @@ install:
   - conda update -q conda
   - conda info -a
   - echo $PATH
-  - source activate camoco
-  - echo $PATH
-  - ls -la ~
-  - ls -la ~/.camoco
-  - ls -la ~/.camoco/conda
-  - which python
-  - python setup.py install
+  - ls -la ~/.camoco/*
+  - ls -la ~/.camoco/conda/*
 # command to run tests, e.g. python setup.py test
 script:  
+  - source activate camoco
+  - which python
+  - python setup.py install
   - py.test  tests -v  
