@@ -14,14 +14,11 @@ cat <<EOF
         print help message
     -b | --base
         Base installation directory for camoco (default: ~/.camoco).
-    -g | --github-user
-        Optional github user to clone Camoco repo from (default: schae234)
 EOF
 exit 0
 }
 
 # Configurable variables
-GH_USER='schae234'
 BASE=$HOME/.camoco
 
 RED='\033[0;31m'
@@ -44,11 +41,7 @@ case $key in
     shift
     ;;
     -b|--base)
-    BASE= $(readlink -f $2)
-    shift
-    ;;
-    -g|--github-user)
-    GH_USER=$2
+    BASE=$2
     shift
     ;;
     *)  
