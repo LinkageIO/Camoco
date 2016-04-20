@@ -15,4 +15,5 @@ install:
 # command to run tests, e.g. python setup.py test
 script:  
   - source $HOME/.camoco/conda/bin/activate camoco
+  - export PATH=/home/travis/.camoco/bin/:$PATH
   - py.test  tests -v  

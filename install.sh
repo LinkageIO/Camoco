@@ -248,7 +248,7 @@ then
     red '-----------------------------------------------'
     red "Update your $HOME/.bashrc:"
     echo "export LD_LIBRARY_PATH=$BASE/lib:\$LD_LIBRARY_PATH"
-    echo "export PATH=\$PATH:$BASE/bin:$BASE/conda/bin"
+    echo "export PATH=$BASE/bin:$BASE/conda/bin:\$PATH"
     red '-----------------------------------------------'
 fi
 
