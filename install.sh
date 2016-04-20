@@ -176,8 +176,8 @@ then
     conda config --add envs_dirs $BASE/conda
     conda remove -y --name $NAME --all
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
-        cython nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
-        scipy pandas matplotlib numexpr patsy statsmodels pytables flask \
+        cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
+        scipy pandas matplotlib==1.4.3 numexpr patsy statsmodels pytables flask \
         networkx ipython mpmath pytest 
     #conda remove -y -n $NAME libgfortran --force
     #conda install -y -n $NAME libgcc --force
@@ -242,12 +242,12 @@ source deactivate $NAME
 #===================================================
 #------------Update the bashrc----------------------
 #===================================================
-if [ $(grep $BASE/lib ~/.bashrc | wc -l) -eq 0 ]
+if [ $(grep $BASE/conda/bin ~/.bashrc | wc -l) -eq 0 ]
 then 
     red '-----------------------------------------------'
     red "Update your $HOME/.bashrc:"
     echo "export LD_LIBRARY_PATH=$BASE/lib:\$LD_LIBRARY_PATH"
-    echo "export PATH=$BASE/bin:\$PATH"
+    echo "export PATH=$PATH:$BASE/bin:$BASE/conda/bin"
     red '-----------------------------------------------'
 fi
 
