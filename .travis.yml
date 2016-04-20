@@ -6,19 +6,13 @@ python:
 # Install packages
 env:
   - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.camoco/lib PATH=$PATH:$HOME/.camoco/bin:$HOME/.camoco/conda/bin
-before_install:
-  - bash install.sh
+install:
+  - ./install.sh
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - echo $PATH
-  - ls -la ~/.camoco/*
-  - ls -la ~/.camoco/conda/*
 # command to run tests, e.g. python setup.py test
-install:
-  - source activate camoco
-  - which python
-  - python setup.py install
 script:  
+  - source activate camoco
   - py.test  tests -v  
