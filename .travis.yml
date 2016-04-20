@@ -14,5 +14,5 @@ install:
   - conda info -a
 # command to run tests, e.g. python setup.py test
 script:  
-  - source activate camoco
+  - source $HOME/.camoco/conda/bin/activate camoco
   - py.test  tests -v  
