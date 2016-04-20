@@ -18,6 +18,7 @@ install:
   - ls -la ~
   - ls -la ~/.camoco
   - ls -la ~/.camoco/conda
+  - which python
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:  
