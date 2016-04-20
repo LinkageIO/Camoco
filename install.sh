@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Script to setup camoco in an anaconda environment
 # Written by Joe Jeffers and Rob Schaefer
 # Email: jeffe174@umn.edu, schae234@umn.edu
@@ -173,7 +173,6 @@ fi
 if [ ! -d $BASE/conda/envs/camoco ]
 then
     echo "Making the conda virtual environment named $NAME in $BASE"
-    conda config --add envs_dirs $BASE/conda
     conda remove -y --name $NAME --all
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
         cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
@@ -191,7 +190,9 @@ fi
 #----------Activate the Conda Environment-----------
 #===================================================
 green "activating $NAME"
-source activate $NAME
+source $BASE/conda/bin/activate $NAME
+green 'checking python'
+which python
 
 #==================================================
 #----------Take care of some pip packages ---------
