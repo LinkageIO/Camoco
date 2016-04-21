@@ -167,6 +167,7 @@ if [ ! -d $BASE/conda/envs/camoco ]
 then
     echo "Making the conda virtual environment named $NAME in $BASE"
     conda remove -y --name $NAME --all
+    conda config --add envs_dirs $BASE/conda/envs
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
         cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
         scipy pandas matplotlib==1.4.3 numexpr patsy statsmodels pytables flask \

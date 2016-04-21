@@ -7,12 +7,30 @@ Camoco
 Co-Analysis of Molecular Components
 -----------------------------------
 
-Camoco is a python library for
-building and analyzing co-expression networks. It exposes a nice API and is
-effecient for working with such large data structures. It was created to be
-used interactively through something like iPython or normal scripting. There
-is also a small CLI available (See below)!
+Camoco is a python library for building and analyzing co-expression networks.
+It creates co-expression networks from tablular formatted expression data and
+common genome data files:
 
+Required Files:
++ FPKM (or equivalent) CSV/TSV file
++ GFF File
+
+Optional Files:
++ Gene Ontology (.obo and gene mapping)
+
+Once co-expression networks are built, you can interact with the data using
+the included command line:
+
+```
+source activate camoco
+camoco --help
+```
+See more examples below in the CLI section.
+
+or by using the package within a script
+```
+import camoco as co
+```
 
 Installation
 ------------
@@ -41,8 +59,9 @@ to be available from your shell.
 
 e.g.:
 ```
-export LD_LIBRARY_PATH=$BASE/lib:\$LD_LIBRARY_PATH
-export PATH=$BASE/bin:$BASE/conda/bin:\$PATH
+# Assuming your installed camoco to ~/.camoco
+export LD_LIBRARY_PATH=~/.camoco/lib/:$LD_LIBRARY_PATH
+export PATH=$BASE/bin:~/.camoco/conda/bin/:$PATH
 ```
 
 The installation script accepts simple arguments:
