@@ -79,7 +79,7 @@ def density(args):
             gene_density['zscore'] = (gene_density.score-bs_mean)/bs_std
             gene_density['fdr'] = np.nan
             bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
-            for zscore in range(0,8):
+            for zscore in range(0,8,0.25):
                 zdf = bootstraps[bootstraps.zscore >= zscore]
                 if len(zdf) > 0:
                     num_random = zdf.groupby('iter').apply(len).mean()

@@ -663,6 +663,16 @@ if __name__ == '__main__':
         )
     )
     candidates_cmd.add_argument(
+        '--include-parent-attrs',
+        default=[],
+        metavar='[attrs,]',
+        nargs='*',
+        help=(
+            'Include the specified parent locus attributes from'
+            'the effective SNP.'
+        )
+    )
+    candidates_cmd.add_argument(
         '--strongest-higher',
         action='store_false',
         default=True,

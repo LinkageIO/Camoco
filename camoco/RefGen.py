@@ -366,8 +366,9 @@ class RefGen(Camoco):
 
     def candidate_genes(self, loci, flank_limit=2,
         chain=True, window_size=None, include_parent_locus=False,
-        include_num_intervening=False, include_rank_intervening=False,
-        include_num_siblings=False,attrs=None):
+        include_parent_attrs=False,include_num_intervening=False, 
+        include_rank_intervening=False, include_num_siblings=False,
+        attrs=None):
         '''
             Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -391,8 +392,12 @@ class RefGen(Camoco):
                 Optional parameter which will update candidate genes
                 'attr' attribute with the id of the parent locus
                 which contains it.
-            include_parent_attrs : bool (default: True)
-                Optional parameters to 
+            include_parent_attrs : iterable (default: False)
+                Optional parameter to include attributes from the parent
+                locus. Parent locus attrs specified here will be included. 
+                If effective loci is > 1, the maximum value will be
+                included. E.g. - including the SNP effect size with 
+                candidate genes.
             include_num_intervening : bool (default: False)
                 Optional argument which adds an attribute to each 
                 candidate genes containing the rank of each gene
@@ -431,18 +436,24 @@ class RefGen(Camoco):
             # use the specific methods
             genes = sorted(itertools.chain(up_genes,genes_within,down_genes))
             #include the number of effective loci
-            gene.update({'num_effective_loci':len(locus.sub_loci)})
-            # include parent locus id if thats specified
-            if include_parent_locus == True:
-                for gene in genes:
-                    gene.update({'parent_locus':locus.id})
             if include_rank_intervening == True:
                 ranks = sp.stats.rankdata([locus-x for x in genes])
-                for rank,gene in zip(ranks,genes):
-                    gene.update({'intervening_rank':rank})
+            # Iterate through candidate genes and propagate the 
+            # parental info
+            for i,gene in enumerate(genes):
+                gene.update({'num_effective_loci':len(locus.sub_loci)})
+                # include parent locus id if thats specified
+                if include_parent_locus == True:
+                    gene.update({'parent_locus':locus.id})
+                if include_rank_intervening == True:
+                    gene.update({'intervening_rank':ranks[i]})
+                # update all the parent_attrs
+                for attr in include_parent_attrs:
+                    attr_name = 'parent_{}'.format(attr)
+                    gene.update({attr_name: locus[attr]})
             if include_num_intervening == True:
                 num_down = 0
-                    num_up = 0
+                num_up = 0
                 # Sort the genes by their distance from the locus
                 genes = sorted(genes,key=lambda x: x-locus)
                 for gene in genes:
@@ -455,6 +466,7 @@ class RefGen(Camoco):
                         gene.update({'num_intervening':num_up})
                         num_up += 1
 
+        
             if include_num_siblings == True:
                 for gene in genes:
                     gene.update({'num_siblings':len(genes)})
@@ -471,6 +483,7 @@ class RefGen(Camoco):
                     locus, flank_limit=flank_limit,
                     chain=chain, window_size=window_size,
                     include_parent_locus=include_parent_locus,
+                    include_parent_attrs=include_parent_attrs,
                     include_num_intervening=include_num_intervening,
                     include_rank_intervening=include_rank_intervening,
                     include_num_siblings=include_num_siblings,
