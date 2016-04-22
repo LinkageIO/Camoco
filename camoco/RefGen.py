@@ -391,6 +391,8 @@ class RefGen(Camoco):
                 Optional parameter which will update candidate genes
                 'attr' attribute with the id of the parent locus
                 which contains it.
+            include_parent_attrs : bool (default: True)
+                Optional parameters to 
             include_num_intervening : bool (default: False)
                 Optional argument which adds an attribute to each 
                 candidate genes containing the rank of each gene
@@ -428,8 +430,9 @@ class RefGen(Camoco):
             # you want specific up,within and down genes
             # use the specific methods
             genes = sorted(itertools.chain(up_genes,genes_within,down_genes))
-
-            # include parent locus id if thats  
+            #include the number of effective loci
+            gene.update({'num_effective_loci':len(locus.sub_loci)})
+            # include parent locus id if thats specified
             if include_parent_locus == True:
                 for gene in genes:
                     gene.update({'parent_locus':locus.id})
@@ -439,7 +442,7 @@ class RefGen(Camoco):
                     gene.update({'intervening_rank':rank})
             if include_num_intervening == True:
                 num_down = 0
-                num_up = 0
+                    num_up = 0
                 # Sort the genes by their distance from the locus
                 genes = sorted(genes,key=lambda x: x-locus)
                 for gene in genes:
