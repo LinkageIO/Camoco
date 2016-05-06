@@ -287,7 +287,7 @@ if __name__ == '__main__':
     )
     densityCLI.add_argument(
         '--out', 
-        default=sys.stdout,
+        default=None,
         help='OutputFile Name (default: Standard Out)'
     )
     densityCLI.set_defaults(func=density)
@@ -680,6 +680,17 @@ if __name__ == '__main__':
             'Flag indicating the value in --strongest-attr is'
             'stronger if higher. Default behavior is to treat'
             'lower values as stronger (i.e. p-vals)'
+        )
+    )
+    candidates_cmd.add_argument(
+        '--gene-info',
+        default=[],
+        metavar='[file1, file2, ...]',
+        nargs='*',
+        help=(
+            'Include additional candidate gene info output from '
+            'other tables. Assumes that the gene ID is the first '
+            'column of the file. You can specify multiple files '
         )
     )
     candidates_cmd.add_argument(
