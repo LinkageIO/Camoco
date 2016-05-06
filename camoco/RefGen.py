@@ -366,7 +366,7 @@ class RefGen(Camoco):
 
     def candidate_genes(self, loci, flank_limit=2,
         chain=True, window_size=None, include_parent_locus=False,
-        include_parent_attrs=False,include_num_intervening=False, 
+        include_parent_attrs=False, include_num_intervening=False, 
         include_rank_intervening=False, include_num_siblings=False,
         attrs=None):
         '''
@@ -448,9 +448,10 @@ class RefGen(Camoco):
                 if include_rank_intervening == True:
                     gene.update({'intervening_rank':ranks[i]})
                 # update all the parent_attrs
-                for attr in include_parent_attrs:
-                    attr_name = 'parent_{}'.format(attr)
-                    gene.update({attr_name: locus[attr]})
+                if include_parent_attrs:
+                    for attr in include_parent_attrs:
+                        attr_name = 'parent_{}'.format(attr)
+                        gene.update({attr_name: locus[attr]})
             if include_num_intervening == True:
                 num_down = 0
                 num_up = 0
