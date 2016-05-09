@@ -287,7 +287,7 @@ if __name__ == '__main__':
     )
     densityCLI.add_argument(
         '--out', 
-        default=sys.stdout,
+        default=None,
         help='OutputFile Name (default: Standard Out)'
     )
     densityCLI.set_defaults(func=density)
@@ -663,6 +663,16 @@ if __name__ == '__main__':
         )
     )
     candidates_cmd.add_argument(
+        '--include-parent-attrs',
+        default=[],
+        metavar='[attrs,]',
+        nargs='*',
+        help=(
+            'Include the specified parent locus attributes from'
+            'the effective SNP.'
+        )
+    )
+    candidates_cmd.add_argument(
         '--strongest-higher',
         action='store_false',
         default=True,
@@ -673,42 +683,54 @@ if __name__ == '__main__':
         )
     )
     candidates_cmd.add_argument(
+        '--gene-info',
+        default=[],
+        metavar='[file1, file2, ...]',
+        nargs='*',
+        help=(
+            'Include additional candidate gene info output from '
+            'other tables. Assumes that the gene ID is the first '
+            'column of the file. You can specify multiple files '
+        )
+    )
+    candidates_cmd.add_argument(
         '--out',
         default=sys.stdout
     )
     candidates_cmd.set_defaults(func=candidates)
+
     '''----------------------------------
       gene neighbors
     -------------------------------------'''
     geneneighbors_cmd = subparsers.add_parser(
-      'geneneighbors',
-      help=(
-          'Generate significant gene neighbors'
-          'from largest to smallest Z-score'    
-      )
+        'geneneighbors',
+        help=(
+            'Generate significant gene neighbors'
+            'from largest to smallest Z-score'    
+        )
     )
     geneneighbors_cmd.add_argument(
-      'cob',
-      default=None
+        'cob',
+        default=None
     )
     geneneighbors_cmd.add_argument(
-    '--numneighbors',
-    type=int,
-    default=10, 
-    metavar=10,
-    help=(
-      'The number of neighboring genes to return. '
-      'on each side of the locus. (default: 10)' 
-    )
+        '--numneighbors',
+        type=int,
+        default=10, 
+        metavar=10,
+        help=(
+            'The number of neighboring genes to return. '
+            'on each side of the locus. (default: 10)' 
+        )
     )
     geneneighbors_cmd.add_argument(
-    '--zscore',
-    type=int,
-    default=3, 
-    metavar=3,
-    help=(
-      'Z-score significance cutoff (default: 3). '
-      )
+        '--zscore',
+        type=int,
+        default=3, 
+        metavar=3,
+        help=(
+            'Z-score significance cutoff (default: 3). '
+        )
     )
     geneneighbors_cmd.add_argument(
       '--out',
