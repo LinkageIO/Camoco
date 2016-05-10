@@ -232,7 +232,7 @@ fi
 echo "Installing Camoco"
 cd $CWD
 python setup.py install
-source deactivate $NAME
+source deactivate 
 
 #===================================================
 #------------Update the bashrc----------------------

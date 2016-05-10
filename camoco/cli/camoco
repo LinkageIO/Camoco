@@ -70,9 +70,19 @@ if __name__ == '__main__':
         metavar='Available Commands',
         description='Use --help with each command for more info',
     )
+
+
     # Also allow the help message to be printed using the help command
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
+
+    '''--------------------------
+        Build
+    --------------------------'''
+    bldcmd = subparsers.add_parser(
+        'build',
+        help='Build a dataset.'
+    )
 
     '''--------------------------
         list 
@@ -703,7 +713,7 @@ if __name__ == '__main__':
       gene neighbors
     -------------------------------------'''
     geneneighbors_cmd = subparsers.add_parser(
-        'geneneighbors',
+        'neighbors',
         help=(
             'Generate significant gene neighbors'
             'from largest to smallest Z-score'    
