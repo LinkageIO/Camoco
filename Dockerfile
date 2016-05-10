@@ -6,6 +6,7 @@ RUN apt-get -y update && apt-get install -y \
         git \
         vim \
         gcc \
+        build-essential \
         libqt5gui5 \
         python3
 
