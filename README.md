@@ -34,7 +34,31 @@ import camoco as co
 
 Installation
 ------------
-The best way to install Camoco is to use the included installation script.
+#### Docker
+The easiest way to install Camoco is to use the included DockerFile. Download and
+install [Docker](https://www.docker.com) on Linux, windows or Mac OS X. Using
+docker will ensure that Camoco is run in an environment closest to what it was
+developed in. After you have installed and tested docker, you should be able to
+build and run camoco:
+
+```
+# Download the repo
+git clone https://github.com/schae234/Camoco.git
+# Build the docker file (grab some coffee)
+cd Camoco
+docker build -t camoco .
+# Run the docker image interactively
+docker run -it camoco
+# Inside docker image
+souce activate camoco
+camoco --help
+source deactivate
+# Exit the docker image
+exit
+``` 
+
+#### Virtual Environment
+Alternatively, you can install Camoco using the included installation script.
 This script creates an anaconda based virtual environment which takes care of
 all required python packages as well as several of the external binaries and 
 programs used by Camoco. Installation should be as easy as:
