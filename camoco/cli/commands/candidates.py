@@ -8,7 +8,7 @@ import camoco as co
 
 from itertools import chain
 
-def candidates(args):
+def snp2Gene(args):
     '''
         Perform SNP (locus) to candidate gene mapping
     '''
@@ -17,7 +17,7 @@ def candidates(args):
         # Create any non-existant directories
         if os.path.dirname(args.out) != '':
             os.makedirs(os.path.dirname(args.out),exist_ok=True)
-        if os.path.exists(args.out):
+        if os.path.exists(args.out) and args.overlook == True:
             print(
                 "Output for {} exists! Skipping!".format(
                     args.out
@@ -48,7 +48,7 @@ def candidates(args):
                 lowest=args.strongest_higher
             )
  
-        genes = pd.DataFrame([ x.attr for x in 
+        genes = pd.DataFrame([ x.as_dict() for x in 
             cob.refgen.candidate_genes(
                 effective_loci,
                 flank_limit=args.candidate_flank_limit,
@@ -60,16 +60,20 @@ def candidates(args):
                 include_parent_attrs=args.include_parent_attrs
             )
         ])
-        #densities = cob.trans_locus_density(
-        #    effective_loci,
-        #    flank_limit=args.candidate_flank_limit,
-        #    by_gene=True
-        #)
-        #densities.columns = ['TransDensity']
-        #genes = pd.merge(genes,densities,left_on='Name',right_index=True)
+       
         data = pd.concat([data,genes])
     data['COB'] = cob.name
     data['FlankLimit'] = args.candidate_flank_limit
     data['WindowSize'] = args.candidate_window_size
+
+    # Add data from gene info files
+    for info_file in args.gene_info:
+        cob.log('Adding info for {}',info_file)
+        # Assume the file is a table
+        info = pd.read_table(info_file,sep='\t')
+        # try to match as many columns as possible
+        data = pd.merge(data,info,how='left')
+    
+    # Generate the output file
     data.to_csv(args.out,index=None,sep='\t')
         
