@@ -8,7 +8,7 @@ import camoco as co
 
 from itertools import chain
 
-def snp2Gene(args):
+def snp2gene(args):
     '''
         Perform SNP (locus) to candidate gene mapping
     '''
@@ -67,12 +67,18 @@ def snp2Gene(args):
     data['WindowSize'] = args.candidate_window_size
 
     # Add data from gene info files
+    original_number_genes = len(data)
     for info_file in args.gene_info:
         cob.log('Adding info for {}',info_file)
         # Assume the file is a table
         info = pd.read_table(info_file,sep='\t')
         # try to match as many columns as possible
         data = pd.merge(data,info,how='left')
+        if len(data) != original_number_genes:
+            cob.log.warn(
+                'Info file did not contain unique gene mappings, '
+                'beware of duplicate candidate gene entries!'
+            )
     
     # Generate the output file
     data.to_csv(args.out,index=None,sep='\t')
