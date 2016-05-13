@@ -225,9 +225,9 @@ if __name__ == '__main__':
     )
     densityCLI.add_argument(
         '--num-bootstraps', 
-        default=50,
+        default=100,
         type=int, 
-        metavar=50,
+        metavar=100,
         help=(
             'The number of bootstraps to perform in order '
             'to estimate a null distribution. (default: 50)'
