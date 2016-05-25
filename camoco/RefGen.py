@@ -253,7 +253,7 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
-    def upstream_genes(self,locus,gene_limit=1000,window=None):
+    def upstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Find genes that START upstream of a locus. 
             Genes are ordered so that the nearest genes are 
@@ -271,13 +271,13 @@ class RefGen(Camoco):
                 -----------------------------x****************x--
                    ^_________________________| Window (upstream)
         '''
-        if locus.window == 0 and window is None:
+        if locus.window == 0 and window_size is None:
             raise CamocoZeroWindowError(
                 'Asking for upstream genes for {}',
                 locus.id
             )
-        if window is not None:
-            upstream = locus.start - window
+        if window_size is not None:
+            upstream = locus.start - window_size
         else:
             upstream = locus.upstream
         return [
@@ -292,7 +292,7 @@ class RefGen(Camoco):
             ''',(locus.chrom, locus.start, upstream, gene_limit)
         )]
 
-    def downstream_genes(self,locus,gene_limit=1000,window=None):
+    def downstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Returns genes downstream of a locus. Genes are ordered 
             so that the nearest genes are at the beginning of the list.
@@ -308,13 +308,13 @@ class RefGen(Camoco):
               ---x****************x--------------------------------
                                   |_______________________^ Window (downstream)
         '''
-        if locus.window == 0 and window is None:
+        if locus.window == 0 and window_size is None:
             raise CamocoZeroWindowError(
                 'Asking for upstream genes for {}',
                 locus.id
             )
-        if window is not None:
-            downstream = locus.end + window
+        if window_size is not None:
+            downstream = locus.end + window_size
         else:
             downstream = locus.downstream
 
@@ -330,7 +330,7 @@ class RefGen(Camoco):
             ''',(locus.chrom, locus.end, downstream, gene_limit)
         )]
 
-    def flanking_genes(self, loci, flank_limit=2,chain=True,window=None):
+    def flanking_genes(self, loci, flank_limit=2,chain=True,window_size=None):
         '''
             Returns genes upstream and downstream from a locus
             ** done NOT include genes within locus **
@@ -338,7 +338,7 @@ class RefGen(Camoco):
         if isinstance(loci,Locus):
             # If we cant iterate, we have a single locus
             locus = loci
-            if locus.window == 0 and window is None:
+            if locus.window == 0 and window_size is None:
                 raise CamocoZeroWindowError(
                     'Asking for upstream genes for {}',
                     locus.id
@@ -346,10 +346,10 @@ class RefGen(Camoco):
             upstream_gene_limit = int(flank_limit)
             downstream_gene_limit = int(flank_limit)
             up_genes = self.upstream_genes(
-                locus, gene_limit=upstream_gene_limit, window=window
+                locus, gene_limit=upstream_gene_limit, window_size=window_size
             )
             down_genes = self.downstream_genes(
-                locus, gene_limit=downstream_gene_limit, window=window
+                locus, gene_limit=downstream_gene_limit, window_size=window_size
             )
             if chain:
                 return list(itertools.chain(up_genes,down_genes))
@@ -357,7 +357,7 @@ class RefGen(Camoco):
         else:
             iterator = iter(loci)
             genes = [
-                self.flanking_genes(locus,flank_limit=flank_limit,window=window)\
+                self.flanking_genes(locus,flank_limit=flank_limit,window_size=window_size)\
                 for locus in iterator
             ]
             if chain:
@@ -365,9 +365,10 @@ class RefGen(Camoco):
             return genes
 
     def candidate_genes(self, loci, flank_limit=2,
-        chain=True, window=None, include_parent_locus=False,
-        include_num_intervening=False, include_rank_intervening=False,
-        include_num_siblings=False,attrs=None):
+        chain=True, window_size=None, include_parent_locus=False,
+        include_parent_attrs=False, include_num_intervening=False, 
+        include_rank_intervening=False, include_num_siblings=False,
+        attrs=None):
         '''
             Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -382,7 +383,7 @@ class RefGen(Camoco):
                 considered a candidate surrounding a locus
             chain : bool (default : true)
                 Calls itertools chain on results before returning
-            window : int (default: None)
+            window_size : int (default: None)
                 Optional parameter used to extend or shorten a locus
                 window from which to choose candidates from. If None,
                 the function will resort to what is available in the
@@ -391,6 +392,12 @@ class RefGen(Camoco):
                 Optional parameter which will update candidate genes
                 'attr' attribute with the id of the parent locus
                 which contains it.
+            include_parent_attrs : iterable (default: False)
+                Optional parameter to include attributes from the parent
+                locus. Parent locus attrs specified here will be included. 
+                If effective loci is > 1, the maximum value will be
+                included. E.g. - including the SNP effect size with 
+                candidate genes.
             include_num_intervening : bool (default: False)
                 Optional argument which adds an attribute to each 
                 candidate genes containing the rank of each gene
@@ -421,22 +428,30 @@ class RefGen(Camoco):
             genes_within = self.genes_within(locus)
             up_genes,down_genes = self.flanking_genes(
                 locus, flank_limit=flank_limit, chain=False,
-                window=window
+                window_size=window_size
             )
 
             # This always returns candidates together, if 
             # you want specific up,within and down genes
             # use the specific methods
             genes = sorted(itertools.chain(up_genes,genes_within,down_genes))
-
-            # include parent locus id if thats  
-            if include_parent_locus == True:
-                for gene in genes:
-                    gene.update({'parent_locus':locus.id})
+            #include the number of effective loci
             if include_rank_intervening == True:
                 ranks = sp.stats.rankdata([locus-x for x in genes])
-                for rank,gene in zip(ranks,genes):
-                    gene.update({'intervening_rank':rank})
+            # Iterate through candidate genes and propagate the 
+            # parental info
+            for i,gene in enumerate(genes):
+                gene.update({'num_effective_loci':len(locus.sub_loci)})
+                # include parent locus id if thats specified
+                if include_parent_locus == True:
+                    gene.update({'parent_locus':locus.id})
+                if include_rank_intervening == True:
+                    gene.update({'intervening_rank':ranks[i]})
+                # update all the parent_attrs
+                if include_parent_attrs:
+                    for attr in include_parent_attrs:
+                        attr_name = 'parent_{}'.format(attr)
+                        gene.update({attr_name: locus[attr]})
             if include_num_intervening == True:
                 num_down = 0
                 num_up = 0
@@ -452,6 +467,7 @@ class RefGen(Camoco):
                         gene.update({'num_intervening':num_up})
                         num_up += 1
 
+        
             if include_num_siblings == True:
                 for gene in genes:
                     gene.update({'num_siblings':len(genes)})
@@ -466,8 +482,9 @@ class RefGen(Camoco):
                 # This is becoming a pain in the ass
                 self.candidate_genes(
                     locus, flank_limit=flank_limit,
-                    chain=chain, window=window,
+                    chain=chain, window_size=window_size,
                     include_parent_locus=include_parent_locus,
+                    include_parent_attrs=include_parent_attrs,
                     include_num_intervening=include_num_intervening,
                     include_rank_intervening=include_rank_intervening,
                     include_num_siblings=include_num_siblings,
@@ -479,7 +496,7 @@ class RefGen(Camoco):
             return genes
 
     def bootstrap_candidate_genes(self, loci, flank_limit=2,
-        chain=True,window=None):
+        chain=True, window_size=None, include_parent_locus=False):
         '''
             Returns candidate genes which are random, but conserves
             total number of overall genes.
@@ -493,6 +510,10 @@ class RefGen(Camoco):
                 considered a candidate surrounding a locus
             chain : bool (default : true)
                 Calls itertools chain on results before returning,
+            include_parent_locus : bool (default: False)
+                Optional parameter which will update candidate genes
+                'attr' attribute with the id of the parent locus
+                which contains it.
 
             Returns
             -------
@@ -506,7 +527,7 @@ class RefGen(Camoco):
             num_candidates = len(
                 self.candidate_genes(
                     locus, flank_limit=flank_limit,
-                    chain=True, window=window
+                    chain=True, window_size=window_size
                 )
             )
             if num_candidates == 0:
@@ -517,7 +538,7 @@ class RefGen(Camoco):
             random_candidates = self.upstream_genes(
                 random_gene, 
                 gene_limit=num_candidates,
-                window=10e100
+                window_size=10e100
             )
             if len(random_candidates) != num_candidates:
                 # somehow we hit the end of a chromosome
@@ -525,6 +546,9 @@ class RefGen(Camoco):
                 random_candidates = self.bootstrap_candidate_genes(
                     locus,flank_limit=flank_limit,chain=True
                 )
+            if include_parent_locus == True:
+                for gene in random_candidates:
+                    gene.update({'parent_locus':random_gene.id})
             return random_candidates
         else:
             # Sort the loci so we can collapse down
@@ -533,7 +557,7 @@ class RefGen(Camoco):
             bootstraps = list()
             target = self.candidate_genes(
                 locus_list,flank_limit=flank_limit,
-                chain=False,window=window
+                chain=False,window_size=window_size
             )
             target_accumulator = 0
             candidate_accumulator = 0
@@ -542,13 +566,15 @@ class RefGen(Camoco):
                 # compare downstream of last locus to current locus
                 candidates = self.bootstrap_candidate_genes(
                     locus, flank_limit=flank_limit, 
-                    chain=True, window=window
+                    chain=True, window_size=window_size,
+                    include_parent_locus=include_parent_locus
                 )
                 # If genes randomly overlap, resample
                 while len(seen.intersection(candidates)) > 0:
                     candidates = self.bootstrap_candidate_genes(
                         locus, flank_limit=flank_limit,
-                        window=window, chain=True
+                        window_size=window_size, chain=True,
+                        include_parent_locus=include_parent_locus
                     )
                 # Add all new bootstrapped genes to the seen list
                 seen |= set(candidates)
@@ -838,7 +864,8 @@ class RefGen(Camoco):
 
     @classmethod
     def from_gff(cls,filename,name,description,build,organism,
-                 chrom_feature='chromosome',gene_feature='gene',ID_attr='ID'):
+                 chrom_feature='chromosome',gene_feature='gene',
+                 ID_attr='ID',attr_split='='):
         '''
             Imports RefGen object from a gff (General Feature Format) file.
             See more about the format here:
@@ -871,6 +898,8 @@ class RefGen(Camoco):
             ID_attr : str (default: ID)
                 The key in the attribute column which designates the ID or 
                 name of the feature.
+            attr_split : str (default: '=')
+                The delimiter for keys and values in the attribute column
 
         '''
         self = cls.create(name,description,type='RefGen')
@@ -888,7 +917,7 @@ class RefGen(Camoco):
                 continue
             (chrom,source,feature,start,
              end,score,strand,frame,attributes) = line.strip().split('\t')
-            attributes = dict([(field.strip().split('=')) \
+            attributes = dict([(field.strip().split(attr_split)) \
                 for field in attributes.strip(';').split(';')])
             if feature == chrom_feature:
                 self.log('Found a chromosome: {}',attributes['ID'].strip('"'))

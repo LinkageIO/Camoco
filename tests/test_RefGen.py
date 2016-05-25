@@ -45,10 +45,10 @@ def test_locus_not_in_upstream_downstream(testRefGen):
     '''
     random_gene = testRefGen.random_gene()
     upstream = testRefGen.upstream_genes(
-        random_gene,window=50e5,gene_limit=5
+        random_gene,window_size=50e5,gene_limit=5
     )
     downstream = testRefGen.downstream_genes(
-        random_gene,gene_limit=5,window=50e5
+        random_gene,gene_limit=5,window_size=50e5
     )
     assert random_gene not in upstream
     assert random_gene not in downstream
@@ -62,27 +62,27 @@ def test_upstream_downstream_genes(testRefGen):
     random_gene = testRefGen.random_gene()
     # Grab 10 downstream genes
     downstream_genes = testRefGen.downstream_genes(
-        random_gene,gene_limit=11,window=50e10
+        random_gene,gene_limit=11,window_size=50e10
     )
     assert len(downstream_genes) == 11
     # grab last gene
     last_gene = downstream_genes.pop(-1)
     # Grab upstream genes
     upstream_genes = testRefGen.upstream_genes(
-        last_gene,gene_limit=10,window=50e10
+        last_gene,gene_limit=10,window_size=50e10
     )
     assert sorted(downstream_genes) == sorted(upstream_genes)
 
 def test_flanking_genes(testRefGen):
     random_gene = testRefGen.random_gene()
     downstream = testRefGen.downstream_genes(
-        random_gene, window=50e6, gene_limit=5
+        random_gene, window_size=50e6, gene_limit=5
     )
     upstream = testRefGen.upstream_genes(
-        random_gene, window=50e6, gene_limit=5
+        random_gene, window_size=50e6, gene_limit=5
     )
     flanking = testRefGen.flanking_genes(
-        random_gene, window=50e6, flank_limit=5
+        random_gene, window_size=50e6, flank_limit=5
     )
     assert sorted(flanking) == sorted(upstream + downstream)
 
@@ -97,7 +97,7 @@ def test_candidate_genes_from_SNP(testRefGen):
     random_gene = testRefGen.random_gene()
     # grab a bunch of downstream genes
     down1,down2 = testRefGen.downstream_genes(
-        random_gene,gene_limit=2,window=50e6
+        random_gene,gene_limit=2,window_size=50e6
     )
     # Create a Locus that is on gene 5
     test_snp = Locus(
@@ -115,11 +115,11 @@ def test_candidate_genes_from_gene_includes_gene(testRefGen):
     random_gene = testRefGen.random_gene()
     # grab a bunch of downstream genes
     downstream = testRefGen.downstream_genes(
-        random_gene,gene_limit=10,window=50e6
+        random_gene,gene_limit=10,window_size=50e6
     )
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        downstream[5],flank_limit=10,window=50e6
+        downstream[5],flank_limit=10,window_size=50e6
     )
     assert downstream[4] in candidates
 
@@ -127,7 +127,7 @@ def test_non_chained_candidates(testRefGen):
     random_genes = testRefGen.random_genes(n=10)
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        random_genes,flank_limit=10,window=50e6,chain=False
+        random_genes,flank_limit=10,window_size=50e6,chain=False
     )
     # test that we got candidates for each random locus
     assert len(candidates) == len(random_genes)
@@ -137,19 +137,19 @@ def test_flank_limit_for_candidate_genes(testRefGen):
     random_gene = testRefGen.random_gene()
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        random_gene,flank_limit=5,window=50e6,chain=True
+        random_gene,flank_limit=5,window_size=50e6,chain=True
     )
     assert len(candidates) == 11
 
 def test_flank_limit_for_candidate_genes_from_SNP(testRefGen):
     random_gene = testRefGen.random_gene()
     downstream = testRefGen.downstream_genes(
-        random_gene,gene_limit=10,window=50e6
+        random_gene,gene_limit=10,window_size=50e6
     )
     test_snp = Locus(downstream[5].chrom,downstream[5].start,window=50e6)
     # Create a Locus that is on gene 5
     candidates = testRefGen.candidate_genes(
-        test_snp,flank_limit=5,window=50e6
+        test_snp,flank_limit=5,window_size=50e6
     )
     assert len(candidates) == 11
 
@@ -162,8 +162,8 @@ def test_bootstrap_candidate_length_equal_from_SNP(testRefGen):
 
 def test_bootstrap_candidate_length_equal_from_gene(testRefGen):
     random_gene = testRefGen.random_gene()
-    candidates = testRefGen.candidate_genes(random_gene,window=5e10)
-    bootstraps = testRefGen.bootstrap_candidate_genes(random_gene,window=5e10)
+    candidates = testRefGen.candidate_genes(random_gene,window_size=5e10)
+    bootstraps = testRefGen.bootstrap_candidate_genes(random_gene,window_size=5e10)
     assert len(candidates) == len(bootstraps)
 
 def test_refgen_length(testRefGen):

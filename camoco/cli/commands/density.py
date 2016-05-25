@@ -15,23 +15,30 @@ import camoco as co
 import pandas as pd
 import matplotlib.pylab as plt
 
-co.cf.logging.log_level = 'quiet'
-
 def density(args):
-    args.out = os.path.splitext(args.out)[0] + '_Density.csv'
+    # Build base camoco objects
+    cob = co.COB(args.cob)
+    ont = co.GWAS(args.gwas)
+    # Handle the different output schemes
+    if args.out is None:
+        args.out = '{}_{}_{}_{}_{}'.format(
+            cob.name,
+            ont.name,
+            args.candidate_window_size,
+            args.candidate_flank_limit,
+            ':'.join(args.terms)
+        )
+    args.out = os.path.splitext(args.out)[0] + '.density.tsv'
     if os.path.dirname(args.out) != '':
         os.makedirs(os.path.dirname(args.out),exist_ok=True)
-    if os.path.exists(args.out):
+    if os.path.exists(args.out) and args.overlook == True:
         print(
             "Output for {} exists! Skipping!".format(
                 args.out
             ),file=sys.stderr
         )
         return
-
-    cob = co.COB(args.cob)
-    ont = co.GWAS(args.gwas)
-
+    # Generate a terms iterable
     if 'all' in args.terms:
         terms = ont.iter_terms()
     else:
@@ -81,7 +88,7 @@ def density(args):
             gene_density['zscore'] = (gene_density.score-bs_mean)/bs_std
             gene_density['fdr'] = np.nan
             bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
-            for zscore in range(0,8):
+            for zscore in np.arange(0,9,0.25):
                 zdf = bootstraps[bootstraps.zscore >= zscore]
                 if len(zdf) > 0:
                     num_random = zdf.groupby('iter').apply(len).mean()
@@ -94,6 +101,8 @@ def density(args):
                 else:
                     fdr = 1
                 gene_density.loc[gene_density.zscore >= zscore,'fdr'] = fdr
+                gene_density.sort_values(by='fdr',ascending=True,inplace=True)
+                # This gets collated into all_results below
                 results = gene_density
         else:
             results = OrderedDict()
@@ -124,10 +133,11 @@ def density(args):
             results['NumCandidates'] = len(candidates)
             results['Density'] = emp_density
             results['PValue'] = effective_pval
-            results['BSMean'] = effective_bootstraps.mean()
-            results['BSStd'] = effective_bootstraps.std()
+            results['BSMean'] = bootstraps.mean()
+            results['BSStd'] = bootstraps.std()
             results['SNP2GeneMethod'] = args.snp2gene
             # Tack them onto the end of the results data frame 
+            results = pd.DataFrame([results])
 
         results['Ontology'] = ont.name
         results['COB'] = cob.name
@@ -137,7 +147,7 @@ def density(args):
         results['FlankLimit'] = args.candidate_flank_limit
         results['NumBootstraps'] = args.num_bootstraps
 
-        all_results.append(pd.DataFrame(results))
+        all_results.append(results)
     
     # Return the results 
     all_results = pd.concat(all_results)

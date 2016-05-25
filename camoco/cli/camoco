@@ -1,11 +1,24 @@
 #!/usr/bin/env python3
 
+# Make sure that the camoco install is always frist
+import sys
+import os
+import matplotlib
+# Force matplotlib to not use any Xwindows backend.
+matplotlib.use('Agg')
+
 import camoco as co
+
 import sys
 import os
 import glob
 
 import argparse
+
+from camoco.Tools import log 
+
+import pandas as pd
+pd.set_option('display.width',200)
 
 from camoco.cli.commands.plotGWAS import plot_gwas
 from camoco.cli.commands.density import density
@@ -17,23 +30,22 @@ from camoco.cli.commands.list import list_command
 from camoco.cli.commands.simulateGWAS import simulateGWAS
 from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.candidates import candidates
+from camoco.cli.commands.geneneighbors import geneneighbors
 from camoco import cf
 
 from argparse import ArgumentParser
-
-class cli(ArgumentParser):
-    def __init__(self):
-        self = super().__init__(
-            epilog='Cache. Money. Corn.'        
-        )
-
 
 if __name__ == '__main__':
     '''--------------------------
         Main Arguments 
     --------------------------'''
     parser = argparse.ArgumentParser(
-        epilog='Cache. Money. Corn.'
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog= "\n".join([
+            'version: {}'.format(co.__version__),
+            'src:{}'.format(co.__file__),
+            'Cache. Money. Corn.'
+        ])
     )
     parser.add_argument(
         '--debug',
@@ -58,9 +70,19 @@ if __name__ == '__main__':
         metavar='Available Commands',
         description='Use --help with each command for more info',
     )
+
+
     # Also allow the help message to be printed using the help command
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
+
+    '''--------------------------
+        Build
+    --------------------------'''
+    bldcmd = subparsers.add_parser(
+        'build',
+        help='Build a dataset.'
+    )
 
     '''--------------------------
         list 
@@ -72,7 +94,7 @@ if __name__ == '__main__':
     )
     lstcmd.add_argument(
         'type', 
-        default=None,
+        nargs='?',
         help=(
             'The type of dataset you want to list. e.g. GWAS. '
             'Also accepts SQLite wildcards.'    
@@ -80,7 +102,7 @@ if __name__ == '__main__':
     )
     lstcmd.add_argument(
         'name', 
-        default=None,
+        nargs='?',
         help = (
             'The name of the dataset you want to list. '
             'Also accepts SQLite wildcards.' 
@@ -275,7 +297,7 @@ if __name__ == '__main__':
     )
     densityCLI.add_argument(
         '--out', 
-        default=sys.stdout,
+        default=None,
         help='OutputFile Name (default: Standard Out)'
     )
     densityCLI.set_defaults(func=density)
@@ -316,21 +338,6 @@ if __name__ == '__main__':
        help='''The number of bootstraps to perform in order
              to estimate a null distribution.'''
     )
-    localityCLI.add_argument(
-       '--sd-envelope', 
-       type=int,
-       default=2, 
-       metavar=2,
-       help='''The number or standard deviations to 
-           use for the regression window.'''
-    )
-    localityCLI.add_argument(
-       '--regression-window-size', 
-       type=int, 
-       default=50, 
-       metavar=50,
-       help='The number of items within a window.'
-    )
     # SNP2Gene Mapping
     localityCLI.add_argument(
         '--snp2gene', 
@@ -365,17 +372,6 @@ if __name__ == '__main__':
             'lower values as stronger (i.e. p-vals)'
         )
     )
-    # Permutation parameters
-    localityCLI.add_argument(
-        '--min-fdr-degree', 
-        default=2,
-        metavar=2,
-        type=int, 
-        help=(
-            'The miniumum degree to be included '
-            'as true positive in FDR calculation.'
-        )
-    )
     localityCLI.add_argument(
         '--candidate-window-size',
         type=int,  
@@ -393,13 +389,6 @@ if __name__ == '__main__':
             'included in SNP to gene mapping'
             )
     )
-    # Data Formatting Parameters
-    localityCLI.add_argument(
-        '--plot',
-        action='store_true',
-        default=False,
-        help='Flag indicating to plot data.'
-    )
     localityCLI.add_argument(
         '--out',
         type=str,
@@ -409,10 +398,11 @@ if __name__ == '__main__':
     localityCLI.add_argument(
         '--sig-edge-zscore',
         type=float,
+        metavar=3,
         default=None,
         help=(
-           'If not None, redefine what a significant '
-           'interaction score is. (defaut: 3)'
+           'Redefine what a significant zscore for an interaction. '
+           '(defaut: 3)'
         )
     )
     localityCLI.add_argument(
@@ -451,6 +441,16 @@ if __name__ == '__main__':
         '--go',
         default=None,
         help='Perform Gene Ontology Statistics. (default: None)'
+    )
+    health.add_argument(
+        '--min-term-size',
+        default=10,
+        help='Minimum GO term size to consider in health (defualt: 10)'
+    )
+    health.add_argument(
+        '--max-term-size',
+        default=300,
+        help='Maximum GO term size to consider in health (defualt: 300)'
     )
     health.add_argument(
         '--num-bootstraps',
@@ -503,6 +503,16 @@ if __name__ == '__main__':
         help='The name of the GO Ontology you want to analyze.'
     )
     simulateGWASCLI.add_argument(
+        '--terms',
+        type=str,
+        metavar='all',
+        default = ['all'],
+        nargs='*',
+        help=("Ontology term to simulate. If 'all', which is the default, "
+            "all terms will be tested."    
+        )
+    )
+    simulateGWASCLI.add_argument(
         '--max-term-size',
         type=int,
         default=300,
@@ -544,11 +554,12 @@ if __name__ == '__main__':
         )
     )
     simulateGWASCLI.add_argument(                                                  
-        '--percent-fdr',                                                        
+        '--percent-fcr',                                                        
         type=float,                                                             
         default=None,                                                           
         metavar=0.0,                                                            
         help=(                                                                  
+            'False Cadidate Rate: '
             'The percentage of the term loci to be replaced with '              
             'random loci, simulating noise or false positives '                 
             'within the term'                                                   
@@ -662,6 +673,16 @@ if __name__ == '__main__':
         )
     )
     candidates_cmd.add_argument(
+        '--include-parent-attrs',
+        default=[],
+        metavar='[attrs,]',
+        nargs='*',
+        help=(
+            'Include the specified parent locus attributes from'
+            'the effective SNP.'
+        )
+    )
+    candidates_cmd.add_argument(
         '--strongest-higher',
         action='store_false',
         default=True,
@@ -672,11 +693,60 @@ if __name__ == '__main__':
         )
     )
     candidates_cmd.add_argument(
+        '--gene-info',
+        default=[],
+        metavar='[file1, file2, ...]',
+        nargs='*',
+        help=(
+            'Include additional candidate gene info output from '
+            'other tables. Assumes that the gene ID is the first '
+            'column of the file. You can specify multiple files '
+        )
+    )
+    candidates_cmd.add_argument(
         '--out',
         default=sys.stdout
     )
     candidates_cmd.set_defaults(func=candidates)
 
+    '''----------------------------------
+      gene neighbors
+    -------------------------------------'''
+    geneneighbors_cmd = subparsers.add_parser(
+        'neighbors',
+        help=(
+            'Generate significant gene neighbors'
+            'from largest to smallest Z-score'    
+        )
+    )
+    geneneighbors_cmd.add_argument(
+        'cob',
+        default=None
+    )
+    geneneighbors_cmd.add_argument(
+        '--numneighbors',
+        type=int,
+        default=10, 
+        metavar=10,
+        help=(
+            'The number of neighboring genes to return. '
+            'on each side of the locus. (default: 10)' 
+        )
+    )
+    geneneighbors_cmd.add_argument(
+        '--zscore',
+        type=int,
+        default=3, 
+        metavar=3,
+        help=(
+            'Z-score significance cutoff (default: 3). '
+        )
+    )
+    geneneighbors_cmd.add_argument(
+      '--out',
+      default=sys.stdout
+    )
+    geneneighbors_cmd.set_defaults(func=geneneighbors)
 
     ''' -------------------------------------------------------------------
     # DO IT 
@@ -692,7 +762,18 @@ if __name__ == '__main__':
     if args.overlook is True and len(glob.glob(args.out+'*')):
         print("Skipping {}* because files already exist.".format(args.out))
     else:
-        return_value = args.func(args)
+        try:
+            return_value = args.func(args)
+        except AttributeError as e:
+            log.warn('Command not found. Use --help to see available commands.')
+            if args.debug:
+                raise e
+            sys.exit(1)
+        except Exception as e:
+            log.warn("A bad thing happened.\n\n" + str(e))
+            if args.debug:
+                raise e
+            sys.exit(1)
         if args.interactive is True:
             from IPython.core import ultratb
             sys.excepthook = ultratb.FormattedTB(

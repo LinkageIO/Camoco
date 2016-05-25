@@ -7,6 +7,7 @@ from .Term import Term
 
 from pandas import DataFrame
 from scipy.stats import hypergeom
+from itertools import chain
 
 import sys
 
@@ -25,6 +26,7 @@ class Ontology(Camoco):
         return self.db.cursor().execute(
                 "SELECT COUNT(*) FROM terms;"
         ).fetchone()[0]
+    
 
     def __getitem__(self, id):
         ''' retrieve a term by id '''
@@ -33,12 +35,17 @@ class Ontology(Camoco):
                 'SELECT * from terms WHERE id = ?', (id, )
             ).fetchone()
             term_loci = [
-                self.refgen[gene_id] for gene_id in self.db.cursor().execute(
+                self.refgen[gene_id] for gene_id, in self.db.cursor().execute(
                 ''' SELECT id FROM term_loci WHERE term = ?''', (id, )
             ).fetchall()]
             return Term(id, desc=desc, loci=term_loci)
         except TypeError as e: # Not in database
             raise e
+
+    def num_distinct_loci(self):
+        return self.db.cursor().execute(
+            'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
+        ).fetchone()[0]
 
     def iter_terms(self):
         '''
@@ -164,6 +171,36 @@ class Ontology(Camoco):
         self._create_tables()
         return self
 
+    @classmethod
+    def from_terms(cls, terms, name, description, refgen):
+        '''
+            Convenience function to create a Ontology from an iterable
+            terms object. 
+
+            Parameters
+            ----------
+            terms : iterable of camoco.GOTerm objects
+                Items to add to the ontology. The key being the name
+                of the term and the items being the loci.
+            name : str
+                The name of the camoco object to be stored in the database.
+            description : str
+                A short message describing the dataset.
+            refgen : camoco.RefGen
+                A RefGen object describing the genes in the dataset
+        '''
+        self = cls.create(name,description,refgen)
+        self.log('Adding {} terms to the database.',len(terms))
+        self.add_terms(terms, overwrite=False)
+        # Build the indices
+        self.log('Building the indices.')
+        self._build_indices()
+
+        self.log('Your gene ontology is built.')
+        return self
+
+
+
     def _create_tables(self):
         cur = self.db.cursor()
         cur.execute('''
@@ -192,7 +229,66 @@ class Ontology(Camoco):
         cursor = self.db.cursor()
         cursor.execute('DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;')
 
-    def enrichment(self, locus_list, pval_cutoff=0.05, gene_filter=None,
-            label=None, max_term_size=300):
-        raise NotImplementedError('This is broken')
-        
+    def enrichment(self, locus_list, pval_cutoff=0.05, max_term_size=300,
+                   min_term_size=5):
+        '''
+            Evaluates enrichment of loci within the locus list in terms within
+            the ontology. NOTE: this only tests terms that have at least one
+            locus that exists in locus_list.
+
+            Parameters
+            ----------
+            locus_list : list of co.Locus
+                A list of loci for which to test enrichment. i.e. is there
+                an over-representation of these loci within and the terms in
+                the Ontology.
+            pval_cutoff : float (default: 0.05)
+                Report terms with a pval lower than this value
+            max_term_size : int (default: 300)
+                The maximum term size for which to test enrichment. Useful
+                for filtering out large terms that would otherwise be 
+                uninformative (e.g. top level GO terms)
+            min_term_size : int (default: 5)
+        '''
+        terms = list(
+            filter(
+                lambda t: (len(t) >= min_term_size) and (len(t) <= max_term_size),
+                [self[name] for name, in  self.db.cursor().execute(
+                    '''SELECT DISTINCT(term) 
+                    FROM term_loci WHERE id IN ('{}')
+                    '''.format(
+                        "','".join([x.id for x in locus_list])
+                    )
+                ).fetchall()
+                ]
+            )
+        )
+        num_universe = len(set(chain(*[x.loci for x in terms])))
+        self.log(
+            'test loci occur in {} terms, containing {} genes'.format(
+                len(terms), num_universe
+            )
+        )
+        significant_terms = []
+        for term in terms:
+            term_genes = term.loci
+            if len(term_genes) > max_term_size:
+                continue
+            num_common = len(term_genes.intersection(locus_list))
+            num_in_term = len(term_genes)
+            num_sampled = len(locus_list)
+            pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
+            if pval <= pval_cutoff:
+                term.attrs['pval'] = pval
+                term.attrs['hyper'] = {
+                    'pval'       : pval,
+                    'num_common' : num_common,
+                    'num_universe' : num_universe,
+                    'num_in_term' : num_in_term,
+                    'sum_sampled' : num_sampled
+                }
+                significant_terms.append(term)
+        return significant_terms
+
+
+

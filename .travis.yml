@@ -5,14 +5,20 @@ language: python
 python:
   - "3.4"
 
-services:
-  - docker
+# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 
+# Install packages
+env:
+  - LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
 install:
-  - docker build -t camoco .
+  - ./install.sh
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+# command to run tests, e.g. python setup.py test
+script:  
+  - source $HOME/.camoco/conda/bin/activate camoco
+  - export PATH=/home/travis/.camoco/bin/:$PATH
+  - py.test  tests -v  
 
-script:
-  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_RefGen.py"
-  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_Term.py"
-  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_Expr.py"
-  - docker run -v cobdata:/cobdata camoco -c "cd /src/Camoco/ && py.test-3 -v tests/test_COB.py"

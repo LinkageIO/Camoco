@@ -33,20 +33,43 @@ def candidates(args):
     else:
         terms = [ont[term] for term in args.terms]
 
+    data = pd.DataFrame()
     results = []
     for term in terms:
-        results.append(
+        if 'effective' in args.snp2gene:
+            # Map to effective
+            effective_loci = term.effective_loci(
+                window_size=args.candidate_window_size
+            )
+        elif 'strongest' in args.snp2gene:
+            effective_loci = term.strongest_loci(
+                window_size=args.candidate_window_size,
+                attr=args.strongest_attr,
+                lowest=args.strongest_higher
+            )
+ 
+        genes = pd.DataFrame([ x.attr for x in 
             cob.refgen.candidate_genes(
-                term.effective_loci(window_size=args.candidate_window_size),
+                effective_loci,
                 flank_limit=args.candidate_flank_limit,
-                attrs={'term':term.id},
+                attrs={'Term':term.id},
                 include_parent_locus=True,
                 include_num_siblings=True,
                 include_num_intervening=True,
-                include_rank_intervening=True
+                include_rank_intervening=True,
+                include_parent_attrs=args.include_parent_attrs
             )
-        )
-    pd.DataFrame(
-        [x.attr for x in chain(*results)]
-    ).to_csv(args.out,index=None,sep='\t')
+        ])
+        #densities = cob.trans_locus_density(
+        #    effective_loci,
+        #    flank_limit=args.candidate_flank_limit,
+        #    by_gene=True
+        #)
+        #densities.columns = ['TransDensity']
+        #genes = pd.merge(genes,densities,left_on='Name',right_index=True)
+        data = pd.concat([data,genes])
+    data['COB'] = cob.name
+    data['FlankLimit'] = args.candidate_flank_limit
+    data['WindowSize'] = args.candidate_window_size
+    data.to_csv(args.out,index=None,sep='\t')
         
