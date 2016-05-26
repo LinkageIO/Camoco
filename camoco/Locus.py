@@ -11,7 +11,7 @@ class Locus(object):
             self._id = None
         else:
             self._id = id
-        self.chrom = chrom
+        self.chrom = str(chrom)
         self._start = int(start)
         self._end = int(end) if end is not None else int(start)
         self.window = int(window)
