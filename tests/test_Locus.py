@@ -10,9 +10,9 @@ def simple_Locus():
 
 def test_locus_initialization(simple_Locus):
     # numeric chromosomes
-    assert simple_Locus.chrom is 1
-    assert simple_Locus.start is 100
-    assert simple_Locus.end is 200
+    assert simple_Locus.chrom == '1'
+    assert simple_Locus.start == 100
+    assert simple_Locus.end == 200
     assert len(simple_Locus) == 100
 
 def test_candidate_vs_bootstrap_length(testRefGen,testGWAS):
