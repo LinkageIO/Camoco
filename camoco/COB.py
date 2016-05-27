@@ -8,6 +8,7 @@ from .Locus import Locus,Gene
 from .Expr import Expr
 from .Tools import memoize
 
+from math import isinf
 from numpy import matrix, arcsinh, tanh
 from collections import defaultdict, Counter
 from itertools import chain
@@ -24,10 +25,13 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import itertools
+
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
+
 import statsmodels.api as sm
 import sys
+import json
 
 from scipy.stats import pearsonr
 
@@ -491,6 +495,65 @@ class COB(Expr):
         dm.to_csv(filename)
 
 
+    def to_json(self, gene_list=None, filename=None):
+        '''
+            Produce a JSON network object that can be loaded in cytoscape.js
+            or Cytoscape v3+.
+        '''
+        net = {
+            'nodes' : [],
+            'edges' : []
+        }
+        parents = defaultdict(list)
+        # generate the subnetwork for the genes
+        for gene in gene_list:
+            net['nodes'].append(
+                    {'data':{
+                        'id':str(gene.id), 
+                        'parent':str(gene.attr['parent_locus']),
+                        'classes':'gene'
+                    }}  
+            )
+            parents[str(gene.attr['parent_locus'])].append(gene.id)
+        # Add parents first
+        for parent,children in parents.items():
+            net['nodes'].insert(0,
+                {'data':{
+                    'id':parent,
+                    'parent':None,
+                    'classes':'snp'
+                }}
+            )
+            for child in children:
+                net['edges'].append(
+                    {'data':{
+                        'source': child,
+                        'target' : parent,
+                        'score' : 50,
+                        'distance' : 0
+                    }}
+                )
+        # Now do the edges
+        subnet = self.subnetwork(gene_list)
+        subnet.reset_index(inplace=True)
+        for source,target,score,significant,distance in subnet.itertuples(index=False):
+            net['edges'].append(
+                {'data':{
+                    'source': source,
+                    'target' : target,
+                    'score' : score,
+                    'distance' : fix_val(distance)
+                }}
+            )
+        # Return the correct output
+        net = {'elements' : net}
+        if filename:
+            with open(filename,'w') as OUT:
+                print(json.dumps(net),file=OUT)
+        else:
+            return json.dumps(net)
+
+
     def mcl(self, gene_list=None, I=2.0, scheme=7, min_distance=None,
             min_cluster_size=0, max_cluster_size=10e10):
         '''
@@ -579,8 +642,7 @@ class COB(Expr):
         ).set_index('Gene')
         # We need to find genes not in the subnetwork and add them as degree 0
         # The code below is ~optimized~ 
-        # DO NOT alter unless you know what you're doing
-
+        # DO NOT alter unless you know what you're doing :)
         degree_zero_genes = pd.DataFrame( 
             [(gene.id, 0) for gene in gene_list if gene.id not in local_degree.index],
             columns=['Gene', 'Degree']
@@ -625,7 +687,7 @@ class COB(Expr):
         ).set_index('Gene')
         # We need to find genes not in the subnetwork and add them as degree 0
         # The code below is ~optimized~ 
-        # DO NOT alter unless you know what you're doing
+        # DO NOT alter unless you know what you're doing :)
         degree_zero_genes = pd.DataFrame( 
             [(gene.id, 0) for gene in gene_list if gene.id not in local_degree.index],
             columns=['Gene', 'Degree']
@@ -1191,3 +1253,14 @@ class COB(Expr):
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene'''
         raise NotImplementedError()
+
+def fix_val(val):
+    if isinf(val):
+        return -1
+    if np.isnan(val):
+        # because Fuck JSON
+        return "null"
+    else:
+        return val
+
+

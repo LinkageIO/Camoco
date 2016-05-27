@@ -6,8 +6,12 @@ Camoco
 Co-Analysis of Molecular Components
 -----------------------------------
 Camoco is a python library for building and analyzing co-expression networks.
-It creates co-expression networks from tablular formatted expression data and
-common genome data files:
+Currently, networks are generally built from gene expression data, but given
+that the input to Camoco is simply a gene-by-sample expression matrix, there is
+not reason that the analysis couldn't include things like protein abundance or
+metabolites. Hence the name: co-analysis of molecular components. Very breifly,
+Camoco creates co-expression networks using table formatted expression data and
+and a few common genome data files:
 
 Required Files:
 + FPKM (or equivalent) CSV/TSV file
@@ -20,15 +24,22 @@ Once co-expression networks are built, you can interact with the data using
 the included command line:
 
 ```
+# If you are using the conda virtual environment
 source activate camoco
+# Run the command line interface to get an idea of how Camoco works
 camoco --help
 ```
 See more examples below in the CLI section.
 
-or by using the package within a script
+Camoco is built almost entirely in Python and was designed to be modular and 
+object based. This means that Camoco can also be used interactively from the
+shell using an interactive python session such as iPython. Just import the
+package!
 ```
 import camoco as co
+help(co.COB)
 ```
+Object classes are well documented for inputs and outputs.
 
 Installation
 ------------
@@ -76,8 +87,8 @@ camoco --help
 source deactivate
 ```
 
-You will need to add a few lines to your .bashrc in order for the conda environment
-to be available from your shell.
+You will need to add a few lines to your .bashrc in order for the conda
+environment to be available from your shell.
 
 
 e.g.:
@@ -87,14 +98,15 @@ export LD_LIBRARY_PATH=~/.camoco/lib/:$LD_LIBRARY_PATH
 export PATH=$BASE/bin:~/.camoco/conda/bin/:$PATH
 ```
 
-The installation script accepts simple arguments:
-`-b (default: ~/.camoco)`: the base directory to install camoco including storage for databases
+The installation script accepts simple arguments: `-b (default: ~/.camoco)`:
+the base directory to install camoco including storage for databases
 
 Tagged releases are available on PyPi: `pip install camoco`.
 
 CLI
 ---
-Once installed, the `camoco` command will be available through the terminal. See `camoco --help` for options!
+Once installed, the `camoco` command will be available through the terminal.
+See `camoco --help` for options!
 
 
 Tests
@@ -112,9 +124,10 @@ py.test
 
 Documentation
 -------------
-We acknowledge a lack of formal manual. We are writing this. However, the function definitions
-themselves are well commented throughout the code base. Questions and concerns about usage issued
-through github will be addressed! Contact us!
+We acknowledge a lack of formal manual. We are writing this. However, the
+function definitions themselves are well commented throughout the code base.
+Questions and concerns about usage issued through github will be addressed!
+Contact us!
 
 CacheMoneyCorn
 --------------

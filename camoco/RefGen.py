@@ -310,7 +310,7 @@ class RefGen(Camoco):
         '''
         if locus.window == 0 and window_size is None:
             raise CamocoZeroWindowError(
-                'Asking for upstream genes for {}',
+                'Asking for upstream genes for {} with no window size',
                 locus.id
             )
         if window_size is not None:
@@ -340,7 +340,7 @@ class RefGen(Camoco):
             locus = loci
             if locus.window == 0 and window_size is None:
                 raise CamocoZeroWindowError(
-                    'Asking for upstream genes for {}',
+                    'Asking for upstream genes for {} and no window size.',
                     locus.id
                 )
             upstream_gene_limit = int(flank_limit)
@@ -481,8 +481,10 @@ class RefGen(Camoco):
             genes = [
                 # This is becoming a pain in the ass
                 self.candidate_genes(
-                    locus, flank_limit=flank_limit,
-                    chain=chain, window_size=window_size,
+                    locus, 
+                    flank_limit=flank_limit,
+                    chain=chain,
+                    window_size=window_size,
                     include_parent_locus=include_parent_locus,
                     include_parent_attrs=include_parent_attrs,
                     include_num_intervening=include_num_intervening,
