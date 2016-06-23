@@ -11,10 +11,13 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-__version__ = '0.1.8'
+__version__ = '0.1.10'
 
 import sys
 import os
+
+#import pyximport
+#pyximport.install()
 
 from .Config import cf
 from .Camoco import Camoco

@@ -29,7 +29,7 @@ from camoco.cli.commands.remove import remove
 from camoco.cli.commands.list import list_command
 from camoco.cli.commands.simulateGWAS import simulateGWAS
 from camoco.cli.commands.cistrans import cistrans
-from camoco.cli.commands.candidates import candidates
+from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
 from camoco import cf
 
@@ -70,9 +70,19 @@ if __name__ == '__main__':
         metavar='Available Commands',
         description='Use --help with each command for more info',
     )
+
+
     # Also allow the help message to be printed using the help command
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
+
+    '''--------------------------
+        Build
+    --------------------------'''
+    bldcmd = subparsers.add_parser(
+        'build',
+        help='Build a dataset.'
+    )
 
     '''--------------------------
         list 
@@ -215,9 +225,9 @@ if __name__ == '__main__':
     )
     densityCLI.add_argument(
         '--num-bootstraps', 
-        default=50,
+        default=100,
         type=int, 
-        metavar=50,
+        metavar=100,
         help=(
             'The number of bootstraps to perform in order '
             'to estimate a null distribution. (default: 50)'
@@ -287,7 +297,7 @@ if __name__ == '__main__':
     )
     densityCLI.add_argument(
         '--out', 
-        default=sys.stdout,
+        default=None,
         help='OutputFile Name (default: Standard Out)'
     )
     densityCLI.set_defaults(func=density)
@@ -590,24 +600,24 @@ if __name__ == '__main__':
     cis_trans.set_defaults(func=cistrans)
 
     '''----------------------------------
-        Candidates
+        snp2gene
     -------------------------------------'''
-    candidates_cmd = subparsers.add_parser(
-        'candidates',
+    snp2gene_cmd = subparsers.add_parser(
+        'snp2gene',
         help=(
             'Generate candidate genes and accompanying '
             'information from GWAS SNPs'    
         )
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
         'cob',
         default=None
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
         'gwas',
         help='The camoco GWAS to generate candidates from.'
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
         '--terms',
         nargs='*',
         type=str,
@@ -619,7 +629,7 @@ if __name__ == '__main__':
         ),
         default=['all']
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
         '--candidate-window-size',
         type=int,
         default=10000, 
@@ -629,7 +639,7 @@ if __name__ == '__main__':
             '(default: 10000)'
         )
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
         '--candidate-flank-limit',
         type=int,
         default=1, 
@@ -639,7 +649,7 @@ if __name__ == '__main__':
             'on each side of the locus. (default: 2)' 
         )
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
         '--snp2gene', 
         type=str, 
         default='strongest',
@@ -648,67 +658,90 @@ if __name__ == '__main__':
         help=(
             'The SNP to gene mapping to use. Specifying multiple mappings '
             ' will result in multiple results. Must be in: '
-            "['effective','strongest'] "
-            "(default: strongest)"
+            '["effective","strongest"] '
+            '(default: strongest)'
         )
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
         '--strongest-attr', 
         default='pval', 
         type=str, 
         metavar='pval',
         help=(
-            'The locus attr used to determine which locus is the'
+            'The locus attr used to determine which locus is the '
             'strongest locus. (defualt=pval).'
         )
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
+        '--include-parent-attrs',
+        default=[],
+        metavar='attrs',
+        nargs='*',
+        help=(
+            'Include the specified parent locus attributes from '
+            'the effective SNP.'
+        )
+    )
+    snp2gene_cmd.add_argument(
         '--strongest-higher',
         action='store_false',
         default=True,
         help=(
-            'Flag indicating the value in --strongest-attr is'
-            'stronger if higher. Default behavior is to treat'
-            'lower values as stronger (i.e. p-vals)'
+            'Flag indicating the value in --strongest-attr is '
+            'stronger if higher. Default behavior is to treat '
+            'lower values as stronger (i.e. p-vals) '
         )
     )
-    candidates_cmd.add_argument(
+    snp2gene_cmd.add_argument(
+        '--gene-info',
+        default=[],
+        metavar='file',
+        nargs='*',
+        help=(
+            'Include additional candidate gene info output from '
+            'other tables. Tables will be joined on as many columns as '
+            'possible. You can specify multiple files.'
+        )
+    )
+    snp2gene_cmd.add_argument(
         '--out',
         default=sys.stdout
     )
-    candidates_cmd.set_defaults(func=candidates)
+    snp2gene_cmd.set_defaults(func=snp2gene)
+
+
     '''----------------------------------
       gene neighbors
     -------------------------------------'''
     geneneighbors_cmd = subparsers.add_parser(
-      'geneneighbors',
-      help=(
-          'Generate significant gene neighbors'
-          'from largest to smallest Z-score'    
-      )
+        'neighbors',
+        help=(
+            'Generate significant gene neighbors'
+            'from largest to smallest Z-score'    
+        )
     )
     geneneighbors_cmd.add_argument(
-      'cob',
-      default=None
+        'cob',
+        default=None
     )
     geneneighbors_cmd.add_argument(
-    '--numneighbors',
-    type=int,
-    default=10, 
-    metavar=10,
-    help=(
-      'The number of neighboring genes to return. '
-      'on each side of the locus. (default: 10)' 
-    )
+        '--numneighbors',
+        type=int,
+        default=10, 
+        metavar=10,
+        help=(
+            'The number of neighboring genes to return. '
+            'on each side of the locus. (default: 10)' 
+        )
     )
     geneneighbors_cmd.add_argument(
-    '--zscore',
-    type=int,
-    default=3, 
-    metavar=3,
-    help=(
-      'Z-score significance cutoff (default: 3). '
-      )
+        '--zscore',
+        type=int,
+        default=3, 
+        metavar=3,
+        help=(
+            'Z-score significance cutoff (default: 3). '
+        )
     )
     geneneighbors_cmd.add_argument(
       '--out',

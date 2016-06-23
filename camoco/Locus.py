@@ -11,7 +11,7 @@ class Locus(object):
             self._id = None
         else:
             self._id = id
-        self.chrom = chrom
+        self.chrom = str(chrom)
         self._start = int(start)
         self._end = int(end) if end is not None else int(start)
         self.window = int(window)
@@ -210,3 +210,15 @@ class Locus(object):
 class Gene(Locus):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
+
+    def as_dict(self):
+        a_dict = {
+            'gene'  : self.name,
+            'chrom' : self.chrom,
+            'start' : self.start,
+            'end'   : self.end
+        }
+        a_dict.update(self.attr)
+        return a_dict
+
+
