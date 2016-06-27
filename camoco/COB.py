@@ -778,7 +778,7 @@ class COB(Expr):
                     xticks=np.arange(len(dm.columns)),
                     xticklabels=dm.columns.values
                 )
-                ax.set_xticklabels(ax.xaxis.get_majorticklabels(), rotation=90)
+                ax.set_xticklabels(dm.columns, rotation=90)
         if (include_gene_labels is None and len(dm.index) < 100) \
             or include_gene_labels == True:
                 ax.set(
