@@ -23,8 +23,8 @@ pd.set_option('display.width', 100)
 
 class Expr(Camoco):
     '''
-        A representation of gene expression. The base data structure for this
-        guy is a
+        A gene expression dataset. Build, normalize, filter and 
+        easily access different parts of the gene expression matrix.
     '''
     def __init__(self, name):
         super().__init__(name=name, type='Expr') 
@@ -292,9 +292,26 @@ class Expr(Camoco):
         self._transformation_log('reset')
 
 
-    def _normalize(self, norm_method=None, is_raw=None, max_val=None, **kwargs):
-        ''' evaluates qc expression data and re-enters 
-            normaized data into database '''
+    def _normalize(self, norm_method=None, max_val=None):
+        ''' 
+            Evaluates QC expression data and re-enters 
+            normalized data into database 
+
+            Parameters
+            ----------
+            norm_method : The normalization method to use. This can be inferred
+                from the raw data type. By default RNASeq uses np.arcsinh and
+                microarray data uses np.log2. A different normalization function
+                can be passed directly in. 
+                Default: None (inferred from Expr.rawtype)
+            max_val : This value is used to determine if any columns of the 
+                dataset have already been normalized. If any 'normailzed' 
+                values in an Accession column is larger than max_val, an
+                exception is thown. max_val is determined by Expr.raw_type
+                (default 100 for MicroArray and 1100 for RNASeq) but a 
+                max_val can be passed in to override these defaults.
+
+        '''
         self.log('------------ Normalizing')
         if all(self.is_normalized(max_val=max_val)):
             self.log("Dataset already normalized")
@@ -604,8 +621,8 @@ class Expr(Camoco):
             sep='\t', normalize=True, quality_control=True, **kwargs):
         ''' 
             Create a Expr instance from a file containing raw expression data.
-            For instance FPKM or results from a microarray experiment. This
-            is a convenience method which reads the table in to a pandas DataFrame
+            For instance FPKM or results from a microarray experiment. This is
+            a convenience method which reads the table in to a pandas DataFrame
             object and passes the object the Expr.from_DataFrame(...). See the
             doc on Expr.from_DataFrame(...) for more options.
 
@@ -623,21 +640,23 @@ class Expr(Camoco):
                 is cross references during import so we can pull information
                 about genes we are interested in during analysis.
             rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype passed to
-                camoco.Expr.from_DataFrame. See docs there for more information.
+                This is noted here to reinforce the impotance of the rawtype
+                passed to camoco.Expr.from_DataFrame. See docs there for more
+                information.
             sep : str (default: \t)
                 Column delimiter for the data in filename path
             normalize : bool (Default: True)
-                Specifies whether or not to normalize the data so raw expression values
-                lie within a log space. This is best practices for generating interpretable
-                expression analyses. See Expr._normalize method for more information.
-                info.
+                Specifies whether or not to normalize the data so raw
+                expression values lie within a log space. This is best
+                practices for generating interpretable expression analyses. See
+                Expr._normalize method for more information.  info.
             quality_control : bool (Default: True)
-                A flag which specifies whether or not to perform QC. Parameters for QC are passed
-                in using the **kwargs arguments. For default parameters and options
-                see Expr._quality_control.
+                A flag which specifies whether or not to perform QC. Parameters
+                for QC are passed in using the **kwargs arguments. For default
+                parameters and options see Expr._quality_control.
             **kwargs : key value pairs
-                additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
+                additional parameters passed to subsequent methods. (see
+                Expr.from_DataFrame)
 
             Returns
             -------
@@ -645,22 +664,28 @@ class Expr(Camoco):
 
         '''
         tbl = pd.read_table(filename, sep=sep)
-        return cls.from_DataFrame(tbl, name, description, refgen, rawtype=rawtype, **kwargs)
+        return cls.from_DataFrame(
+                tbl, name, description, refgen, 
+                rawtype=rawtype, **kwargs
+            )
 
     @classmethod
     def from_DataFrame(cls, df, name, description, refgen, rawtype=None,
-        normalize=True, norm_method=None, quantile=False, quality_control=True, **kwargs):
+            normalize=True, norm_method=None, quantile=False, 
+            quality_control=True, **kwargs
+        ):
         ''' 
-            Creates an Expr instance from a pandas DataFrame. Expects that the DataFrame
-            index is gene names and the column names are accessions (i.e. experiments).
-            This is the preferred method for creating an Expr instance, in other words,
-            other classmethods transform their data so they can call this method.
+            Creates an Expr instance from a pandas DataFrame. Expects that the
+            DataFrame index is gene names and the column names are accessions
+            (i.e. experiments).  This is the preferred method for creating an
+            Expr instance, in other words, other classmethods transform their
+            data so they can call this method.
 
             Parameters
             ----------
             df : pandas.DataFrame
-                a DataFrame containing expression data. Assumes index is the genes and
-                columns is the accessions (experiment names)
+                a DataFrame containing expression data. Assumes index is the
+                genes and columns is the accessions (experiment names)
             name : str
                 A short name to refer to from the camoco dataset API.
             description : str
@@ -671,26 +696,29 @@ class Expr(Camoco):
                 is cross references during import so we can pull information
                 about genes we are interested in during analysis.
             rawtype : str (one of: 'RNASEQ' or 'MICROARRAY')
-                Specifies the fundamental datatype used to measure expression. During importation
-                of the raw expression data, this value is used to make decisions in converting data
-                to log-space.
+                Specifies the fundamental datatype used to measure expression.
+                During importation of the raw expression data, this value is
+                used to make decisions in converting data to log-space.
             normalize : bool (Default: True)
-                Specifies whether or not to normalize the data so raw expression values
-                lie within a log space. This is best practices for generating interpretable
-                expression analyses. See Expr._normalize method for more information.
-                info.
+                Specifies whether or not to normalize the data so raw
+                expression values lie within a log space. This is best
+                practices for generating interpretable expression analyses. See
+                Expr._normalize method for more information.  info.
             norm_method : None OR python function
-                If rawtype is NOT RNASEQ or MICROARRY AND normalize is still True, the normalization
-                method for the raw expression values needs to be passed in. This is for extreme customization
+                If rawtype is NOT RNASEQ or MICROARRY AND normalize is still
+                True, the normalization method for the raw expression values
+                needs to be passed in. This is for extreme customization
                 situations.
             quantile : bool (Default : False)
-                Specifies whether or not to perform quantile normalization on import.
+                Specifies whether or not to perform quantile normalization on
+                import.
             quality_control : bool (Default: True)
-                A flag which specifies whether or not to perform QC. Parameters for QC are passed
-                in using the **kwargs arguments. For default parameters and options
-                see Expr._quality_control.
+                A flag which specifies whether or not to perform QC. Parameters
+                for QC are passed in using the **kwargs arguments. For default
+                parameters and options see Expr._quality_control.
             **kwargs : key value pairs
-                additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
+                additional parameters passed to subsequent methods.
+                See arguments for Expr._normalize(), Expr._quality_control()
 
             Returns
             -------
