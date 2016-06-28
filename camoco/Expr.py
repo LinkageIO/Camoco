@@ -292,7 +292,7 @@ class Expr(Camoco):
         self._transformation_log('reset')
 
 
-    def _normalize(self, norm_method=None, max_val=None):
+    def _normalize(self, norm_method=None, max_val=None, **kwargs):
         ''' 
             Evaluates QC expression data and re-enters 
             normalized data into database 
