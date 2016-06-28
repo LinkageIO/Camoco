@@ -1190,7 +1190,7 @@ class COB(Expr):
                 is cross references during import so we can pull information
                 about genes we are interested in during analysis.
             rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype
+                This is noted here to reinforce the importance of the rawtype
                 passed to camoco.Expr.from_DataFrame. See docs there for
                 more information.
             sep : str (default: \\t)
