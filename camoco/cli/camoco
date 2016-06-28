@@ -31,6 +31,8 @@ from camoco.cli.commands.simulateGWAS import simulateGWAS
 from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
+from camoco.cli.commands.build import build_cob
+
 from camoco import cf
 
 from argparse import ArgumentParser
@@ -79,10 +81,142 @@ if __name__ == '__main__':
     '''--------------------------
         Build
     --------------------------'''
-    bldcmd = subparsers.add_parser(
-        'build',
-        help='Build a dataset.'
+    bldcob = subparsers.add_parser(
+        'build-cob',
+        help='Build a Co-expression network.'
     )
+    bldcob.add_argument(
+        'filename',
+        help="Path to CSV or TSV"
+    )
+    bldcob.add_argument(
+        'name',
+        help="Name of the network."
+    )
+    bldcob.add_argument(
+        'description',
+        help="Short description of network"
+    )
+    bldcob.add_argument(
+        'refgen',
+        type=str,
+        help="Name of a pre-built RefGen. See build-refgen command"
+    )
+    bldcob.add_argument(
+        '--rawtype',
+        default=None,
+        help=(
+            "Passing in a rawtype can help determine default parameters for "
+            "standard data types such as MICROARRAY and RNASEQ. "
+            "Specifies the fundamental datatype used to measure expression. "
+            "During importation of the raw expression data, this value is "
+            "used to make decisions in converting data to log-space. "
+            "Options: (one of: 'RNASEQ' or 'MICROARRAY') "
+        )
+    )
+    bldcob.add_argument(
+        '--sep',
+        default='\t',
+        help="Field separators in the CSV or TSV, default=\\t"
+    )
+    bldcob.add_argument(
+        '--index-col',
+        type=str,
+        default=None,
+        help=(
+            'If not None, this column will be set as the gene index '
+            'column. Useful if there is a column name in the text file '
+            'for gene names.'
+        )
+    )  
+    bldcob.add_argument(
+        '--normalize',
+        default=True,
+        help=(
+            "Flag indicating if table values need to be normalized. "
+            "Specifies whether or not to normalize the data so raw expression "
+            "values lie within a log space. This is best practices for "
+            "generating interpretable expression analyses. See Expr._normalize "
+            "method for more information. "
+            "Default: True"
+        )
+    )
+    bldcob.add_argument(
+        '--norm_method',
+        help=(
+            'The normalization method to use. This can be inferred '
+            'from the raw data type. By default RNASEQ uses np.arcsinh and '
+            'MICROARRAY data uses np.log2. A different normalization function '
+            'can be passed directly in. '
+            'Default: None (inferred from Expr.rawtype)'
+    
+        )
+    )
+    bldcob.add_argument(
+        '--max-val',
+        help=(
+            "This value is used to determine if any columns of the "
+            "dataset have already been normalized. If any 'normailzed' "
+            "values in an Accession column is larger than max_val, an "
+            "exception is thown. max_val is determined by Expr.raw_type "
+            "(default 100 for MicroArray and 1100 for RNASeq) but a "
+            "max_val can be passed in to override these defaults. "
+        )
+    )  
+    bldcob.add_argument(
+        '--quantile',
+        help=(
+            'Specifies whether or not to perform quantile normalization on '
+            'expression data.'
+        )
+    ) 
+    bldcob.add_argument(
+        '--quality-control',
+        action='store_true',
+        help=(
+            "A Flag indicating on whether or not to perform quality control "
+            "on expression data."
+        )
+    )  
+    bldcob.add_argument(
+        '--min-expr',
+        default=1,
+        help=(
+            "Expression values (e.g. FPKM) under this threshold will be set "
+            "to NaN and not used during correlation calculations. "
+            "default: 1"
+        )
+    )  
+    bldcob.add_argument(
+        '--max-gene-missing-data',
+        default=0.2,
+        help=(   
+            "Maximum percentage missing data a gene can have. Genes not "
+            "meeting this criteria are removed from dataset."
+            "default: 0.2"
+        )
+    )  
+    bldcob.add_argument(
+        '--max-accession-missing-data',
+        default=0.3,
+        help=(
+            "maximum percentage missing data an accession (experiment) can"
+            "have before it is removed."
+            "Default: 0.3"
+        )
+    )  
+    bldcob.add_argument(
+        '--min-single-sample-expr',
+        default=5,
+        help=(
+            "Genes that do not have a single accession having an expression "
+            "value above this threshold are removed from analysis. These are "
+            "likely presence/absence and will not have a strong coexpression "
+            "pattern."
+        )
+    )  
+
+    bldcob.set_defaults(func=build_cob)
 
     '''--------------------------
         list 
@@ -125,7 +259,10 @@ if __name__ == '__main__':
     ''' --------------------------
         plotGWAS 
     --------------------------'''
-    plotgwas = subparsers.add_parser('plotGWAS',help='Plot a GWAS dataset')
+    plotgwas = subparsers.add_parser(
+        'plotGWAS',
+        help='Plot a GWAS dataset'
+    )
     # Data Set Arguments
     plotgwas.add_argument(
         'cob',
