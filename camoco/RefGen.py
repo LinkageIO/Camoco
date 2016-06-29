@@ -606,7 +606,7 @@ class RefGen(Camoco):
             # Grab the chromosomes rowid because its numeric
             self.db.cursor().execute(query).fetchall(),
             columns=['gene','chrom','start','end']
-        ).sort('gene')
+        ).sort_values(by='gene')
         # chromosome needs to be floats
         positions.chrom = positions.chrom.astype('float')
         # Do a couple of checks
