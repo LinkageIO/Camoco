@@ -245,7 +245,7 @@ class Expr(Camoco):
                     return x
             df.columns = [shorten(x) for x in df.columns]
         # Sort the table by genes
-        df = df.sort()
+        df = df.sort_index()
         # ensure that column names are alphanumeric
         # hdf5 doesn't like unicode characters
         pattern = re.compile('[^A-Za-z0-9_, ;:().]')
