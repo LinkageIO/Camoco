@@ -61,6 +61,9 @@ echo "Setting up the build environment"
 source $HOME/.bashrc
 mkdir -p $BASE
 mkdir -p $BASE/conda
+mkdir -p $BASE/bin 
+mkdir -p $BASE/lib 
+
 cd $BASE
 
 export LD_LIBRARY_PATH=$BASE/lib:$LD_LIBRARY_PATH
