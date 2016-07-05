@@ -228,6 +228,7 @@ if __name__ == '__main__':
     )
     bldcob.add_argument(
         '--max-val',
+        type=float,
         help=(
             "This value is used to determine if any columns of the "
             "dataset have already been normalized. If any 'normailzed' "
@@ -246,8 +247,8 @@ if __name__ == '__main__':
         )
     ) 
     bldcob.add_argument(
-        '--quality-control',
-        action='store_true',
+        '--skip-quality-control',
+        action='store_false',
         help=(
             "A Flag indicating on whether or not to perform quality control "
             "on expression data."
@@ -256,6 +257,7 @@ if __name__ == '__main__':
     bldcob.add_argument(
         '--min-expr',
         default=1,
+        type=float,
         help=(
             "Expression values (e.g. FPKM) under this threshold will be set "
             "to NaN and not used during correlation calculations. "
@@ -265,6 +267,7 @@ if __name__ == '__main__':
     bldcob.add_argument(
         '--max-gene-missing-data',
         default=0.2,
+        type=float,
         help=(   
             "Maximum percentage missing data a gene can have. Genes not "
             "meeting this criteria are removed from dataset."
@@ -274,6 +277,7 @@ if __name__ == '__main__':
     bldcob.add_argument(
         '--max-accession-missing-data',
         default=0.3,
+        type=float,
         help=(
             "maximum percentage missing data an accession (experiment) can"
             "have before it is removed."
@@ -283,6 +287,7 @@ if __name__ == '__main__':
     bldcob.add_argument(
         '--min-single-sample-expr',
         default=5,
+        type=float,
         help=(
             "Genes that do not have a single accession having an expression "
             "value above this threshold are removed from analysis. These are "
@@ -290,6 +295,17 @@ if __name__ == '__main__':
             "pattern."
         )
     )  
+    bldcob.add_argument(
+        '--ignore-refgen-membership',
+        action='store_true',
+        help=(
+            "Flag indicating that feature (genes, metabolites, etc) should "
+            "not be filtered out of the expression matrix because they are "
+            "not present in the reference genome. This is useful for "
+            "features, such as metabolites, that cannot be anchored to "
+            "a RefGen."
+        )
+    )
     bldcob.add_argument(
         '--dry-run',
         action='store_true',
