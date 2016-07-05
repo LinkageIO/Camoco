@@ -864,6 +864,29 @@ class RefGen(Camoco):
                     als[id] = [al]
             return als
 
+
+    @classmethod
+    def from_DataFrame(cls,df,name,description,build,organism,
+            chrom_col='chrom',start_col='start',stop_col='stop',
+            id_col='ID'):
+        '''
+            Imports a RefGen object from a CSV.
+        '''
+        self = cls.create(name,description,type='RefGen')
+        self._global('build',build)
+        self._global('organism','organism')
+        genes = list()
+        for i,row in df.iterrows():
+            genes.append(
+                Gene(
+                    row[chrom_col],int(row[start_col]),int(row[stop_col]),
+                    id=row[id_col],build=build,organism=organism
+                ).update(dict(row.items()))
+            )
+        self.add_gene(genes)
+        self._build_indices()
+        return self
+
     @classmethod
     def from_gff(cls,filename,name,description,build,organism,
                  chrom_feature='chromosome',gene_feature='gene',
@@ -902,7 +925,6 @@ class RefGen(Camoco):
                 name of the feature.
             attr_split : str (default: '=')
                 The delimiter for keys and values in the attribute column
-
         '''
         self = cls.create(name,description,type='RefGen')
         self._global('build',build)
@@ -919,8 +941,10 @@ class RefGen(Camoco):
                 continue
             (chrom,source,feature,start,
              end,score,strand,frame,attributes) = line.strip().split('\t')
-            attributes = dict([(field.strip().split(attr_split)) \
-                for field in attributes.strip(';').split(';')])
+            attributes = dict([
+                field.split(attr_split).strip('"') \
+                    for field in attributes.strip(';').split(';')
+            ])
             if feature == chrom_feature:
                 self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
                 self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
