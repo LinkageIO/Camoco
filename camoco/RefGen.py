@@ -941,10 +941,8 @@ class RefGen(Camoco):
                 continue
             (chrom,source,feature,start,
              end,score,strand,frame,attributes) = line.strip().split('\t')
-            attributes = dict([
-                field.split(attr_split).strip('"') \
-                    for field in attributes.strip(';').split(';')
-            ])
+            attributes = dict([(field.strip().split(attr_split)) \
+                    for field in attributes.strip(';').split(';')])
             if feature == chrom_feature:
                 self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
                 self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
