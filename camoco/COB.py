@@ -220,9 +220,10 @@ class COB(Expr):
 
         '''
         if gene_list is None:
+            ids = self._expr.index.values
             df = self.coex
         else:
-            ids = np.array([self._expr_index[x.id] for x in set(gene_list)])
+            ids = np.array(sorted([self._expr_index[x.id] for x in set(gene_list)]))
             if filter_missing_gene_ids:
                 # filter out the Nones
                 ids = np.array(list(filter(None, ids)))
@@ -230,6 +231,7 @@ class COB(Expr):
             # Grab the coexpression indices for the genes
             indices = PCCUP.coex_index(ids, num_genes)
             df = self.coex.iloc[indices]
+            # Add in the gene labels
         if min_distance is not None:
             df = df.loc[df.distance >= min_distance, :]
         if sig_only:
@@ -246,7 +248,11 @@ class COB(Expr):
                 parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
-        return df.copy()
+        ids = pd.DataFrame(
+            list(itertools.combinations(ids,2)),
+            columns=['gene_a','gene_b']  
+        )
+        return pd.concat([ids,df],axis=1).set_index(['gene_a','gene_b'])
 
     def cluster_coefficient(self, locus_list, flank_limit,
         trans_locus=True, bootstrap=False, by_gene=True, iter_name=None):
@@ -952,18 +958,19 @@ class COB(Expr):
             Also calculates pairwise gene distance.
         '''
         # Start off with a fresh set of genes we can pass to functions
-        tbl = pd.DataFrame(
-            list(itertools.combinations(self._expr.index.values, 2)),
-            columns=['gene_a', 'gene_b']
-        )
+        #tbl = pd.DataFrame(
+        #    list(itertools.combinations(self._expr.index.values, 2)),
+        #    columns=['gene_a', 'gene_b']
+        #)
+        tbl = pd.DataFrame()
 
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
         pccs = 1 - PCCUP.pair_correlation(
             np.ascontiguousarray(self._expr.as_matrix())
         )
-        assert len(pccs) == len(tbl)
-        tbl['score'] = pccs
+        # assert len(pccs) == len(tbl)
+        tbl['score'] = pd.Series(pccs,dtype='float32')
         # correlations of 1 dont transform well, they cause infinities
         tbl.loc[tbl['score'] == 1, 'score'] = 0.99999999
         tbl.loc[tbl['score'] == -1, 'score'] = -0.99999999
@@ -976,7 +983,6 @@ class COB(Expr):
             tbl['score'],
             np.isnan(tbl['score'])
         )
-
         # 2. Calculate Z Scores
         pcc_mean = valid_scores.mean()
         pcc_std = valid_scores.std()
@@ -984,24 +990,22 @@ class COB(Expr):
         self._global('pcc_mean', pcc_mean)
         self._global('pcc_std', pcc_std)
         tbl['score'] = (valid_scores-pcc_mean)/pcc_std
-
         # 3. Assign significance
         self._global('significance_threshold', significance_thresh)
         tbl['significant'] = pd.Series(
             list(tbl['score'] >= significance_thresh),
-            dtype='int_'
+            dtype='bool'
         )
-
         # 4. Calculate Gene Distance
         self.log("Calculating Gene Distance")
         distances = self.refgen.pairwise_distance(
             gene_list=self.refgen.from_ids(self._expr.index)
         )
         assert len(distances) == len(tbl)
-        tbl['distance'] = distances
+        tbl['distance'] = pd.Series(distances,dtype='float32')
         # Reindex the table to match genes
         self.log('Indexing coex table')
-        tbl.set_index(['gene_a', 'gene_b'], inplace=True)
+        #tbl.set_index(['gene_a', 'gene_b'], inplace=True)
 
         # 5. Put table in the hdf5 store
         self._build_tables(tbl)
