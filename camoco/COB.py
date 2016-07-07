@@ -48,6 +48,11 @@ class COB(Expr):
             self.degree = self.hdf5['degree']
         except KeyError as e:
             self.log("{} is empty ({})", name, e)
+        try:
+            self.log('Loading Clusters')
+            self.clusters = self.hdf5['clusters']
+        except KeyError as e:
+            self.log('Clusters not loaded for: {} ()', name, e)
 
     def __repr__(self):
         return '<COB: {}>'.format(self.name)
@@ -77,8 +82,13 @@ class COB(Expr):
             min single sample expr: {}
             max accession missing data: {}
 
+            Clusters
+            ------------------
+            Num clusters (size > 3): {}
+
 
         '''.format(
+            # Dataset
             self.name,
             self.description,
             self.rawtype,
@@ -90,10 +100,13 @@ class COB(Expr):
             # Raw
             len(self.expr(raw=True)),
             len(self.expr(raw=True).columns),
+            # QC
             self._global('qc_min_expr'),
             self._global('qc_max_gene_missing_data'),
             self._global('qc_min_single_sample_expr'),
-            self._global('qc_max_accession_missing_data')
+            self._global('qc_max_accession_missing_data'),
+            # Clusters
+            sum(self.clusters.groupby('cluster').apply(len) > 3)
         ), file=file)
 
     def qc_gene(self):

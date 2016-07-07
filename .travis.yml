@@ -16,4 +16,7 @@ install:
 script:  
   - source $HOME/.camoco/conda/bin/activate camoco
   - export PATH=/home/travis/.camoco/bin/:$PATH
-  - py.test  tests -v  
+  - py.test -v --cov=camoco/
+
+after_success:
+  - coveralls
