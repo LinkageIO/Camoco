@@ -12,7 +12,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - pip install -r test_requirements.txt
+  - conda install pytest-cov
 # command to run tests, e.g. python setup.py test
 script:  
   - source $HOME/.camoco/conda/bin/activate camoco
