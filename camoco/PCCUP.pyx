@@ -14,12 +14,12 @@ from libc.math cimport isnan
 # input is a typed numpy memoryview (::1 means c contiguous array)
 def pair_correlation(double[:, ::1] x):
     # Define a new memoryview on an empty gene X gene matrix
-    cdef double[::1] pccs = np.empty(comb(x.shape[0],2,exact=True))
-    cdef double u, v
+    cdef float[::1] pccs = np.empty(comb(x.shape[0],2,exact=True)).astype('float32')
+    cdef float u, v
     cdef int i, j, k, count
     cdef long num_rows, num_cols
-    cdef double du, dv, d, n, r
-    cdef double sum_u, sum_v, sum_u2, sum_v2, sum_uv
+    cdef float du, dv, d, n, r
+    cdef float sum_u, sum_v, sum_u2, sum_v2, sum_uv
     cdef long index
 
     index = 0
@@ -53,7 +53,12 @@ def pair_correlation(double[:, ::1] x):
                     pccs[index] = np.nan
                 else:
                     r = 1 - n / (du * dv)
-                    pccs[index] = r
+                    if r == 1.0:
+                        pccs[index] = 0.99999999
+                    elif r == -1.0:
+                        pccs[index] = -0.99999999
+                    else:
+                        pccs[index] = r
             index += 1
     # Return the base of the memory view
     return pccs.base

@@ -173,7 +173,7 @@ then
     conda config --add envs_dirs $BASE/conda/envs
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
         cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
-        scipy pandas matplotlib==1.4.3 numexpr patsy statsmodels pytables flask \
+        scipy pandas matplotlib==1.4.3 numexpr patsy statsmodels feather flask \
         networkx ipython mpmath pytest 
     #conda remove -y -n $NAME libgfortran --force
     #conda install -y -n $NAME libgcc --force

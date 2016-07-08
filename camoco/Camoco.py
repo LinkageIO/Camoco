@@ -3,6 +3,7 @@ import apsw as lite
 import os as os
 import tempfile
 import pandas as pd
+import feather as ft
 
 from .Tools import log
 from .Config import cf
@@ -55,19 +56,32 @@ class Camoco(object):
             )
         )
 
-    def _hdf5(self, dbname, type=None):
+    def _ft(self, tblname, dbname=None, type=None, df=None):
         if type is None:
             type = self.type
-        # return a connection if exists
-        return pd.HDFStore(
-            os.path.expanduser(
-                os.path.join(
-                    cf.options.basedir,
-                    'databases',
-                    "{}.{}.hd5".format(type, dbname)
+        if dbname is None:
+            dbname = self.name
+        if df is None:
+            # return the dataframe if it exists 
+            return ft.read_dataframe(
+                os.path.expanduser(
+                    os.path.join(
+                        cf.options.basedir,
+                        'databases',
+                        "{}.{}.{}.ft".format(type, dbname, tblname)
+                    )
                 )
             )
-        )
+        else:
+            return ft.write_dataframe(df, 
+                os.path.expanduser(
+                    os.path.join(
+                        cf.options.basedir,
+                        'databases',
+                        "{}.{}.{}.ft".format(type, dbname, tblname)
+                    )
+                )
+            )
 
     def _tmpfile(self):
         # returns a handle to a tmp file
