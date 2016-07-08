@@ -246,7 +246,6 @@ class Expr(Camoco):
         # Sort the table by genes
         df = df.sort_index()
         # ensure that column names are alphanumeric
-        # hdf5 doesn't like unicode characters
         pattern = re.compile('[^A-Za-z0-9_, ;:().]')
         df.columns = [pattern.sub('', x) for x in df.columns.values ]
         # Also, make sure gene names are uppercase
@@ -618,7 +617,7 @@ class Expr(Camoco):
         '''
         # Piggy back on the super create method
         self = super().create(name, description,type=type)
-        # Create appropriate HDF5 tables
+        # Create appropriate feather tables
         self._ft('expr', df=pd.DataFrame())
         self._ft('raw_expr', df=pd.DataFrame())
         # Delete existing datasets

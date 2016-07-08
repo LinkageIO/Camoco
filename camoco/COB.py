@@ -53,8 +53,8 @@ class COB(Expr):
             self.log("{} is empty ({})", name, e)
         try:
             self.log('Loading Clusters')
-            self.clusters = self.hdf5['clusters']
-        except KeyError as e:
+            self.clusters = self._ft('clusters')
+        except FeatherError as e:
             self.log('Clusters not loaded for: {} ()', name, e)
 
     def __repr__(self):
@@ -1016,7 +1016,7 @@ class COB(Expr):
     def _calculate_degree(self):
         '''
             Calculates degrees of genes within network. Stores
-            them in our HDF5 store.
+            them in our feather store.
         '''
         self.log('Building Degree')
         self.degree = pd.DataFrame(
