@@ -231,7 +231,12 @@ class COB(Expr):
             # Grab the coexpression indices for the genes
             indices = PCCUP.coex_index(ids, num_genes)
             df = self.coex.iloc[indices]
-            # Add in the gene labels
+        # Add in the gene labels
+        ids = pd.DataFrame(
+            list(itertools.combinations(ids,2)),
+            columns=['gene_a','gene_b']  
+        )
+        df = pd.concat([ids,df],axis=1).set_index(['gene_a','gene_b'])
         if min_distance is not None:
             df = df.loc[df.distance >= min_distance, :]
         if sig_only:
@@ -248,11 +253,7 @@ class COB(Expr):
                 parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
-        ids = pd.DataFrame(
-            list(itertools.combinations(ids,2)),
-            columns=['gene_a','gene_b']  
-        )
-        return pd.concat([ids,df],axis=1).set_index(['gene_a','gene_b'])
+        return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
         trans_locus=True, bootstrap=False, by_gene=True, iter_name=None):
