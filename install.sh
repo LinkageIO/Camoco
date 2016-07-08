@@ -177,7 +177,7 @@ then
         ipython mpmath pytest-cov 
     #conda remove -y -n $NAME libgfortran --force
     #conda install -y -n $NAME libgcc --force
-    conda install feather-format -c conda-forge
+    conda install --no-update-deps -y -n $NAME -c conda-forge feather-format 
     conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/omnia termcolor
     conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/cpcloud ipdb
 else
