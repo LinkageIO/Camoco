@@ -16,9 +16,13 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
+  - conda install pytest-cov
 # command to run tests, e.g. python setup.py test
 script:  
   - source $HOME/.camoco/conda/bin/activate camoco
   - export PATH=/home/travis/.camoco/bin/:$PATH
-  - py.test  tests -v  
+  - which py.test
+  - py.test -v --cov=camoco/
 
+after_success:
+  - coveralls

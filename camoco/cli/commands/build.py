@@ -1,8 +1,12 @@
 import camoco as co
+from camoco.Tools import DummyRefGen
 
 def build_cob(args):
     # Build the refgen
-    refgen = co.RefGen(args.refgen)
+    if not args.ignore_refgen_membership:
+        refgen = co.RefGen(args.refgen)
+    else:
+        refgen = DummyRefGen() 
     # Basically just pass all the CLI arguments to the COB class method  
     co.COB.from_table(
         args.filename,
@@ -17,7 +21,8 @@ def build_cob(args):
         min_single_sample_expr=args.min_single_sample_expr,
         min_expr=args.min_expr,
         max_val=args.max_val,
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
+        quality_control=args.skip_quality_control
     )
     print("Build successful!")
 

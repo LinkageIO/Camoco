@@ -7,10 +7,10 @@ import re
 
 class Locus(object):
     def __init__(self, chrom, start, end=None, id=None, window=0, sub_loci=None, **kwargs):
-        if id is None or id.startswith('<None>'):
+        if id is None or str(id).startswith('<None>'):
             self._id = None
         else:
-            self._id = id
+            self._id = str(id)
         self.chrom = str(chrom)
         self._start = int(start)
         self._end = int(end) if end is not None else int(start)

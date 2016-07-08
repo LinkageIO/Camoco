@@ -51,6 +51,11 @@ class COB(Expr):
             self.degree = self._ft('degree')
         except FeatherError as e:
             self.log("{} is empty ({})", name, e)
+        try:
+            self.log('Loading Clusters')
+            self.clusters = self.hdf5['clusters']
+        except KeyError as e:
+            self.log('Clusters not loaded for: {} ()', name, e)
 
     def __repr__(self):
         return '<COB: {}>'.format(self.name)
@@ -80,8 +85,13 @@ class COB(Expr):
             min single sample expr: {}
             max accession missing data: {}
 
+            Clusters
+            ------------------
+            Num clusters (size > 3): {}
+
 
         '''.format(
+            # Dataset
             self.name,
             self.description,
             self.rawtype,
@@ -93,10 +103,13 @@ class COB(Expr):
             # Raw
             len(self.expr(raw=True)),
             len(self.expr(raw=True).columns),
+            # QC
             self._global('qc_min_expr'),
             self._global('qc_max_gene_missing_data'),
             self._global('qc_min_single_sample_expr'),
-            self._global('qc_max_accession_missing_data')
+            self._global('qc_max_accession_missing_data'),
+            # Clusters
+            sum(self.clusters.groupby('cluster').apply(len) > 3)
         ), file=file)
 
     def qc_gene(self):
@@ -208,9 +221,10 @@ class COB(Expr):
             include score, significant (bool), and inter-genic distance.
         '''
         if gene_list is None:
+            ids = self._expr.index.values
             df = self.coex
         else:
-            ids = np.array([self._expr_index[x.id] for x in set(gene_list)])
+            ids = np.array(sorted([self._expr_index[x.id] for x in set(gene_list)]))
             if filter_missing_gene_ids:
                 # filter out the Nones
                 ids = np.array(list(filter(None, ids)))
@@ -218,6 +232,7 @@ class COB(Expr):
             # Grab the coexpression indices for the genes
             indices = PCCUP.coex_index(ids, num_genes)
             df = self.coex.iloc[indices]
+            # Add in the gene labels
         if min_distance is not None:
             df = df.loc[df.distance >= min_distance, :]
         if sig_only:
@@ -234,7 +249,11 @@ class COB(Expr):
                 parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
-        return df.copy()
+        ids = pd.DataFrame(
+            list(itertools.combinations(ids,2)),
+            columns=['gene_a','gene_b']  
+        )
+        return pd.concat([ids,df],axis=1).set_index(['gene_a','gene_b'])
 
     def cluster_coefficient(self, locus_list, flank_limit,
         trans_locus=True, bootstrap=False, by_gene=True, iter_name=None):
@@ -943,7 +962,7 @@ class COB(Expr):
             del self.coex
         except AttributeError:
             pass
-        
+
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
         pccs = (1 - PCCUP.pair_correlation(

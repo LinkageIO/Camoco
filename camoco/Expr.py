@@ -30,14 +30,13 @@ class Expr(Camoco):
     def __init__(self, name):
         super().__init__(name=name, type='Expr')
         # Part I: Load the Expression dataset
+        self.log('Loading Expr table')
         try:
-            self.log('Loading Expr table')
-            
-            # Load the expression Data
             self._expr = self._ft('expr')
             self._gene_qc_status = self._ft('gene_qc_status')
         except FeatherError as e:
             self._expr = pd.DataFrame()
+        
         self.log('Building Expr Index')
         self._expr_index = defaultdict(
             lambda: None,
@@ -245,13 +244,13 @@ class Expr(Camoco):
                     return x
             df.columns = [shorten(x) for x in df.columns]
         # Sort the table by genes
-        df = df.sort()
+        df = df.sort_index()
         # ensure that column names are alphanumeric
         # hdf5 doesn't like unicode characters
         pattern = re.compile('[^A-Za-z0-9_, ;:().]')
         df.columns = [pattern.sub('', x) for x in df.columns.values ]
         # Also, make sure gene names are uppercase
-        df.index = [pattern.sub('', x).upper() for x in df.index.values ]
+        df.index = [pattern.sub('', str(x)).upper() for x in df.index.values ]
         try:
             self._ft(table, df=df)
             self._expr = df
@@ -398,34 +397,43 @@ class Expr(Camoco):
         if not membership:
             membership = self.refgen
         self._global('qc_membership', str(membership))
-        self.log("Filtering out genes not in {}", membership)
         qc_gene['pass_membership'] = [x in membership for x in df.index]
+        self.log(
+            "Found out {} genes not in {}", 
+            sum(qc_gene['pass_membership'] == False), 
+            membership
+        )
 
         # -----------------------------------------
         # Set minimum FPKM threshold
-        self.log("Filtering out expression values lower than {}", min_expr)
+        self.log("Filtering expression values lower than {}", min_expr)
         df_flt = df.copy()
         df_flt[df < min_expr] = np.nan
         df = df_flt
         # -----------------------------------------
         # Gene Missing Data Test
-        self.log(
-            "Filtering out genes with > {} missing data",
-            max_gene_missing_data
-        )
         qc_gene['pass_missing_data'] = df.apply(
             lambda x : ((sum(np.isnan(x))) < len(x)*max_gene_missing_data),
             axis=1
+        )
+        self.log(
+            "Found {} genes with > {} missing data",
+            sum(qc_gene['pass_missing_data'] == False),
+            max_gene_missing_data
         )
         # -----------------------------------------
         # Gene Min Expression Test
         # filter out genes which do not meet a minimum expr
         # threshold in at least one sample
-        self.log(("Filtering out genes which "
-                  "do not have one sample above {}"), min_single_sample_expr)
         qc_gene['pass_min_expression'] = df.apply(
             lambda x: any(x >= min_single_sample_expr),
             axis=1 # 1 is column
+        )
+        self.log(
+            ("Found {} genes which "
+            "do not have one sample above {}"), 
+            sum(qc_gene['pass_min_expression'] == False),
+            min_single_sample_expr
         )
         qc_gene['PASS_ALL'] = qc_gene.apply(
             lambda row: np.all(row), axis=1
@@ -433,13 +441,16 @@ class Expr(Camoco):
         df = df.loc[qc_gene['PASS_ALL'], :]
         # -----------------------------------------
         # Filter out ACCESSIONS with too much missing data
-        self.log("Filtering out accessions with > {} missing data", max_accession_missing_data)
-
         qc_accession['pass_missing_data'] = df.apply(
             lambda col : (
                 ((sum(np.isnan(col)) / len(col)) <= max_accession_missing_data)
             ),
             axis=0 # 0 is columns
+        )
+        self.log(
+            "Found {} accessions with > {} missing data", 
+            sum(qc_accession['pass_missing_data'] == False),
+            max_accession_missing_data
         )
         # Update the total QC passing column
         qc_accession['PASS_ALL'] = qc_accession.apply(
@@ -450,8 +461,8 @@ class Expr(Camoco):
         self._ft('qc_accession', df=qc_accession)
         self._ft('qc_gene', df=qc_gene)
         # Report your findings
-        self.log('Gene Removal:\n{}', str(qc_gene.apply(sum, axis=0)))
-        self.log('Accession Removal:\n{}', str(qc_accession.apply(sum, axis=0)))
+        self.log('Genes passing QC:\n{}', str(qc_gene.apply(sum, axis=0)))
+        self.log('Accessions passing QC:\n{}', str(qc_accession.apply(sum, axis=0)))
         # Also report a breakdown by chromosome
         qc_gene = qc_gene[qc_gene['pass_membership']]
         qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index]
@@ -736,6 +747,8 @@ class Expr(Camoco):
             self.log('Performing Quality Control on genes')
             self._quality_control(**kwargs)
             assert self.anynancol() == False
+        else:
+            self.log('Skipping Quality Control!')
         if normalize:
             self.log('Performing Raw Expression Normalization')
             self._normalize(**kwargs)

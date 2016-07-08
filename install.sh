@@ -174,7 +174,7 @@ then
     conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
         cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
         scipy pandas matplotlib==1.4.3 numexpr patsy statsmodels feather flask \
-        networkx ipython mpmath pytest 
+        networkx ipython mpmath pytest-cov 
     #conda remove -y -n $NAME libgfortran --force
     #conda install -y -n $NAME libgcc --force
     conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/omnia termcolor
