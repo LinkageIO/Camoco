@@ -978,23 +978,12 @@ class COB(Expr):
         self.log("Calculating Coexpression")
         pccs = (1 - PCCUP.pair_correlation(
             np.ascontiguousarray(self._expr.as_matrix())
-<<<<<<< HEAD
         ))
         
         self.log("Running Fisher Transform")
         pccs = np.arctanh(pccs); gc.collect();
         
         self.log("Calculating Mean and STD")
-=======
-        )
-        # assert len(pccs) == len(tbl)
-        tbl['score'] = pd.Series(pccs,dtype='float32')
-        # correlations of 1 dont transform well, they cause infinities
-        tbl.loc[tbl['score'] == 1, 'score'] = 0.9999999
-        tbl.loc[tbl['score'] == -1, 'score'] = -0.9999999
-        # Perform fisher transform on PCCs
-        tbl['score'] = np.arctanh(tbl['score'])
->>>>>>> upstream/master
         # Sometimes, with certain datasets, the NaN mask overlap
         # completely for the two genes expression data making its PCC a nan.
         # This affects the mean and std fro the gene.
