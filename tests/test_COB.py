@@ -8,6 +8,7 @@ import itertools
 
 import numpy as np
 
+import random
 from scipy.misc import comb
 from camoco import cf
 
@@ -52,6 +53,18 @@ def test_coex_id_concordance(testCOB):
         ):
         assert sorted(testCOB.coexpression(a,b).name) == sorted([a.id,b.id])
 
+def test_coex_to_expr_concordance(testCOB):
+    expr_len = testCOB._expr.shape[0]
+    expr_idxs = sort(np.unique(np.array(
+        [random.randint(0,expr_len) for i in range(cf.test.num*10)]
+    )))
+    coex_idxs = co.PCCUP.coex_index(expr_idxs, expr_len)
+    new_expr_idxs = np.unique(co.PCCUP.coex_expr_index(coex_idxs, expr_len).flatten())
+    missing = 0
+    for i in new_expr_idxs:
+        if i not in expr_idxs:
+            missing += 1
+    assert missing == 0
 
 def test_num_neighbors_equals_degree(testCOB):
     random_gene = testCOB.refgen.random_gene()

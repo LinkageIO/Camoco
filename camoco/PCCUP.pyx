@@ -121,7 +121,7 @@ def coex_expr_index(long[:] ids, int num_genes):
     pos = 0
     
     for i in range(num_genes):
-        if (ids[idx] < (pos + (num_genes - i))):
+        if (ids[idx] < (pos + (num_genes - (i+1)))):
             for j in range(i+1, num_genes):
                 if ids[idx] == pos:
                     coors[idx, 0] = i
@@ -131,7 +131,7 @@ def coex_expr_index(long[:] ids, int num_genes):
                     break
                 pos += 1
         else:
-            pos += (num_genes - i)
+            pos += (num_genes - (i+1))
         
         if idx >= num_rows:
             break
