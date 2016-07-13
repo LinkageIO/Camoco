@@ -180,15 +180,17 @@ class COB(Expr):
                 name=(gene_a.id,gene_b.id),
                 index = ['score','significant','distance']
             )
+        return self.subnetwork([gene_a,gene_b],sig_only=False).iloc[0]
         # Grab the indices in the original expression matrix
-        ids = np.array([self._expr_index[gene_a.id], self._expr_index[gene_b.id]])
+        #ids = np.array([self._expr_index[gene_a.id], self._expr_index[gene_b.id]])
         # We need the number of genes
-        num_genes = self.num_genes()
-        index = PCCUP.coex_index(ids, num_genes)[0]
-        return self.coex.iloc[index]
+        #num_genes = self.num_genes()
+        #index = PCCUP.coex_index(ids, num_genes)[0]
+        #return self.coex.iloc[index]
 
     def subnetwork(self, gene_list=None, sig_only=True, min_distance=None,
-        filter_missing_gene_ids=True, trans_locus_only=False):
+        filter_missing_gene_ids=True, trans_locus_only=False,
+        names_as_index=True):
         '''
             Extract a subnetwork of edges exclusively between genes
             within the gene_list. Also includes various options for
@@ -214,6 +216,8 @@ class COB(Expr):
                 this argument requires that locus attr object has
                 the 'parent_locus' key:val set to distinguish between
                 cis and trans elements.
+            names_as_index : bool (default: True)
+                Include gene names as the index. 
 
             Returns
             -------
@@ -221,18 +225,29 @@ class COB(Expr):
             include score, significant (bool), and inter-genic distance.
         '''
         if gene_list is None:
-            ids = self._expr.index.values
+            # Return the entire DataFrame
+            ids = self._expr_index.values()
             df = self.coex
         else:
-            ids = np.array(sorted([self._expr_index[x.id] for x in set(gene_list)]))
-            if filter_missing_gene_ids:
-                # filter out the Nones
-                ids = np.array(list(filter(None, ids)))
-            num_genes = self.num_genes()
-            # Grab the coexpression indices for the genes
-            indices = PCCUP.coex_index(ids, num_genes)
-            df = self.coex.iloc[indices]
+            # Extract the ids for each Gene
+            gene_list = set(sorted(gene_list))
+            ids = np.array([self._expr_index[x.id] for x in gene_list])
+        if filter_missing_gene_ids:
+            # filter out the Nones
+            ids = np.array(list(filter(None, ids)))
+        num_genes = self.num_genes()
+        # Grab the coexpression indices for the genes
+        indices = PCCUP.coex_index(ids, num_genes)
+        df = self.coex.iloc[indices]
+        if names_as_index == True:
             # Add in the gene labels
+            ids = pd.DataFrame(
+                list(itertools.combinations(self._expr.index[ids],2)),
+                columns=['gene_a','gene_b']  
+            )
+            df.insert(0,'gene_a', ids['gene_a'].values)
+            df.insert(1,'gene_b', ids['gene_b'].values)
+            df = df.set_index(['gene_a','gene_b'])
         if min_distance is not None:
             df = df.loc[df.distance >= min_distance, :]
         if sig_only:
@@ -249,11 +264,7 @@ class COB(Expr):
                 parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
-        ids = pd.DataFrame(
-            list(itertools.combinations(ids,2)),
-            columns=['gene_a','gene_b']  
-        )
-        return pd.concat([ids,df],axis=1).set_index(['gene_a','gene_b'])
+        return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
         trans_locus=True, bootstrap=False, by_gene=True, iter_name=None):
@@ -967,12 +978,23 @@ class COB(Expr):
         self.log("Calculating Coexpression")
         pccs = (1 - PCCUP.pair_correlation(
             np.ascontiguousarray(self._expr.as_matrix())
+<<<<<<< HEAD
         ))
         
         self.log("Running Fisher Transform")
         pccs = np.arctanh(pccs); gc.collect();
         
         self.log("Calculating Mean and STD")
+=======
+        )
+        # assert len(pccs) == len(tbl)
+        tbl['score'] = pd.Series(pccs,dtype='float32')
+        # correlations of 1 dont transform well, they cause infinities
+        tbl.loc[tbl['score'] == 1, 'score'] = 0.9999999
+        tbl.loc[tbl['score'] == -1, 'score'] = -0.9999999
+        # Perform fisher transform on PCCs
+        tbl['score'] = np.arctanh(tbl['score'])
+>>>>>>> upstream/master
         # Sometimes, with certain datasets, the NaN mask overlap
         # completely for the two genes expression data making its PCC a nan.
         # This affects the mean and std fro the gene.
