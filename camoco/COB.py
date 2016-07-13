@@ -227,7 +227,6 @@ class COB(Expr):
         if gene_list is None:
             # Return the entire DataFrame
             ids = self._expr_index.values()
-            df = self.coex
         else:
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
@@ -239,6 +238,8 @@ class COB(Expr):
         # Grab the coexpression indices for the genes
         indices = PCCUP.coex_index(ids, num_genes)
         df = self.coex.iloc[indices]
+        if sig_only:
+            df = df.loc[df.significant == 1, :]
         if names_as_index == True:
             # Add in the gene labels
             ids = pd.DataFrame(
@@ -250,8 +251,7 @@ class COB(Expr):
             df = df.set_index(['gene_a','gene_b'])
         if min_distance is not None:
             df = df.loc[df.distance >= min_distance, :]
-        if sig_only:
-            df = df.loc[df.significant == 1, :]
+        
         if trans_locus_only:
             try:
                 parents = {x.id:x.attr['parent_locus'] for x in gene_list}
@@ -1165,7 +1165,7 @@ class COB(Expr):
         self._calculate_coexpression()
         self._calculate_degree()
         self._calculate_leaves()
-        #self._calculate_clusters()
+        self._calculate_clusters()
         return self
 
     @classmethod

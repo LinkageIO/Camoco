@@ -55,7 +55,7 @@ def test_coex_id_concordance(testCOB):
 
 def test_coex_to_expr_concordance(testCOB):
     expr_len = testCOB._expr.shape[0]
-    expr_idxs = sort(np.unique(np.array(
+    expr_idxs = np.sort(np.unique(np.array(
         [random.randint(0,expr_len) for i in range(cf.test.num*10)]
     )))
     coex_idxs = co.PCCUP.coex_index(expr_idxs, expr_len)
