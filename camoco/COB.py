@@ -1019,13 +1019,29 @@ class COB(Expr):
             them in our feather store.
         '''
         self.log('Building Degree')
-        self.degree = pd.DataFrame(
-            data=list(Counter(chain(
-                *self.subnetwork(sig_only=True).index.get_values()
-            )).items()),
-            columns=['Gene', 'Degree']
-        ).set_index('Gene')
+        
+        # Get significant expressions and dump coex from memory for time being
+        sigs = self.coex[self.coex.significant]
+        del self.coex
+        
+        # Get the index and find the counts
+        self.log('Finding the degrees')
+        sigs = sigs.index.values
+        sigs = PCCUP.coex_expr_index(sigs, len(self._expr.index.values))
+        sigs = np.array(list(Counter(chain(*sigs)).items()))
+        
+        self.log('Storing the degrees')
+        self.degree = pd.DataFrame(sigs, columns=['idx', 'Degree'])
+        for i in range(self.degree.shape[0]):
+            expr_idx = self.degree.iloc[i]['idx']
+            self.degree.set_value(i, 'Gene', self._expr.iloc[expr_idx].name)
+        self.degree.drop('idx', axis=1, inplace=True)
+        self.degree = self.degree.set_index('Gene')
         self._ft('degree', df=self.degree)
+        
+        # Cleanup and reinstate the coex table
+        del sigs; gc.collect();
+        self.coex = self._ft('coex')
         return self
         
     def _calculate_leaves(self):
@@ -1068,7 +1084,6 @@ class COB(Expr):
         '''
             Calculates global clusters
         '''
-        import ipdb; ipdb.set_trace();
         clusters = self.mcl()
         self.clusters = pd.DataFrame(
             data=[(gene.id, i) for i, cluster in enumerate(clusters) \
@@ -1097,7 +1112,6 @@ class COB(Expr):
         z = (z - float(self._global('pcc_mean'))) \
             / float(self._global('pcc_std'))
         return z
-
 
     ''' -----------------------------------------------------------------------
             Class Methods -- Factory Methods
@@ -1138,7 +1152,7 @@ class COB(Expr):
         # The Expr object already exists, just get a handle on it
         self = expr
         self._calculate_coexpression()
-        #self._calculate_degree()
+        self._calculate_degree()
         self._calculate_leaves()
         #self._calculate_clusters()
         return self

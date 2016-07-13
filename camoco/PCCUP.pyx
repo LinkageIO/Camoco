@@ -54,9 +54,9 @@ def pair_correlation(double[:, ::1] x):
                 else:
                     r = 1 - n / (du * dv)
                     if r == 1.0:
-                        pccs[index] = 0.99999999
+                        pccs[index] = 0.999999
                     elif r == -1.0:
-                        pccs[index] = -0.99999999
+                        pccs[index] = -0.999999
                     else:
                         pccs[index] = r
             index += 1
@@ -109,6 +109,34 @@ cdef square_to_vector(long i, long j, mi):
     # Calculate the number of items on diagonal
     d = i + 1
     return k-ld-d
+
+def coex_expr_index(long[:] ids, int num_genes):
+    '''
+        Convert a list of coex indexes to a tuple of expr indexes
+    '''
+    cdef int num_rows = ids.shape[0]
+    coors = np.zeros([num_rows,2], dtype=np.int32)
+    cdef long idx, pos, i, j
+    idx = 0
+    pos = 0
+    
+    for i in range(num_genes):
+        if (ids[idx] < (pos + (num_genes - i))):
+            for j in range(i+1, num_genes):
+                if ids[idx] == pos:
+                    coors[idx, 0] = i
+                    coors[idx, 1] = j
+                    idx += 1
+                if idx >= num_rows:
+                    break
+                pos += 1
+        else:
+            pos += (num_genes - i)
+        
+        if idx >= num_rows:
+            break
+    
+    return coors
 
 def coex_neighbors(long id, int mi):
     '''

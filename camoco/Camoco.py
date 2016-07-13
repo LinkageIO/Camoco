@@ -63,7 +63,7 @@ class Camoco(object):
             dbname = self.name
         if df is None:
             # return the dataframe if it exists 
-            return ft.read_dataframe(
+            df = ft.read_dataframe(
                 os.path.expanduser(
                     os.path.join(
                         cf.options.basedir,
@@ -72,8 +72,16 @@ class Camoco(object):
                     )
                 )
             )
+            if 'idx' in df.columns.values:
+                df.set_index('idx', drop=True, inplace=True)
+                df.index.name = None
+            return df
+        
         else:
-            return ft.write_dataframe(df, 
+            if not(df.index.dtype_str == 'int64') and not(df.empty):
+                df = df.copy()
+                df['idx'] = df.index
+            ft.write_dataframe(df, 
                 os.path.expanduser(
                     os.path.join(
                         cf.options.basedir,
@@ -82,6 +90,9 @@ class Camoco(object):
                     )
                 )
             )
+            if 'idx' in df.columns.values:
+                del df
+            return 
 
     def _tmpfile(self):
         # returns a handle to a tmp file

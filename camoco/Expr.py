@@ -247,9 +247,9 @@ class Expr(Camoco):
         df = df.sort_index()
         # ensure that column names are alphanumeric
         pattern = re.compile('[^A-Za-z0-9_, ;:().]')
-        df.columns = [pattern.sub('', x) for x in df.columns.values ]
+        df.columns = [pattern.sub('', x) for x in df.columns.values]
         # Also, make sure gene names are uppercase
-        df.index = [pattern.sub('', str(x)).upper() for x in df.index.values ]
+        df.index = [pattern.sub('', str(x)).upper() for x in df.index.values]
         try:
             self._ft(table, df=df)
             self._expr = df
