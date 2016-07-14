@@ -190,7 +190,7 @@ class COB(Expr):
 
     def subnetwork(self, gene_list=None, sig_only=True, min_distance=None,
         filter_missing_gene_ids=True, trans_locus_only=False,
-        names_as_index=True):
+        names_as_index=True, names_as_cols=False):
         '''
             Extract a subnetwork of edges exclusively between genes
             within the gene_list. Also includes various options for
@@ -217,42 +217,48 @@ class COB(Expr):
                 the 'parent_locus' key:val set to distinguish between
                 cis and trans elements.
             names_as_index : bool (default: True)
-                Include gene names as the index. 
+                Include gene names as the index.
+            names_as_cols : bool (default: False)
+                Include gene names as two columns named 'gene_a' and 'gene_b'.
 
             Returns
             -------
             A pandas.DataFrame containing the edges. Columns
             include score, significant (bool), and inter-genic distance.
         '''
+        num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
-            ids = self._expr_index.values()
-            df = self.coex
+            df = self.coex.copy()
         else:
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
             ids = np.array([self._expr_index[x.id] for x in gene_list])
-        if filter_missing_gene_ids:
-            # filter out the Nones
-            ids = np.array(list(filter(None, ids)))
-        num_genes = self.num_genes()
-        # Grab the coexpression indices for the genes
-        indices = PCCUP.coex_index(ids, num_genes)
-        df = self.coex.iloc[indices]
+            if filter_missing_gene_ids:
+                # filter out the Nones
+                ids = np.array(list(filter(None, ids)))
+            
+            # Grab the coexpression indices for the genes
+            ids = PCCUP.coex_index(ids, num_genes)
+            df = self.coex.iloc[ids]
+            del ids
         
-        if names_as_index == True:
-            # Add in the gene labels
-            ids = pd.DataFrame(
-                list(itertools.combinations(self._expr.index[ids],2)),
-                columns=['gene_a','gene_b']  
-            )
-            df.insert(0,'gene_a', ids['gene_a'].values)
-            df.insert(1,'gene_b', ids['gene_b'].values)
-            df = df.set_index(['gene_a','gene_b'])
-        if min_distance is not None:
-            df = df.loc[df.distance >= min_distance, :]
         if sig_only:
-            df = df.loc[df.significant == 1, :]
+            df = df[df.significant]
+        if min_distance is not None:
+            df = df[df.distance >= min_distance]
+        
+        if names_as_cols or names_as_index:
+            names = self._expr.index.values
+            ids = df.index.values
+            ids = PCCUP.coex_expr_index(ids, num_genes)
+            df.insert(0,'gene_a', names[ids[:,0]])
+            df.insert(1,'gene_b', names[ids[:,1]])
+            del ids; del names;
+        
+        if names_as_index:
+            df = df.set_index(['gene_a','gene_b'])
+        
         if trans_locus_only:
             try:
                 parents = {x.id:x.attr['parent_locus'] for x in gene_list}
@@ -485,11 +491,12 @@ class COB(Expr):
         with open(filename, 'w') as OUT:
             self.log("Creating .dat file")
             self.subnetwork(
-                gene_list, sig_only=sig_only, min_distance=min_distance
-            )['score'].to_csv(OUT, sep='\t')
+                gene_list, sig_only=sig_only, min_distance=min_distance, 
+                names_as_index=False, names_as_cols=True
+            ).to_csv(OUT, columns=['gene_a','gene_b','score'], index=False, sep='\t')
             self.log('Done')
 
-    def to_graphml(self,file, gene_list=None,sig_only=True,min_distance=0):
+    def to_graphml(self,file, gene_list=None, sig_only=True, min_distance=0):
         # Get all the graph edges (and the nodes implicitly)
         self.log('Getting the network.')
         edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only, min_distance=min_distance).index.values
@@ -629,7 +636,7 @@ class COB(Expr):
             self.log('waiting for MCL to finish...')
             sout = p.communicate()[0]
             p.wait()
-            self.log('...Done')
+            self.log('MCL done, Reading results.')
             if p.returncode==0:
                 # Filter out cluters who are smaller than the min size
                 return list(
@@ -1042,17 +1049,17 @@ class COB(Expr):
         sigs = PCCUP.coex_expr_index(sigs, len(self._expr.index.values))
         sigs = np.array(list(Counter(chain(*sigs)).items()))
         
+        # Translate the expr indexes to the gene names
         self.log('Storing the degrees')
+        names = self._expr.index.values
         self.degree = pd.DataFrame(sigs, columns=['idx', 'Degree'])
-        for i in range(self.degree.shape[0]):
-            expr_idx = self.degree.iloc[i]['idx']
-            self.degree.set_value(i, 'Gene', self._expr.iloc[expr_idx].name)
+        self.degree.insert(0,'Gene', names[self.degree['idx']])
         self.degree.drop('idx', axis=1, inplace=True)
         self.degree = self.degree.set_index('Gene')
         self._ft('degree', df=self.degree)
         
         # Cleanup and reinstate the coex table
-        del sigs; gc.collect();
+        del sigs; del names; gc.collect();
         self.coex = self._ft('coex')
         return self
         
@@ -1097,12 +1104,14 @@ class COB(Expr):
             Calculates global clusters
         '''
         clusters = self.mcl()
+        self.log('Building cluster dataframe')
         self.clusters = pd.DataFrame(
             data=[(gene.id, i) for i, cluster in enumerate(clusters) \
                     for gene in cluster],
             columns=['Gene', 'cluster']
         ).set_index('Gene')
         self._ft('clusters', df=self.clusters)
+        self.log('Finished finding clusters')
         return self
     
     def _coex_concordance(self, gene_a, gene_b, maxnan=10):
@@ -1166,7 +1175,7 @@ class COB(Expr):
         self._calculate_coexpression()
         self._calculate_degree()
         self._calculate_leaves()
-        #self._calculate_clusters()
+        self._calculate_clusters()
         return self
 
     @classmethod
