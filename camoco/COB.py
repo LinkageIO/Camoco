@@ -482,33 +482,65 @@ class COB(Expr):
                 return edges.score[0]
             return np.nanmean(edges.score)/(1/np.sqrt(len(edges)))
 
-    def to_dat(self, gene_list=None, filename=None, sig_only=False, min_distance=0):
+    def to_dat(self, gene_list=None, filename=None, sig_only=True, min_distance=0):
         '''
             Outputs a .DAT file (see Sleipnir library)
         '''
         if filename is None:
             filename = self.name + '.dat'
         with open(filename, 'w') as OUT:
-            self.log("Creating .dat file")
-            self.subnetwork(
-                gene_list, sig_only=sig_only, min_distance=min_distance, 
-                names_as_index=False, names_as_cols=True
-            ).to_csv(OUT, columns=['gene_a','gene_b','score'], index=False, sep='\t')
+            # Get the score table
+            self.log('Pulling the scores for the .dat')
+            score = self.subnetwork(gene_list, sig_only=sig_only, 
+            min_distance=min_distance, names_as_index=False,
+            names_as_cols=False)
+            del self.coex
+            
+            # Drop unecessary columns
+            score.drop(['distance','significant'], axis=1, inplace=True)
+            
+            # Find the ids from those
+            self.log("Finding the IDs")
+            names = self._expr.index.values
+            ids = PCCUP.coex_expr_index(score.index.values, self.num_genes())
+            score.insert(0,'gene_a', names[ids[:,0]])
+            score.insert(1,'gene_b', names[ids[:,1]])
+            del ids; del names;
+            
+            # Print it out!
+            self.log('Writing the .dat')
+            score.to_csv(
+                OUT, columns=['gene_a','gene_b','score'],index=False, sep='\t')
+            del score
+            self.coex = self._ft('coex')
             self.log('Done')
 
     def to_graphml(self,file, gene_list=None, sig_only=True, min_distance=0):
-        # Get all the graph edges (and the nodes implicitly)
+        # Get the edge indexes
         self.log('Getting the network.')
-        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only, min_distance=min_distance).index.values
+        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
+        min_distance=min_distance, names_as_index=False,
+        names_as_cols=False).index.values
+        del self.coex
+        
+        # Find the ids from those
+        names = self._expr.index.values
+        edges = PCCUP.coex_expr_index(edges, self.num_genes())
+        df = pd.DataFrame(index=np.arange(edges.shape[0]))
+        df['gene_a'] = names[edges[:,0]]
+        df['gene_b'] = names[edges[:,1]]
+        del edges; del names;
 
         # Build the NetworkX network
         self.log('Building the graph.')
-        net = nx.Graph()
-        net.add_edges_from(edges)
+        net = nx.from_pandas_dataframe(df,'gene_a','gene_b')
+        del df;
 
         # Print the file
         self.log('Writing the file.')
         nx.write_graphml(net,file)
+        del net;
+        self.coex = self._ft('coex')
         return
 
     def to_treeview(self, filename, cluster_method='mcl', gene_normalize=True):
@@ -534,7 +566,7 @@ class COB(Expr):
         dm.to_csv(filename)
 
 
-    def to_json(self, gene_list=None, filename=None):
+    def to_json(self, gene_list=None, filename=None, sig_only=True, min_distance=None):
         '''
             Produce a JSON network object that can be loaded in cytoscape.js
             or Cytoscape v3+.
@@ -572,9 +604,13 @@ class COB(Expr):
                         'distance' : 0
                     }}
                 )
-        # Now do the edges
-        subnet = self.subnetwork(gene_list)
-        subnet.reset_index(inplace=True)
+        # Get the edge indexes
+        self.log('Getting the network.')
+        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
+        min_distance=min_distance, names_as_index=False,
+        names_as_cols=True)
+        del self.coex
+    
         for source,target,score,significant,distance in subnet.itertuples(index=False):
             net['edges'].append(
                 {'data':{
@@ -589,8 +625,12 @@ class COB(Expr):
         if filename:
             with open(filename,'w') as OUT:
                 print(json.dumps(net),file=OUT)
+                del net
+                self.coex = self._ft('coex')
         else:
-            return json.dumps(net)
+            net = json.dumps(net)
+            self.coex = self._ft('coex')
+            return net
 
 
     def mcl(self, gene_list=None, I=2.0, scheme=7, min_distance=None,
