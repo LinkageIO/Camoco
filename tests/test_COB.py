@@ -1,16 +1,16 @@
 '''
     COB Tests
 '''
-
-import pytest
 import camoco as co
-import itertools
-
-import numpy as np
+from camoco import cf
 
 import random
+import itertools
+from collections import Counter
+
+import pytest
+import numpy as np
 from scipy.misc import comb
-from camoco import cf
 
 def test_coordination_between_expr_and_expr_index(testCOB):
     for i,x in enumerate(testCOB._expr.index):
@@ -54,17 +54,30 @@ def test_coex_id_concordance(testCOB):
         assert sorted(testCOB.coexpression(a,b).name) == sorted([a.id,b.id])
 
 def test_coex_to_expr_concordance(testCOB):
+    # Get Random set of expr indexes
     expr_len = testCOB._expr.shape[0]
     expr_idxs = np.sort(np.unique(np.array(
         [random.randint(0,expr_len) for i in range(cf.test.num*10)]
     )))
+    
+    # Translate them back and forth
     coex_idxs = co.PCCUP.coex_index(expr_idxs, expr_len)
-    new_expr_idxs = np.unique(co.PCCUP.coex_expr_index(coex_idxs, expr_len).flatten())
-    missing = 0
-    for i in new_expr_idxs:
-        if i not in expr_idxs:
-            missing += 1
-    assert missing == 0
+    new_expr_idxs = co.PCCUP.coex_expr_index(coex_idxs, expr_len).flatten()
+    
+    # Check all elements are the same in both
+    if not (expr_idxs.shape[0] == np.unique(new_expr_idxs).shape[0]):
+        assert False
+    res = (expr_idxs == np.unique(new_expr_idxs))
+    if not (np.sum(res) == res.shape[0]):
+        assert False
+    
+    # Check all values occur the proper number of times
+    corr_count = len(expr_idxs)-1
+    bad_vals = []
+    for k,v in Counter(new_expr_idxs).items():
+        if not (v == corr_count):
+            bad_vals.append((k,v))
+    assert bad_vals == []
 
 def test_num_neighbors_equals_degree(testCOB):
     random_gene = testCOB.refgen.random_gene()
