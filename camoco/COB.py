@@ -226,7 +226,6 @@ class COB(Expr):
             A pandas.DataFrame containing the edges. Columns
             include score, significant (bool), and inter-genic distance.
         '''
-        num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
             df = self.coex.copy()
@@ -239,6 +238,7 @@ class COB(Expr):
                 ids = np.array(list(filter(None, ids)))
             
             # Grab the coexpression indices for the genes
+            num_genes = self.num_genes()
             ids = PCCUP.coex_index(ids, num_genes)
             df = self.coex.iloc[ids]
             del ids
@@ -248,7 +248,7 @@ class COB(Expr):
         if min_distance is not None:
             df = df[df.distance >= min_distance]
         
-        if names_as_cols or names_as_index:
+        if names_as_index or names_as_cols:
             names = self._expr.index.values
             ids = df.index.values
             ids = PCCUP.coex_expr_index(ids, num_genes)
