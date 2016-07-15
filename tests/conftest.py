@@ -429,7 +429,7 @@ def AtSeedIonome(AtTair10):
         csvs = glob.glob(
             os.path.expanduser(os.path.join(
                 cf.options.testdir,
-                'raw', 'GWAS', 'AtIonome', 
+                'raw', 'GWAS', 'AtIonome',
                 'AtSeedIonome','*.csv.gz'
             ))
         )
@@ -446,7 +446,7 @@ def AtSeedIonome(AtTair10):
         # Import class from dataframe
         return co.GWAS.from_DataFrame(
             df, 'AtSeedIonome', 'Arabidopsis second pass 1.6M',
-            AtTair10, term_col='Trait', 
+            AtTair10, term_col='Trait',
             chr_col='CHR', pos_col='POS'
         )
     else:
@@ -580,5 +580,3 @@ def AtGO(AtTair10):
         )
     else:
         return co.GOnt('AtGO')
-
-

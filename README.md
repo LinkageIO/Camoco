@@ -1,12 +1,10 @@
 Camoco
 ======
-[![Build Status](https://travis-ci.org/schae234/Camoco.svg?branch=master)](https://travis-ci.org/schae234/Camoco)
-[![Coverage Status](https://coveralls.io/repos/schae234/Camoco/badge.svg?branch=master&service=github)](https://coveralls.io/github/schae234/Camoco?branch=master)
-
+-[![Build Status](https://travis-ci.org/schae234/Camoco.svg?branch=master)](https://travis-ci.org/schae234/Camoco)
+-[![Coverage Status](https://coveralls.io/repos/schae234/Camoco/badge.svg?branch=master&service=github)](https://coveralls.io/github/schae234/Camoco?branch=master)
 
 Co-Analysis of Molecular Components
 -----------------------------------
-
 Camoco is a python library for building and analyzing co-expression networks.
 Currently, networks are generally built from gene expression data, but given
 that the input to Camoco is simply a gene-by-sample expression matrix, there is
@@ -51,6 +49,7 @@ install [Docker](https://www.docker.com) on Linux, windows or Mac OS X. Using
 docker will ensure that Camoco is run in an environment closest to what it was
 developed in. After you have installed and tested docker, you should be able to
 build and run camoco:
+
 
 ```
 # Download the repo
