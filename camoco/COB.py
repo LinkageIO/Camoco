@@ -181,12 +181,6 @@ class COB(Expr):
                 index = ['score','significant','distance']
             )
         return self.subnetwork([gene_a,gene_b],sig_only=False).iloc[0]
-        # Grab the indices in the original expression matrix
-        #ids = np.array([self._expr_index[gene_a.id], self._expr_index[gene_b.id]])
-        # We need the number of genes
-        #num_genes = self.num_genes()
-        #index = PCCUP.coex_index(ids, num_genes)[0]
-        #return self.coex.iloc[index]
 
     def subnetwork(self, gene_list=None, sig_only=True, min_distance=None,
         filter_missing_gene_ids=True, trans_locus_only=False,
