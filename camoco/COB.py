@@ -818,7 +818,7 @@ class COB(Expr):
     def plot(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
-             include_gene_labels=None):
+             include_gene_labels=None, avg_by_cluster=False):
         '''
             Plots a heatmap of genes x expression.
         '''
@@ -835,6 +835,13 @@ class COB(Expr):
             order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
+        # Optional Average by cluster
+        if avg_by_cluster == True:
+            dm = self.clusters.groupby('cluster').\
+                    filter(lambda x: len(x) > 10).\
+                    groupby('cluster').\
+                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
+                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
         # Save plot if provided filename
         fig = plt.figure(
             facecolor='white'

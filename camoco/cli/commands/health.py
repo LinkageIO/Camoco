@@ -48,7 +48,6 @@ def cob_health(args):
         )
     else:
         log('Skipped raw.')
-
     if not path.exists('{}_Expr_norm.png'.format(args.out)):
         cob.plot(
             '{}_Expr_norm.png'.format(args.out),
@@ -56,7 +55,15 @@ def cob_health(args):
         )
     else:
         log('Skipped norm.')
-
+    log('Plotting Cluster Expression-----------------------------------------')
+    if not path.exists('{}_Expr_cluster.png'.format(args.out)):
+        cob.plot(
+            '{}_Expr_cluster.png'.format(args.out),
+            raw=False,
+            avg_by_cluster=True
+        )
+    else:
+        log('Skipped norm.')
     log('Printing Summary ---------------------------------------------------')
     if not path.exists('{}.summary.txt'.format(args.out)):
         with open('{}.summary.txt'.format(args.out),'w') as OUT:
