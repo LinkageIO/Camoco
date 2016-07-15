@@ -240,6 +240,7 @@ class COB(Expr):
             # Grab the coexpression indices for the genes
             num_genes = self.num_genes()
             ids = PCCUP.coex_index(ids, num_genes)
+            ids.sort()
             df = self.coex.iloc[ids]
             del ids
         
