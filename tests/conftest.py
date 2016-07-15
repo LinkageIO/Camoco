@@ -359,8 +359,7 @@ def AtRoot(AtTair10):
             'AtRoot', 'Arab Root',
             AtTair10,
             rawtype='MICROARRAY',
-            quantile=True, 
-            max_val=900
+            quantile=True
         )
     else:
         return co.COB('AtRoot')
