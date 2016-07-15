@@ -1296,7 +1296,8 @@ class COB(Expr):
         '''
         return cls.from_DataFrame(
             pd.read_table(
-                filename,sep=sep,
+                filename,
+                sep=sep,
                 compression='infer',
                 index_col=index_col
             ),
