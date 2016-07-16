@@ -818,9 +818,47 @@ class COB(Expr):
     def plot(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
-             include_gene_labels=None, avg_by_cluster=False):
+             include_gene_labels=None, avg_by_cluster=False
+             min_cluster_size=10):
         '''
             Plots a heatmap of genes x expression.
+
+            Parameters
+            ----------
+            filename : str 
+                If specified, figure will be written to output filename
+            genes : co.Locus iterable (default: None)
+                An iterable of genes to plot expression for
+            accessions : iterable of str
+                An iterable of strings to extract for expression values.
+                Values must be a subset of column values in expression matrix
+            gene_normalize: bool (default: True)
+                normalize gene values in heatmap to show expression patterns.
+            raw : bool (default: False)
+                If true, raw expression data will be used. Default is to use
+                the normailzed, QC'd data.
+            cluster_method : str (default: mcl)
+                Specifies how to organize the gene axis in the heatmap. If
+                'mcl', genes will be organized by MCL cluster. If 'leaf', 
+                genes will be organized based on hierarchical clustering,
+                any other value will result in genes to be in sorted order.
+            include_accession_labels : bool (default: None)
+                Force the rendering of accession labels. If None, accession 
+                lables will be included as long as there are less than 30.
+            include_gene_lables : bool (default: None)
+                Force rendering of gene labels in heatmap. If None, gene
+                labels will be rendered as long as there are less than 100.
+            avg_by_cluster : bool (default: False)
+                If True, gene expression values will be averaged by cluster
+                showing a single row per cluster.
+            min_cluster_size : int ( default: 10)
+                If avg_by_cluster, only cluster sizes larger than min_cluster_size
+                will be included.
+
+            Returns
+            -------
+            a populated matplotlib figure object
+
         '''
         # Get leaves
         dm = self.expr(genes=genes,accessions=accessions,
@@ -837,10 +875,14 @@ class COB(Expr):
         dm = dm.loc[order, :]
         # Optional Average by cluster
         if avg_by_cluster == True:
+            # Extract clusters
             dm = self.clusters.groupby('cluster').\
-                    filter(lambda x: len(x) > 10).\
+                    # Filter out clusters smaller than 10 genes
+                    filter(lambda x: len(x) > min_cluster_size).\
                     groupby('cluster').\
+                    # Average clusters by accession
                     apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
+                    # Standard normalize each clus
                     apply(lambda x: (x-x.mean())/x.std() ,axis=1)
         # Save plot if provided filename
         fig = plt.figure(
