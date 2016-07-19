@@ -130,7 +130,7 @@ class COB(Expr):
     def set_sig_edge_zscore(self,zscore):
         self.coex.significant = self.coex.score >= zscore
 
-    def neighbors(self, gene, sig_only=True):
+    def neighbors(self, gene, sig_only=True, names_as_index=True, names_as_cols=False):
         '''
             Returns a DataFrame containing the neighbors for gene.
 
@@ -138,19 +138,39 @@ class COB(Expr):
             ----------
             gene : co.Locus
                 The gene for which to extract neighbors
+            sig_only : bool
+                A flag to include only significant interactions.
+            names_as_index : bool (default: True)
+                Include gene names as the index.
+            names_as_cols : bool (default: False)
+                Include gene names as two columns named 'gene_a' and 'gene_b'.
 
             Returns
             -------
             A DataFrame containing edges
         '''
+        # Find the neighbors
         gene_id = self._expr_index[gene.id]
         neighbor_indices = PCCUP.coex_neighbors(gene_id, self.num_genes())
+        neighbor_indices.sort()
         edges = self.coex.iloc[neighbor_indices]
+        del neighbor_indices
         if sig_only:
-            return edges[edges.significant == 1]
-        else:
-            return edges
-
+            edges = edges[edges.significant == 1]
+        
+        # Find the indexes if necessary
+        if names_as_index or names_as_cols:
+            names = self._expr.index.values
+            ids = edges.index.values
+            ids = PCCUP.coex_expr_index(ids, self.num_genes())
+            edges.insert(0,'gene_a', names[ids[:,0]])
+            edges.insert(1,'gene_b', names[ids[:,1]])
+            del ids; del names;
+        if names_as_index:
+            edges = edges.set_index(['gene_a','gene_b'])
+        
+        return edges
+        
     def coexpression(self, gene_a, gene_b):
         '''
             Returns a coexpression z-score between two genes. This
@@ -232,8 +252,7 @@ class COB(Expr):
                 ids = np.array(list(filter(None, ids)))
             
             # Grab the coexpression indices for the genes
-            num_genes = self.num_genes()
-            ids = PCCUP.coex_index(ids, num_genes)
+            ids = PCCUP.coex_index(ids, self.num_genes())
             ids.sort()
             df = self.coex.iloc[ids]
             del ids
@@ -246,7 +265,7 @@ class COB(Expr):
         if names_as_index or names_as_cols:
             names = self._expr.index.values
             ids = df.index.values
-            ids = PCCUP.coex_expr_index(ids, num_genes)
+            ids = PCCUP.coex_expr_index(ids, self.num_genes())
             df.insert(0,'gene_a', names[ids[:,0]])
             df.insert(1,'gene_b', names[ids[:,1]])
             del ids; del names;
