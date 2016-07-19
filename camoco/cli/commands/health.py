@@ -48,7 +48,6 @@ def cob_health(args):
         )
     else:
         log('Skipped raw.')
-
     if not path.exists('{}_Expr_norm.png'.format(args.out)):
         cob.plot(
             '{}_Expr_norm.png'.format(args.out),
@@ -56,7 +55,15 @@ def cob_health(args):
         )
     else:
         log('Skipped norm.')
-
+    log('Plotting Cluster Expression-----------------------------------------')
+    if not path.exists('{}_Expr_cluster.png'.format(args.out)):
+        cob.plot(
+            '{}_Expr_cluster.png'.format(args.out),
+            raw=False,
+            avg_by_cluster=True
+        )
+    else:
+        log('Skipped norm.')
     log('Printing Summary ---------------------------------------------------')
     if not path.exists('{}.summary.txt'.format(args.out)):
         with open('{}.summary.txt'.format(args.out),'w') as OUT:
@@ -70,7 +77,7 @@ def cob_health(args):
         if not path.exists('{}_qc_gene.txt'.format(args.out)):
             # Print out the breakdown of QC Values
             refgen = co.RefGen(args.refgen)
-            gene_qc = cob.hdf5['qc_gene']
+            gene_qc = cob._ft('qc_gene')
             gene_qc = gene_qc[gene_qc.pass_membership]
             gene_qc['chrom'] = ['chr'+str(refgen[x].chrom) for x in gene_qc.index]
             gene_qc = gene_qc.groupby('chrom').agg(sum,axis=0)

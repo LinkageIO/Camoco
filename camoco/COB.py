@@ -181,12 +181,6 @@ class COB(Expr):
                 index = ['score','significant','distance']
             )
         return self.subnetwork([gene_a,gene_b],sig_only=False).iloc[0]
-        # Grab the indices in the original expression matrix
-        #ids = np.array([self._expr_index[gene_a.id], self._expr_index[gene_b.id]])
-        # We need the number of genes
-        #num_genes = self.num_genes()
-        #index = PCCUP.coex_index(ids, num_genes)[0]
-        #return self.coex.iloc[index]
 
     def subnetwork(self, gene_list=None, sig_only=True, min_distance=None,
         filter_missing_gene_ids=True, trans_locus_only=False,
@@ -824,7 +818,7 @@ class COB(Expr):
     def plot(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
-             include_gene_labels=None):
+             include_gene_labels=None, avg_by_cluster=False):
         '''
             Plots a heatmap of genes x expression.
         '''
@@ -841,6 +835,13 @@ class COB(Expr):
             order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
+        # Optional Average by cluster
+        if avg_by_cluster == True:
+            dm = self.clusters.groupby('cluster').\
+                    filter(lambda x: len(x) > 10).\
+                    groupby('cluster').\
+                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
+                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
         # Save plot if provided filename
         fig = plt.figure(
             facecolor='white'
@@ -1302,7 +1303,8 @@ class COB(Expr):
         '''
         return cls.from_DataFrame(
             pd.read_table(
-                filename,sep=sep,
+                filename,
+                sep=sep,
                 compression='infer',
                 index_col=index_col
             ),

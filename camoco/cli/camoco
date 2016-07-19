@@ -678,10 +678,12 @@ if __name__ == '__main__':
     health.add_argument(
         '--min-term-size',
         default=10,
+        metavar=10,
         help='Minimum GO term size to consider in health (defualt: 10)'
     )
     health.add_argument(
         '--max-term-size',
+        metavar=300,
         default=300,
         help='Maximum GO term size to consider in health (defualt: 300)'
     )
@@ -689,6 +691,7 @@ if __name__ == '__main__':
         '--num-bootstraps',
         default=100,
         type=int,
+        metavar=100,
         help='Number of Bootstraps for pvalue stats.'
     )
     health.set_defaults(func=cob_health)

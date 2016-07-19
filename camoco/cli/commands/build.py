@@ -14,6 +14,7 @@ def build_cob(args):
         args.description,
         refgen,
         # Optional arguments
+        sep=args.sep,
         rawtype=args.rawtype,
         quantile=False,
         max_gene_missing_data=args.max_gene_missing_data,
