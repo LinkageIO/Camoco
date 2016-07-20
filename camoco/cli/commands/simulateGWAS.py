@@ -9,7 +9,6 @@ from collections import OrderedDict
 
 def simulateGWAS(args):
     # Make sure that output files are handled correctly 
-    import ipdb; ipdb.set_trace()
     if args.out != sys.stdout:
         args.out = "{}_GWASSim.csv".format(args.out.replace('.csv',''))        
         if os.path.dirname(args.out) != '':
