@@ -125,6 +125,12 @@ class Camoco(object):
     def __getattr__(self, name):
         return self._global(name)
 
+    def __del__(self):
+        '''
+            Destroy a Camoco object and associated files.
+        '''
+        pass
+
     @classmethod
     def create(cls, name, description, type='Camoco'):
         '''
