@@ -31,7 +31,7 @@ from camoco.cli.commands.simulateGWAS import simulateGWAS
 from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
-from camoco.cli.commands.build import build_cob,build_refgen
+from camoco.cli.commands.build import build_cob,build_refgen,build_gont
 
 from camoco import cf
 
@@ -78,6 +78,36 @@ if __name__ == '__main__':
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
 
+
+    '''--------------------------
+        Build GOnt
+    --------------------------'''
+    bldgo = subparsers.add_parser(
+        'build-go',
+        help='Build a Gene Ontology (GO)'
+    )
+    bldgo.add_argument(
+        'filename',
+        help='Gene-term map file'
+    )
+    bldgo.add_argument(
+        'obo_filename',
+        help='GO .obo filename'
+    )
+    bldgo.add_argument(
+        'name',
+        help='GO dataset name'
+    )
+    bldgo.add_argument(
+        'description',
+        help='short dataset description'
+    )
+    bldgo.add_argument(
+        'refgen',
+        help='Camoco reference Genome name.'
+    )
+    bldgo.set_defaults(func=build_gont)
+    
 
     '''--------------------------
         Build RefGen
@@ -679,12 +709,14 @@ if __name__ == '__main__':
         '--min-term-size',
         default=10,
         metavar=10,
+        type=int,
         help='Minimum GO term size to consider in health (defualt: 10)'
     )
     health.add_argument(
         '--max-term-size',
         metavar=300,
         default=300,
+        type=int,
         help='Maximum GO term size to consider in health (defualt: 300)'
     )
     health.add_argument(
@@ -725,9 +757,22 @@ if __name__ == '__main__':
     -------------------------------------'''
     simulateGWASCLI = subparsers.add_parser(
         'simulateGWAS',
-        help=(
-            'Simulate a GWAS dataset by adding candidate windows and '
-            'flanking limits to terms within an Ontology'
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        help='Evaluate co-expression in simulated GWAS datasets',
+        description=(
+            'Simulate a GWAS dataset by adding candidate windows and \n'
+            'flanking limits to terms within an Ontology. The ideal \n'
+            'GWAS experiment is simulated by defining SNPs to having a 1:1 \n'
+            'mapping to gene in a GO term. i.e. SNPs are directly generated \n'
+            'using starting position of genes in GO term \n'
+            'Noise is intruduced to the experiment \n'
+            'using various sources of noise outlined below.\n'
+            'Optional arguments below are applied in the following order: \n\n'
+            '+ GO terms between min and max term size are extracted \n'
+            '+ `--percent-SNPs-missed` of "SNPs" in GO term are removed. (False Negative SNPs) \n'
+            '+ `--percent-fcr` of "SNPs" are replaced with random "SNPs" (False Positive SNPs) \n'
+            '+ `--candidate-flank-limit` and `--candidate-window-size` introduce noise in \n'
+            '   SNP to gene mapping.'
         )
     )
     simulateGWASCLI.add_argument(
@@ -751,20 +796,20 @@ if __name__ == '__main__':
     simulateGWASCLI.add_argument(
         '--max-term-size',
         type=int,
-        default=300,
+        default=100,
         help='Maximum number of genes allowed in a GO term'
     )
     simulateGWASCLI.add_argument(
         '--min-term-size',
         type=int,
-        default=5,
+        default=50,
         help='Minimum number of genes allowed in a GO term'
     )
     simulateGWASCLI.add_argument(
         '--candidate-window-size',
         type=int,
-        default=10000, 
-        metavar=10000,
+        default=1, 
+        metavar=1,
         help=(
             'The window size, in bp, for mapping effective SNPs to genes. '
         )
@@ -772,8 +817,8 @@ if __name__ == '__main__':
     simulateGWASCLI.add_argument(
         '--candidate-flank-limit',
         type=int,
-        default=1, 
-        metavar=1,
+        default=0, 
+        metavar=0,
         help=(
             'The number of flanking genes included in SNP to gene mapping. '
             'on each side of the locus.' 
@@ -791,16 +836,29 @@ if __name__ == '__main__':
     )
     simulateGWASCLI.add_argument(                                                  
         '--percent-fcr',                                                        
-        type=float,                                                             
+        type=int,                                                             
         default=None,                                                           
-        metavar=0.0,                                                            
+        metavar=0,                                                            
         help=(                                                                  
             'False Cadidate Rate: '
             'The percentage of the term loci to be replaced with '              
             'random loci, simulating noise or false positives '                 
-            'within the term'                                                   
+            'within the term. (Default: 0)'                                                   
         )                                                                       
     )  
+    simulateGWASCLI.add_argument(
+        '--percent-SNPs-missed',
+        metavar=0,
+        type=int,
+        default=None,
+        help=(
+            'Percentage of input SNPs that were missed by '
+            'simulated GWAS. e.g. if GWAS term SNPs ideally '
+            'tag 10 GO genes and --percent-missed=0.50 half '
+            'of the genes in the GO term will be removed resulting '
+            'in an input network of 5 genes. (Default=0)'
+        )
+    )
     simulateGWASCLI.add_argument(
         '--out', 
         default=sys.stdout,
