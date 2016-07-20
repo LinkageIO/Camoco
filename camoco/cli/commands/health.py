@@ -115,7 +115,11 @@ def cob_health(args):
         )
         plt.title('{} Degree Distribution'.format(cob.name))
         # Save Fig
-        plt.savefig('{}_DegreeDist.png'.format(args.out))
+        try:
+            plt.savefig('{}_DegreeDist.png'.format(args.out))
+        except FutureWarning as e:
+            # This is a matplotlib bug
+            pass
     else:
         log('Skipping Degree Dist.')
 
@@ -270,7 +274,10 @@ def cob_health(args):
             axes[2,1].set_xlabel('Term Size')
             # Save Figure
             plt.tight_layout()
-            plt.savefig('{}_GO.png'.format(args.out))
+            try:
+                plt.savefig('{}_GO.png'.format(args.out))
+            except FutureWarning as e:
+                pass
         else:
             log('Skipping GO Volcano.')
             
