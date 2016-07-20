@@ -230,30 +230,27 @@ class COB(Expr):
             if filter_missing_gene_ids:
                 # filter out the Nones
                 ids = np.array(list(filter(None, ids)))
-            
+                if len(ids) == 0:
+                    return pd.DataFrame()
             # Grab the coexpression indices for the genes
             num_genes = self.num_genes()
             ids = PCCUP.coex_index(ids, num_genes)
             ids.sort()
             df = self.coex.iloc[ids]
             del ids
-        
-        if sig_only:
-            df = df[df.significant]
         if min_distance is not None:
             df = df[df.distance >= min_distance]
-        
-        if names_as_index or names_as_cols:
+        if names_as_index or names_as_cols or trans_locus_only:
             names = self._expr.index.values
             ids = df.index.values
+            if len(ids) == 0:
+                return pd.DataFrame()
             ids = PCCUP.coex_expr_index(ids, num_genes)
             df.insert(0,'gene_a', names[ids[:,0]])
             df.insert(1,'gene_b', names[ids[:,1]])
             del ids; del names;
-        
         if names_as_index:
             df = df.set_index(['gene_a','gene_b'])
-        
         if trans_locus_only:
             try:
                 parents = {x.id:x.attr['parent_locus'] for x in gene_list}
@@ -266,6 +263,8 @@ class COB(Expr):
                 parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
+        if sig_only:
+            df = df[df.significant]
         return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
@@ -342,13 +341,14 @@ class COB(Expr):
                 locus_list, flank_limit=flank_limit, chain=True,
                 include_parent_locus=True
             )
-        self.log("Found {} candidate genes", len(genes_list))
+        #self.log("Found {} candidate genes", len(genes_list))
         # Extract the edges for the full set of genes
         edges = self.subnetwork(
             genes_list,
             min_distance=0,
             sig_only=False,
-            trans_locus_only=True
+            trans_locus_only=True,
+            names_as_index=True
         )
         if by_gene == True:
             # Filter out trans edges
@@ -416,7 +416,7 @@ class COB(Expr):
                 locus_list, flank_limit=flank_limit, chain=True,
                 include_parent_locus=True
             )
-        self.log("Found {} candidate genes", len(genes_list))
+        #self.log("Found {} candidate genes", len(genes_list))
         # Get global and local degree for candidates
         gdegree = self.global_degree(genes_list, trans_locus_only=True)
         ldegree = self.local_degree(genes_list, trans_locus_only=True)
@@ -818,7 +818,7 @@ class COB(Expr):
     def plot(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
-             include_gene_labels=None, avg_by_cluster=False
+             include_gene_labels=None, avg_by_cluster=False,
              min_cluster_size=10):
         '''
             Plots a heatmap of genes x expression.
@@ -877,12 +877,9 @@ class COB(Expr):
         if avg_by_cluster == True:
             # Extract clusters
             dm = self.clusters.groupby('cluster').\
-                    # Filter out clusters smaller than 10 genes
                     filter(lambda x: len(x) > min_cluster_size).\
                     groupby('cluster').\
-                    # Average clusters by accession
                     apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
-                    # Standard normalize each clus
                     apply(lambda x: (x-x.mean())/x.std() ,axis=1)
         # Save plot if provided filename
         fig = plt.figure(
