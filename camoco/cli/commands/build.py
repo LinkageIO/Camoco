@@ -41,3 +41,14 @@ def build_refgen(args):
         attr_split=args.attr_split
     )
     print("Build successful!")
+
+def build_gont(args):
+    refgen = co.RefGen(args.refgen)
+    co.GOnt.from_obo(
+        args.obo_filename,
+        args.filename,
+        args.name,
+        args.description,
+        refgen
+    )
+    print('Build Successful')
