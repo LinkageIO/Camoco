@@ -227,28 +227,31 @@ class COB(Expr):
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
             ids = np.array([self._expr_index[x.id] for x in gene_list])
+            num_genes = self.num_genes()
             if filter_missing_gene_ids:
                 # filter out the Nones
                 ids = np.array(list(filter(None, ids)))
-                if len(ids) == 0:
-                    return pd.DataFrame()
-            # Grab the coexpression indices for the genes
-            num_genes = self.num_genes()
-            ids = PCCUP.coex_index(ids, num_genes)
-            ids.sort()
-            df = self.coex.iloc[ids]
-            del ids
+            if len(ids) == 0:
+                df = pd.DataFrame(columns=['score','significant','distance'])
+            else:
+                # Grab the coexpression indices for the genes
+                ids = PCCUP.coex_index(ids, num_genes)
+                ids.sort()
+                df = self.coex.iloc[ids]
+                del ids
         if min_distance is not None:
             df = df[df.distance >= min_distance]
         if names_as_index or names_as_cols or trans_locus_only:
             names = self._expr.index.values
             ids = df.index.values
-            if len(ids) == 0:
-                return pd.DataFrame()
-            ids = PCCUP.coex_expr_index(ids, num_genes)
-            df.insert(0,'gene_a', names[ids[:,0]])
-            df.insert(1,'gene_b', names[ids[:,1]])
-            del ids; del names;
+            if len(ids) > 0:
+                ids = PCCUP.coex_expr_index(ids, num_genes)
+                df.insert(0,'gene_a', names[ids[:,0]])
+                df.insert(1,'gene_b', names[ids[:,1]])
+                del ids; del names;
+            else:
+                df.insert(0,'gene_a',[])
+                df.insert(0,'gene_b',[])
         if names_as_index:
             df = df.set_index(['gene_a','gene_b'])
         if trans_locus_only:
