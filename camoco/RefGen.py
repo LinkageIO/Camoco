@@ -27,7 +27,6 @@ class RefGen(Camoco):
     def __init__(self,name):
         # initialize camoco instance
         super().__init__(name,type="RefGen")
-        self._create_tables()
 
     @property
     def genome(self):
@@ -853,6 +852,19 @@ class RefGen(Camoco):
                 else:
                     als[id] = [al]
             return als
+
+    @classmethod
+    def create(cls,name,description,type):
+        self = super().create(name,description,type=type)
+        self.db.cursor().execute(''' 
+            DROP TABLE IF EXISTS chromosomes;
+            DROP TABLE IF EXISTS genes;
+            DROP TABLE IF EXISTS gene_attrs;
+            DROP TABLE IF EXISTS aliases;
+            ''')
+        self._create_tables()
+        self._build_indices()
+        return self
 
 
     @classmethod
