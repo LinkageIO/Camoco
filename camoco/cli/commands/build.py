@@ -1,4 +1,5 @@
 import camoco as co
+import pandas as pd
 from camoco.Tools import DummyRefGen
 
 def build_cob(args):
@@ -8,7 +9,7 @@ def build_cob(args):
     else:
         refgen = DummyRefGen() 
     # Basically just pass all the CLI arguments to the COB class method  
-    co.COB.from_table(
+    cob = co.COB.from_table(
         args.filename,
         args.name,
         args.description,
@@ -26,6 +27,7 @@ def build_cob(args):
         quality_control=args.skip_quality_control
     )
     print("Build successful!")
+    print(cob.summary())
 
 def build_refgen(args):
     co.RefGen.from_gff(
@@ -52,3 +54,18 @@ def build_gont(args):
         refgen
     )
     print('Build Successful')
+
+def build_GWAS(args):
+    df = pd.DataFrame.from_csv(args.filename,sep=args.sep).reset_index()
+    refgen = co.RefGen(args.refgen)
+    gwas = co.GWAS.from_DataFrame(
+        df,
+        args.name,
+        args.description,
+        refgen,
+        term_col=args.trait_col,
+        chr_col=args.chrom_col,
+        pos_col=args.pos_col
+    )
+    print("Build Successful:")
+    print(gwas.summary())

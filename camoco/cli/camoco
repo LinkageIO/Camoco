@@ -31,7 +31,7 @@ from camoco.cli.commands.simulateGWAS import simulateGWAS
 from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
-from camoco.cli.commands.build import build_cob,build_refgen,build_gont
+from camoco.cli.commands.build import build_cob,build_refgen,build_gont,build_GWAS
 
 from camoco import cf
 
@@ -77,6 +77,61 @@ if __name__ == '__main__':
     # Also allow the help message to be printed using the help command
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
+
+    '''--------------------------
+        Build GWAS
+    --------------------------'''
+    bldgwas = subparsers.add_parser(
+        'build-gwas',
+        help='build a GWAS dataset'
+    )
+    bldgwas.add_argument(
+        'filename',
+        help='Filename of csv/tsv.'
+    )
+    bldgwas.add_argument(
+        'name',
+        help='Name of GWAS dataset.'
+    )
+    bldgwas.add_argument(
+        'description',
+        help='Short description of dataset.'
+    )
+    bldgwas.add_argument(
+        'refgen',
+        help='Name of camoco RefGen dataset.'
+    )
+    bldgwas.add_argument(
+        '--trait-col',
+        metavar='Trait',
+        default='Trait',
+        help='The name of the column in the table containing the trait name. '
+    )
+    bldgwas.add_argument(
+        '--chrom-col',
+        metavar='CHR',
+        default='CHR',
+        help=(
+            'The name of the column containing the SNP chromosome (note: must '
+            'correspond with chromosome names if RefGen)'
+        )
+    )
+    bldgwas.add_argument(
+        '--pos-col',
+        metavar='POS',
+        default='POS',
+        help=(
+            'The name of the column containing the SNP position (note: must '
+            'correspond with the positions in RefGen)'
+        )
+    )
+    bldgwas.add_argument(
+        '--sep',
+        metavar='\t',
+        default='\t',
+        help='Field Separator in CSV/TSV (default:\\t)'
+    )
+    bldgwas.set_defaults(func=build_GWAS)
 
 
     '''--------------------------
