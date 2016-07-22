@@ -97,4 +97,7 @@ def test_subnetwork_contains_only_input_when_duplicates(testCOB):
     assert set(itertools.chain(*subnet.index.values)) == set([x.id for x in random_genes])
 
 def test_degree_index_matches_degree(testCOB):
-    assert True
+    assert False
+
+def test_empty_subnetwork_returns_proper_dataframe(testCOB):
+    assert False

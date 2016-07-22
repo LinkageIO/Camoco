@@ -187,4 +187,5 @@ def test_filtered_refgen(testRefGen):
         assert x in test_filtered_refgen
     co.del_dataset('RefGen','test_filtered_refgen',safe=False) 
 
-
+def test_rowid_equals_1_after_refgen_rebuild(testRefGen):
+    assert False
