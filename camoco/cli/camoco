@@ -177,7 +177,7 @@ if __name__ == '__main__':
         type=str,
         help=(
             'The locus attr used to determine which locus is the'
-            'strongest locus. (defualt=pval).'
+            'strongest locus. (default=pval).'
         )
     )
     plotgwas.add_argument(
@@ -273,7 +273,7 @@ if __name__ == '__main__':
         metavar='pval',
         help=(
             'The locus attr used to determine which locus is the'
-            'strongest locus. (defualt=pval).'
+            'strongest locus. (default=pval).'
         )
     )
     densityCLI.add_argument(
@@ -359,7 +359,7 @@ if __name__ == '__main__':
         metavar='pval',
         help=(
             'The locus attribute used to determine which locus is the'
-            'strongest locus. (defualt=pval).'
+            'strongest locus. (default=pval).'
         )
     )
     localityCLI.add_argument(
@@ -445,12 +445,12 @@ if __name__ == '__main__':
     health.add_argument(
         '--min-term-size',
         default=10,
-        help='Minimum GO term size to consider in health (defualt: 10)'
+        help='Minimum GO term size to consider in health (default: 10)'
     )
     health.add_argument(
         '--max-term-size',
         default=300,
-        help='Maximum GO term size to consider in health (defualt: 300)'
+        help='Maximum GO term size to consider in health (default: 300)'
     )
     health.add_argument(
         '--num-bootstraps',
@@ -674,7 +674,7 @@ if __name__ == '__main__':
         metavar='pval',
         help=(
             'The locus attr used to determine which locus is the '
-            'strongest locus. (defualt=pval).'
+            'strongest locus. (default=pval).'
         )
     )
     snp2gene_cmd.add_argument(
