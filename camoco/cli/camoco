@@ -458,6 +458,11 @@ if __name__ == '__main__':
         type=int,
         help='Number of Bootstraps for pvalue stats.'
     )
+    health.add_argument(
+        '--two_tailed_GO',
+        default=None,
+        help='If you want to include GO terms with a negative density for enrichment default: None)'
+    )
     health.set_defaults(func=cob_health)
 
 
