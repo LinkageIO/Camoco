@@ -125,10 +125,10 @@ def cob_health(args):
             terms_tested = 0
             for term in go.iter_terms():
                 term.loci = list(filter(lambda x: x in cob, term.loci))
-                if len(term) < 1 or len(term) > 300:
+                if len(term) < args.min_term_size or len(term) > args.max_term_size:
                     continue
                 #one tailed vs two tailed test
-                if args.two_tailed_GO is None:
+                if two_tailed_GO is None:
                     #run one tail for only positive values
                     if cob.density(term.loci) > 0:
                         density = cob.density(term.loci)
@@ -136,7 +136,7 @@ def cob_health(args):
                     #skip negative density values
                     else:
                         continue
-                #if two_tailed_go is not none include negative values
+                #if two_tailed_go is not none
                 else:
                     density = cob.density(term.loci)
                     density_emp.append(density)
