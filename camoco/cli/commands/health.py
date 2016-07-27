@@ -128,7 +128,7 @@ def cob_health(args):
                 if len(term) < args.min_term_size or len(term) > args.max_term_size:
                     continue
                 #one tailed vs two tailed test
-                if two_tailed_GO is None:
+                if args.two_tailed_GO is None:
                     #run one tail for only positive values
                     if cob.density(term.loci) > 0:
                         density = cob.density(term.loci)
