@@ -46,6 +46,22 @@ class RefGenFunc(Camoco):
                 res.append(desc)
         return res
     
+    def to_csv(self, filename=None, sep="\t"):
+        '''
+            Make a table of all functional annotations.
+        '''
+        # Find the default filename
+        if filename == None:
+            filename = self.name + '_func.tsv'
+        
+        # Pull them all from sqlite
+        cur = self.db.cursor()
+        cur.execute("SELECT * FROM func;")
+        
+        # Used pandas to save it
+        df = pd.DataFrame(cur.fetchall(),columns=['gene','desc']).set_index('gene')
+        df.to_csv(filename,sep=sep)
+    
     def add_table(self, filename, sep="\t", gene_col=0, skip_cols=None):
         ''' 
             Imports Annotation relationships from a csv file. By default will
