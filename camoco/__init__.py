@@ -33,4 +33,6 @@ from .Locus import Locus
 from .Tools import available_datasets,del_dataset
 from .Tools import mv_dataset,redescribe_dataset
 from .GEO import Family
-from .GOnt import GOnt 
+from .GOnt import GOnt
+from .Annotation import RefGenFunc
+from .Annotation import GWASData
