@@ -53,6 +53,15 @@ done
 
 NAME="camoco"
 
+#===================================================
+#----------Check for internet connection------------
+#===================================================
+wget -q --tries=10 --timeout=20 --spider http://github.com
+if [[ $? -ne 0 ]]; then
+        echo "Check your internet connection and try again."
+		exit
+fi
+
 export CWD=$(pwd)
 #===================================================
 #----------Setup the build Environment--------------

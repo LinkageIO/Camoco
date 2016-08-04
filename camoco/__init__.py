@@ -16,8 +16,8 @@ __version__ = '0.2.00'
 import sys
 import os
 
-#import pyximport
-#pyximport.install()
+import pyximport
+pyximport.install()
 
 from .Config import cf
 from .Camoco import Camoco

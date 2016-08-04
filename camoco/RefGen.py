@@ -969,6 +969,32 @@ class RefGen(Camoco):
         self._build_indices()
         return self
 
+    def copy(self,name,description):
+        '''
+            Creates a copy of a refgen with a new name and description.
+
+            Parameters
+            ----------
+                name : str
+                    Name of the copy refgen
+                description : str
+                    Short description of the reference genome
+            Returns
+            -------
+                co.RefGen object containing the same genes and 
+                chromosomems as the original.
+        '''
+        copy = self.create(name,description,'RefGen')
+        copy._global('build',self.build)
+        copy._global('organism',self.organism)
+        # Should have the same chromosomems
+        for chrom in self.iter_chromosomes():
+            copy.add_chromosome(chrom)
+        # Should have the same gene list
+        copy.add_gene(self.iter_genes(),refgen=self)
+        copy._build_indices()
+        return copy
+
     @classmethod
     def filtered_refgen(cls,name,description,refgen,gene_list):
         '''

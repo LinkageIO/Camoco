@@ -288,29 +288,17 @@ if __name__ == '__main__':
             'for gene names.'
         )
     )  
-    bldcob.add_argument(
-        '--normalize',
-        default=True,
-        help=(
-            "Flag indicating if table values need to be normalized. "
-            "Specifies whether or not to normalize the data so raw expression "
-            "values lie within a log space. This is best practices for "
-            "generating interpretable expression analyses. See Expr._normalize "
-            "method for more information. "
-            "Default: True"
-        )
-    )
-    bldcob.add_argument(
-        '--norm_method',
-        help=(
-            'The normalization method to use. This can be inferred '
-            'from the raw data type. By default RNASEQ uses np.arcsinh and '
-            'MICROARRAY data uses np.log2. A different normalization function '
-            'can be passed directly in. '
-            'Default: None (inferred from Expr.rawtype)'
-    
-        )
-    )
+    #bldcob.add_argument(
+    #    '--norm_method',
+    #    help=(
+    #        'The normalization method to use. This can be inferred '
+    #        'from the raw data type. By default RNASEQ uses np.arcsinh and '
+    #        'MICROARRAY data uses np.log2. A different normalization function '
+    #        'can be passed directly in. '
+    #        'Default: None (inferred from Expr.rawtype)'
+    #
+    #    )
+    #)
     bldcob.add_argument(
         '--max-val',
         type=float,
@@ -333,20 +321,31 @@ if __name__ == '__main__':
     ) 
     bldcob.add_argument(
         '--skip-quality-control',
-        action='store_false',
+        default=False,
+        action='store_true', 
         help=(
-            "A Flag indicating on whether or not to perform quality control "
-            "on expression data."
+            "A Flag indicating to skip quality control procedure "
+            "on expression data. "
+            "Default: False"
         )
     )  
     bldcob.add_argument(
+        '--skip-normalization',
+        default=False,
+        action='store_true',
+        help=(
+            "Flag indicating that expression normaliztion should be skipped. "
+            "Default: False"
+        )
+    )
+    bldcob.add_argument(
         '--min-expr',
-        default=1,
+        default=0,
         type=float,
         help=(
             "Expression values (e.g. FPKM) under this threshold will be set "
             "to NaN and not used during correlation calculations. "
-            "default: 1"
+            "default: 0"
         )
     )  
     bldcob.add_argument(
@@ -381,14 +380,15 @@ if __name__ == '__main__':
         )
     )  
     bldcob.add_argument(
-        '--ignore-refgen-membership',
+        '--allow-non-membership',
         action='store_true',
         help=(
             "Flag indicating that feature (genes, metabolites, etc) should "
             "not be filtered out of the expression matrix because they are "
             "not present in the reference genome. This is useful for "
             "features, such as metabolites, that cannot be anchored to "
-            "a RefGen."
+            "a RefGen. If true, features will be added to the RefGen with "
+            "unknown coordinates"
         )
     )
     bldcob.add_argument(
