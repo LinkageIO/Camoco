@@ -208,31 +208,39 @@ if __name__ == '__main__':
     )
     bldref.add_argument(
         '--chrom-feature',
+        default='chromosome',
+        metavar='chromosome',
         help=(
             'The name of the feature (in column 3) that designates a '
-            'a chromosome. '
+            'a chromosome. default: "chromosome"'
         )
     )
     bldref.add_argument(
         '--gene-feature',
+        default='gene',
+        metavar='gene',
         help=(
             'The name of the feature (in column 2) that designates a '
             'gene. These features will be the main object that the RefGen '
-            'encompasses. '
+            'encompasses. default: "gene"'
         )
     )
     bldref.add_argument(
         '--ID-attr',
+        default='ID',
+        metavar='ID',
         help=(
             'The key in the attribute column which designates the ID or '
-            'name of the feature. '
+            'name of the feature. default: "ID"'
         )
     )
     bldref.add_argument(
         '--attr-split',
         default='=',
+        metavar='=',
         help=(
-            'The delimiter for keys and values in the attribute column '
+            'The delimiter for keys and values in the attribute column. '
+            'default: "="'
         )
     )
     bldref.set_defaults(func=build_refgen)
