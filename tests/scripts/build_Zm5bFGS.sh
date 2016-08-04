@@ -1,7 +1,7 @@
 #!/bin/sh
 
 camoco build-refgen \
-    raw/RefGen/ZmB73_5b_FGS.gff.gz \
+    ../raw/RefGen/ZmB73_5b_FGS.gff.gz \
     Zm5bFGS \
     'Maize RefGen' \
     5b \
