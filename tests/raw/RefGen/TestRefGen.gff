@@ -1,0 +1,10 @@
+1	random	gene	1	100	.	-	.	ID=Gene1;Name=Gene1;biotype=protein_coding
+2	random	gene	2	200	.	+	.	ID=Gene2;Name=Gene2;biotype=protein_coding
+3	random	gene	3	300	.	-	.	ID=Gene3;Name=Gene3;biotype=protein_coding
+4	random	gene	4	400	.	+	.	ID=Gene4;Name=Gene4;biotype=protein_coding
+5	random	gene	5	500	.	-	.	ID=Gene5;Name=Gene5;biotype=protein_coding
+6	random	gene	6	600	.	+	.	ID=Gene6;Name=Gene6;biotype=protein_coding
+7	random	gene	7	700	.	-	.	ID=Gene7;Name=Gene7;biotype=protein_coding
+8	random	gene	8	800	.	+	.	ID=Gene8;Name=Gene8;biotype=protein_coding
+9	random	gene	9	900	.	+	.	ID=Gene9;Name=Gene9;biotype=protein_coding
+10	random	gene	10	1000	.	-	.	ID=Gene10;Name=Gene10;biotype=protein_coding
