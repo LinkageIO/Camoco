@@ -287,7 +287,7 @@ class COB(Expr):
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
         if sig_only:
-            df = df[df.significant]
+            df = df.iloc[df.significant]
         return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
@@ -1092,8 +1092,11 @@ class COB(Expr):
             np.ascontiguousarray(self._expr.as_matrix())
         ))
         
-        self.log("Running Fisher Transform")
-        pccs = np.arctanh(pccs); gc.collect();
+        self.log("Applying Fisher Transform")
+        pccs[pccs >= 1] = 0.9999999
+        pccs[pccs <= -1] = -0.9999999
+        pccs = np.arctanh(pccs)
+        gc.collect();
         
         self.log("Calculating Mean and STD")
         # Sometimes, with certain datasets, the NaN mask overlap
@@ -1111,7 +1114,12 @@ class COB(Expr):
         
         # 3. Build the dataframe
         self.log("Build the dataframe")
-        tbl = pd.DataFrame(pccs, index=np.arange(len(pccs)), columns=['score'], copy=False)
+        tbl = pd.DataFrame(
+            pccs, 
+            index=np.arange(len(pccs)), 
+            columns=['score'], 
+            copy=False
+        )
         del pccs; gc.collect();
         
         # 3. Calculate Gene Distance
@@ -1121,7 +1129,7 @@ class COB(Expr):
         gc.collect()
         
         # 4. Assign significance
-        self.log("Finding the Significance")
+        self.log("Thresholding Significant Network Interactions")
         self._global('significance_threshold', significance_thresh)
         tbl['significant'] = tbl['score'] >= significance_thresh
         gc.collect()
