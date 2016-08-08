@@ -62,10 +62,10 @@ if __name__ == '__main__':
         help='Initiate an ipdb session right before exiting.'
     )
     parser.add_argument(
-        '--overlook',
+        '--force',
         action='store_true',
         default=False,
-        help='Skip analysis if files produced by --out exists.'
+        help='Overwrite output files from previous analyses.'
     )
     subparsers = parser.add_subparsers(
         title='Camoco CLI program',
@@ -1116,17 +1116,13 @@ if __name__ == '__main__':
         sys.excepthook = ultratb.FormattedTB(
             mode='Verbose', color_scheme='Linux', call_pdb=1
         )
-    # SKip analyses that already happened (if --overlook is provided)
-    if args.overlook is True and len(glob.glob(args.out+'*')):
-        print("Skipping {}* because files already exist.".format(args.out))
     else:
         try:
             return_value = args.func(args)
         except AttributeError as e:
-            log.warn('Command not found. Use --help to see available commands.')
             if args.debug:
                 raise e
-            sys.exit(1)
+            sys.exit(e)
         except Exception as e:
             log.warn("A bad thing happened.\n\n" + str(e))
             if args.debug:

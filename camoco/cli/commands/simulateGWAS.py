@@ -13,9 +13,9 @@ def simulateGWAS(args):
         args.out = "{}_GWASSim.csv".format(args.out.replace('.csv',''))        
         if os.path.dirname(args.out) != '':
             os.makedirs(os.path.dirname(args.out),exist_ok=True)
-        if os.path.exists("{}_GWASSim.csv".format(args.out.replace('.csv',''))):
+        if os.path.exists("{}".format(args.out)) and not args.force:
             print(
-                "{}_GWASSim.csv exists! Skipping!".format(
+                "{} exists! Skipping!".format(
                     args.out.replace('.csv','')
                 )
             )
@@ -54,8 +54,10 @@ def simulateGWAS(args):
         if args.percent_SNPs_missed != None and args.percent_SNPs_missed > 0:
             # Calulate the index needed to hit percent missing
             missing_index = math.ceil(len(eloci) * (1-(args.percent_SNPs_missed/100)))
+            if missing_index < 2:
+                missing_index = 2 
             new_eloci = np.random.permutation(eloci)[0:missing_index]
-            cob.log('Simulating {}% of SNPs missed by GWAS ({} genes -> {})',args.percent_SNPs_missed,len(eloci),len(new_eloci))
+            cob.log('Simulating {}% of SNPs missed by GWAS ({} SNPs -> {})',args.percent_SNPs_missed,len(eloci),len(new_eloci))
             eloci = new_eloci
         # Replace a percentage of SNPs with false positives
         if args.percent_fcr != None and args.percent_fcr > 0:                                            

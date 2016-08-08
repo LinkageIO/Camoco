@@ -159,4 +159,4 @@ def density(args):
     # Return the results 
     all_results = pd.concat(all_results)
     # Make sure the output directory exists
-    all_results.to_csv(args.out,sep='\t')
+    all_results.to_csv(args.out,sep='\t',index=None)
