@@ -100,7 +100,7 @@ class SimulationAnalysis(object):
             data = breakdown[breakdown.COB==cob]
             starting_signal = data.ix[data[noise_source]==data[noise_source].min()].iloc[0]['num_sig']
             data['num_sig'] = data['num_sig']/starting_signal
-            axes[i].plot(data[noise_source],data[0],label=label,marker='o')
+            axes[i].plot(data[noise_source],data['num_sig'],label=label,marker='o')
             axes[i].set_title("{} Terms".format(cob))
             if i == 0:
                 axes[i].set_ylabel('Number Significant Terms')
