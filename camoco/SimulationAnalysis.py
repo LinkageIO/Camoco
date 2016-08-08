@@ -100,7 +100,6 @@ class SimulationAnalysis(object):
             data = breakdown[breakdown.COB==cob]
             starting_signal = data.ix[data[noise_source]==data[noise_source].min()].iloc[0]['num_sig']
             data['num_sig'] = data['num_sig']/starting_signal
-            import ipdb; ipdb.set_trace()
             axes[i].plot(data[noise_source],data[0],label=label,marker='o')
             axes[i].set_title("{} Terms".format(cob))
             if i == 0:
