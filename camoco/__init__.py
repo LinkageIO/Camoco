@@ -16,8 +16,8 @@ __version__ = '0.2.00'
 import sys
 import os
 
-#import pyximport
-#pyximport.install()
+import pyximport
+pyximport.install()
 
 from .Config import cf
 from .Camoco import Camoco
@@ -33,4 +33,6 @@ from .Locus import Locus
 from .Tools import available_datasets,del_dataset
 from .Tools import mv_dataset,redescribe_dataset
 from .GEO import Family
-from .GOnt import GOnt 
+from .GOnt import GOnt
+from .Annotation import RefGenFunc
+from .Annotation import GWASData

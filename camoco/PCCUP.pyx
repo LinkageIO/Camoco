@@ -53,12 +53,8 @@ def pair_correlation(double[:, ::1] x):
                     pccs[index] = np.nan
                 else:
                     r = 1 - n / (du * dv)
-                    if r == 1.0:
-                        pccs[index] = 0.999999
-                    elif r == -1.0:
-                        pccs[index] = -0.999999
-                    else:
-                        pccs[index] = r
+                    # Avoid putting nans  
+                    pccs[index] = r
             index += 1
     # Return the base of the memory view
     return pccs.base
@@ -116,6 +112,8 @@ def coex_expr_index(long[:] ids, int num_genes):
     '''
     cdef int num_rows = ids.shape[0]
     coors = np.zeros([num_rows,2], dtype=np.int32)
+    if num_rows == 0:
+        return coors
     cdef long idx, pos, i, j
     idx = 0
     pos = 0

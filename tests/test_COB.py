@@ -100,4 +100,8 @@ def test_degree_index_matches_degree(testCOB):
     assert False
 
 def test_empty_subnetwork_returns_proper_dataframe(testCOB):
-    assert False
+    subnet = testCOB.subnetwork([])
+    assert len(subnet) == 0
+    assert 'score' in subnet.columns
+    assert 'significant' in subnet.columns
+    assert 'distance' in subnet.columns

@@ -130,7 +130,7 @@ class COB(Expr):
     def set_sig_edge_zscore(self,zscore):
         self.coex.significant = self.coex.score >= zscore
 
-    def neighbors(self, gene, sig_only=True):
+    def neighbors(self, gene, sig_only=True, names_as_index=True, names_as_cols=False):
         '''
             Returns a DataFrame containing the neighbors for gene.
 
@@ -138,19 +138,39 @@ class COB(Expr):
             ----------
             gene : co.Locus
                 The gene for which to extract neighbors
+            sig_only : bool
+                A flag to include only significant interactions.
+            names_as_index : bool (default: True)
+                Include gene names as the index.
+            names_as_cols : bool (default: False)
+                Include gene names as two columns named 'gene_a' and 'gene_b'.
 
             Returns
             -------
             A DataFrame containing edges
         '''
+        # Find the neighbors
         gene_id = self._expr_index[gene.id]
         neighbor_indices = PCCUP.coex_neighbors(gene_id, self.num_genes())
+        neighbor_indices.sort()
         edges = self.coex.iloc[neighbor_indices]
+        del neighbor_indices
         if sig_only:
-            return edges[edges.significant == 1]
-        else:
-            return edges
-
+            edges = edges[edges.significant == 1]
+        
+        # Find the indexes if necessary
+        if names_as_index or names_as_cols:
+            names = self._expr.index.values
+            ids = edges.index.values
+            ids = PCCUP.coex_expr_index(ids, self.num_genes())
+            edges.insert(0,'gene_a', names[ids[:,0]])
+            edges.insert(1,'gene_b', names[ids[:,1]])
+            del ids; del names;
+        if names_as_index:
+            edges = edges.set_index(['gene_a','gene_b'])
+        
+        return edges
+        
     def coexpression(self, gene_a, gene_b):
         '''
             Returns a coexpression z-score between two genes. This
@@ -267,7 +287,7 @@ class COB(Expr):
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
         if sig_only:
-            df = df[df.significant]
+            df = df.ix[df.significant]
         return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
@@ -1069,20 +1089,28 @@ class COB(Expr):
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
         pccs = (1 - PCCUP.pair_correlation(
-            np.ascontiguousarray(self._expr.as_matrix())
+            np.ascontiguousarray(
+                # PCCUP expects floats
+                self._expr.as_matrix().astype('float')
+            )
         ))
         
-        self.log("Running Fisher Transform")
-        pccs = np.arctanh(pccs); gc.collect();
+        self.log("Applying Fisher Transform")
+        pccs[pccs >= 1] = 0.9999999
+        pccs[pccs <= -1] = -0.9999999
+        pccs = np.arctanh(pccs)
+        gc.collect();
         
         self.log("Calculating Mean and STD")
         # Sometimes, with certain datasets, the NaN mask overlap
         # completely for the two genes expression data making its PCC a nan.
         # This affects the mean and std fro the gene.
         pcc_mean = np.ma.masked_array(pccs, np.isnan(pccs)).mean()
-        self._global('pcc_mean', pcc_mean); gc.collect();
+        self._global('pcc_mean', pcc_mean)
+        gc.collect()
         pcc_std = np.ma.masked_array(pccs, np.isnan(pccs)).std()
-        self._global('pcc_std', pcc_std); gc.collect();
+        self._global('pcc_std', pcc_std)
+        gc.collect()
         
         # 2. Calculate Z Scores
         self.log("Finding adjusted scores")
@@ -1091,8 +1119,14 @@ class COB(Expr):
         
         # 3. Build the dataframe
         self.log("Build the dataframe")
-        tbl = pd.DataFrame(pccs, index=np.arange(len(pccs)), columns=['score'], copy=False)
-        del pccs; gc.collect();
+        tbl = pd.DataFrame(
+            pccs, 
+            index=np.arange(len(pccs)), 
+            columns=['score'], 
+            copy=False
+        )
+        del pccs
+        gc.collect()
         
         # 3. Calculate Gene Distance
         self.log("Calculating Gene Distance")
@@ -1101,7 +1135,7 @@ class COB(Expr):
         gc.collect()
         
         # 4. Assign significance
-        self.log("Finding the Significance")
+        self.log("Thresholding Significant Network Interactions")
         self._global('significance_threshold', significance_thresh)
         tbl['significant'] = tbl['score'] >= significance_thresh
         gc.collect()
@@ -1109,7 +1143,8 @@ class COB(Expr):
         # 5. Store the table
         self.log("Storing the coex table")
         self._ft('coex', df=tbl)
-        del tbl; gc.collect();
+        del tbl
+        gc.collect()
         
         # 6. Load the new table into the object
         self.coex = self._ft('coex')
@@ -1122,29 +1157,25 @@ class COB(Expr):
             them in our feather store.
         '''
         self.log('Building Degree')
-        
         # Get significant expressions and dump coex from memory for time being
-        sigs = self.coex[self.coex.significant]
-        del self.coex
-        
+        # Generate a df that starts all genes at 0
+        names = self._expr.index.values
+        self.degree = pd.DataFrame(0,index=names,columns=['Degree'])
         # Get the index and find the counts
-        self.log('Finding the degrees')
+        self.log('Calculating Gene degree')
+        sigs = self.coex[self.coex.significant]
         sigs = sigs.index.values
         sigs = PCCUP.coex_expr_index(sigs, len(self._expr.index.values))
-        sigs = np.array(list(Counter(chain(*sigs)).items()))
-        
-        # Translate the expr indexes to the gene names
-        self.log('Storing the degrees')
-        names = self._expr.index.values
-        self.degree = pd.DataFrame(sigs, columns=['idx', 'Degree'])
-        self.degree.insert(0,'Gene', names[self.degree['idx']])
-        self.degree.drop('idx', axis=1, inplace=True)
-        self.degree = self.degree.set_index('Gene')
+        sigs = list(Counter(chain(*sigs)).items())
+        if len(sigs) > 0:
+            # Translate the expr indexes to the gene names
+            for i,degree in sigs:
+                self.degree.ix[names[i]] = degree
         self._ft('degree', df=self.degree)
-        
-        # Cleanup and reinstate the coex table
-        del sigs; del names; gc.collect();
-        self.coex = self._ft('coex')
+        # Cleanup
+        del sigs 
+        del names
+        gc.collect()
         return self
         
     def _calculate_leaves(self):
@@ -1163,7 +1194,6 @@ class COB(Expr):
         del self.coex
         
         # Subtract pccs from 1 so we do not get negative distances
-        self.log("Running transformations")
         dists = (dists * pcc_std) + pcc_mean
         dists = np.tanh(dists)
         dists = 1 - dists
@@ -1189,12 +1219,15 @@ class COB(Expr):
         '''
         clusters = self.mcl()
         self.log('Building cluster dataframe')
-        self.clusters = pd.DataFrame(
-            data=[(gene.id, i) for i, cluster in enumerate(clusters) \
-                    for gene in cluster],
-            columns=['Gene', 'cluster']
-        ).set_index('Gene')
-        self._ft('clusters', df=self.clusters)
+        names = self._expr.index.values
+        self.clusters = pd.DataFrame(np.nan,index=names,columns=['cluster'])
+        if len(clusters) > 0:
+            self.clusters = pd.DataFrame(
+                data=[(gene.id, i) for i, cluster in enumerate(clusters) \
+                        for gene in cluster],
+                columns=['Gene', 'cluster']
+            ).set_index('Gene')
+            self._ft('clusters', df=self.clusters)
         self.log('Finished finding clusters')
         return self
     
@@ -1343,14 +1376,14 @@ class COB(Expr):
             -------
                 a COB object
         '''
+        df = pd.read_table(
+            filename,
+            sep=sep,
+            compression='infer',
+            index_col=index_col
+        )
         return cls.from_DataFrame(
-            pd.read_table(
-                filename,
-                sep=sep,
-                compression='infer',
-                index_col=index_col
-            ),
-            name,description,refgen,
+            df, name, description, refgen,
             rawtype=rawtype,**kwargs
         )
 

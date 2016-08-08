@@ -28,6 +28,7 @@ class Expr(Camoco):
         easily access different parts of the gene expression matrix.
     '''
     def __init__(self, name):
+        # Create a camoco object
         super().__init__(name=name, type='Expr')
         # Part I: Load the Expression dataset
         self.log('Loading Expr table')
@@ -390,7 +391,6 @@ class Expr(Camoco):
         # If TRUE it passes, if FALSE it fails!!!
         qc_gene = pd.DataFrame({'has_id':True}, index=df.index)
         qc_accession = pd.DataFrame({'has_id':True}, index=df.columns)
-
         # -----------------------------------------
         # Gene Membership test
         if not membership:
