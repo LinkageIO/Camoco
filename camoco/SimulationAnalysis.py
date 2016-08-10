@@ -1,8 +1,8 @@
 import matplotlib
-matplotlib.use('Agg')
 
 import matplotlib.pylab as plt
 matplotlib.style.use('ggplot')
+#matplotlib.use('Agg')
 
 import glob as glob
 import camoco as co
@@ -35,6 +35,10 @@ class SimulationAnalysis(object):
             [pd.read_table(x,sep=self.sep) \
                 for x in glob.glob(dir+'*GWASSim.csv')]
         )
+        if 'MCR' not in self.df.columns:
+            self.df['MCR'] = 0
+        if 'FCR' not in self.df.columns:
+            self.df['FCR'] = 0
         self.df = pd.pivot_table(
             self.df,
             index=['COB','GO','WindowSize','FlankLimit','MCR','FCR'],
@@ -72,15 +76,16 @@ class SimulationAnalysis(object):
         )
 
     def plot_signal_vs_noise(self,filename=None, figsize=(16,8), alpha=0.05,
-                             figaxes=None,label=None,noise_source='FCR',
-                             pval_col='Density_pval'):
+                             figaxes=None, label=None, noise_source='FCR',
+                             pval_col='Density_pval', max_pval=0.05, 
+                             min_pval=0, normalize_num_sig=False):
         '''
             Plot the number of terms significant at varying FCR/MCR levels.
 
             THIS IS FOR WHEN YOU HAVE THE SAME TERMS AND YOU VARY THEIR
-            FCR OR NOISE LEVEL!!!
+            FCR/MCR OR NOISE LEVEL!!!
         '''
-        df = self.terms_with_signal()
+        df = self.terms_with_signal(max_pval=max_pval,min_pval=min_pval)
         # Aggregate by COB and by noise source and calculate the 
         # number of GO terms that have a sig pval below alpha
         breakdown = df.reset_index(drop=True)\
@@ -98,15 +103,22 @@ class SimulationAnalysis(object):
                 raise ValueError('Cannot overlay plots with different number of COBs')
         for i,cob in enumerate(cobs):
             data = breakdown[breakdown.COB==cob]
-            starting_signal = data.ix[data[noise_source]==data[noise_source].min()].iloc[0]['num_sig']
-            data['num_sig'] = data['num_sig']/starting_signal
+            if normalize_num_sig:
+                # Divide by the starting number of significant terms
+                starting_signal = data.ix[data[noise_source]==data[noise_source].min()].iloc[0]['num_sig']
+                data.loc[:,'num_sig'] = data.loc[:,'num_sig'] / starting_signal
             axes[i].plot(data[noise_source],data['num_sig'],label=label,marker='o')
             axes[i].set_title("{} Terms".format(cob))
             if i == 0:
-                axes[i].set_ylabel('Number Significant Terms')
+                if normalize_num_sig:
+                    axes[i].set_ylim(0,1.05)
+                    axes[i].set_ylabel('Percent Significant Terms')
+                else:
+                    axes[i].set_ylabel('Number Significant Terms')
             axes[i].set_xlabel(noise_source)
+        lgd = axes[i].legend(bbox_to_anchor=(2.0,0.5))
         if filename is not None:
-            plt.savefig(filename)
+            plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight')
         return (fig,axes)
 
     
