@@ -77,6 +77,9 @@ def build_gont(args):
 
 def build_GWAS(args):
     df = pd.DataFrame.from_csv(args.filename,sep=args.sep).reset_index()
+    if len(df.columns) == 1:
+        raise ValueError("Only 1 column found, check --sep, see --help")
+    print('Loading {}'.format(args.refgen))
     refgen = co.RefGen(args.refgen)
     gwas = co.GWAS.from_DataFrame(
         df,

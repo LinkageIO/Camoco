@@ -46,6 +46,5 @@ def cistrans(args):
     # Calculate the mann whitney U test
     u,pval = sp.stats.mannwhitneyu(cis[:,0],trans[:,0]) 
     print('P-val: {}'.format(pval))
+    print('Figure saved: {}'.format(args.out+'.png'))
     plt.savefig(args.out+'.png')
-
-
