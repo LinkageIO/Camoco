@@ -915,6 +915,7 @@ class COB(Expr):
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
         im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        # Intelligently add labels
         if (include_accession_labels is None and len(dm.columns) < 30) \
             or include_accession_labels == True:
                 ax.set(

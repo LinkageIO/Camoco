@@ -16,9 +16,6 @@ import pandas as pd
 import matplotlib.pylab as plt
 
 def density(args):
-    # Build base camoco objects
-    cob = co.COB(args.cob)
-    ont = co.GWAS(args.gwas)
     # Handle the different output schemes
     if args.out is None:
         args.out = '{}_{}_{}_{}_{}'.format(
@@ -31,13 +28,16 @@ def density(args):
     args.out = os.path.splitext(args.out)[0] + '.density.tsv'
     if os.path.dirname(args.out) != '':
         os.makedirs(os.path.dirname(args.out),exist_ok=True)
-    if os.path.exists(args.out) and args.overlook == True:
+    if os.path.exists(args.out) and args.force != True:
         print(
             "Output for {} exists! Skipping!".format(
                 args.out
             ),file=sys.stderr
         )
         return
+    # Build base camoco objects
+    cob = co.COB(args.cob)
+    ont = co.GWAS(args.gwas)
     # Generate a terms iterable
     if 'all' in args.terms:
         terms = ont.iter_terms()
