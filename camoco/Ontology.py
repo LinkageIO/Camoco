@@ -10,6 +10,7 @@ from scipy.stats import hypergeom
 from itertools import chain
 
 import sys
+import numpy
 
 class Ontology(Camoco):
     '''
@@ -60,6 +61,30 @@ class Ontology(Camoco):
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(
             self.name, self.description, len(self), self.refgen)
+
+    def rand(self, n=1, min_term_size=1, max_term_size=10000):
+        '''
+            Return a random Term from the Ontology
+        '''
+        cur = self.db.cursor()
+        ids = cur.execute(''' 
+            SELECT term FROM term_loci 
+            GROUP BY term 
+            HAVING COUNT(term) > ?
+                AND COUNT(term) < ?
+            ORDER BY RANDOM() 
+            LIMIT ?;
+        ''',(min_term_size,max_term_size,n)).fetchall()
+        if len(ids) == 0:
+            raise ValueError(
+                'No Terms exists with this criteria '
+                '{} < len(term) < {}:'.format(min_term_size,max_term_size)
+            )
+        terms = [self[id[0]] for id in ids]
+        if len(terms) == 1:
+            return terms[0]
+        else:
+            return terms
 
     def add_term(self, term, cursor=None, overwrite=False):
         ''' This will add a single term to the ontology
