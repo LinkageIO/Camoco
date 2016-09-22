@@ -78,12 +78,17 @@ class COB(Expr):
             Num Raw Genes: {:,}
             Num Raw Accessions: {}
 
-            QC
+            QC Parameters
             ------------------
-            min expr level: {}
-            max gene missing data: {}
-            min single sample expr: {}
+            min expr level: {} 
+                - expression below this is set to NaN
+            max gene missing data: {} 
+                - genes missing more than this percent are removed
             max accession missing data: {}
+                - Accession missing more than this percent are removed
+            min single sample expr: {} 
+                - genes must have at least this amount of expression in 
+                  on accession
 
             Clusters
             ------------------
@@ -842,7 +847,7 @@ class COB(Expr):
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
-             min_cluster_size=10):
+             min_cluster_size=10, cluster_accessions=True):
         '''
             Plots a heatmap of genes x expression.
 
@@ -877,17 +882,21 @@ class COB(Expr):
             min_cluster_size : int ( default: 10)
                 If avg_by_cluster, only cluster sizes larger than min_cluster_size
                 will be included.
+            cluster_accessions : bool (default: True)
+                If true, accessions will be clustered
+            plot_dendrogram : bool (default: True)
+                If true, dendrograms will be plotted
 
             Returns
             -------
             a populated matplotlib figure object
 
         '''
-        # Get leaves
+        # Get leaves of genes
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
-            order = self._ft('leaves').sort('index').index.values
+            order = self._ft('leaves').sort_values(by='index').index.values
         elif cluster_method == 'mcl':
             order = self._ft('clusters').loc[dm.index].\
                     fillna(np.inf).sort_values(by='cluster').index.values
@@ -896,6 +905,20 @@ class COB(Expr):
             order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
+
+        # Get leaves of accessions
+        if cluster_accessions:
+            accession_pccs = (1 - PCCUP.pair_correlation(
+                np.ascontiguousarray(
+                    # PCCUP expects floats
+                    self._expr.as_matrix().T.astype('float')
+                )
+            ))
+            link = linkage(1-accession_pccs, method='complete')
+            accession_dists = leaves_list(link)
+            # Order by accession distance
+            dm = dm.loc[:,dm.columns[accession_dists]]
+
         # Optional Average by cluster
         if avg_by_cluster == True:
             # Extract clusters
@@ -906,7 +929,8 @@ class COB(Expr):
                     apply(lambda x: (x-x.mean())/x.std() ,axis=1)
         # Save plot if provided filename
         fig = plt.figure(
-            facecolor='white'
+            facecolor='white',
+            figsize=(20,20)
         )
         ax = fig.add_subplot(111)
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
@@ -932,7 +956,7 @@ class COB(Expr):
         fig.colorbar(im)
         # Save if you wish
         if filename is not None:
-            plt.savefig(filename,figsize=(5,10))
+            plt.savefig(filename,dpi=300)
             plt.close()
         return fig
 
@@ -1152,6 +1176,7 @@ class COB(Expr):
         self.log("Done")
         return self
 
+
     def _calculate_degree(self):
         '''
             Calculates degrees of genes within network. Stores
@@ -1200,7 +1225,7 @@ class COB(Expr):
         dists = 1 - dists
         gc.collect()
         
-        # Find the leaves or something
+        # Find the leaves from hierarchical clustering
         self.log("Finding the leaves")
         dists = leaves_list(linkage(dists, method='single'))
         gc.collect()
