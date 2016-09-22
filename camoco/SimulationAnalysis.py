@@ -1,4 +1,5 @@
 import matplotlib
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import matplotlib.pylab as plt
 matplotlib.style.use('ggplot')
@@ -50,7 +51,6 @@ class SimulationAnalysis(object):
         self.df['window_id'] = ['{}/{}'.format(x,y) for x,y in zip(self.df.FlankLimit,self.df.WindowSize)]
     
     def terms_with_signal(self, max_pval=0.05, min_pval=0,
-                          max_WindowSize=1, max_FlankLimit=0,
 			  pval_col='Density_pval'):
         '''
             Return only terms with a starting pvalue between the 
@@ -58,9 +58,7 @@ class SimulationAnalysis(object):
         '''
         # Split the data in a few informative ways
         # We only want the True FCR
-        fdr = self.df[(self.df.WindowSize<=max_WindowSize) \
-                & (self.df.FlankLimit<=max_FlankLimit)]
-        fdr = fdr.set_index(['COB','GO','FCR'],drop=False).sort_index()
+        fdr = self.df.set_index(['COB','GO','FCR'],drop=False).sort_index()
         # Split out groups
         terms_with_signal = fdr.query(
             'FCR==0 and MCR==0 and FlankLimit==0 and {}<{} and {}>={}'.format(pval_col,max_pval,pval_col,min_pval)
@@ -121,6 +119,60 @@ class SimulationAnalysis(object):
             plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight')
         return (fig,axes)
 
+    def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05):
+        '''
+            Generate a heatmap based on Density PVal
+        '''
+        cobs = self.df.COB.unique()
+        fig,axes = plt.subplots(len(cobs),1,sharex=True)
+        fig.set_size_inches(8,11)
+        signal = self.terms_with_signal()
+        for i,cob in enumerate(cobs):
+            data = pd.pivot_table(
+                signal.ix[signal.COB==cob],
+                columns=['WindowSize','FlankLimit'],
+                index=['GO'],
+                values='Density_pval'
+            )
+            #data[data > pval_cutoff] = np.nan
+            #data[data < pval_cutoff] = 0
+            axes[i].set_frame_on(False)
+            cmap = plt.cm.Greens_r
+            cmap.set_bad('white',1.0)
+            im = axes[i].pcolormesh(
+                np.ma.masked_invalid(data),
+                cmap=cmap,
+                #linewidth=0.1,
+                edgecolor='lightgrey',
+                vmin=0,
+                vmax=0.05
+            )
+            # Make the layout more natural
+            axes[i].set_ylabel(cob,fontsize=20)
+            axes[i].yaxis.set_label_position("right")
+            axes[i].invert_yaxis()
+            axes[i].set(
+                yticks=np.arange(len(data.index))+0.5
+            )
+            axes[i].yaxis.set_ticks_position('left')
+            axes[i].xaxis.set_ticks_position('none')
+            if i == 0:
+                axes[i].xaxis.tick_top()
+                axes[i].set_xticks(np.arange(len(data.columns))+0.5)
+                axes[i].set_xticklabels(data.columns.values, rotation=90)
+            axes[i].set_yticklabels(data.index.values)
+        # Create a new axis to append the color bar to
+        divider = make_axes_locatable(axes[len(cobs)-1])
+        cax = divider.append_axes("bottom", size="5%", pad=0.05)
+        cbar = fig.colorbar(
+            im, cax=cax, orientation='horizontal', ticks=[0,0.025,0.05]
+        )
+        cbar.set_ticklabels(['0','0.025','≥0.05'])
+        plt.tight_layout(pad=0.4,w_pad=0.5, h_pad=1.0)
+        if filename is not None:
+            plt.savefig(filename,dpi=300)
+            plt.close()
+        return (fig,axes)   
     
     # FCR Analysis
     # ----------------------------------------------
