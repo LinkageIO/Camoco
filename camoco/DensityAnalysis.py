@@ -34,6 +34,16 @@ class DensityAnalysis(object):
             [pd.read_table(x,sep=self.sep) \
                 for x in glob.glob(dir+"*.density.tsv") ]
         )
+
+    def pivot(self,value='PValue'):
+        data = pd.pivot_table(
+            self.df,
+            index=['COB','WindowSize','FlankLimit'],
+            columns=['Term'],
+            values=value
+        )
+        return data
+
    
     def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05):
         '''
@@ -85,6 +95,6 @@ class DensityAnalysis(object):
         cbar.set_ticklabels(['0','0.025','≥0.05'])
         plt.tight_layout(pad=0.4,w_pad=0.5, h_pad=1.0)
         if filename is not None:
-            plt.savefig(filename)
+            plt.savefig(filename,dpi=300)
             plt.close()
         return (fig,axes)
