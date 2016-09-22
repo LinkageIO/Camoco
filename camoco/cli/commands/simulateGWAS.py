@@ -24,32 +24,40 @@ def simulateGWAS(args):
     go = co.GOnt(args.GOnt)
     cob = co.COB(args.cob)
     if 'all' in args.terms:
-        terms = go.iter_terms()
+        terms = list(go.iter_terms(
+            min_term_size=args.min_term_size,
+            max_term_size=args.max_term_size
+        ))
     elif os.path.exists(args.terms[0]):
         terms = [go[x.strip()] for x in open(args.terms[0]).readlines()]
     else:
         # Otherwise get the term out of the GWAS
         terms = [ go[x] for x in args.terms ] 
-    terms = [ x for x in terms if len(x.loci) >= args.min_term_size and len(x.loci) <= args.max_term_size ]
     cob.log("Simulating GWAS for {} GO Terms",len(terms))
     cob.log("All terms are between {} and {} 'SNPs'", args.min_term_size, args.max_term_size)
 
     results = []
     for i,term in enumerate(terms):
+        cob.log('-'*75)
         window_size = args.candidate_window_size
         flank_limit =  args.candidate_flank_limit
         # Generate a series of densities for parameters
-        num_genes = len(term.loci)
-        if num_genes == 0:
-            continue
+        num_genes = len([x for x in term.loci if x in cob])
         eloci = [ x for x  in term.effective_loci(
             window_size=window_size
         ) if x in cob ]
-        cob.log('-'*75)
         cob.log(
             'Simulation {}: {} ({}/{} genes in {})',
             i,term.id,len(eloci),num_genes,cob.name
         )   
+        if num_genes > args.max_term_size:
+            cob.log("Too many genes... skipping")
+            continue
+        elif num_genes < args.min_term_size:
+            cob.log("Too few genes... skipping")
+            continue
+        elif num_genes == 0:
+            continue
         # Remove a percentage of SNPs to simulate false negatives
         if args.percent_SNPs_missed != None and args.percent_SNPs_missed > 0:
             # Calulate the index needed to hit percent missing
@@ -75,7 +83,12 @@ def simulateGWAS(args):
             eloci,
             flank_limit=flank_limit
         )
-        cob.log("SNP to gene mapping finds {} genes at window:{} bp, flanking:{} genes",len(candidates),args.candidate_window_size,args.candidate_flank_limit)
+        cob.log(
+            "SNP to gene mapping finds {} genes at window:{} bp, "
+            "flanking:{} genes", len(candidates),
+            args.candidate_window_size,
+            args.candidate_flank_limit
+        )
         if len(candidates) == 0:
             density = np.NaN
             trans_density = np.NaN
@@ -123,11 +136,12 @@ def simulateGWAS(args):
         results.append(OrderedDict([
            ('COB',cob.name),
            ('GO',term.id),
+           ('TermSize',len(term)),
            ('NumRealGenes',num_genes),
            ('WindowSize',window_size),
            ('FlankLimit',flank_limit),
            ('FCR',args.percent_fcr),
-           ('MissedSNPsRate',args.percent_SNPs_missed),
+           ('MCR',args.percent_SNPs_missed),
            ('NumEffective',len(eloci)),
            ('NumCandidates',len(candidates)),
            ('Density',density),

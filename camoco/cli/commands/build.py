@@ -71,7 +71,9 @@ def build_gont(args):
         args.filename,
         args.name,
         args.description,
-        refgen
+        refgen,
+        go_col=args.go_col,
+        id_col=args.id_col
     )
     print('Build Successful')
 

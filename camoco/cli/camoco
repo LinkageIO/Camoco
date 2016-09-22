@@ -161,6 +161,16 @@ if __name__ == '__main__':
         'refgen',
         help='Camoco reference Genome name.'
     )
+    bldgo.add_argument(
+        '--go-col',
+        default=1,
+        help='The GO Term ID column in Gene-term map file (default:1)'
+    )
+    bldgo.add_argument(
+        '--id-col',
+        default=0,
+        help='The gene ID column in Gene-term map file (default:0)'
+    )
     bldgo.set_defaults(func=build_gont)
     
 
@@ -1124,9 +1134,7 @@ if __name__ == '__main__':
                 raise e
             sys.exit(e)
         except Exception as e:
-            log.warn("A bad thing happened.\n\n" + str(e))
-            if args.debug:
-                raise e
+            log.warn("A baaaad thing happened.\n\n" + str(e))
             sys.exit(1)
         if args.interactive is True:
             from IPython.core import ultratb

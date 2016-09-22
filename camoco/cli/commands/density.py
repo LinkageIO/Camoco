@@ -16,6 +16,9 @@ import pandas as pd
 import matplotlib.pylab as plt
 
 def density(args):
+    # Build base camoco objects
+    cob = co.COB(args.cob)
+    ont = co.GWAS(args.gwas)
     # Handle the different output schemes
     if args.out is None:
         args.out = '{}_{}_{}_{}_{}'.format(
@@ -35,9 +38,6 @@ def density(args):
             ),file=sys.stderr
         )
         return
-    # Build base camoco objects
-    cob = co.COB(args.cob)
-    ont = co.GWAS(args.gwas)
     # Generate a terms iterable
     if 'all' in args.terms:
         terms = ont.iter_terms()
@@ -110,7 +110,7 @@ def density(args):
                 gene_density.loc[gene_density.zscore >= zscore,'bs_std'] = bs_std
                 gene_density.sort_values(by='fdr',ascending=True,inplace=True)
                 # This gets collated into all_results below
-                results = gene_density
+                results = gene_density.reset_index()
         else:
             results = OrderedDict()
             # Grab gene candidates
