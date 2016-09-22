@@ -48,11 +48,17 @@ class Ontology(Camoco):
             'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
         ).fetchone()[0]
 
-    def iter_terms(self):
+    def iter_terms(self,min_term_size=0,max_term_size=10000000):
         '''
             Return a generator that iterates over each term in the ontology.
         '''
-        for id, in self.db.cursor().execute("SELECT id FROM terms"):
+        terms = self.db.cursor().execute('''
+            SELECT term from term_loci
+            GROUP BY term
+            HAVING COUNT(term) >= ?
+                AND COUNT(term) <= ?
+        ''',(min_term_size,max_term_size))
+        for id, in terms:
             yield self[id]
 
     def terms(self):
@@ -70,8 +76,8 @@ class Ontology(Camoco):
         ids = cur.execute(''' 
             SELECT term FROM term_loci 
             GROUP BY term 
-            HAVING COUNT(term) > ?
-                AND COUNT(term) < ?
+            HAVING COUNT(term) >= ?
+                AND COUNT(term) <= ?
             ORDER BY RANDOM() 
             LIMIT ?;
         ''',(min_term_size,max_term_size,n)).fetchall()
@@ -223,8 +229,6 @@ class Ontology(Camoco):
 
         self.log('Your gene ontology is built.')
         return self
-
-
 
     def _create_tables(self):
         cur = self.db.cursor()
