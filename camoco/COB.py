@@ -927,6 +927,9 @@ class COB(Expr):
                     groupby('cluster').\
                     apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
                     apply(lambda x: (x-x.mean())/x.std() ,axis=1)
+            if len(dm) == 0:
+                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
+                return None
         # Save plot if provided filename
         fig = plt.figure(
             facecolor='white',
