@@ -8,6 +8,7 @@ from .Term import Term
 from pandas import DataFrame
 from scipy.stats import hypergeom
 from itertools import chain
+from functools import lru_cache
 
 import sys
 import numpy
@@ -29,6 +30,7 @@ class Ontology(Camoco):
         ).fetchone()[0]
     
 
+    @lru_cache(maxsize=131072)
     def __getitem__(self, id):
         ''' retrieve a term by id '''
         try:
@@ -39,7 +41,11 @@ class Ontology(Camoco):
                 self.refgen[gene_id] for gene_id, in self.db.cursor().execute(
                 ''' SELECT id FROM term_loci WHERE term = ?''', (id, )
             ).fetchall()]
-            return Term(id, desc=desc, loci=term_loci)
+            term_attrs = {k:v for k,v in self.db.cursor().execute(
+                ''' SELECT key,val FROM term_artts WHERE term = ?''',(id,)         
+                )
+            }
+            return Term(id, desc=desc, loci=term_loci,**term_attrs)
         except TypeError as e: # Not in database
             raise e
 
@@ -68,9 +74,19 @@ class Ontology(Camoco):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(
             self.name, self.description, len(self), self.refgen)
 
-    def rand(self, n=1, min_term_size=1, max_term_size=10000):
+    def rand(self, n=1, min_term_size=1, max_term_size=100000):
         '''
             Return a random Term from the Ontology
+
+            Parameters
+            ----------
+            n : int (default: 1)
+                The number of random terms to return
+            min_term_size : int (default: 1)
+                The smallest acceptable term size
+                i.e. the number of genes annotated to the term
+            max_term_size : int (default: 100000)
+                The largest acceptable term size
         '''
         cur = self.db.cursor()
         ids = cur.execute(''' 
@@ -242,8 +258,15 @@ class Ontology(Camoco):
             CREATE TABLE IF NOT EXISTS term_loci (
                 term TEXT, 
                 id TEXT
-            )'''
+            );'''
         )
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS term_attrs (
+                term TEXT,
+                key TEXT,
+                val TEXT
+            );
+        ''')
 
     def _clear_tables(self):
         cur = self.db.cursor()
