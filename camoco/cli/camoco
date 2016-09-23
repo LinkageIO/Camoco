@@ -164,11 +164,13 @@ if __name__ == '__main__':
     bldgo.add_argument(
         '--go-col',
         default=1,
+        type=int,
         help='The GO Term ID column in Gene-term map file (default:1)'
     )
     bldgo.add_argument(
         '--id-col',
         default=0,
+        type=int,
         help='The gene ID column in Gene-term map file (default:0)'
     )
     bldgo.set_defaults(func=build_gont)
@@ -793,6 +795,12 @@ if __name__ == '__main__':
         help='Maximum GO term size to consider in health (defualt: 300)'
     )
     health.add_argument(
+        '--max-terms',
+        default=None,
+        type=int,
+        help='If specified, limits the number of total GO terms tested (i.e. Subsampling)'
+    )
+    health.add_argument(
         '--num-bootstraps',
         default=100,
         type=int,
@@ -1126,21 +1134,24 @@ if __name__ == '__main__':
         sys.excepthook = ultratb.FormattedTB(
             mode='Verbose', color_scheme='Linux', call_pdb=1
         )
-    else:
-        try:
-            return_value = args.func(args)
-        except AttributeError as e:
-            if args.debug:
-                raise e
-            sys.exit(e)
-        except Exception as e:
-            log.warn("A baaaad thing happened.\n\n" + str(e))
+    # Execute the command
+    try:
+        return_value = args.func(args)
+    except AttributeError as e:
+        if args.debug:
+            raise e
+        sys.exit(e)
+    except Exception as e:
+        log.warn("A baaaad thing happened.\n\n" + str(e))
+        if args.debug:
+            raise e
+        else:
             sys.exit(1)
-        if args.interactive is True:
-            from IPython.core import ultratb
-            sys.excepthook = ultratb.FormattedTB(
-                mode='Verbose', color_scheme='Linux', call_pdb=1
-            )
-            from camoco.Exceptions import CamocoInteractive
-            raise CamocoInteractive()
-        sys.exit(return_value)
+    if args.interactive is True:
+        from IPython.core import ultratb
+        sys.excepthook = ultratb.FormattedTB(
+            mode='Verbose', color_scheme='Linux', call_pdb=1
+        )
+        from camoco.Exceptions import CamocoInteractive
+        raise CamocoInteractive()
+    sys.exit(return_value)
