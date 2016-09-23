@@ -191,6 +191,7 @@ class RefGen(Camoco):
                     raise e
         return genes
 
+    # NOTE: Dont LRU cache this, it gets cached in from_id
     def __getitem__(self,item):
         '''
             A convenience method to extract loci from the reference genome.
