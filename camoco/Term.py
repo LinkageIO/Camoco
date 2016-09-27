@@ -75,8 +75,8 @@ class Term(object):
                 collapsed[-1] = collapsed[-1] + locus
             else:
                 collapsed.append(locus)
-        log('{}: Found {} SNPs -> {} effective SNPs', 
-            self.id, len(self.loci), len(collapsed)
+        log('{}: Found {} SNPs -> {} effective SNPs with window size {} bp', 
+            self.id, len(self.loci), len(collapsed), window_size
         )
         return collapsed
 

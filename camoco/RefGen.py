@@ -20,13 +20,13 @@ import scipy as sp
 import math
 import gzip
 import re
+from functools import lru_cache
 
 
 class RefGen(Camoco):
     def __init__(self,name):
         # initialize camoco instance
         super().__init__(name,type="RefGen")
-        self._create_tables()
 
     @property
     def genome(self):
@@ -100,7 +100,7 @@ class RefGen(Camoco):
             An iterable containing random genes
 
         '''
-        rand_nums = np.random.randint(1,high=self.num_genes(),size=n)
+        rand_nums = np.random.choice(self.num_genes()+1,n,replace=False)
         gene_info = self.db.cursor().executemany(
                 "SELECT chromosome,start,end,id from genes WHERE rowid = ?",
                 [[int(rownum)] for rownum in rand_nums]
@@ -127,7 +127,33 @@ class RefGen(Camoco):
             '''):
             yield self.Gene(*x,build=self.build,organism=self.organism)
 
-    def from_ids(self, gene_list, check_shape=False):
+
+    @lru_cache(maxsize=131072)
+    def from_id(self, gene_id):
+        '''
+            Returns a gene object from a string
+
+            Parameters
+            ----------
+            gene_id : str
+                ID of the gene you want to pull out
+
+            Returns
+            -------
+            A single gene Object
+
+        '''
+        cur = self.db.cursor()
+        if gene_id not in self:
+            result = cur.execute('SELECT id FROM aliases WHERE alias = ?', [gene_id]).fetchone()
+            if not result:
+                raise ValueError('{} not in {}'.format(gene_id,self.name))
+            gene_id = result[0]
+        gene_id = gene_id.upper()
+        info = cur.execute('SELECT chromosome,start,end,id FROM genes WHERE id = ?', [gene_id]).fetchone()
+        return self.Gene(*info,build=self.build,organism=self.organism)
+
+    def from_ids(self, gene_ids, check_shape=False):
         '''
             Returns a list of gene object from an iterable of id strings
             OR from a single gene id string.
@@ -147,70 +173,34 @@ class RefGen(Camoco):
             otherwise a single gene
 
         '''
+        if isinstance(gene_ids,str):
+            import warnings
+            warnings.warn(
+                'Passing singe values into RefGen.from_ids is deprecated. Use RefGen.from_id() '
+                'or slicing syntax instead.'    
+            )
+            return self.from_id(gene_ids)
+        genes = []
+        for id in gene_ids:
+            try:
+                genes.append(self.from_id(id))
+            except ValueError as e:
+                if check_shape == False:
+                    continue
+                else:
+                    raise e
+        return genes
 
-        cur = self.db.cursor()
-        if isinstance(gene_list,str):
-        # Handle when we pass in a single id
-            gene_id = gene_list
-            if gene_id not in self:
-                result = cur.execute('SELECT id FROM aliases WHERE alias = ?', [gene_id]).fetchone()
-                if not result:
-                    raise ValueError('{} not in {}'.format(gene_id,self.name))
-                gene_id = result[0]
-            info = cur.execute('SELECT chromosome,start,end,id FROM genes WHERE id = ?', [gene_id]).fetchone()
-            return self.Gene(*info,build=self.build,organism=self.organism)
-
-        else:
-        # Handle when we pass an iterable of gene ids
-            bad_ids = []
-            gene_info = []
-            for id in gene_list:
-                gene_id = id
-                if gene_id not in self:
-                    result = cur.execute('SELECT id FROM aliases WHERE alias = ?', [gene_id]).fetchone()
-                    if not result:
-                        bad_ids.append(gene_id)
-                        continue
-                    gene_id = result[0]
-                gene_info.append(cur.execute('SELECT chromosome,start,end,id FROM genes WHERE id = ?', [gene_id]).fetchone())
-
-            genes = [self.Gene(*x,build=self.build,organism=self.organism) \
-                    for x in gene_info]
-
-            if check_shape and len(genes) != len(gene_list):
-                err_msg = '\nThese input ids do not have genes in reference:'
-                for x in range(len(bad_ids)):
-                    if x % 5 == 0:
-                        err_msg += '\n'
-                    err_msg += bad_ids[x] + '\t'
-                raise ValueError(err_msg)
-            return genes
-
+    # NOTE: Dont LRU cache this, it gets cached in from_id
     def __getitem__(self,item):
         '''
-            A convenience method to extract loci from the reference geneome.
+            A convenience method to extract loci from the reference genome.
         '''
         if isinstance(item,str):
-            # Handle when we pass in a single id
-            gene_id = item.upper()
-            try:
-                return self.Gene(
-                    *self.db.cursor().execute('''
-                        SELECT chromosome,start,end,id FROM genes WHERE id = ?
-                        ''',(gene_id,)
-                    ).fetchone(),
-                    build=self.build,
-                    organism=self.organism
-                )
-            except TypeError as e:
-                raise ValueError('{} not in {}'.format(gene_id,self.name))
-        genes = [
-            self.Gene(*x,build=self.build,organism=self.organism) \
-            for x in self.db.cursor().execute('''
-                SELECT chromosome,start,end,id FROM genes WHERE id IN ('{}')
-            '''.format("','".join(map(str.upper,item))))
-        ]
-        return genes
+            return self.from_id(item)
+        # Allow for iterables of items to be passed in
+        else:
+            return self.from_ids(item)
 
     def chromosome(self,id):
         '''
@@ -563,7 +553,7 @@ class RefGen(Camoco):
             )
             target_accumulator = 0
             candidate_accumulator = 0
-            self.log('target: {}, loci: {}',len(target),len(locus_list))
+            #self.log('target: {}, loci: {}',len(target),len(locus_list))
             for i,(locus,targ) in enumerate(zip(locus_list,target)):
                 # compare downstream of last locus to current locus
                 candidates = self.bootstrap_candidate_genes(
@@ -583,7 +573,7 @@ class RefGen(Camoco):
                 bootstraps.append(candidates)
             if chain:
                 bootstraps = list(seen)
-            self.log("Found {} bootstraps",len(bootstraps))
+            #self.log("Found {} bootstraps",len(bootstraps))
             return bootstraps
 
 
@@ -606,7 +596,7 @@ class RefGen(Camoco):
             # Grab the chromosomes rowid because its numeric
             self.db.cursor().execute(query).fetchall(),
             columns=['gene','chrom','start','end']
-        ).sort('gene')
+        ).sort_values(by='gene')
         # chromosome needs to be floats
         positions.chrom = positions.chrom.astype('float')
         # Do a couple of checks
@@ -865,6 +855,42 @@ class RefGen(Camoco):
             return als
 
     @classmethod
+    def create(cls,name,description,type):
+        self = super().create(name,description,type=type)
+        self.db.cursor().execute(''' 
+            DROP TABLE IF EXISTS chromosomes;
+            DROP TABLE IF EXISTS genes;
+            DROP TABLE IF EXISTS gene_attrs;
+            DROP TABLE IF EXISTS aliases;
+            ''')
+        self._create_tables()
+        self._build_indices()
+        return self
+
+
+    @classmethod
+    def from_DataFrame(cls,df,name,description,build,organism,
+            chrom_col='chrom',start_col='start',stop_col='stop',
+            id_col='ID'):
+        '''
+            Imports a RefGen object from a CSV.
+        '''
+        self = cls.create(name,description,type='RefGen')
+        self._global('build',build)
+        self._global('organism','organism')
+        genes = list()
+        for i,row in df.iterrows():
+            genes.append(
+                Gene(
+                    row[chrom_col],int(row[start_col]),int(row[stop_col]),
+                    id=row[id_col],build=build,organism=organism
+                ).update(dict(row.items()))
+            )
+        self.add_gene(genes)
+        self._build_indices()
+        return self
+
+    @classmethod
     def from_gff(cls,filename,name,description,build,organism,
                  chrom_feature='chromosome',gene_feature='gene',
                  ID_attr='ID',attr_split='='):
@@ -902,7 +928,6 @@ class RefGen(Camoco):
                 name of the feature.
             attr_split : str (default: '=')
                 The delimiter for keys and values in the attribute column
-
         '''
         self = cls.create(name,description,type='RefGen')
         self._global('build',build)
@@ -920,7 +945,7 @@ class RefGen(Camoco):
             (chrom,source,feature,start,
              end,score,strand,frame,attributes) = line.strip().split('\t')
             attributes = dict([(field.strip().split(attr_split)) \
-                for field in attributes.strip(';').split(';')])
+                    for field in attributes.strip(';').split(';')])
             if feature == chrom_feature:
                 self.log('Found a chromosome: {}',attributes['ID'].strip('"'))
                 self.add_chromosome(Chrom(attributes['ID'].strip('"'),end))
@@ -944,6 +969,32 @@ class RefGen(Camoco):
         self.add_gene(genes)
         self._build_indices()
         return self
+
+    def copy(self,name,description):
+        '''
+            Creates a copy of a refgen with a new name and description.
+
+            Parameters
+            ----------
+                name : str
+                    Name of the copy refgen
+                description : str
+                    Short description of the reference genome
+            Returns
+            -------
+                co.RefGen object containing the same genes and 
+                chromosomems as the original.
+        '''
+        copy = self.create(name,description,'RefGen')
+        copy._global('build',self.build)
+        copy._global('organism',self.organism)
+        # Should have the same chromosomems
+        for chrom in self.iter_chromosomes():
+            copy.add_chromosome(chrom)
+        # Should have the same gene list
+        copy.add_gene(self.iter_genes(),refgen=self)
+        copy._build_indices()
+        return copy
 
     @classmethod
     def filtered_refgen(cls,name,description,refgen,gene_list):

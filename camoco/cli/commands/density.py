@@ -31,7 +31,7 @@ def density(args):
     args.out = os.path.splitext(args.out)[0] + '.density.tsv'
     if os.path.dirname(args.out) != '':
         os.makedirs(os.path.dirname(args.out),exist_ok=True)
-    if os.path.exists(args.out) and args.overlook == True:
+    if os.path.exists(args.out) and args.force != True:
         print(
             "Output for {} exists! Skipping!".format(
                 args.out
@@ -110,7 +110,7 @@ def density(args):
                 gene_density.loc[gene_density.zscore >= zscore,'bs_std'] = bs_std
                 gene_density.sort_values(by='fdr',ascending=True,inplace=True)
                 # This gets collated into all_results below
-                results = gene_density
+                results = gene_density.reset_index()
         else:
             results = OrderedDict()
             # Grab gene candidates
@@ -159,4 +159,4 @@ def density(args):
     # Return the results 
     all_results = pd.concat(all_results)
     # Make sure the output directory exists
-    all_results.to_csv(args.out,sep='\t')
+    all_results.to_csv(args.out,sep='\t',index=None)

@@ -3,7 +3,7 @@ from scipy.misc import comb
 
 def gene_distances(double[:] chr, long[:] start, long[:] end):
     # Create an array to put the results in
-    cdef double[:] distances = np.empty(comb(chr.shape[0],2,exact=True))
+    cdef float[:] distances = np.empty(comb(chr.shape[0],2,exact=True)).astype('float32')
     # to remember which permutation we are one
     cdef long i, j, index
 
@@ -17,9 +17,9 @@ def gene_distances(double[:] chr, long[:] start, long[:] end):
             if chr[i] != chr[j]:
                 distances[index] = np.inf 
             elif start[i] < start[j]: # i is upstream of j
-                distances[index] = float(start[j] - end[i])
+                distances[index] = np.float32(start[j] - end[i])
             else: # i is upstream of j
-                distances[index] = float(start[i] - end[j])
+                distances[index] = np.float32(start[i] - end[j])
             index += 1
     assert index == len(distances)
     return distances.base

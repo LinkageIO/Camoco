@@ -43,20 +43,31 @@ def cob_health(args):
     if not path.exists('{}_Expr_raw.png'.format(args.out)):
         cob.plot(
             '{}_Expr_raw.png'.format(args.out),
+            include_accession_labels=True,
             raw=True,
             cluster_method=None
         )
     else:
         log('Skipped raw.')
-
     if not path.exists('{}_Expr_norm.png'.format(args.out)):
         cob.plot(
             '{}_Expr_norm.png'.format(args.out),
-            raw=False
+            include_accession_labels=True,
+            raw=False,
+            cluster_method='leaf',
+            cluster_accessions=True
         )
     else:
         log('Skipped norm.')
-
+    log('Plotting Cluster Expression-----------------------------------------')
+    if not path.exists('{}_Expr_cluster.png'.format(args.out)):
+        cob.plot(
+            '{}_Expr_cluster.png'.format(args.out),
+            raw=False,
+            avg_by_cluster=True
+        )
+    else:
+        log('Skipped norm.')
     log('Printing Summary ---------------------------------------------------')
     if not path.exists('{}.summary.txt'.format(args.out)):
         with open('{}.summary.txt'.format(args.out),'w') as OUT:
@@ -70,7 +81,7 @@ def cob_health(args):
         if not path.exists('{}_qc_gene.txt'.format(args.out)):
             # Print out the breakdown of QC Values
             refgen = co.RefGen(args.refgen)
-            gene_qc = cob.hdf5['qc_gene']
+            gene_qc = cob._ft('qc_gene')
             gene_qc = gene_qc[gene_qc.pass_membership]
             gene_qc['chrom'] = ['chr'+str(refgen[x].chrom) for x in gene_qc.index]
             gene_qc = gene_qc.groupby('chrom').agg(sum,axis=0)
@@ -108,7 +119,11 @@ def cob_health(args):
         )
         plt.title('{} Degree Distribution'.format(cob.name))
         # Save Fig
-        plt.savefig('{}_DegreeDist.png'.format(args.out))
+        try:
+            plt.savefig('{}_DegreeDist.png'.format(args.out))
+        except FutureWarning as e:
+            # This is a matplotlib bug
+            pass
     else:
         log('Skipping Degree Dist.')
 
@@ -122,8 +137,21 @@ def cob_health(args):
             locality_emp = []
             locality_pvals = []
             term_sizes = []
+            term_desc = []
             terms_tested = 0
-            for term in go.iter_terms():
+            if args.max_terms is not None:
+                log('Limiting to {} GO Terms',args.max_terms)
+                terms = go.rand(
+                    n=args.max_terms,
+                    min_term_size=args.min_term_size,
+                    max_term_size=args.max_term_size
+                )
+            else:
+                terms = go.iter_terms(
+                    min_term_size=args.min_term_size,
+                    max_term_size=args.max_term_size
+                )
+            for term in terms:
                 term.loci = list(filter(lambda x: x in cob, term.loci))
                 if len(term) < args.min_term_size or len(term) > args.max_term_size:
                     continue
@@ -177,7 +205,8 @@ def cob_health(args):
                 if terms_tested % 100 == 0 and terms_tested > 0:
                     log('Processed {} terms'.format(terms_tested)) 
             go_enrichment = pd.DataFrame({
-                'id' : term_ids,
+                'GOTerm' : term_ids,
+                'desc' : str(term.desc),
                 'size' : term_sizes,
                 'density' : density_emp,
                 'density_pval' : density_pvals,
@@ -211,8 +240,9 @@ def cob_health(args):
             fold = sum(np.array(go_enrichment['density_pval'])>1.3)/(0.05 * len(go_enrichment))
             axes[0,0].axhline(y=-1*np.log10(0.05),color='red')
             axes[0,0].text(
-                0, -0.2,
+                min(axes[0,0].get_xlim()),-1*np.log10(0.05),
                 '{:.3g} Fold Enrichement'.format(fold),
+                color='red'
             )
             axes[1,0].scatter(
                 go_enrichment['size'],
@@ -274,7 +304,10 @@ def cob_health(args):
             axes[2,1].set_xlabel('Term Size')
             # Save Figure
             plt.tight_layout()
-            plt.savefig('{}_GO.png'.format(args.out))
+            try:
+                plt.savefig('{}_GO.png'.format(args.out))
+            except FutureWarning as e:
+                pass
         else:
             log('Skipping GO Volcano.')
             

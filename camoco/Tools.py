@@ -334,3 +334,13 @@ def groupedFDR(df):
         )
     groups = ['Ontology','COB','WindowSize','FlankLimit','TraitType','Term']
     return df.reset_index().groupby(groups).apply(grouped_agg)
+
+
+class DummyRefGen(object):
+    '''
+        This is a dummy refgen that will always return True
+    '''
+    def __init__(self):
+        self.name = 'DummyRefGen'
+    def __contains__(self,x):
+        return True

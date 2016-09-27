@@ -14,12 +14,12 @@ from libc.math cimport isnan
 # input is a typed numpy memoryview (::1 means c contiguous array)
 def pair_correlation(double[:, ::1] x):
     # Define a new memoryview on an empty gene X gene matrix
-    cdef double[::1] pccs = np.empty(comb(x.shape[0],2,exact=True))
-    cdef double u, v
+    cdef float[::1] pccs = np.empty(comb(x.shape[0],2,exact=True)).astype('float32')
+    cdef float u, v
     cdef int i, j, k, count
     cdef long num_rows, num_cols
-    cdef double du, dv, d, n, r
-    cdef double sum_u, sum_v, sum_u2, sum_v2, sum_uv
+    cdef float du, dv, d, n, r
+    cdef float sum_u, sum_v, sum_u2, sum_v2, sum_uv
     cdef long index
 
     index = 0
@@ -53,6 +53,7 @@ def pair_correlation(double[:, ::1] x):
                     pccs[index] = np.nan
                 else:
                     r = 1 - n / (du * dv)
+                    # Avoid putting nans  
                     pccs[index] = r
             index += 1
     # Return the base of the memory view
@@ -104,6 +105,36 @@ cdef square_to_vector(long i, long j, mi):
     # Calculate the number of items on diagonal
     d = i + 1
     return k-ld-d
+
+def coex_expr_index(long[:] ids, int num_genes):
+    '''
+        Convert a list of coex indexes to a tuple of expr indexes
+    '''
+    cdef int num_rows = ids.shape[0]
+    coors = np.zeros([num_rows,2], dtype=np.int32)
+    if num_rows == 0:
+        return coors
+    cdef long idx, pos, i, j
+    idx = 0
+    pos = 0
+    
+    for i in range(num_genes):
+        if (ids[idx] < (pos + (num_genes - (i+1)))):
+            for j in range(i+1, num_genes):
+                if ids[idx] == pos:
+                    coors[idx, 0] = i
+                    coors[idx, 1] = j
+                    idx += 1
+                if idx >= num_rows:
+                    break
+                pos += 1
+        else:
+            pos += (num_genes - (i+1))
+        
+        if idx >= num_rows:
+            break
+    
+    return coors
 
 def coex_neighbors(long id, int mi):
     '''

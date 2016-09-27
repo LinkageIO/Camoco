@@ -515,7 +515,7 @@ if __name__ == '__main__':
         type=str,
         help=(
             'The locus attr used to determine which locus is the'
-            'strongest locus. (default=pval).'
+            'strongest locus. (defualt=pval).'
         )
     )
     plotgwas.add_argument(
@@ -611,7 +611,7 @@ if __name__ == '__main__':
         metavar='pval',
         help=(
             'The locus attr used to determine which locus is the'
-            'strongest locus. (default=pval).'
+            'strongest locus. (defualt=pval).'
         )
     )
     densityCLI.add_argument(
@@ -697,7 +697,7 @@ if __name__ == '__main__':
         metavar='pval',
         help=(
             'The locus attribute used to determine which locus is the'
-            'strongest locus. (default=pval).'
+            'strongest locus. (defualt=pval).'
         )
     )
     localityCLI.add_argument(
@@ -783,24 +783,16 @@ if __name__ == '__main__':
     health.add_argument(
         '--min-term-size',
         default=10,
-<<<<<<< HEAD
-        help='Minimum GO term size to consider in health (default: 10)'
-=======
         metavar=10,
         type=int,
         help='Minimum GO term size to consider in health (defualt: 10)'
->>>>>>> upstream/master
     )
     health.add_argument(
         '--max-term-size',
         metavar=300,
         default=300,
-<<<<<<< HEAD
-        help='Maximum GO term size to consider in health (default: 300)'
-=======
         type=int,
         help='Maximum GO term size to consider in health (defualt: 300)'
->>>>>>> upstream/master
     )
     health.add_argument(
         '--max-terms',
@@ -814,11 +806,6 @@ if __name__ == '__main__':
         type=int,
         metavar=100,
         help='Number of Bootstraps for pvalue stats.'
-    )
-    health.add_argument(
-        '--two_tailed_GO',
-        default=None,
-        help='If you want to include GO terms with a negative density for enrichment default: None)'
     )
     health.set_defaults(func=cob_health)
 
@@ -1057,7 +1044,7 @@ if __name__ == '__main__':
         metavar='pval',
         help=(
             'The locus attr used to determine which locus is the '
-            'strongest locus. (default=pval).'
+            'strongest locus. (defualt=pval).'
         )
     )
     snp2gene_cmd.add_argument(

@@ -8,7 +8,9 @@ from .Locus import Locus
 from .Tools import log,rawFile
 
 from collections import defaultdict
-import networkx as nx
+from itertools import chain
+from functools import lru_cache
+
 import pandas as pd
 import apsw as lite
 import numpy as np
@@ -17,6 +19,34 @@ import re
 class GOTerm(Term):
     '''
         Subclass to handle the intricacies of GO Terms
+
+        GO term are groups of genes with an evidence based function.
+        They are curated by the GeneOntology consortium:
+        (http://geneontology.org/page/download-ontology)
+
+        GO Terms are just special cases of the camoco.Term class.
+        Unlike normal Terms, GO Terms are related to one another. 
+        They form a Directed Acyclic Graph, i.e. they form a tree
+        where terms near the leaves are more functionally specific.
+
+        Normally, ontologies are split into three clades: Cellular Component,
+        Biological Process, and Molecular Function. 
+
+        Each GO Terms has these properties:
+        - GO Id
+        - Name 
+        - Namespace (BP, CC, pr MF)
+        - Definition
+        - Relationship to other terms
+        - A Set of genes it describes
+        Terms Optionally have:
+        - Alt/Secondary IDs
+        - Synonyms
+        - Database cross references
+        - Comments
+        - Tags
+
+
     '''
     def __init__(self, id, name='', desc='', alt_id=None, 
         is_a=None, loci=None, **kwargs):
@@ -27,8 +57,13 @@ class GOTerm(Term):
         '''
         super().__init__(id, desc=desc, loci=loci, **kwargs)
         self.name = name
+        # GO terms have parents as well as alternate IDs
         self.is_a = set(is_a) if is_a else set()
         self.alt_id = set(alt_id) if alt_id else set()
+
+    @property
+    def namespace(self):
+        return self.attrs['namespace']
 
     def __str__(self):
         return "Term: {}, Name: {}, Desc: {}, {} Loci".format(
@@ -53,6 +88,7 @@ class GOnt(Ontology):
     def __init__(self, name, type='GOnt'):
         super().__init__(name, type=type)
 
+    @lru_cache(maxsize=100000)
     def __getitem__(self, id):
         ''' retrieve a term by id '''
         main_id = self.db.cursor().execute(
@@ -75,12 +111,19 @@ class GOnt(Ontology):
         ])
 
         # Get the isa relationships
-        is_a = set(termID for termID in self.db.cursor().execute(
+        is_a = set(chain(*self.db.cursor().execute(
             'SELECT parent FROM rels WHERE child = ?', (id, )).fetchall())
+        )
 
         # Get the alternate ids of the term
-        alts = set(termID for termID in self.db.cursor().execute(
+        alts = set(chain(*self.db.cursor().execute(
             'SELECT alt FROM alts WHERE main = ?', (id, )).fetchall())
+        )
+
+        term_attrs = {k:v for k,v in self.db.cursor().execute(
+            ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
+            )
+        }
 
         return GOTerm(
             id, name=name, desc=desc, alt_id=alts, 
@@ -100,7 +143,7 @@ class GOnt(Ontology):
 
         # Add the term name and description
         cur.execute(
-            'INSERT OR ABORT INTO terms (id, desc, name) VALUES (?, ?, ?)', 
+            'INSERT OR REPLACE INTO terms (id, desc, name) VALUES (?, ?, ?)', 
             (term.id, term.desc, term.name)
         )
         if term.loci:
@@ -147,19 +190,27 @@ class GOnt(Ontology):
         if not cursor:
             cur.execute('END TRANSACTION')
 
-    @staticmethod
-    def getISA(terms, term):
+    def parents(self, term):
         '''
-            Internal function to handle propagating is_a relationships
+            Return an iterable containing the parents of a term.
+            Parents are determined via the is_a propertu of the term.
+
+            Parameters
+            ----------
+            term : GOTerm
+
+            Returns
+            -------
+            An iterable containing the parents
+
+            NOTE: note guaranteed to be in order NOR guaranteed 
+            to not contain duplicates
         '''
-        tot = set()
-        if not terms[term]['is_a']:
-            return tot
-        else:
-            for item in terms[term]['is_a']:
-                tot.add(item)
-                tot = tot | GOnt.getISA(terms, item)
-            return tot
+        for parent_term in term.is_a:
+            yield self[parent_term]
+            for grand_parent in self.parents(self[parent_term]):
+                yield grand_parent
+
 
     @classmethod
     def create(cls, name, description, refgen, overwrite=True, type='GOnt'):
@@ -174,47 +225,51 @@ class GOnt(Ontology):
 
         return self
 
+    ''' --------------------------------------------------------------------
+        Internal Methods
+     --------------------------------------------------------------------'''
+
     def _parse_obo(self,obo_file):
         '''
             Parses a GO obo file
+
+            Paramters
+            ---------
+            obo_file : filename
+                The path the the obo file. You can download
+                it here: http://geneontology.org/page/download-ontology
             
             Returns
             -------
-            A dictionary containing id:fields for the tersm  
+            A list of Empty (i.e. no genes) GO Terms 
         '''
         # Importing the obo information
         self.log('Importing OBO: {}', obo_file)
-        terms = defaultdict(dict)
-        cur_term = ''
+        cur_term = None
+        terms = []
         isa_re = re.compile('is_a: (.*) !.*')
         with rawFile(obo_file) as INOBO:
             for line in INOBO:
                 line = line.strip()
                 if line.startswith('id: '):
-                    cur_term = line.replace('id: ', '')
+                    if cur_term is not None:
+                        terms.append(cur_term)
+                    GOid = line.replace('id: ', '')
+                    cur_term = GOTerm(GOid)
                 elif line.startswith('name: '):
-                    terms[cur_term]['name'] = line.replace('name: ', '')
-                    terms[cur_term]['desc'] = ''
-                    terms[cur_term]['is_a'] = set()
-                    terms[cur_term]['alt_id'] = set()
-                    terms[cur_term]['genes'] = set()
+                    GOname = line.replace('name: ', '')
+                    cur_term.name = GOname
                 elif line.startswith('namespace: '):
-                    terms[cur_term]['type'] = line.replace('namespace: ', '')
+                    cur_term.attrs['namespace'] = line.replace('namespace: ', '')
                 elif line.startswith('alt_id: '):
-                    the_id = line.replace('alt_id: ', '')
-                    terms[cur_term]['alt_id'].add(the_id)
-                    terms[the_id] = terms[cur_term]
+                    alt_id = line.replace('alt_id: ', '')
+                    cur_term.alt_id.add(alt_id)
                 elif line.startswith('def: '):
-                    terms[cur_term]['desc'] += line.replace('def: ', '')
+                    cur_term.desc += line.replace('def: ', '')
                 elif line.startswith('comment: '):
-                    terms[cur_term]['desc'] += line.replace('comment: ', '')
+                    cur_term.desc += line.replace('comment: ', '')
                 elif line.startswith('is_a: '):
-                    terms[cur_term]['is_a'].add(isa_re.match(line).group(1))
-
-        # Propagating the relationships using the embeded function
-        self.log('Propagating is_a relationships.')
-        for cur_term in terms:
-            terms[cur_term]['is_a'] = self.getISA(terms,cur_term)
+                    cur_term.is_a.add(isa_re.match(line).group(1))
         return terms
 
     def _parse_gene_term_map(self,gene_map_file,headers=True,
@@ -228,7 +283,7 @@ class GOnt(Ontology):
             if headers:
                 garb = INMAP.readline()
             for line in INMAP.readlines():
-                row = line.strip().split('\t')
+                row = line.strip('\n').split('\t')
                 gene = row[id_col].split('_')[0].strip()
                 cur_term = row[go_col]
                 # Make a map between genes and associated GO terms
@@ -298,51 +353,33 @@ class GOnt(Ontology):
                 Kill old instances.
         '''
         self = cls.create(name, description, refgen, overwrite=overwrite)
-        # Parse the input files
-        terms = self._parse_obo(obo_file)
-        genes = self._parse_gene_term_map(gene_map_file,
-            headers=headers,go_col=go_col,id_col=id_col
-        )
-
-        # Get the requisite gene objects
-        self.log('Mixing genes and term data.')
-        for (cur_gene, cur_terms) in genes.items():
-            for cur_term in cur_terms:
-                if terms[cur_term] == {}:
-                    #self.log('Could not find term for {}',cur_term)
-                    continue
-                terms[cur_term]['genes'].add(cur_gene)
-                for parent in terms[cur_term]['is_a']:
-                    terms[parent]['genes'].add(cur_gene)
-        del genes
-
-        # Making the Term objects
-        self.log('Making the objects to insert into the database.')
-        termObjs = []
-        for (term, info) in terms.items():
-            if terms[term] == {}:
-                continue
-            # Make the Gene Objects from the refgen
-            geneObjs = refgen.from_ids(terms[term]['genes'])
-            # Make the Term object and add it to the list
-            termObjs.append(
-                GOTerm(term, name=terms[term]['name'], 
-                    alt_id=terms[term]['alt_id'], is_a=terms[term]['is_a'],
-                    desc=terms[term]['desc'], loci=geneObjs
-                )
-            )
-        del terms
-
-        # Add them all to the database
-        self.log('Adding {} terms to the database.',len(termObjs))
-        self.add_terms(termObjs, overwrite=False)
-        del termObjs
-
+        # Parse the OBO file and get a list of empty terms
+        terms = {term.id : term for term in self._parse_obo(obo_file)}
+        # Add terms to the database so that the parent method works
+        self.add_terms(terms.values(), overwrite=False)
         # Build the indices
         self.log('Building the indices.')
         self._build_indices()
+        # Parse the Gene/Term mapping 
+        genes = self._parse_gene_term_map(gene_map_file,
+            headers=headers,go_col=go_col,id_col=id_col
+        )
+        # Assign genes to terms AND to parent terms
+        self.log("Adding GO-gene assignments")
+        for gene_id,term_ids in genes.items():
+            # Get a gene object from the refgen
+            gene = self.refgen[gene_id]
+            for term_id in term_ids:
+                # Add gene to each term its annotated to
+                if term_id not in terms:
+                    continue
+                terms[term_id].loci.add(gene)
+                # Propogate gene to each parental term
+                for parent in self.parents(terms[term_id]):
+                    terms[parent.id].loci.add(gene)
+        self.add_terms(terms.values(), overwrite=False)
 
-        self.log('Your gene ontology is built.')
+        self.log('Build Sucessful.')
         return self
 
     def _create_tables(self):
@@ -360,6 +397,7 @@ class GOnt(Ontology):
         super()._clear_tables()
         cur = self.db.cursor()
         cur.execute('DELETE FROM rels; DELETE FROM alts;')
+
 
     def _build_indices(self):
         super()._build_indices()

@@ -18,31 +18,31 @@ import matplotlib.pyplot as plt
 import io
 import re
 import string
+from feather import FeatherError
 
 pd.set_option('display.width', 100)
 
 class Expr(Camoco):
     '''
-        A representation of gene expression. The base data structure for this
-        guy is a
+        A gene expression dataset. Build, normalize, filter and 
+        easily access different parts of the gene expression matrix.
     '''
     def __init__(self, name):
-        super().__init__(name=name, type='Expr') 
+        # Create a camoco object
+        super().__init__(name=name, type='Expr')
         # Part I: Load the Expression dataset
+        self.log('Loading Expr table')
         try:
-            self.log('Loading Expr table')
-            # Open the HDF5 store
-            self.hdf5 = self._hdf5(name)
-            # Load the expression Data
-            self._expr = self.hdf5['expr']
-            self._gene_qc_status = self.hdf5['gene_qc_status']
-        except KeyError as e:
+            self._expr = self._ft('expr')
+            self._gene_qc_status = self._ft('gene_qc_status')
+        except FeatherError as e:
             self._expr = pd.DataFrame()
+        
         self.log('Building Expr Index')
         self._expr_index = defaultdict(
             lambda: None,
             {gene:index for index, gene in enumerate(self._expr.index)}
-        ) 
+        )
         # Part II: Load the Reference Genome
         try:
             self.log('Loading RefGen')
@@ -86,11 +86,11 @@ class Expr(Camoco):
         return self._expr.columns
 
     def genes(self, raw=False):
-        # Returns a list of distinct genes 
+        # Returns a list of distinct genes
         if raw is False:
             return self.refgen.from_ids(self._expr.index)
         else:
-            return self.refgen.from_ids(self.hdf5['raw_expr'].index)
+            return self.refgen.from_ids(self._ft('raw_expr').index)
 
     def expr_profile(self, gene):
         '''
@@ -111,7 +111,7 @@ class Expr(Camoco):
 
     def max_values(self, axis=0):
         return np.nanmax(self._expr, axis=axis)
-    
+
     def anynancol(self):
         '''
             A gut check method to make sure none of the expression columns
@@ -119,7 +119,7 @@ class Expr(Camoco):
         '''
         return any(self._expr.apply(lambda col: all(np.isnan(col)), axis=0))
 
-    def expr(self, genes=None, accessions=None, 
+    def expr(self, genes=None, accessions=None,
              raw=False,gene_normalize=False):
         '''
             Access raw and QC'd expression data.
@@ -145,7 +145,7 @@ class Expr(Camoco):
         '''
         if raw is True:
             self.log('Extracting raw expression values')
-            df = self.hdf5['raw_expr'] 
+            df = self._ft('raw_expr')
         else:
             df = self._expr
         if genes is not None:
@@ -159,10 +159,10 @@ class Expr(Camoco):
         return df
 
     def plot_accession_histograms(self, bins=50, figsize=(16, 8)):
-        ''' 
+        '''
             Plot histogram of accession expression values.
         '''
-        raw = self.hdf5['raw_expr']
+        raw = self._ft('raw_expr')
         qcd = self._expr
 
         for name, values in qcd.iteritems():
@@ -178,7 +178,7 @@ class Expr(Camoco):
             # Plot histograms
             f = plt.figure(figsize=figsize)
             plt.subplot(121)
-            plt.hist(raw_valid[~raw_valid.mask], bins=bins) 
+            plt.hist(raw_valid[~raw_valid.mask], bins=bins)
             plt.xlim(-15, 15)
             plt.title('{}:{}'.format(self.name, name))
             plt.ylabel('Frequency')
@@ -187,7 +187,7 @@ class Expr(Camoco):
             plt.xlabel('Expression')
             plt.xlim(-15, 15)
 
-            plt.savefig("ACC_HIST_{}:{}.png".format(self.name, name)) 
+            plt.savefig("ACC_HIST_{}:{}.png".format(self.name, name))
             plt.close(f)
 
 
@@ -224,19 +224,19 @@ class Expr(Camoco):
         '''
         # update the transformation log
         if len(set(df.columns)) != len(df.columns):
-            raise CamocoGeneNameError('Gene names not Unique.')        
+            raise CamocoGeneNameError('Gene names not Unique.')
         if len(set(df.index)) != len(df.index):
             raise CamocoAccessionNameError('Accession names not Unique')
         self._transformation_log(transform_name)
         if raw == True:
-            table = 'raw_expr' 
-            # If we are updating the raw table, remove the 
-            # normal table since it assumes it came from 
+            table = 'raw_expr'
+            # If we are updating the raw table, remove the
+            # normal table since it assumes it came from
             # the raw table.
             self._reset(raw=False)
         else:
             table = 'expr'
-            # Keep full names in raw, but compress the 
+            # Keep full names in raw, but compress the
             # names in the normed network
             def shorten(x):
                 if len(x) > 100:
@@ -245,16 +245,14 @@ class Expr(Camoco):
                     return x
             df.columns = [shorten(x) for x in df.columns]
         # Sort the table by genes
-        df = df.sort()
+        df = df.sort_index()
         # ensure that column names are alphanumeric
-        # hdf5 doesn't like unicode characters
         pattern = re.compile('[^A-Za-z0-9_, ;:().]')
-        df.columns = [pattern.sub('', x) for x in df.columns.values ]
+        df.columns = [pattern.sub('', x) for x in df.columns.values]
         # Also, make sure gene names are uppercase
-        df.index = [pattern.sub('', x).upper() for x in df.index.values ]
+        df.index = [pattern.sub('', str(x)).upper() for x in df.index.values]
         try:
-            self.hdf5[table] = df
-            self.hdf5.flush(fsync=True)
+            self._ft(table, df=df)
             self._expr = df
         except Exception as e:
             self.log('Unable to update expression table values: {}', e)
@@ -277,24 +275,42 @@ class Expr(Camoco):
                 self._global('transformation_log') + '->' + str(transform)
             )
             self.log('Trans. Log: {}', self._global('transformation_log'))
- 
+
     def _reset(self, raw=False):
-        ''' 
-            resets the expression values to their raw 
-            state undoing any normalizations 
+        '''
+            resets the expression values to their raw
+            state undoing any normalizations
         '''
         if raw:
             # kill the raw table too
             self.log('Resetting raw expression data')
-            self.hdf5['raw_expr'] = pd.DataFrame()
+            self._ft('raw_expr', df=pd.DataFrame())
         self.log('Resetting expression data')
-        self.hdf5['expr'] = self._expr = self.expr(raw=True)
+        self._expr = self.expr(raw=True)
+        self._ft('expr', df=self._expr)
         self._transformation_log('reset')
 
 
-    def _normalize(self, norm_method=None, is_raw=None, max_val=None, **kwargs):
-        ''' evaluates qc expression data and re-enters 
-            normaized data into database '''
+    def _normalize(self, norm_method=None, max_val=None, **kwargs):
+        ''' 
+            Evaluates QC expression data and re-enters 
+            normalized data into database 
+
+            Parameters
+            ----------
+            norm_method : The normalization method to use. This can be inferred
+                from the raw data type. By default RNASeq uses np.arcsinh and
+                microarray data uses np.log2. A different normalization function
+                can be passed directly in. 
+                Default: None (inferred from Expr.rawtype)
+            max_val : This value is used to determine if any columns of the 
+                dataset have already been normalized. If any 'normailzed' 
+                values in an Accession column is larger than max_val, an
+                exception is thown. max_val is determined by Expr.raw_type
+                (default 100 for MicroArray and 1100 for RNASeq) but a 
+                max_val can be passed in to override these defaults.
+
+        '''
         self.log('------------ Normalizing')
         if all(self.is_normalized(max_val=max_val)):
             self.log("Dataset already normalized")
@@ -375,66 +391,77 @@ class Expr(Camoco):
         # If TRUE it passes, if FALSE it fails!!!
         qc_gene = pd.DataFrame({'has_id':True}, index=df.index)
         qc_accession = pd.DataFrame({'has_id':True}, index=df.columns)
-
         # -----------------------------------------
         # Gene Membership test
         if not membership:
             membership = self.refgen
         self._global('qc_membership', str(membership))
-        self.log("Filtering out genes not in {}", membership)
         qc_gene['pass_membership'] = [x in membership for x in df.index]
+        self.log(
+            "Found out {} genes not in {}", 
+            sum(qc_gene['pass_membership'] == False), 
+            membership
+        )
 
         # -----------------------------------------
         # Set minimum FPKM threshold
-        self.log("Filtering out expression values lower than {}", min_expr)
+        self.log("Filtering expression values lower than {}", min_expr)
         df_flt = df.copy()
         df_flt[df < min_expr] = np.nan
         df = df_flt
         # -----------------------------------------
         # Gene Missing Data Test
-        self.log(
-            "Filtering out genes with > {} missing data",
-            max_gene_missing_data
-        )
         qc_gene['pass_missing_data'] = df.apply(
             lambda x : ((sum(np.isnan(x))) < len(x)*max_gene_missing_data),
             axis=1
+        )
+        self.log(
+            "Found {} genes with > {} missing data",
+            sum(qc_gene['pass_missing_data'] == False),
+            max_gene_missing_data
         )
         # -----------------------------------------
         # Gene Min Expression Test
         # filter out genes which do not meet a minimum expr
         # threshold in at least one sample
-        self.log(("Filtering out genes which "
-                  "do not have one sample above {}"), min_single_sample_expr)
         qc_gene['pass_min_expression'] = df.apply(
             lambda x: any(x >= min_single_sample_expr),
             axis=1 # 1 is column
         )
+        self.log(
+            ("Found {} genes which "
+            "do not have one sample above {}"), 
+            sum(qc_gene['pass_min_expression'] == False),
+            min_single_sample_expr
+        )
         qc_gene['PASS_ALL'] = qc_gene.apply(
             lambda row: np.all(row), axis=1
         )
-        df = df.loc[qc_gene['PASS_ALL'], :] 
+        df = df.loc[qc_gene['PASS_ALL'], :]
         # -----------------------------------------
         # Filter out ACCESSIONS with too much missing data
-        self.log("Filtering out accessions with > {} missing data", max_accession_missing_data)
-
         qc_accession['pass_missing_data'] = df.apply(
             lambda col : (
                 ((sum(np.isnan(col)) / len(col)) <= max_accession_missing_data)
             ),
             axis=0 # 0 is columns
         )
+        self.log(
+            "Found {} accessions with > {} missing data", 
+            sum(qc_accession['pass_missing_data'] == False),
+            max_accession_missing_data
+        )
         # Update the total QC passing column
         qc_accession['PASS_ALL'] = qc_accession.apply(
             lambda row: np.all(row), axis=1
         )
-        df = df.loc[:, qc_accession['PASS_ALL']] 
+        df = df.loc[:, qc_accession['PASS_ALL']]
         # Update the database
-        self.hdf5['qc_accession'] = qc_accession
-        self.hdf5['qc_gene'] = qc_gene
+        self._ft('qc_accession', df=qc_accession)
+        self._ft('qc_gene', df=qc_gene)
         # Report your findings
-        self.log('Gene Removal:\n{}', str(qc_gene.apply(sum, axis=0)))
-        self.log('Accession Removal:\n{}', str(qc_accession.apply(sum, axis=0)))
+        self.log('Genes passing QC:\n{}', str(qc_gene.apply(sum, axis=0)))
+        self.log('Accessions passing QC:\n{}', str(qc_accession.apply(sum, axis=0)))
         # Also report a breakdown by chromosome
         qc_gene = qc_gene[qc_gene['pass_membership']]
         qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index]
@@ -487,18 +514,16 @@ class Expr(Camoco):
                     )
                 )
         # assign ranks by accession (column)
-        expr_ranks = expr.rank(
-            axis=0, method='first',
-            na_option='keep'
-        )
+        expr_ranks = expr.rank(axis=0, method='first', na_option='keep')
+        assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
         # normalize rank to be percentage
         expr_ranks = expr_ranks.apply(
-            lambda col: col/np.nanmax(col.values), 
+            lambda col: col/np.nanmax(col.values),
             axis=0
         )
         # we need to know the number of non-nans so we can correct for their ranks later
         self.log('Sorting ranked data')
-        # Sort values by accession/column, lowest to highest 
+        # Sort values by accession/column, lowest to highest
         expr_sort = expr.apply(lambda col: self.inplace_nansort(col), axis=0)
         # make sure the nans weren't included in the sort or the rank
         assert np.all(np.isnan(expr) == np.isnan(expr_ranks))
@@ -506,7 +531,7 @@ class Expr(Camoco):
         # calculate ranked averages
         self.log('Calculating averages')
         rank_average = expr_sort.apply(np.nanmean, axis=1)
-        # we need to apply the percentages to the lenght of the 
+        # we need to apply the percentages to the lenght of the
         rankmax = len(rank_average)
         self.log('Range of normalized values:{}..{} (n = {})'.format(
             min(rank_average), max(rank_average), len(rank_average))
@@ -532,7 +557,7 @@ class Expr(Camoco):
         '''
         # Keep a record of parent refgen
         self._global('parent_refgen', refgen.name)
-        # Filter down to only genes in 
+        # Filter down to only genes in
         if filter:
             refgen = refgen.filtered_refgen(
                 'Filtered{}'.format(self.name),
@@ -592,20 +617,20 @@ class Expr(Camoco):
         '''
         # Piggy back on the super create method
         self = super().create(name, description,type=type)
-        # Create appropriate HDF5 tables
-        self.hdf5['expr'] = pd.DataFrame()
-        self.hdf5['raw_expr'] = pd.DataFrame()
-        # Delete existing datasets 
+        # Create appropriate feather tables
+        self._ft('expr', df=pd.DataFrame())
+        self._ft('raw_expr', df=pd.DataFrame())
+        # Delete existing datasets
         self._set_refgen(refgen, filter=False)
         return self
 
     @classmethod
     def from_table(cls, filename, name, description, refgen, rawtype=None,
             sep='\t', normalize=True, quality_control=True, **kwargs):
-        ''' 
+        '''
             Create a Expr instance from a file containing raw expression data.
-            For instance FPKM or results from a microarray experiment. This
-            is a convenience method which reads the table in to a pandas DataFrame
+            For instance FPKM or results from a microarray experiment. This is
+            a convenience method which reads the table in to a pandas DataFrame
             object and passes the object the Expr.from_DataFrame(...). See the
             doc on Expr.from_DataFrame(...) for more options.
 
@@ -623,21 +648,23 @@ class Expr(Camoco):
                 is cross references during import so we can pull information
                 about genes we are interested in during analysis.
             rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype passed to
-                camoco.Expr.from_DataFrame. See docs there for more information.
+                This is noted here to reinforce the impotance of the rawtype
+                passed to camoco.Expr.from_DataFrame. See docs there for more
+                information.
             sep : str (default: \t)
                 Column delimiter for the data in filename path
             normalize : bool (Default: True)
-                Specifies whether or not to normalize the data so raw expression values
-                lie within a log space. This is best practices for generating interpretable
-                expression analyses. See Expr._normalize method for more information.
-                info.
+                Specifies whether or not to normalize the data so raw
+                expression values lie within a log space. This is best
+                practices for generating interpretable expression analyses. See
+                Expr._normalize method for more information.  info.
             quality_control : bool (Default: True)
-                A flag which specifies whether or not to perform QC. Parameters for QC are passed
-                in using the **kwargs arguments. For default parameters and options
-                see Expr._quality_control.
+                A flag which specifies whether or not to perform QC. Parameters
+                for QC are passed in using the **kwargs arguments. For default
+                parameters and options see Expr._quality_control.
             **kwargs : key value pairs
-                additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
+                additional parameters passed to subsequent methods. (see
+                Expr.from_DataFrame)
 
             Returns
             -------
@@ -645,22 +672,28 @@ class Expr(Camoco):
 
         '''
         tbl = pd.read_table(filename, sep=sep)
-        return cls.from_DataFrame(tbl, name, description, refgen, rawtype=rawtype, **kwargs)
+        return cls.from_DataFrame(
+                tbl, name, description, refgen, 
+                rawtype=rawtype, **kwargs
+            )
 
     @classmethod
     def from_DataFrame(cls, df, name, description, refgen, rawtype=None,
-        normalize=True, norm_method=None, quantile=False, quality_control=True, **kwargs):
+            normalize=True, norm_method=None, quantile=False, 
+            quality_control=True, **kwargs
+        ):
         ''' 
-            Creates an Expr instance from a pandas DataFrame. Expects that the DataFrame
-            index is gene names and the column names are accessions (i.e. experiments).
-            This is the preferred method for creating an Expr instance, in other words,
-            other classmethods transform their data so they can call this method.
+            Creates an Expr instance from a pandas DataFrame. Expects that the
+            DataFrame index is gene names and the column names are accessions
+            (i.e. experiments).  This is the preferred method for creating an
+            Expr instance, in other words, other classmethods transform their
+            data so they can call this method.
 
             Parameters
             ----------
             df : pandas.DataFrame
-                a DataFrame containing expression data. Assumes index is the genes and
-                columns is the accessions (experiment names)
+                a DataFrame containing expression data. Assumes index is the
+                genes and columns is the accessions (experiment names)
             name : str
                 A short name to refer to from the camoco dataset API.
             description : str
@@ -671,26 +704,29 @@ class Expr(Camoco):
                 is cross references during import so we can pull information
                 about genes we are interested in during analysis.
             rawtype : str (one of: 'RNASEQ' or 'MICROARRAY')
-                Specifies the fundamental datatype used to measure expression. During importation
-                of the raw expression data, this value is used to make decisions in converting data
-                to log-space.
+                Specifies the fundamental datatype used to measure expression.
+                During importation of the raw expression data, this value is
+                used to make decisions in converting data to log-space.
             normalize : bool (Default: True)
-                Specifies whether or not to normalize the data so raw expression values
-                lie within a log space. This is best practices for generating interpretable
-                expression analyses. See Expr._normalize method for more information.
-                info.
+                Specifies whether or not to normalize the data so raw
+                expression values lie within a log space. This is best
+                practices for generating interpretable expression analyses. See
+                Expr._normalize method for more information.  info.
             norm_method : None OR python function
-                If rawtype is NOT RNASEQ or MICROARRY AND normalize is still True, the normalization
-                method for the raw expression values needs to be passed in. This is for extreme customization
+                If rawtype is NOT RNASEQ or MICROARRY AND normalize is still
+                True, the normalization method for the raw expression values
+                needs to be passed in. This is for extreme customization
                 situations.
             quantile : bool (Default : False)
-                Specifies whether or not to perform quantile normalization on import.
+                Specifies whether or not to perform quantile normalization on
+                import.
             quality_control : bool (Default: True)
-                A flag which specifies whether or not to perform QC. Parameters for QC are passed
-                in using the **kwargs arguments. For default parameters and options
-                see Expr._quality_control.
+                A flag which specifies whether or not to perform QC. Parameters
+                for QC are passed in using the **kwargs arguments. For default
+                parameters and options see Expr._quality_control.
             **kwargs : key value pairs
-                additional parameters passed to subsequent methods. (see Expr.from_DataFrame)
+                additional parameters passed to subsequent methods.
+                See arguments for Expr._normalize(), Expr._quality_control()
 
             Returns
             -------
@@ -710,6 +746,8 @@ class Expr(Camoco):
             self.log('Performing Quality Control on genes')
             self._quality_control(**kwargs)
             assert self.anynancol() == False
+        else:
+            self.log('Skipping Quality Control!')
         if normalize:
             self.log('Performing Raw Expression Normalization')
             self._normalize(**kwargs)
@@ -721,4 +759,3 @@ class Expr(Camoco):
         self.log('Filtering refgen: {}', refgen.name)
         self._set_refgen(refgen, filter=True)
         return self
-

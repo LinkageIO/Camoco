@@ -8,8 +8,10 @@ from .Term import Term
 from pandas import DataFrame
 from scipy.stats import hypergeom
 from itertools import chain
+from functools import lru_cache
 
 import sys
+import numpy
 
 class Ontology(Camoco):
     '''
@@ -28,6 +30,7 @@ class Ontology(Camoco):
         ).fetchone()[0]
     
 
+    @lru_cache(maxsize=131072)
     def __getitem__(self, id):
         ''' retrieve a term by id '''
         try:
@@ -38,7 +41,11 @@ class Ontology(Camoco):
                 self.refgen[gene_id] for gene_id, in self.db.cursor().execute(
                 ''' SELECT id FROM term_loci WHERE term = ?''', (id, )
             ).fetchall()]
-            return Term(id, desc=desc, loci=term_loci)
+            term_attrs = {k:v for k,v in self.db.cursor().execute(
+                ''' SELECT key,val FROM term_artts WHERE term = ?''',(id,)         
+                )
+            }
+            return Term(id, desc=desc, loci=term_loci,**term_attrs)
         except TypeError as e: # Not in database
             raise e
 
@@ -47,11 +54,17 @@ class Ontology(Camoco):
             'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
         ).fetchone()[0]
 
-    def iter_terms(self):
+    def iter_terms(self,min_term_size=0,max_term_size=10000000):
         '''
             Return a generator that iterates over each term in the ontology.
         '''
-        for id, in self.db.cursor().execute("SELECT id FROM terms"):
+        terms = self.db.cursor().execute('''
+            SELECT term from term_loci
+            GROUP BY term
+            HAVING COUNT(term) >= ?
+                AND COUNT(term) <= ?
+        ''',(min_term_size,max_term_size))
+        for id, in terms:
             yield self[id]
 
     def terms(self):
@@ -60,6 +73,40 @@ class Ontology(Camoco):
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(
             self.name, self.description, len(self), self.refgen)
+
+    def rand(self, n=1, min_term_size=1, max_term_size=100000):
+        '''
+            Return a random Term from the Ontology
+
+            Parameters
+            ----------
+            n : int (default: 1)
+                The number of random terms to return
+            min_term_size : int (default: 1)
+                The smallest acceptable term size
+                i.e. the number of genes annotated to the term
+            max_term_size : int (default: 100000)
+                The largest acceptable term size
+        '''
+        cur = self.db.cursor()
+        ids = cur.execute(''' 
+            SELECT term FROM term_loci 
+            GROUP BY term 
+            HAVING COUNT(term) >= ?
+                AND COUNT(term) <= ?
+            ORDER BY RANDOM() 
+            LIMIT ?;
+        ''',(min_term_size,max_term_size,n)).fetchall()
+        if len(ids) == 0:
+            raise ValueError(
+                'No Terms exists with this criteria '
+                '{} < len(term) < {}:'.format(min_term_size,max_term_size)
+            )
+        terms = [self[id[0]] for id in ids]
+        if len(terms) == 1:
+            return terms[0]
+        else:
+            return terms
 
     def add_term(self, term, cursor=None, overwrite=False):
         ''' This will add a single term to the ontology
@@ -199,8 +246,6 @@ class Ontology(Camoco):
         self.log('Your gene ontology is built.')
         return self
 
-
-
     def _create_tables(self):
         cur = self.db.cursor()
         cur.execute('''
@@ -213,8 +258,15 @@ class Ontology(Camoco):
             CREATE TABLE IF NOT EXISTS term_loci (
                 term TEXT, 
                 id TEXT
-            )'''
+            );'''
         )
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS term_attrs (
+                term TEXT,
+                key TEXT,
+                val TEXT
+            );
+        ''')
 
     def _clear_tables(self):
         cur = self.db.cursor()
