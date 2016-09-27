@@ -270,6 +270,7 @@ class GOnt(Ontology):
                     cur_term.desc += line.replace('comment: ', '')
                 elif line.startswith('is_a: '):
                     cur_term.is_a.add(isa_re.match(line).group(1))
+        terms.append(cur_term)
         return terms
 
     def _parse_gene_term_map(self,gene_map_file,headers=True,
@@ -372,6 +373,7 @@ class GOnt(Ontology):
             for term_id in term_ids:
                 # Add gene to each term its annotated to
                 if term_id not in terms:
+                    self.log("{} not in Ontology",term_id)
                     continue
                 terms[term_id].loci.add(gene)
                 # Propogate gene to each parental term
