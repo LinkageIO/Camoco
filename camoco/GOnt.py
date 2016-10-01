@@ -369,18 +369,20 @@ class GOnt(Ontology):
         self.log("Adding GO-gene assignments")
         for gene_id,term_ids in genes.items():
             # Get a gene object from the refgen
-            gene = self.refgen[gene_id]
-            for term_id in term_ids:
-                # Add gene to each term its annotated to
-                if term_id not in terms:
-                    self.log("{} not in Ontology",term_id)
-                    continue
-                terms[term_id].loci.add(gene)
-                # Propogate gene to each parental term
-                for parent in self.parents(terms[term_id]):
-                    terms[parent.id].loci.add(gene)
+            try:
+                gene = self.refgen[gene_id]
+                for term_id in term_ids:
+                    # Add gene to each term its annotated to
+                    if term_id not in terms:
+                        self.log("{} not in Ontology",term_id)
+                        continue
+                    terms[term_id].loci.add(gene)
+                    # Propogate gene to each parental term
+                    for parent in self.parents(terms[term_id]):
+                        terms[parent.id].loci.add(gene)
+            except ValueError as e:
+                pass
         self.add_terms(terms.values(), overwrite=False)
-
         self.log('Build Sucessful.')
         return self
 
