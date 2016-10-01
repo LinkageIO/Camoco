@@ -539,6 +539,29 @@ def AtLeafHydroIonome(AtTair10):
 '''----------------------------------------------------------------------------
     GOnt Fixtures
 ----------------------------------------------------------------------------'''
+
+@pytest.fixture(scope='module')
+def TestGO(Zm5bFGS):
+    if cf.test.force.Ontology:
+        co.del_dataset('GOnt','TestGO',safe=False)
+    if not co.available_datasets('GOnt','TestGO'):
+        obo = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.test.obo'
+        )
+        gene_map_file = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.test.tsv'
+        )
+        return co.GOnt.from_obo(
+           obo, gene_map_file, 'TestGO',
+           'Test GO', Zm5bFGS
+        )
+    else:
+        return co.GOnt('TestGO')
+
+
+
 @pytest.fixture(scope="module")
 def ZmGO(Zm5bFGS):
     if cf.test.force.Ontology:
