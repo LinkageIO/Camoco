@@ -10,8 +10,8 @@ def test_GO(TestGO):
 def test_len_of_GO(TestGO):
     assert len(TestGO) == 10
 
-def test_go_term_propagation:
-    assert len(TestGO['GO:000001'].loci) == 15
+def test_go_term_propagation(TestGO):
+    assert len(TestGO['GO:0000001'].loci) == 15
 
 def test_get_item(ZmGO):
     assert ZmGO[bp_term_id]
