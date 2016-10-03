@@ -88,7 +88,7 @@ class GOnt(Ontology):
     def __init__(self, name, type='GOnt'):
         super().__init__(name, type=type)
 
-    @lru_cache(maxsize=100000)
+    @lru_cache(maxsize=2**17)
     def __getitem__(self, id):
         ''' retrieve a term by id '''
         main_id = self.db.cursor().execute(
@@ -132,7 +132,11 @@ class GOnt(Ontology):
 
 
     def add_term(self, term, cursor=None, overwrite=False):
-        ''' This will add a single term to the ontology '''
+        ''' 
+            Add a single term to the ontology 
+        
+        '''
+        self.__getitem__.cache_clear()
         if overwrite:
             self.del_term(term.id)
         if not cursor:
