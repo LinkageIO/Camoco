@@ -374,7 +374,7 @@ class Expr(Camoco):
                 contained within it i.e. a set of gene ids.
             dry_run : bool (default: False)
                 Used in testing to speed up calculations. Limits the QC
-                dataframe to only have 5000 genes.
+                dataframe to only have 100 genes.
         '''
         self.log('------------Quality Control')
         df = self.expr()
@@ -473,7 +473,7 @@ class Expr(Camoco):
         if dry_run:
             # If dry run, take first 100 rows of QC
             self.log.warn("Dry Run")
-            df = df.iloc[0:5000, :]
+            df = df.iloc[0:100,:]
         self._update_values(df, 'quality_control')
 
     @staticmethod
