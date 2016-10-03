@@ -5,4 +5,7 @@ camoco --debug build-cob \
     'ZmRNASeqTissueAtlas' \
     'Maize test net' \
     Zm5bFGS \
-    --rawtype RNASEQ
+    --rawtype RNASEQ \
+    --max-val 200 \
+    --dry-run
+    
