@@ -42,6 +42,19 @@ if __name__ == '__main__':
         Main Arguments 
     --------------------------'''
     parser = argparse.ArgumentParser(
+        description=(
+	"      ___           ___           ___           ___           ___           ___      \n"
+	"     /  /\         /  /\         /__/\         /  /\         /  /\         /  /\     \n"
+	"    /  /:/        /  /::\       |  |::\       /  /::\       /  /:/        /  /::\    \n"
+	"   /  /:/        /  /:/\:\      |  |:|:\     /  /:/\:\     /  /:/        /  /:/\:\   \n"
+	"  /  /:/  ___   /  /:/~/::\   __|__|:|\:\   /  /:/  \:\   /  /:/  ___   /  /:/  \:\  \n"
+	" /__/:/  /  /\ /__/:/ /:/\:\ /__/::::| \:\ /__/:/ \__\:\ /__/:/  /  /\ /__/:/ \__\:\ \n"
+	" \  \:\ /  /:/ \  \:\/:/__\/ \  \:\~~\__\/ \  \:\ /  /:/ \  \:\ /  /:/ \  \:\ /  /:/ \n"
+	"  \  \:\  /:/   \  \::/       \  \:\        \  \:\  /:/   \  \:\  /:/   \  \:\  /:/  \n"
+	"   \  \:\/:/     \  \:\        \  \:\        \  \:\/:/     \  \:\/:/     \  \:\/:/   \n"
+	"    \  \::/       \  \:\        \  \:\        \  \::/       \  \::/       \  \::/    \n"
+	"     \__\/         \__\/         \__\/         \__\/         \__\/         \__\/     \n" 
+	),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog= "\n".join([
             'version: {}'.format(co.__version__),
@@ -67,6 +80,7 @@ if __name__ == '__main__':
         default=False,
         help='Overwrite output files from previous analyses.'
     )
+    parser.set_defaults(func=lambda x: parser.print_help())
     subparsers = parser.add_subparsers(
         title='Camoco CLI program',
         metavar='Available Commands',
