@@ -245,6 +245,7 @@ class COB(Expr):
             A pandas.DataFrame containing the edges. Columns
             include score, significant (bool), and inter-genic distance.
         '''
+        num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
             df = self.coex.copy()
@@ -252,7 +253,6 @@ class COB(Expr):
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
             ids = np.array([self._expr_index[x.id] for x in gene_list])
-            num_genes = self.num_genes()
             if filter_missing_gene_ids:
                 # filter out the Nones
                 ids = np.array(list(filter(None, ids)))

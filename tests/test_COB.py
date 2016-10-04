@@ -57,7 +57,7 @@ def test_coex_to_expr_concordance(testCOB):
     # Get Random set of expr indexes
     expr_len = testCOB._expr.shape[0]
     expr_idxs = np.sort(np.unique(np.array(
-        [random.randint(0,expr_len) for i in range(cf.test.num*10)]
+        [random.randint(1,expr_len) for i in range(cf.test.num*10)]
     )))
     
     # Translate them back and forth
@@ -97,7 +97,11 @@ def test_subnetwork_contains_only_input_when_duplicates(testCOB):
     assert set(itertools.chain(*subnet.index.values)) == set([x.id for x in random_genes])
 
 def test_degree_index_matches_degree(testCOB):
-    assert False
+    # Compare the degree determined from subnetwork aggregation
+    # is the same as what is in the data frame
+    for k,v in Counter(itertools.chain(*testCOB.subnetwork().index.values)).items():
+        assert testCOB.degree.ix[k].Degree == v
+
 
 def test_empty_subnetwork_returns_proper_dataframe(testCOB):
     subnet = testCOB.subnetwork([])
