@@ -86,7 +86,7 @@ class RefGen(Camoco):
 
     def random_genes(self,n,**kwargs):
         '''
-            Return random genes from the RefGen
+            Return random genes from the RefGen, without replacement. 
 
             Parameters
             ----------
@@ -97,10 +97,10 @@ class RefGen(Camoco):
 
             Returns
             -------
-            An iterable containing random genes
+            An iterable containing n (unique) random genes
 
         '''
-        rand_nums = np.random.choice(self.num_genes()+1,n,replace=False)
+        rand_nums = np.random.choice(self.num_genes()+1,n+1,replace=False)
         gene_info = self.db.cursor().executemany(
                 "SELECT chromosome,start,end,id from genes WHERE rowid = ?",
                 [[int(rownum)] for rownum in rand_nums]
