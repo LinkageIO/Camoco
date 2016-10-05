@@ -128,3 +128,8 @@ def test_zero_index_genes_doesnt_get_filtered(testCOB):
     # entry between genes
     assert len(testCOB.subnetwork([gene_a,gene_b],sig_only=False)) == 1
 
+def test_zero_degree_genes_return_empty_dataframe(testCOB):
+    # get a random zero degree gene
+    gene_id = testCOB.degree.ix[testCOB.degree.Degree==0].sample(1).index[0]
+    gene = testCOB.refgen[gene_id]
+    assert len(testCOB.neighbors(gene)) == 0
