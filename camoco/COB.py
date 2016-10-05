@@ -162,6 +162,8 @@ class COB(Expr):
         del neighbor_indices
         if sig_only:
             edges = edges[edges.significant == 1]
+        if len(edges) == 0:
+            return pd.DataFrame(columns=['score','distance','significant'])
         
         # Find the indexes if necessary
         if names_as_index or names_as_cols:
