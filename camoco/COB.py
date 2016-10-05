@@ -92,7 +92,7 @@ class COB(Expr):
 
             Clusters
             ------------------
-            Num clusters (size > 3): {}
+            Num clusters (size >= 10): {}
 
 
         '''.format(
@@ -114,7 +114,7 @@ class COB(Expr):
             self._global('qc_min_single_sample_expr'),
             self._global('qc_max_accession_missing_data'),
             # Clusters
-            sum(self.clusters.groupby('cluster').apply(len) > 3)
+            sum(self.clusters.groupby('cluster').apply(len) >= 10)
         ), file=file)
 
     def qc_gene(self):
@@ -906,6 +906,17 @@ class COB(Expr):
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
 
+        # Optional Average by cluster
+        if avg_by_cluster == True:
+            # Extract clusters
+            dm = self.clusters.groupby('cluster').\
+                    filter(lambda x: len(x) >= min_cluster_size).\
+                    groupby('cluster').\
+                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
+                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
+            if len(dm) == 0:
+                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
+                return None
         # Get leaves of accessions
         if cluster_accessions:
             accession_pccs = (1 - PCCUP.pair_correlation(
@@ -919,17 +930,7 @@ class COB(Expr):
             # Order by accession distance
             dm = dm.loc[:,dm.columns[accession_dists]]
 
-        # Optional Average by cluster
-        if avg_by_cluster == True:
-            # Extract clusters
-            dm = self.clusters.groupby('cluster').\
-                    filter(lambda x: len(x) > min_cluster_size).\
-                    groupby('cluster').\
-                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
-                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
-            if len(dm) == 0:
-                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
-                return None
+
         # Save plot if provided filename
         fig = plt.figure(
             facecolor='white',
@@ -962,6 +963,8 @@ class COB(Expr):
             plt.savefig(filename,dpi=300)
             plt.close()
         return fig
+
+
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         '''
