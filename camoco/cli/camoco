@@ -53,7 +53,10 @@ if __name__ == '__main__':
 	"  \  \:\  /:/   \  \::/       \  \:\        \  \:\  /:/   \  \:\  /:/   \  \:\  /:/  \n"
 	"   \  \:\/:/     \  \:\        \  \:\        \  \:\/:/     \  \:\/:/     \  \:\/:/   \n"
 	"    \  \::/       \  \:\        \  \:\        \  \::/       \  \::/       \  \::/    \n"
-	"     \__\/         \__\/         \__\/         \__\/         \__\/         \__\/     \n" 
+	"     \__\/         \__\/         \__\/         \__\/         \__\/         \__\/ \n\n\n" 
+        "Camoco (Co-analysis of Molecular Components) inter-relates and co-analyzes different \n"
+        "levels of genomic data. Namely it integrates genes present near and around GWAS loci\n"
+        "using unbiased, functional information derived from co-expression networks."
 	),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog= "\n".join([
