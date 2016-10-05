@@ -100,7 +100,7 @@ class RefGen(Camoco):
             An iterable containing n (unique) random genes
 
         '''
-        rand_nums = np.random.choice(self.num_genes()+1,n+1,replace=False)
+        rand_nums = np.random.choice(self.num_genes()+1,n,replace=False)
         gene_info = self.db.cursor().executemany(
                 "SELECT chromosome,start,end,id from genes WHERE rowid = ?",
                 [[int(rownum)] for rownum in rand_nums]
