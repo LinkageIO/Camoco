@@ -255,7 +255,7 @@ class COB(Expr):
             ids = np.array([self._expr_index[x.id] for x in gene_list])
             if filter_missing_gene_ids:
                 # filter out the Nones
-                ids = np.array(list(filter(None, ids)))
+                ids = np.array([x for x in ids if x is not None])
             if len(ids) == 0:
                 df = pd.DataFrame(columns=['score','significant','distance'])
             else:
