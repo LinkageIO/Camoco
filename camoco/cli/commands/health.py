@@ -63,7 +63,9 @@ def cob_health(args):
     if not path.exists('{}_Expr_cluster.png'.format(args.out)):
         cob.plot(
             '{}_Expr_cluster.png'.format(args.out),
+            include_accession_labels=True,
             raw=False,
+            cluster_accessions=True,
             avg_by_cluster=True
         )
     else:
@@ -157,6 +159,7 @@ def cob_health(args):
                     continue
                 term_ids.append(term.id)
                 term_sizes.append(len(term))
+                term_desc.append(str(term.desc))
                 # ------ Density 
                 density = cob.density(term.loci)
                 density_emp.append(density)
@@ -195,7 +198,7 @@ def cob_health(args):
                     log('Processed {} terms'.format(terms_tested)) 
             go_enrichment = pd.DataFrame({
                 'GOTerm' : term_ids,
-                'desc' : str(term.desc),
+                'desc' : term_desc,
                 'size' : term_sizes,
                 'density' : density_emp,
                 'density_pval' : density_pvals,
