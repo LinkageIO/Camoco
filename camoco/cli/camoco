@@ -20,18 +20,21 @@ from camoco.Tools import log
 import pandas as pd
 pd.set_option('display.width',200)
 
-from camoco.cli.commands.plotGWAS import plot_gwas
-from camoco.cli.commands.density import OverlapAnalysis
-from camoco.cli.commands.locality import locality
-from camoco.cli.commands.health import cob_health
-from camoco.cli.commands.crossRef import crossref
+# House Keeping commands
+from camoco.cli.commands.build import build_cob,build_refgen,build_gont,build_GWAS
 from camoco.cli.commands.remove import remove 
 from camoco.cli.commands.list import list_command
+# Functional and Validation commands
+from camoco.cli.commands.health import cob_health
 from camoco.cli.commands.simulateGWAS import simulateGWAS
+from camoco.cli.commands.plotGWAS import plot_gwas
+# Information Commands
+from camoco.cli.commands.crossRef import crossref
 from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
-from camoco.cli.commands.build import build_cob,build_refgen,build_gont,build_GWAS
+# Analysis Commands
+from camoco.cli.commands.OverlapAnalysis import OverlapAnalysis
 
 from camoco import cf
 
@@ -663,7 +666,7 @@ if __name__ == '__main__':
         default=None,
         help='OutputFile Name (default: Standard Out)'
     )
-    overlapCLI.set_defaults(func=OverlapAnalysis)
+    overlapCLI.set_defaults(func=OverlapAnalysis.from_CLI)
 
 
     ''' --------------------------
