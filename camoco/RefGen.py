@@ -27,6 +27,7 @@ class RefGen(Camoco):
     def __init__(self,name):
         # initialize camoco instance
         super().__init__(name,type="RefGen")
+        self._build_indices()
 
     @property
     def genome(self):
@@ -243,6 +244,7 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
+    @profile
     def upstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Find genes that START upstream of a locus. 
@@ -273,7 +275,8 @@ class RefGen(Camoco):
         return [
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
-                SELECT chromosome,start,end,id FROM genes
+                SELECT chromosome,start,end,id FROM genes 
+                INDEXED BY gene_start_end 
                 WHERE chromosome = ?
                 AND start < ? -- Gene must start BEFORE locus
                 AND end >= ?  -- Gene must end AFTER locus window (upstream) 
@@ -282,6 +285,7 @@ class RefGen(Camoco):
             ''',(locus.chrom, locus.start, upstream, gene_limit)
         )]
 
+    @profile
     def downstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Returns genes downstream of a locus. Genes are ordered 
@@ -737,8 +741,15 @@ class RefGen(Camoco):
     def _build_indices(self):
         self.log('Building Indices')
         cur = self.db.cursor()
+        cur.execute('DROP INDEX IF EXISTS gene_start_end;')
+        cur.execute('DROP INDEX IF EXISTS gene_start;')
+        cur.execute('DROP INDEX IF EXISTS gene_end;')
+        cur.execute('DROP INDEX IF EXISTS geneid')
+        cur.execute('DROP INDEX IF EXISTS geneattr')
         cur.execute('''
-            CREATE INDEX IF NOT EXISTS genepos ON genes (chromosome,start);
+            CREATE INDEX IF NOT EXISTS gene_start_end ON genes (chromosome,start DESC,end ASC);
+            CREATE INDEX IF NOT EXISTS gene_start ON genes (chromosome,start);
+            CREATE INDEX IF NOT EXISTS gene_end ON genes (chromosome,end);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
             CREATE INDEX IF NOT EXISTS geneattr ON gene_attrs (id);
         ''')
