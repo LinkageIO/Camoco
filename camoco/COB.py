@@ -391,6 +391,7 @@ class COB(Expr):
             gene_split = gene_split.groupby('gene').agg(np.mean)
             if iter_name is not None:
                 gene_split['iter'] = iter_name
+            gene_split.index.name = 'gene'
             return gene_split
         else:
             if return_mean:
@@ -453,6 +454,7 @@ class COB(Expr):
         degree = ldegree.merge(gdegree,left_index=True,right_index=True)
         degree.columns = ['local', 'global']
         degree = degree.sort_values(by='global')
+        degree.index.name = 'gene'
         if include_regression:
             # Add the regression lines
             ols = sm.OLS(degree['local'], degree['global']).fit()
