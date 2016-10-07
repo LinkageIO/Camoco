@@ -21,7 +21,7 @@ import pandas as pd
 pd.set_option('display.width',200)
 
 from camoco.cli.commands.plotGWAS import plot_gwas
-from camoco.cli.commands.density import density
+from camoco.cli.commands.density import OverlapAnalysis
 from camoco.cli.commands.locality import locality
 from camoco.cli.commands.health import cob_health
 from camoco.cli.commands.crossRef import crossref
@@ -553,22 +553,30 @@ if __name__ == '__main__':
     plotgwas.set_defaults(func=plot_gwas) 
 
     ''' --------------------------
-        density 
+        Overlap (density/locality) 
     --------------------------'''
-    densityCLI = subparsers.add_parser(
-        'density',
-        help='Calculate network density among GWAS results'
+    overlapCLI = subparsers.add_parser(
+        'overlap',
+        help='Calculate network overlap among GWAS results. See --method for details.'
     )
     # Data Set Arguments
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         'cob',
         help='The camoco network to use.'
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         'gwas', 
         help='The camoco GWAS to use.'
     )
-    densityCLI.add_argument(
+
+    # keyword args
+    overlapCLI.add_argument(
+        'method',
+        default='density',
+        choices=['density','locality'],
+        help='The metric used to evaulate overlap between Loci and the Network'
+    )
+    overlapCLI.add_argument(
         '--terms',
         nargs='*', 
         help=(
@@ -578,7 +586,7 @@ if __name__ == '__main__':
         ),
         default=['all']
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--num-bootstraps', 
         default=100,
         type=int, 
@@ -588,7 +596,7 @@ if __name__ == '__main__':
             'to estimate a null distribution. (default: 100)'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--candidate-window-size',
         type=int,
         default=10000, 
@@ -598,7 +606,7 @@ if __name__ == '__main__':
             '(default: 10000)'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--candidate-flank-limit',
         type=int,
         default=1, 
@@ -608,7 +616,7 @@ if __name__ == '__main__':
             'on each side of the locus. (default: 2)' 
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--snp2gene', 
         type=str, 
         default='strongest',
@@ -621,7 +629,7 @@ if __name__ == '__main__':
             "(default: strongest)"
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--strongest-attr', 
         default='pval', 
         type=str, 
@@ -631,7 +639,7 @@ if __name__ == '__main__':
             'strongest locus. (defualt=pval).'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--strongest-higher',
         action='store_false',
         default=True,
@@ -641,7 +649,7 @@ if __name__ == '__main__':
             'lower values as stronger (i.e. p-vals)'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--gene-specific',
         action='store_true',
         default=False,
@@ -650,127 +658,14 @@ if __name__ == '__main__':
             'gene specific density.'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--out', 
         default=None,
         help='OutputFile Name (default: Standard Out)'
     )
-    densityCLI.set_defaults(func=density)
+    overlapCLI.set_defaults(func=OverlapAnalysis)
 
 
-    ''' --------------------------------------------------------------------
-        locality
-        --------------------------------------------------------------------'''
-    localityCLI = subparsers.add_parser(
-        'locality',
-        description=(
-            'Calculate subnetwork locality. Creates a grid using permutable '
-            'parameters (see --permutable) which interrogates locality.'
-        ),
-        help='Calculate subnetwork locality'
-    )
-    # -----------------Data Set Arguments -----------------------------------
-    localityCLI.add_argument(
-        'cob', 
-        help='The camoco network to use.'
-    )
-    localityCLI.add_argument(
-        'gwas',
-        help='The camoco GWAS to use.'
-    )
-    localityCLI.add_argument(
-        '--terms',
-        nargs='*', 
-        metavar='TERM',
-        help='The term within the ontology to use. (default: all)',
-        default=['all']
-    )
-    localityCLI.add_argument(
-       '--num-bootstraps', 
-       type=int,
-       default=100,
-       metavar=100, 
-       help='''The number of bootstraps to perform in order
-             to estimate a null distribution.'''
-    )
-    # SNP2Gene Mapping
-    localityCLI.add_argument(
-        '--snp2gene', 
-        type=str,
-        default='strongest', 
-        metavar='strongest', 
-        choices=['strongest','effective'],
-        help=(
-            'The SNP to gene mapping to use. Specifying multiple mappings '
-            ' will result in multiple results. Must be in: '
-            "['effective','strongest'] "
-            "(default:strongest)"
-        )
-    )
-    localityCLI.add_argument(
-        '--strongest-attr', 
-        type=str,
-        default='pval', 
-        metavar='pval',
-        help=(
-            'The locus attribute used to determine which locus is the'
-            'strongest locus. (defualt=pval).'
-        )
-    )
-    localityCLI.add_argument(
-        '--strongest-higher',
-        action='store_false',
-        default=True,
-        help=(
-            'Flag indicating the value in --strongest-attr is'
-            'stronger if higher. Default behavior is to treat'
-            'lower values as stronger (i.e. p-vals)'
-        )
-    )
-    localityCLI.add_argument(
-        '--candidate-window-size',
-        type=int,  
-        default=10000,
-        metavar=10000,
-        help='The window size for mapping effective SNPs to genes.'
-    )
-    localityCLI.add_argument(
-        '--candidate-flank-limit',
-        default=1,
-        metavar=1,
-        type=int,
-        help= (
-           'The number of flanking genes (each side) '
-            'included in SNP to gene mapping'
-            )
-    )
-    localityCLI.add_argument(
-        '--out',
-        type=str,
-        default='.',
-        help='Basename of output file (pngs and csvs will be produced.)'
-    )
-    localityCLI.add_argument(
-        '--sig-edge-zscore',
-        type=float,
-        metavar=3,
-        default=None,
-        help=(
-           'Redefine what a significant zscore for an interaction. '
-           '(defaut: 3)'
-        )
-    )
-    localityCLI.add_argument(
-        '--gene-specific',
-        action='store_true',
-        default=False,
-        help=(
-            'Flag indicating whether or not to perform'
-            'gene specific calculations.'
-        )
-    )
-    localityCLI.set_defaults(func=locality)
-    
     ''' --------------------------
         Health
     --------------------------'''
