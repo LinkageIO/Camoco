@@ -13,10 +13,6 @@ import pandas as pd
 import matplotlib.pylab as plt
 import statsmodels.api as sm
 
-from camoco.Tools import confidence_interval, \
-                         mean_confidence_interval,\
-                         NearestDict
-
 from camoco.Tools import log as coblog
 
 from collections import namedtuple

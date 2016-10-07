@@ -460,7 +460,7 @@ class COB(Expr):
             degree['fitted'] = ols.fittedvalues
             degree = degree.sort_values(by='resid',ascending=False)
         if iter_name is not None:
-            degree['iter_name'] = iter_name
+            degree['iter'] = iter_name
         return degree
 
     def density(self, gene_list, min_distance=None, by_gene=False):
