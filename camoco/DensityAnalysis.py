@@ -32,7 +32,7 @@ class DensityAnalysis(object):
     def _build_data(self,dir='./'):
         self.df = pd.concat(
             [pd.read_table(x,sep=self.sep) \
-                for x in glob.glob(dir+"*.density.tsv") ]
+                for x in glob.glob(dir+"/*.tsv") ]
         )
 
     def pivot(self,value='PValue'):

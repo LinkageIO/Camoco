@@ -371,7 +371,6 @@ class COB(Expr):
                 locus_list, flank_limit=flank_limit, chain=True,
                 include_parent_locus=True
             )
-        #self.log("Found {} candidate genes", len(genes_list))
         # Extract the edges for the full set of genes
         edges = self.subnetwork(
             genes_list,
