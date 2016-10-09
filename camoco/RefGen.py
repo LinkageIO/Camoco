@@ -27,6 +27,7 @@ class RefGen(Camoco):
     def __init__(self,name):
         # initialize camoco instance
         super().__init__(name,type="RefGen")
+        self._create_tables()
         self._build_indices()
 
     @property
@@ -244,7 +245,6 @@ class RefGen(Camoco):
                 genes = list(itertools.chain(*genes))
             return genes
 
-    @profile
     def upstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Find genes that START upstream of a locus. 
@@ -276,16 +276,15 @@ class RefGen(Camoco):
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes 
-                INDEXED BY gene_start_end 
+                INDEXED BY gene_start_end
                 WHERE chromosome = ?
+                AND start >= ?  -- Gene must end AFTER locus window (upstream) 
                 AND start < ? -- Gene must start BEFORE locus
-                AND end >= ?  -- Gene must end AFTER locus window (upstream) 
                 ORDER BY start DESC
                 LIMIT ?
-            ''',(locus.chrom, locus.start, upstream, gene_limit)
+            ''',(locus.chrom, upstream,locus.start, gene_limit)
         )]
 
-    @profile
     def downstream_genes(self,locus,gene_limit=1000,window_size=None):
         '''
             Returns genes downstream of a locus. Genes are ordered 
@@ -316,6 +315,7 @@ class RefGen(Camoco):
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes
+                INDEXED BY gene_start_end
                 WHERE chromosome = ?
                 AND start > ?
                 AND start <= ?
@@ -741,13 +741,15 @@ class RefGen(Camoco):
     def _build_indices(self):
         self.log('Building Indices')
         cur = self.db.cursor()
-        cur.execute('DROP INDEX IF EXISTS gene_start_end;')
-        cur.execute('DROP INDEX IF EXISTS gene_start;')
-        cur.execute('DROP INDEX IF EXISTS gene_end;')
-        cur.execute('DROP INDEX IF EXISTS geneid')
-        cur.execute('DROP INDEX IF EXISTS geneattr')
+        #cur.execute('DROP INDEX IF EXISTS gene_start_end;')
+        #cur.execute('DROP INDEX IF EXISTS gene_end_start;')
+        #cur.execute('DROP INDEX IF EXISTS gene_start;')
+        #cur.execute('DROP INDEX IF EXISTS gene_end;')
+        #cur.execute('DROP INDEX IF EXISTS geneid')
+        #cur.execute('DROP INDEX IF EXISTS geneattr')
         cur.execute('''
-            CREATE INDEX IF NOT EXISTS gene_start_end ON genes (chromosome,start DESC,end ASC);
+            CREATE INDEX IF NOT EXISTS gene_start_end ON genes (chromosome,start DESC, end ASC, id);
+            CREATE INDEX IF NOT EXISTS gene_end_start ON genes (chromosome,end DESC,start DESC,id);
             CREATE INDEX IF NOT EXISTS gene_start ON genes (chromosome,start);
             CREATE INDEX IF NOT EXISTS gene_end ON genes (chromosome,end);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
