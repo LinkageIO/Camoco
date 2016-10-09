@@ -83,17 +83,23 @@ class OverlapAnalysis(object):
             boostraps (0.05 * 1000 = 50).
         '''
         target_score = overlap.score.mean()
-        cur_num = 50
+        max_bs = 1000
         num_bs = 0
         bs = []
         if self.args.num_bootstraps == 'auto':
+            # Create a bullshit generator... err bootstraps
+            bs_generator = (self.overlap(loci,bootstrap=True,iter_name=x) \
+                for x in range(max_bs)
+            )
             while num_bs <= 50 and len(bs) < 1000: 
-                # Add some bootstraps
-                bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
-                    for x in range(cur_num)
-                ] + bs
+                # Add 50 bootstraps to current bootstraps
+                bs = [next(bs_generator) for x in range(50)] + bs
+                # Find the number of bs more extreme than the empirical score
                 num_bs = sum([df.score.mean() >= target_score for df in bs])
-                self.cob.log("Iteration: {} -- current pval: {} {}% complete",len(bs),num_bs/len(bs),num_bs/50)
+                self.cob.log(
+                    "Iteration: {} -- current pval: {} {}% complete",
+                    len(bs),num_bs/len(bs),num_bs/50
+                )
         else:
             # Be a lil broke back noodle and explicitly bootstrap
             bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
@@ -222,7 +228,7 @@ class OverlapAnalysis(object):
         fig.set_size_inches(8,11)
         for i,cob in enumerate(cobs):
             data = pd.pivot_table(
-                self.results.ix[self.results.COB==cob,self.results.method=='density'],
+                self.results.ix[(self.results.COB==cob) & (self.results.Method=='density')],
                 index=['WindowSize','FlankLimit'],
                 columns=['Term'],
                 values='TermPValue',
