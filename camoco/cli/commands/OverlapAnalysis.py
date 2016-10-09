@@ -48,7 +48,7 @@ class OverlapAnalysis(object):
                 self.ont.name,
                 self.args.candidate_window_size,
                 self.args.candidate_flank_limit,
-                ':'.join(args.terms)
+                ':'.join(self.args.terms)
             )
         self.args.out = os.path.splitext(self.args.out)[0] + '.{}.overlap.tsv'.format(self.args.method)
         if os.path.dirname(self.args.out) != '':
@@ -74,6 +74,33 @@ class OverlapAnalysis(object):
                 lowest=self.args.strongest_higher
             )
 
+    def generate_bootstraps(self,loci,overlap):
+        '''
+            bootstrapping procedure. Our target here is to provide enough bootstraps
+            to identify loci that are significant at n==1000 bootstraps. The auto 
+            procedure will continue untill we meet n==1000 OR we find 50 bootstraps
+            that are have higher score such that we will never be significant at 1000
+            boostraps (0.05 * 1000 = 50).
+        '''
+        target_score = overlap.score.mean()
+        cur_num = 50
+        num_bs = 0
+        bs = []
+        if self.args.num_bootstraps == 'auto':
+            while num_bs <= 50 and len(bs) < 1000: 
+                # Add some bootstraps
+                bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
+                    for x in range(cur_num)
+                ] + bs
+                num_bs = sum([df.score.mean() >= target_score for df in bs])
+                self.cob.log("Iteration: {} -- current pval: {} {}% complete",len(bs),num_bs/len(bs),num_bs/50)
+        else:
+            # Be a lil broke back noodle and explicitly bootstrap
+            bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
+                for x in range(int(self.args.num_bootstraps))
+            ]
+        return pd.concat(bs)
+
     @classmethod
     def from_csv(cls,dir='./',sep='\t'):
         self = cls()
@@ -94,6 +121,7 @@ class OverlapAnalysis(object):
         self.args = args
         self.cob = co.COB(args.cob)
         self.ont = co.GWAS(args.gwas)
+        self.generate_output_name()
 
         # Generate a terms iterable
         if 'all' in self.args.terms:
@@ -113,9 +141,7 @@ class OverlapAnalysis(object):
             )
             loci = self.snp2gene(term)
             overlap = self.overlap(loci)
-            bootstraps = pd.concat([self.overlap(loci,bootstrap=True,iter_name=x) \
-                    for x in range(self.args.num_bootstraps)
-            ])
+            bootstraps = self.generate_bootstraps(loci,overlap)
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
             # Calculate z scores for density
@@ -145,7 +171,7 @@ class OverlapAnalysis(object):
                 overlap.sort_values(by=['zscore'],ascending=False,inplace=True)
             overlap_pval = (
                 (sum(bootstraps.groupby('iter').apply(lambda x: x.score.mean()) >= overlap.score.mean()))\
-                 / self.args.num_bootstraps
+                 / len(bootstraps.iter.unique())
             )
             # This gets collated into all_results below
             overlap['COB'] = self.cob.name
@@ -156,7 +182,7 @@ class OverlapAnalysis(object):
             overlap['TermLoci'] = len(term.loci)
             overlap['TermCollapsedLoci'] = len(loci)
             overlap['TermPValue'] = overlap_pval
-            overlap['NumBootstraps'] = self.args.num_bootstraps
+            overlap['NumBootstraps'] = len(bootstraps.iter.unique())
             overlap['Method'] = self.args.method
             results.append(overlap.reset_index())
         self.results = pd.concat(results)
@@ -196,7 +222,7 @@ class OverlapAnalysis(object):
         fig.set_size_inches(8,11)
         for i,cob in enumerate(cobs):
             data = pd.pivot_table(
-                self.results.ix[self.results.COB==cob],
+                self.results.ix[self.results.COB==cob,self.results.method=='density'],
                 index=['WindowSize','FlankLimit'],
                 columns=['Term'],
                 values='TermPValue',

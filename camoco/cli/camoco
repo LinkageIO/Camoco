@@ -591,8 +591,7 @@ if __name__ == '__main__':
     )
     overlapCLI.add_argument(
         '--num-bootstraps', 
-        default=100,
-        type=int, 
+        default='auto',
         metavar=100,
         help=(
             'The number of bootstraps to perform in order '
@@ -650,15 +649,6 @@ if __name__ == '__main__':
             'Flag indicating the value in --strongest-attr is'
             'stronger if higher. Default behavior is to treat'
             'lower values as stronger (i.e. p-vals)'
-        )
-    )
-    overlapCLI.add_argument(
-        '--gene-specific',
-        action='store_true',
-        default=False,
-        help=(
-            'Flag indicating whether or not to perform'
-            'gene specific density.'
         )
     )
     overlapCLI.add_argument(
