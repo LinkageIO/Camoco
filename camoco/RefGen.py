@@ -435,14 +435,16 @@ class RefGen(Camoco):
             # Iterate through candidate genes and propagate the 
             # parental info
             for i,gene in enumerate(genes):
-                gene.update({'num_effective_loci':len(locus.sub_loci)})
+                #gene.update({'num_effective_loci':len(locus.sub_loci)})
                 # include parent locus id if thats specified
                 if include_parent_locus == True:
                     gene.update({'parent_locus':locus.id})
                 if include_rank_intervening == True:
                     gene.update({'intervening_rank':ranks[i]})
                 # update all the parent_attrs
-                if include_parent_attrs:
+                if include_parent_attrs and len(include_parent_attrs) > 0:
+                    if 'all' in include_parent_attrs: 
+                        include_parent_attrs = locus.attr.keys()
                     for attr in include_parent_attrs:
                         attr_name = 'parent_{}'.format(attr)
                         gene.update({attr_name: locus[attr]})
@@ -460,8 +462,6 @@ class RefGen(Camoco):
                     elif gene < locus:
                         gene.update({'num_intervening':num_up})
                         num_up += 1
-
-        
             if include_num_siblings == True:
                 for gene in genes:
                     gene.update({'num_siblings':len(genes)})
