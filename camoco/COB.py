@@ -6,7 +6,7 @@ from .Camoco import Camoco
 from .RefGen import RefGen
 from .Locus import Locus,Gene
 from .Expr import Expr
-from .Tools import memoize
+from .Tools import memoize,available_datasets
 from .Term import Term
 from .Ontology import Ontology
 
@@ -54,8 +54,11 @@ class COB(Expr):
         except FeatherError as e:
             self.log("{} is empty ({})", name, e)
         try:
+            if not available_datasets('Ontology','{}MCL'.format(name)):
+                self._calculate_clusters()
             self.log('Loading Clusters')
             self.clusters = self._ft('clusters')
+            self.MCL = Ontology('{}MCL'.format(self.name))
         except FeatherError as e:
             self.log('Clusters not loaded for: {} ()', name, e)
 
