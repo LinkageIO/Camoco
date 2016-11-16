@@ -35,14 +35,14 @@ class SimulationAnalysis(object):
         self.df = pd.concat(
             [pd.read_table(x,sep=self.sep) \
                 for x in glob.glob(dir+'*GWASSim.csv')]
-        )
-        if 'MCR' not in self.df.columns:
-            self.df['MCR'] = 0
-        if 'FCR' not in self.df.columns:
-            self.df['FCR'] = 0
+        ).fillna(0)
+        for col in ['MCR','FCR','WindowSize','FlankLimit','COB','GO']:
+            if col not in self.df.columns:
+                self.df[col] = 0
         self.df = pd.pivot_table(
             self.df,
             index=['COB','GO','WindowSize','FlankLimit','MCR','FCR'],
+            dropna=True,
             aggfunc=np.mean
         )
         self.df = self.df.reset_index()
@@ -51,7 +51,7 @@ class SimulationAnalysis(object):
         self.df['window_id'] = ['{}/{}'.format(x,y) for x,y in zip(self.df.FlankLimit,self.df.WindowSize)]
     
     def terms_with_signal(self, max_pval=0.05, min_pval=0,
-			  pval_col='Density_pval'):
+			  pval_col='Density_pval',min_term_size=0,max_term_size=10e10):
         '''
             Return only terms with a starting pvalue between the 
             specified argument.
@@ -61,7 +61,13 @@ class SimulationAnalysis(object):
         fdr = self.df.set_index(['COB','GO','FCR'],drop=False).sort_index()
         # Split out groups
         terms_with_signal = fdr.query(
-            'FCR==0 and MCR==0 and FlankLimit==0 and {}<{} and {}>={}'.format(pval_col,max_pval,pval_col,min_pval)
+               'FCR==0 and MCR==0 and FlankLimit==0 '
+               'and {}<{} and {}>={}'
+               'and NumCandidates>={} and NumCandidates<={}'.format(
+                pval_col,max_pval,
+                pval_col,min_pval,
+                min_term_size,max_term_size
+            )
         )
         # Only return terms that were significant at FCR of 0 
         return pd.concat(
@@ -76,21 +82,25 @@ class SimulationAnalysis(object):
     def plot_signal_vs_noise(self,filename=None, figsize=(16,8), alpha=0.05,
                              figaxes=None, label=None, noise_source='FCR',
                              pval_col='Density_pval', max_pval=0.05, 
-                             min_pval=0, normalize_num_sig=False):
+                             min_pval=0, normalize_num_sig=False,
+                             min_term_size=0,max_term_size=10e10):
         '''
             Plot the number of terms significant at varying FCR/MCR levels.
 
             THIS IS FOR WHEN YOU HAVE THE SAME TERMS AND YOU VARY THEIR
             FCR/MCR OR NOISE LEVEL!!!
         '''
-        df = self.terms_with_signal(max_pval=max_pval,min_pval=min_pval)
+        df = self.terms_with_signal(
+            max_pval=max_pval, min_pval=min_pval, 
+            min_term_size=min_term_size, max_term_size=max_term_size
+        )
         # Aggregate by COB and by noise source and calculate the 
         # number of GO terms that have a sig pval below alpha
         breakdown = df.reset_index(drop=True)\
             .groupby(['COB',noise_source])\
             .apply(lambda x: sum(x[pval_col] <= alpha))\
             .reset_index()\
-            .rename(columns={0:'num_sig'})
+            .rename(columns={0:'num_sig'}).copy()
         # Get the number of unique cobs in the dataset
         cobs = breakdown.COB.unique()
         if figaxes == None:
