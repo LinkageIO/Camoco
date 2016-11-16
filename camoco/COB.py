@@ -7,6 +7,8 @@ from .RefGen import RefGen
 from .Locus import Locus,Gene
 from .Expr import Expr
 from .Tools import memoize
+from .Term import Term
+from .Ontology import Ontology
 
 from math import isinf
 from numpy import matrix, arcsinh, tanh
@@ -1263,6 +1265,20 @@ class COB(Expr):
                 columns=['Gene', 'cluster']
             ).set_index('Gene')
             self._ft('clusters', df=self.clusters)
+        self.log('Creating Cluster Ontology')
+        terms = []
+        for i,x in enumerate(self.clusters.groupby('cluster')):
+            genes = self.refgen[x[1].index.values]
+            terms.append(Term(
+                'MCL{}'.format(i),
+                desc='{} MCL Cluster {}'.format(self.name,i),
+                loci = genes
+            ))
+        self.MCL = Ontology.from_terms(
+            terms,
+            '{}MCL'.format(self.name),
+            '{} MCL Clusters'.format(self.name),
+            self.refgen)
         self.log('Finished finding clusters')
         return self
     
