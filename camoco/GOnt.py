@@ -14,6 +14,7 @@ from functools import lru_cache
 import pandas as pd
 import apsw as lite
 import numpy as np
+import networkx as nx
 import re
 
 class GOTerm(Term):
@@ -197,7 +198,7 @@ class GOnt(Ontology):
     def parents(self, term):
         '''
             Return an iterable containing the parents of a term.
-            Parents are determined via the is_a propertu of the term.
+            Parents are determined via the is_a property of the term.
 
             Parameters
             ----------
@@ -214,6 +215,28 @@ class GOnt(Ontology):
             yield self[parent_term]
             for grand_parent in self.parents(self[parent_term]):
                 yield grand_parent
+
+    def graph(self, terms=None):
+        '''
+            Create a NetworkX graph from terms
+        '''
+        # Create the graph object
+        if terms == None:
+            terms = self.iter_terms()
+        else:
+            # terms include 
+            terms = list(chain(*[self.parents(term) for term in terms]))
+
+        # 
+        G = nx.Graph()
+        G.add_nodes_from(set(terms))
+        # build a list of all the edges
+        edges = []
+        for term in terms:
+            for parent in term.is_a:
+                edges.append((term.id,parent))
+        G.add_edges_from(edges)
+        return G
 
 
     @classmethod
