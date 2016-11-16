@@ -9,6 +9,7 @@ from pandas import DataFrame
 from scipy.stats import hypergeom
 from itertools import chain
 from functools import lru_cache
+from collections import OrderedDict
 
 import sys
 import numpy
@@ -18,6 +19,15 @@ class Ontology(Camoco):
         An Ontology is just a collection of terms. Each term is just a
         collection of genes. Sometimes terms are related or nested
         within each other, sometimes not. Simple enough.
+        
+        Parameters
+        ----------
+        name : unique identifier
+
+        Returns
+        -------
+        An Ontology Object
+
     '''
     def __init__(self, name, type='Ontology'):
         super().__init__(name, type=type)
@@ -25,10 +35,37 @@ class Ontology(Camoco):
             self.refgen = RefGen(self.refgen)
 
     def __len__(self):
+        '''
+            Return the number of non-empty terms
+        '''
+        return self.num_terms(min_term_size=1)
+
+    def num_terms(self,min_term_size=0,max_term_size=10e10):
+        '''
+            Returns the number of terms in the Ontology
+            within the min_term_size and max_term_size
+
+            Parameters
+            ----------
+            min_term_size (default:0)
+                The minimum number of loci associated with the term 
+            max_term_size (default: 10e10)
+                The maximum number of loci associated with the term
+
+            Returns
+            -------
+            the number of terms that fit the criteria
+
+        '''
         return self.db.cursor().execute(
-                "SELECT COUNT(*) FROM terms;"
+            '''SELECT COUNT(*) FROM (
+                SELECT DISTINCT(term) FROM term_loci 
+                GROUP BY term 
+                HAVING COUNT(term) >= ? 
+                    AND  COUNT(term) <= ?
+            );''',
+            (min_term_size, max_term_size)
         ).fetchone()[0]
-    
 
     @lru_cache(maxsize=131072)
     def __getitem__(self, id):
@@ -42,7 +79,7 @@ class Ontology(Camoco):
                 ''' SELECT id FROM term_loci WHERE term = ?''', (id, )
             ).fetchall()]
             term_attrs = {k:v for k,v in self.db.cursor().execute(
-                ''' SELECT key,val FROM term_artts WHERE term = ?''',(id,)         
+                ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
                 )
             }
             return Term(id, desc=desc, loci=term_loci,**term_attrs)
@@ -282,7 +319,8 @@ class Ontology(Camoco):
         cursor.execute('DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;')
 
     def enrichment(self, locus_list, pval_cutoff=0.05, max_term_size=300,
-                   min_term_size=5):
+                   min_term_size=2, num_universe=None, return_table=False,
+                   include_genes=False):
         '''
             Evaluates enrichment of loci within the locus list in terms within
             the ontology. NOTE: this only tests terms that have at least one
@@ -301,6 +339,17 @@ class Ontology(Camoco):
                 for filtering out large terms that would otherwise be 
                 uninformative (e.g. top level GO terms)
             min_term_size : int (default: 5)
+                The minimum term size for which to test enrichment. Useful
+                for filtering out very small terms that would be uninformative
+                (e.g. single gene terms)
+            num_universe : int (default: None)
+                Use a custom universe size for the hypergeometric calculation, 
+                for instance if you have a reduced number of genes in a reference
+                co-expression network. If None, the value will be calculated as
+                the total number of distinct genes that are observed in the 
+                ontology.
+            include_genes : boo (default: False)
+                Include comma delimited genes as a field
         '''
         terms = list(
             filter(
@@ -315,9 +364,11 @@ class Ontology(Camoco):
                 ]
             )
         )
-        num_universe = len(set(chain(*[x.loci for x in terms])))
+        if num_universe is None:
+            #num_universe = len(set(chain(*[x.loci for x in terms])))
+            num_universe = self.num_distinct_loci() 
         self.log(
-            'test loci occur in {} terms, containing {} genes'.format(
+            'Loci occur in {} terms, containing {} genes'.format(
                 len(terms), num_universe
             )
         )
@@ -329,18 +380,38 @@ class Ontology(Camoco):
             num_common = len(term_genes.intersection(locus_list))
             num_in_term = len(term_genes)
             num_sampled = len(locus_list)
+            # the reason this is num_common - 1 is because we are looking for 1 - cdf
+            # and we need to greater than OR equal to
             pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
             if pval <= pval_cutoff:
                 term.attrs['pval'] = pval
-                term.attrs['hyper'] = {
-                    'pval'       : pval,
-                    'num_common' : num_common,
-                    'num_universe' : num_universe,
-                    'num_in_term' : num_in_term,
-                    'sum_sampled' : num_sampled
-                }
+                term.attrs['hyper'] = OrderedDict([
+                    ('pval'        , pval),
+                    ('term_tested' , len(terms)),
+                    ('num_common'  , num_common),
+                    ('num_universe', num_universe),
+                    ('term_size'   , num_in_term),
+                    ('num_terms'   , len(self)),
+                    ('sum_sampled' , num_sampled)
+                ])
+                if include_genes == True:
+                    term.attrs['hyper']['genes'] = ",".join(
+                        [x.id for x in term_genes.intersection(locus_list)]
+                    )
                 significant_terms.append(term)
-        return significant_terms
+
+        if return_table == True:
+            tbl = []
+            for x in significant_terms:
+                val = OrderedDict([
+                    ('term', x.name),
+                    ('id'  , x.id)
+                ])
+                val.update(x.attrs['hyper'])
+                tbl.append(val)
+            return DataFrame.from_records(tbl).sort_values(by='pval')
+        else:
+            return sorted(significant_terms,key=lambda x: x.attrs['pval'])
 
 
 
