@@ -17,7 +17,7 @@ def snp2gene(args):
         # Create any non-existant directories
         if os.path.dirname(args.out) != '':
             os.makedirs(os.path.dirname(args.out),exist_ok=True)
-        if os.path.exists(args.out) and args.overlook == True:
+        if os.path.exists(args.out) and not args.force:
             print(
                 "Output for {} exists! Skipping!".format(
                     args.out
@@ -72,12 +72,16 @@ def snp2gene(args):
         cob.log('Adding info for {}',info_file)
         # Assume the file is a table
         info = pd.read_table(info_file,sep='\t')
+        if len(info.columns) == 1:
+            info = pd.read_table(info_file,sep=',')
         # try to match as many columns as possible
+        matching_columns = set(data.columns).intersection(info.columns)
+        cob.log("Joining SNP2Gene mappings with info file on: {}",','.join(matching_columns))
         data = pd.merge(data,info,how='left')
         if len(data) != original_number_genes:
             cob.log.warn(
-                'Info file did not contain unique gene mappings, '
-                'beware of duplicate candidate gene entries!'
+                'There were multiple info rows for some genes. '
+                'Beware of potential duplicate candidate gene entries! '
             )
     
     # Generate the output file
