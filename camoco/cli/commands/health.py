@@ -270,8 +270,9 @@ def cob_health(args):
             fold = sum(np.array(go_enrichment['locality_pval'])>1.3)/(0.05 * len(go_enrichment))
             axes[0,1].axhline(y=-1*np.log10(0.05),color='red')
             axes[0,1].text(
-                0, -0.2,
+                min(axes[0,1].get_xlim()),-1*np.log10(0.05),
                 '{:.3g} Fold Enrichement'.format(fold),
+                color='red'
             )
             axes[1,1].scatter(
                 go_enrichment['size'],
