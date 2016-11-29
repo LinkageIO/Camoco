@@ -54,7 +54,8 @@ class COB(Expr):
         except FeatherError as e:
             self.log("{} is empty ({})", name, e)
         try:
-            if not available_datasets('Ontology','{}MCL'.format(name)):
+            if not available_datasets('Ontology','{}MCL'.format(name))\
+                and self.coex != None:
                 self._calculate_clusters()
             self.log('Loading Clusters')
             self.clusters = self._ft('clusters')
