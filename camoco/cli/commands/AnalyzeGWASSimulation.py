@@ -32,7 +32,8 @@ class Analysis(object):
     def build_data(self,dir='./'):
         self.df = pd.concat(
             [pd.read_table(x,sep='\t',index_col=0) \
-                for x in glob.glob(dir+'*GWASSim.csv')]
+                for x in glob.glob(dir+'*GWASSim.csv')
+            ]
         )
         if len(self.df) == 0:
             raise ValueError('No simulation output files were found.')
@@ -40,7 +41,8 @@ class Analysis(object):
             self.df.reset_index(),
             index=['COB','GO','WindowSize','FlankLimit','FCR'],
             aggfunc=np.mean
-        ).reset_index()
+        )
+        self.df.reset_index()
         # Add an id column
         self.df['id'] = self.df.COB+'/'+self.df.GO
         self.df['window_id'] = ['{}/{}'.format(x,y) for x,y in zip(self.df.FlankLimit,self.df.WindowSize)]
