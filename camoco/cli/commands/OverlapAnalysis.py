@@ -5,13 +5,14 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import matplotlib.pylab as plt
 matplotlib.style.use('ggplot')
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 
 import argparse
 import sys
 import os
 import copy
+import re
 
 import numpy as np
 import scipy as sp
@@ -24,17 +25,6 @@ import pandas as pd
 pd.set_option('display.width',300)
 import glob as glob
 
-
-tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),    
-             (44, 160, 44), (152, 223, 138), (214, 39, 40), (255, 152, 150),    
-             (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),    
-             (227, 119, 194), (247, 182, 210), (127, 127, 127), (199, 199, 199),    
-             (188, 189, 34), (219, 219, 141), (23, 190, 207), (158, 218, 229)]    
-# Scale the RGB values to the [0, 1] range, which is the format matplotlib accepts.    
-for i in range(len(tableau20)):    
-    r, g, b = tableau20[i]    
-    tableau20[i] = (r / 255., g / 255., b / 255.)
- 
 
 class OverlapAnalysis(object):
     def __init__(self):
@@ -218,58 +208,128 @@ class OverlapAnalysis(object):
                 iter_name=iter_name,
                 include_regression=True,
             ).rename(columns={'resid':'score'})
+
+
+    def num_below_fdr(self,fdr_cutoff=0.3):
+        return pd.pivot_table(
+            x.results,
+            index=['Method','COB','WindowSize','FlankLimit'],
+            columns='Term',
+            values='fdr',
+            aggfunc=lambda x: sum(x<=fdr_cutoff)
+        )
             
     def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05):
         '''
             Generate a heatmap based on TermPVal
         '''
+        methods = self.results.Method.unique()
         cobs = self.results.COB.unique()
-        fig,axes = plt.subplots(len(cobs),1,sharex=True)
-        fig.set_size_inches(8,11)
+        fig,axes = plt.subplots(len(cobs),len(methods))
+        fig.set_size_inches((8,10))
+        def get_axis(i,j,axes):
+            if len(axes.shape) == 1:
+                return axes[i]
+            else:
+                return axes[i,j]
         for i,cob in enumerate(cobs):
-            data = pd.pivot_table(
-                self.results.ix[(self.results.COB==cob) & (self.results.Method=='density')],
-                index=['WindowSize','FlankLimit'],
-                columns=['Term'],
-                values='TermPValue',
-                aggfunc=np.mean
-            )
-            #data[data > pval_cutoff] = np.nan
-            #data[data < pval_cutoff] = 0
-            axes[i].set_frame_on(False)
-            cmap = plt.cm.Greens_r
-            cmap.set_bad('white',1.0)
-            im = axes[i].pcolormesh(
-                np.ma.masked_invalid(data),
-                cmap=cmap,
-                #linewidth=0.1,
-                edgecolor='lightgrey',
-                vmin=0,
-                vmax=0.05
-            )
-            # Make the layout more natural
-            axes[i].set_ylabel(cob,fontsize=20)
-            axes[i].yaxis.set_label_position("right")
-            axes[i].invert_yaxis()
-            axes[i].set(
-                yticks=np.arange(len(data.index))+0.5
-            )
-            axes[i].yaxis.set_ticks_position('left')
-            axes[i].xaxis.set_ticks_position('none')
-            if i == 0:
-                axes[i].xaxis.tick_top()
-                axes[i].set_xticks(np.arange(len(data.columns))+0.5)
-                axes[i].set_xticklabels(data.columns.values, rotation=90)
-            axes[i].set_yticklabels(data.index.values)
+            for j,method in enumerate(methods):
+                axis = get_axis(i,j,axes)
+                data = pd.pivot_table(
+                    self.results.ix[(self.results.COB==cob) & (self.results.Method==method)],
+                    index=['WindowSize','FlankLimit'],
+                    columns=['Term'],
+                    values='TermPValue',
+                    aggfunc=np.mean
+                )
+                #data[data > pval_cutoff] = np.nan
+                #data[data < pval_cutoff] = 0
+                axis.set_frame_on(False)
+                cmap = plt.cm.Greens_r
+                cmap.set_bad('white',1.0)
+                im = axis.pcolormesh(
+                    np.ma.masked_invalid(data),
+                    cmap=cmap,
+                    #linewidth=0.1,
+                    edgecolor='lightgrey',
+                    vmin=0,
+                    vmax=0.05
+                )
+                # Make the layout more natural
+                if j == len(methods) - 1 :
+                    axis.set_ylabel(cob,fontsize=10)
+                    axis.yaxis.set_label_position("right")
+                if j == 0:
+                    axis.set_yticklabels(
+                        axis.get_yticklabels(),size=7
+                    )
+                    axis.set(
+                        yticks=np.arange(len(data.index))+0.5
+                    )
+                else:
+                    axis.set_yticks([])
+                    axis.set_yticklabels([])
+                axis.yaxis.set_ticks_position('left')
+                axis.invert_yaxis()
+                if i == 0:
+                    axis.set_title(method,y=1.15,size=15)
+                    axis.xaxis.tick_top()
+                    axis.set_xticks(np.arange(len(data.columns))+0.5)
+                    axis.set_xticklabels(
+                        [re.sub('\d','',x) for x in data.columns.values], 
+                        rotation=45,
+                        size=7
+                    )
+                else:
+                    axis.set_xticks([])
+                    axis.set_xticklabels([])
+                axis.set_yticklabels(data.index.values)
         # Create a new axis to append the color bar to
-        divider = make_axes_locatable(axes[len(cobs)-1])
-        cax = divider.append_axes("bottom", size="5%", pad=0.05)
-        cbar = fig.colorbar(
-            im, cax=cax, orientation='horizontal', ticks=[0,0.025,0.05]
-        )
-        cbar.set_ticklabels(['0','0.025','≥0.05'])
-        plt.tight_layout(pad=0.4,w_pad=0.5, h_pad=1.0)
+        #fig.subplots_adjust(right=0.8)
+        #cax = fig.add_axes([.95,0.5,0.01,0.4])
+        #divider = make_axes_locatable(get_axes(0,0,))
+        #cax = divider.append_axes("bottom", size="5%", pad=0.05)
+        #cbar = fig.colorbar(
+        #    im, cax=cax, orientation='vertical', ticks=[0,0.025,0.05]
+        #)
+        #cbar.set_ticklabels(['0','0.025','≥0.05'])
+        #plt.tight_layout(pad=0.4,w_pad=0.5, h_pad=1.0)
         if filename is not None:
             plt.savefig(filename,dpi=300)
             plt.close()
         return (fig,axes)
+
+    def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
+        df = self.results[np.isfinite(self.results.fdr)]
+        df = df[df.fdr <= fdr_cutoff]
+        # Filter out genes that do not occur at 2+ SNP to gene mappings, 
+        # they will never be included
+        df = df.groupby(
+            ['COB','Term','Method','gene']
+        ).filter(lambda df: len(df)>=min_snp2gene_obs).copy()
+        # Find genes that are significant in both density and locality 
+        # in the same element and the same network
+        both_same_net = df.groupby(
+            ['COB','Term','gene']
+        ).filter(lambda df: len(df.Method.unique()) == 2).copy()
+        both_same_net.loc[:,'Method'] = 'both_same_net'
+        # Find genes that are significant in both density and locality 
+        # in the same element but any network
+        both_any_net = df.groupby(
+            ['Term','gene']
+        ).filter(lambda df: len(df.Method.unique()) == 2).copy()
+        both_any_net.loc[:,'Method'] = 'both_any_net'
+        both_any_net['COB'] = 'Any'
+        # Concatenate
+        df = pd.concat([df,both_same_net,both_any_net])
+        # Pivot
+        return pd.pivot_table(
+            df,
+            columns=['Method','COB'],
+            index=['Term'],
+            values='gene',
+            aggfunc=lambda x: len(set(x))
+        ).fillna(0).astype(int)
+
+
+
