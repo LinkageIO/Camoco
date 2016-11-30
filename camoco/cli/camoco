@@ -780,6 +780,12 @@ if __name__ == '__main__':
         )
     )
     simulateGWASCLI.add_argument(
+        '--method',
+        default='density',
+        choices=['density','locality'],
+        help='The metric used to evaluate overlap between the loci and the network'
+    )
+    simulateGWASCLI.add_argument(
         '--max-term-size',
         type=int,
         default=100,
@@ -812,8 +818,7 @@ if __name__ == '__main__':
     )
     simulateGWASCLI.add_argument(
         '--num-bootstraps', 
-        type=int, 
-        default=100,
+        default='auto',
         metavar=100,
         help=(
             'The number of bootstraps to perform in order '
@@ -823,34 +828,35 @@ if __name__ == '__main__':
     simulateGWASCLI.add_argument(                                                  
         '--percent-fcr',                                                        
         type=int,                                                             
-        default=None,                                                           
+        default=0,                                                           
         metavar=0,                                                            
         help=(                                                                  
-            'False Cadidate Rate: '
+            '(FCR) False Cadidate Rate: '
             'The percentage of the term loci to be replaced with '              
             'random loci, simulating noise or false positives '                 
             'within the term. (Default: 0)'                                                   
         )                                                                       
     )  
     simulateGWASCLI.add_argument(
-        '--percent-SNPs-missed',
+        '--percent-mcr',
         metavar=0,
         type=int,
-        default=None,
+        default=0,
         help=(
+            '(MCR) Missing Candidate Rate: '
             'Percentage of input SNPs that were missed by '
             'simulated GWAS. e.g. if GWAS term SNPs ideally '
-            'tag 10 GO genes and --percent-missed=0.50 half '
+            'tag 10 GO genes and --percent-mcr=50 half '
             'of the genes in the GO term will be removed resulting '
             'in an input network of 5 genes. (Default=0)'
         )
     )
     simulateGWASCLI.add_argument(
         '--out', 
-        default=sys.stdout,
-        help='OutputFile Name (default: Standard Out)'
+        default=None,
+        help='OutputFile Name'
     )
-    simulateGWASCLI.set_defaults(func=simulateGWAS)
+    simulateGWASCLI.set_defaults(func=simulateGWAS.from_CLI)
 
     '''----------------------------------
         CisTrans
