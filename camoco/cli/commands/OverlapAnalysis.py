@@ -299,7 +299,11 @@ class OverlapAnalysis(object):
             plt.close()
         return (fig,axes)
 
-    def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
+    def high_priority_candidates(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
+        '''
+            Return the number of candidate genes, seen at multiple SNP2Gene
+            mappings and in multiple networks (both)
+        '''
         df = self.results[np.isfinite(self.results.fdr)]
         df = df[df.fdr <= fdr_cutoff]
         # Filter out genes that do not occur at 2+ SNP to gene mappings, 
@@ -321,10 +325,27 @@ class OverlapAnalysis(object):
         both_any_net.loc[:,'Method'] = 'both_any_net'
         both_any_net['COB'] = 'Any'
         # Concatenate
-        df = pd.concat([df,both_same_net,both_any_net])
-        # Pivot
+        return pd.concat([df,both_same_net,both_any_net])
+
+    def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3):
+        '''
+            Return the number of shared genes by Term
+        '''
+        df = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
+
+        x={df[0]:set(df[1].gene) for df in df.groupby('Term')}                     
+        adj = []                                                                        
+        for a in x.keys():                                                              
+            for b in x.keys():                                                          
+                adj.append((a,b,len(set(x[a]).intersection(x[b]))))                     
+        adj = pd.DataFrame(adj)                                                         
+        return pd.pivot_table(adj,index=0,columns=1,values=2)    
+
+    def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
+        candidates = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
+        # Pivot and aggregate
         return pd.pivot_table(
-            df,
+            candidates,
             columns=['Method','COB'],
             index=['Term'],
             values='gene',
