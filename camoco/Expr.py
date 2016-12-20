@@ -105,6 +105,8 @@ class Expr(Camoco):
             max_val = 1100
         elif self.rawtype.upper() == 'MICROARRAY':
             max_val = 100
+        else:
+            max_val = 0
         return self._expr.apply(
             lambda col: np.nanmax(col.values) < max_val, axis=0
         )
