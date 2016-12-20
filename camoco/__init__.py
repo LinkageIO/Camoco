@@ -17,7 +17,9 @@ import sys
 import os
 
 import pyximport
-#pyximport.install()
+pyximport.install(setup_args={
+    "include_dirs":numpy.get_include() 
+})
 
 from .Config import cf
 from .Camoco import Camoco
