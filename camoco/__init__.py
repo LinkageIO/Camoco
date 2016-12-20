@@ -15,6 +15,7 @@ __version__ = '0.3.0'
 
 import sys
 import os
+import numpy
 
 import pyximport
 pyximport.install(setup_args={
