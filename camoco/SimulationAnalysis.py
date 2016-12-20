@@ -13,17 +13,6 @@ pd.set_option('display.width',300)
 
 from ggplot import *
 
-tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),    
-             (44, 160, 44), (152, 223, 138), (214, 39, 40), (255, 152, 150),    
-             (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),    
-             (227, 119, 194), (247, 182, 210), (127, 127, 127), (199, 199, 199),    
-             (188, 189, 34), (219, 219, 141), (23, 190, 207), (158, 218, 229)]    
-  
-# Scale the RGB values to the [0, 1] range, which is the format matplotlib accepts.    
-for i in range(len(tableau20)):    
-    r, g, b = tableau20[i]    
-    tableau20[i] = (r / 255., g / 255., b / 255.)
-
 class SimulationAnalysis(object):
 
     def __init__(self,dir='./',sep='\t'):
@@ -34,51 +23,80 @@ class SimulationAnalysis(object):
     def build_data(self,dir='./'):
         self.df = pd.concat(
             [pd.read_table(x,sep=self.sep) \
-                for x in glob.glob(dir+'*GWASSim.csv')]
+                for x in glob.glob(dir+'*GWASsimulation.tsv')
+            ]
         ).fillna(0)
-        for col in ['MCR','FCR','WindowSize','FlankLimit','COB','GO']:
+        for col in ['MCR','FCR','WindowSize','FlankLimit','COB','Term']:
             if col not in self.df.columns:
                 self.df[col] = 0
         self.df = pd.pivot_table(
             self.df,
-            index=['COB','GO','WindowSize','FlankLimit','MCR','FCR'],
+            index=['COB','Term','WindowSize','FlankLimit','MCR','FCR'],
             dropna=True,
             aggfunc=np.mean
         )
         self.df = self.df.reset_index()
         # Add an id column
-        self.df['id'] = self.df.COB+'/'+self.df.GO
+        self.df['id'] = self.df.COB+'/'+self.df.Term
         self.df['window_id'] = ['{}/{}'.format(x,y) for x,y in zip(self.df.FlankLimit,self.df.WindowSize)]
-    
+
     def terms_with_signal(self, max_pval=0.05, min_pval=0,
-			  pval_col='Density_pval',min_term_size=0,max_term_size=10e10):
+                          max_WindowSize=1, max_FlankLimit=0,
+                          min_term_size=0, max_term_size=10e10,
+                          ):
         '''
-            Return only terms with a starting pvalue between the 
-            specified argument.
+            Return only terms with a starting pvalue (no noise) 
+            between the specified arguments.
+
+            Parameters
+            ----------
+            min_pval : float (default: 0.0)
+                The minimum pval that a term can have and still be considered
+                to have 'signal'. This is useful to stratify terms into groups,
+                for instance moderate signal: min_pval=0.01 (pval_max: 0.05)
+            max_pval : float (default: 0.05)
+                The maximum pval that a term can have and still be considered
+                to have 'signal'
+            min_term_size : int (default: 0)
+                The minimum starting term size to consider
+            max_term_size : int (default: 0)
+                The maximum term size to consider
+            max_WindowSize : int (default: 1)
+                Stratify results terms by window_size as specified in the term
+                candidate genes function (snp2genes mapping). Default will 
+                constrain genes to only those which are truly in the simulated
+                term.
+            max_FlankLimit : int (default: 0)
+                Stratify terms by flanklimit as specified in the term candidate
+                genes function (snp2gene mapping). Default will constrain genes
+                to only include those which are truly in the simulated term.
         '''
         # Split the data in a few informative ways
         # We only want the True FCR
-        fdr = self.df.set_index(['COB','GO','FCR'],drop=False).sort_index()
+        fdr = self.df[ \
+                  (self.df.WindowSize <= max_WindowSize) \
+                & (self.df.FlankLimit <= max_FlankLimit)
+        ]
+        fdr = fdr.set_index(['COB','Term','FCR'],drop=False).sort_index()
         # Split out groups
         terms_with_signal = fdr.query(
-               'FCR==0 and MCR==0 and FlankLimit==0 '
-               'and {}<{} and {}>={}'
-               'and NumCandidates>={} and NumCandidates<={}'.format(
-                pval_col,max_pval,
-                pval_col,min_pval,
-                min_term_size,max_term_size
-            )
+            'FCR==0 and FlankLimit==0 '
+            'and TermPValue<{max_pval} '
+            'and TermPValue>={min_pval} '
+            'and NumCandidates>={min_term_size} '
+            'and NumCandidates<={max_term_size}'.format(**locals())
         )
         # Only return terms that were significant at FCR of 0 
         return pd.concat(
             [fdr.loc[x,y,:] \
                 for x,y in zip(
                     terms_with_signal.COB,
-                    terms_with_signal.GO
+                    terms_with_signal.Term
                 )
             ]
         )
-
+ 
+    
     def plot_signal_vs_noise(self,filename=None, figsize=(16,8), alpha=0.05,
                              figaxes=None, label=None, noise_source='FCR',
                              pval_col='Density_pval', max_pval=0.05, 
@@ -98,7 +116,7 @@ class SimulationAnalysis(object):
         # number of GO terms that have a sig pval below alpha
         breakdown = df.reset_index(drop=True)\
             .groupby(['COB',noise_source])\
-            .apply(lambda x: sum(x[pval_col] <= alpha))\
+            .apply(lambda x: sum(x.TermPValue <= alpha))\
             .reset_index()\
             .rename(columns={0:'num_sig'}).copy()
         # Get the number of unique cobs in the dataset
