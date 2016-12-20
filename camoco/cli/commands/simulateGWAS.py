@@ -232,6 +232,7 @@ class simulateGWAS(object):
                 self.args.candidate_flank_limit
             )
             overlap = self.overlap(eloci)
+            # Dont bother bootstrapping on terms with overlap score below 0
             if overlap.score.mean() < 0:
                 continue
             bootstraps = self.generate_bootstraps(eloci,overlap)
@@ -244,6 +245,7 @@ class simulateGWAS(object):
                 (sum(bootstraps.groupby('iter').apply(lambda x: x.score.mean()) >= overlap.score.mean()))\
                 / len(bootstraps.iter.unique())
             )
+            # Create a results object
             overlap['COB'] = self.cob.name
             overlap['Ontology'] = self.go.name
             overlap['Term'] = term.id
@@ -255,7 +257,6 @@ class simulateGWAS(object):
             overlap['NumEffective'] = len(eloci)
             overlap['NumCandidates'] = len(candidates)
             overlap['TermSize'] = len(term)
-            overlap['TermLoci'] = len(term.loci)
             overlap['TermCollapsedLoci'] = len(eloci)
             overlap['TermPValue'] = overlap_pval
             overlap['NumBootstraps'] = len(bootstraps.iter.unique())
