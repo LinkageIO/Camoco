@@ -41,8 +41,7 @@ class SimulationAnalysis(object):
         self.df['window_id'] = ['{}/{}'.format(x,y) for x,y in zip(self.df.FlankLimit,self.df.WindowSize)]
 
     def terms_with_signal(self, max_pval=0.05, min_pval=0,
-                          max_WindowSize=1, max_FlankLimit=0,
-                          min_term_size=0, max_term_size=10e10,
+                          min_term_size=0, max_term_size=10e10
                           ):
         '''
             Return only terms with a starting pvalue (no noise) 
@@ -73,14 +72,14 @@ class SimulationAnalysis(object):
         '''
         # Split the data in a few informative ways
         # We only want the True FCR
-        fdr = self.df[ \
-                  (self.df.WindowSize <= max_WindowSize) \
-                & (self.df.FlankLimit <= max_FlankLimit)
-        ]
-        fdr = fdr.set_index(['COB','Term','FCR'],drop=False).sort_index()
+        #fdr = self.df[ \
+        #          (self.df.WindowSize <= max_WindowSize) \
+        #        & (self.df.FlankLimit <= max_FlankLimit)
+        #]
+        fdr = self.df.set_index(['COB','Term','MCR','FCR'],drop=False).sort_index()
         # Split out groups
         terms_with_signal = fdr.query(
-            'FCR==0 and FlankLimit==0 '
+            'MCR == 0 and FCR==0 and FlankLimit==0 and WindowSize<=1 '
             'and TermPValue<{max_pval} '
             'and TermPValue>={min_pval} '
             'and NumCandidates>={min_term_size} '
@@ -88,19 +87,13 @@ class SimulationAnalysis(object):
         )
         # Only return terms that were significant at FCR of 0 
         return pd.concat(
-            [fdr.loc[x,y,:] \
-                for x,y in zip(
-                    terms_with_signal.COB,
-                    terms_with_signal.Term
-                )
-            ]
+            [fdr.loc[x,y,:,:] for x,y in terms_with_signal[['COB','Term']].values]
         )
- 
     
     def plot_signal_vs_noise(self,filename=None, figsize=(16,8), alpha=0.05,
-                             figaxes=None, label=None, noise_source='FCR',
-                             pval_col='Density_pval', max_pval=0.05, 
-                             min_pval=0, normalize_num_sig=False,
+                             figaxes=None, label=None, noise_source='MCR',
+                             max_pval=0.05, min_pval=0, 
+                             normalize_num_sig=False,
                              min_term_size=0,max_term_size=10e10):
         '''
             Plot the number of terms significant at varying FCR/MCR levels.
@@ -119,6 +112,9 @@ class SimulationAnalysis(object):
             .apply(lambda x: sum(x.TermPValue <= alpha))\
             .reset_index()\
             .rename(columns={0:'num_sig'}).copy()
+        breakdown['norm'] = breakdown.groupby(['COB']).apply(
+            lambda x: x.num_sig/x.num_sig.max()
+        ).values
         # Get the number of unique cobs in the dataset
         cobs = breakdown.COB.unique()
         if figaxes == None:
@@ -131,9 +127,9 @@ class SimulationAnalysis(object):
             data = breakdown[breakdown.COB==cob]
             if normalize_num_sig:
                 # Divide by the starting number of significant terms
-                starting_signal = data.ix[data[noise_source]==data[noise_source].min()].iloc[0]['num_sig']
-                data.loc[:,'num_sig'] = data.loc[:,'num_sig'] / starting_signal
-            axes[i].plot(data[noise_source],data['num_sig'],label=label,marker='o')
+                axes[i].plot(data[noise_source],data['norm'],label=label,marker='o')
+            else:
+                axes[i].plot(data[noise_source],data['num_sig'],label=label,marker='o')
             axes[i].set_title("{} Terms".format(cob))
             if i == 0:
                 if normalize_num_sig:
@@ -145,6 +141,7 @@ class SimulationAnalysis(object):
         lgd = axes[i].legend(bbox_to_anchor=(2.0,0.5))
         if filename is not None:
             plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight')
+        print(breakdown)
         return (fig,axes)
 
     def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05):
@@ -211,9 +208,12 @@ class SimulationAnalysis(object):
             geom_line() + geom_point(alpha=0.1) + xlab('FCR') +\
             ylab('-log10(PVal)') + facet_wrap('COB') + ggtitle('Signal/Noise')
 
-    @staticmethod
-    def plot_windowed_terms(df,filename=None,figsize=(16,8),alpha=0.05,
-                            figaxes=None,label=None,bins=20):
+    def plot_windowed_terms(self,filename=None,figsize=(16,8),alpha=0.05,
+                            figaxes=None,label=None,bins=10):
+        '''
+
+        '''
+        df = self.terms_with_signal()
         # Generate the effective FCR rates
         real = df.set_index('id').query('FlankLimit==0 and FCR==0.00').NumCandidates
         df['EffectiveFCR'] = 1 - (real[df.id].values / df.NumCandidates)
@@ -230,19 +230,28 @@ class SimulationAnalysis(object):
                 raise ValueError('Cannot overlay plots with different number of COBs')
         for i,cob in enumerate(cobs):
             data = df[df.COB==cob]
-            starting_signal = sum(data.Pval[data.FCRBin >= 0] <= alpha)
+            #starting_signal = sum(data.TermPValue[data.FCRBin >= 0] <= alpha)
+            starting_signal = len(data.Term.unique())
             fcr = list()
             signal = list()
             num = list()
             for bin in data.FCRBin.unique():
                 fcr.append(bin/bins)
-                signal.append(sum(data.Pval[data.FCRBin >= bin] <= alpha)/starting_signal)
-                num.append(sum(data.Pval[data.FCRBin >= bin] <= alpha))
+                signal.append(
+                    len(data[(data.FCRBin >= bin) & (data.TermPValue <= alpha)].Term.unique())/starting_signal
+                )
+                num.append(
+                    len(data[(data.FCRBin >= bin) & (data.TermPValue <= alpha)].Term.unique())
+                )
+                #signal.append(sum(data.TermPValue[data.FCRBin >= bin] <= alpha)/starting_signal)
+                #num.append(sum(data.TermPValue[data.FCRBin >= bin] <= alpha))
             axes[0,i].plot(fcr,signal,label=label,marker='o',color='k')
+            axes[0,i].set_ylim((0,1))
             axes[0,i].set_title("{} Signal vs. FCR".format(cob))
             # Plot the other axis too
             ax2 = axes[0,i].twinx()
             ax2.plot(fcr,num,label=label,marker='o',color='k')
+            ax2.set_ylim((0,starting_signal))
             # do a scatter plot too
             boxes = []
             labels = []
@@ -255,6 +264,8 @@ class SimulationAnalysis(object):
             if i == 0:
                 axes[0,i].set_ylabel('Signal (Fraction Terms Significant)')
                 axes[1,i].set_ylabel('Windowing Parameters')
+            if i == len(cobs)-1:
+                ax2.set_ylabel('Number of Terms')
         #plt.legend()
         if filename is not None:
             plt.savefig(filename)
