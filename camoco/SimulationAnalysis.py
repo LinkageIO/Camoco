@@ -70,12 +70,6 @@ class SimulationAnalysis(object):
                 genes function (snp2gene mapping). Default will constrain genes
                 to only include those which are truly in the simulated term.
         '''
-        # Split the data in a few informative ways
-        # We only want the True FCR
-        #fdr = self.df[ \
-        #          (self.df.WindowSize <= max_WindowSize) \
-        #        & (self.df.FlankLimit <= max_FlankLimit)
-        #]
         fdr = self.df.set_index(['COB','Term','MCR','FCR'],drop=False).sort_index()
         # Split out groups
         terms_with_signal = fdr.query(
@@ -126,10 +120,16 @@ class SimulationAnalysis(object):
         for i,cob in enumerate(cobs):
             data = breakdown[breakdown.COB==cob]
             if normalize_num_sig:
-                # Divide by the starting number of significant terms
-                axes[i].plot(data[noise_source],data['norm'],label=label,marker='o')
+                signal = data['norm']
             else:
-                axes[i].plot(data[noise_source],data['num_sig'],label=label,marker='o')
+                signal = data['num_sig']
+            # Plot Signal vs Noise
+            axes[i].plot(
+                np.append(data[noise_source],100),
+                np.append(signal,0),
+                label=label,
+                marker='o'
+            )
             axes[i].set_title("{} Terms".format(cob))
             if i == 0:
                 if normalize_num_sig:
@@ -209,11 +209,17 @@ class SimulationAnalysis(object):
             ylab('-log10(PVal)') + facet_wrap('COB') + ggtitle('Signal/Noise')
 
     def plot_windowed_terms(self,filename=None,figsize=(16,8),alpha=0.05,
-                            figaxes=None,label=None,bins=10):
+                            figaxes=None,label=None,bins=10,
+                            max_pval=0.05, min_pval=0, 
+                            normalize_num_sig=False,
+                            min_term_size=0,max_term_size=10e10):
         '''
-
+            Plot the number of terms that retain 
         '''
-        df = self.terms_with_signal()
+        df = self.terms_with_signal(
+            max_pval=max_pval, min_pval=min_pval, 
+            min_term_size=min_term_size, max_term_size=max_term_size
+        )
         # Generate the effective FCR rates
         real = df.set_index('id').query('FlankLimit==0 and FCR==0.00').NumCandidates
         df['EffectiveFCR'] = 1 - (real[df.id].values / df.NumCandidates)
@@ -226,7 +232,7 @@ class SimulationAnalysis(object):
             fig, axes = plt.subplots(2,len(cobs),figsize=figsize,sharex=True)
         else:
             fig,axes = figaxes
-            if len(cobs) != len(axes):
+            if len(cobs) != axes.shape[1]:
                 raise ValueError('Cannot overlay plots with different number of COBs')
         for i,cob in enumerate(cobs):
             data = df[df.COB==cob]
@@ -237,38 +243,42 @@ class SimulationAnalysis(object):
             num = list()
             for bin in data.FCRBin.unique():
                 fcr.append(bin/bins)
-                signal.append(
-                    len(data[(data.FCRBin >= bin) & (data.TermPValue <= alpha)].Term.unique())/starting_signal
-                )
-                num.append(
-                    len(data[(data.FCRBin >= bin) & (data.TermPValue <= alpha)].Term.unique())
-                )
-                #signal.append(sum(data.TermPValue[data.FCRBin >= bin] <= alpha)/starting_signal)
-                #num.append(sum(data.TermPValue[data.FCRBin >= bin] <= alpha))
-            axes[0,i].plot(fcr,signal,label=label,marker='o',color='k')
-            axes[0,i].set_ylim((0,1))
+                # Find out how many terms still have PVals < 0.05
+                if normalize_num_sig:
+                    signal.append(
+                        len(data[(data.FCRBin >= bin) & (data.TermPValue <= alpha)]\
+                            .Term.unique())/starting_signal
+                    )
+                else:
+                    signal.append(
+                        len(data[(data.FCRBin >= bin) & (data.TermPValue <= alpha)]\
+                            .Term.unique())
+                    )
+            fcr.append(1)
+            signal.append(0)
+            axes[0,i].plot(fcr,signal,label=label,marker='o')
+            if normalize_num_sig:
+                axes[0,i].set_ylim((0,1))
             axes[0,i].set_title("{} Signal vs. FCR".format(cob))
-            # Plot the other axis too
-            ax2 = axes[0,i].twinx()
-            ax2.plot(fcr,num,label=label,marker='o',color='k')
-            ax2.set_ylim((0,starting_signal))
-            # do a scatter plot too
+            # do a box-plot too
             boxes = []
             labels = []
-            for wid,wd in data.query('WindowSize>1').sort_values(['WindowSize','FlankLimit']).groupby(['WindowSize','FlankLimit']):
+            for wid,wd in data.query('WindowSize>1')\
+                    .sort_values(['WindowSize','FlankLimit'])\
+                    .groupby(['WindowSize','FlankLimit']):
                 print('Plotting {}'.format(wid))
                 boxes.insert(0,wd.EffectiveFCR)
                 labels.insert(0,'/'.join(map(str,wid)))
-            axes[1,i].boxplot(boxes,labels=labels,vert=False)
+            if filename is not None:
+                axes[1,i].boxplot(boxes,labels=labels,vert=False)
             # if we are on the left, plot the label
             if i == 0:
                 axes[0,i].set_ylabel('Signal (Fraction Terms Significant)')
                 axes[1,i].set_ylabel('Windowing Parameters')
-            if i == len(cobs)-1:
-                ax2.set_ylabel('Number of Terms')
-        #plt.legend()
+        lgd = axes[0,i].legend(bbox_to_anchor=(2.0,0.5))
         if filename is not None:
-            plt.savefig(filename)
+            plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight')
+
         return (fig,axes)
 
        
