@@ -239,12 +239,26 @@ else
     green "apsw installed"
 fi
 
+
+#==================================================
+#---------------Update Setuptools------------------
+#==================================================
+pip install setuptools --upgrade
+
 #==================================================
 #-----------------Install Camoco-------------------
 #=================================================
-echo "Installing Camoco"
+green "Installing Camoco"
 cd $CWD
 python setup.py install
+python -c 'import camoco'
+if [ $? -eq 1 ]
+then
+    red 'Camoco failed to install!'
+    exit 1
+else
+    green 'Camoco installed!'
+fi
 source deactivate 
 
 #===================================================
