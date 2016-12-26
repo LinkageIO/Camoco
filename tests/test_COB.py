@@ -54,10 +54,13 @@ def test_coex_id_concordance(testCOB):
         assert sorted(testCOB.coexpression(a,b).name) == sorted([a.id,b.id])
 
 def test_coex_to_expr_concordance(testCOB):
+    '''
+        Translate expr indexes to coex indexes and back again
+    '''
     # Get Random set of expr indexes
     expr_len = testCOB._expr.shape[0]
     expr_idxs = np.sort(np.unique(np.array(
-        [random.randint(0,expr_len) for i in range(cf.test.num*10)]
+        [random.randint(0,expr_len-1) for i in range(cf.test.num*10)]
     )))
     
     # Translate them back and forth
@@ -97,7 +100,36 @@ def test_subnetwork_contains_only_input_when_duplicates(testCOB):
     assert set(itertools.chain(*subnet.index.values)) == set([x.id for x in random_genes])
 
 def test_degree_index_matches_degree(testCOB):
-    assert False
+    # Compare the degree determined from subnetwork aggregation
+    # is the same as what is in the data frame
+    for k,v in Counter(itertools.chain(*testCOB.subnetwork().index.values)).items():
+        assert testCOB.degree.ix[k].Degree == v
+
 
 def test_empty_subnetwork_returns_proper_dataframe(testCOB):
-    assert False
+    subnet = testCOB.subnetwork([])
+    assert len(subnet) == 0
+    assert 'score' in subnet.columns
+    assert 'significant' in subnet.columns
+    assert 'distance' in subnet.columns
+
+
+def test_zero_index_genes_doesnt_get_filtered(testCOB):
+    ''' ---- Regression bug
+        This bug occured when one of the genes in the subnetwork list
+        had an index of 0, which was filtered out because the list filter
+        function thought it was None
+    '''
+    # get the first gene in the matrix
+    gene_a = testCOB.refgen[testCOB._expr.index[0]]
+    # get a random gene
+    gene_b = testCOB.refgen.random_gene()
+    # make sure that the subnetwork contains a single coexpression 
+    # entry between genes
+    assert len(testCOB.subnetwork([gene_a,gene_b],sig_only=False)) == 1
+
+def test_zero_degree_genes_return_empty_dataframe(testCOB):
+    # get a random zero degree gene
+    gene_id = testCOB.degree.ix[testCOB.degree.Degree==0].sample(1).index[0]
+    gene = testCOB.refgen[gene_id]
+    assert len(testCOB.neighbors(gene)) == 0

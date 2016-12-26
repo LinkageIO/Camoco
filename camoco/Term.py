@@ -6,7 +6,19 @@ from .Tools import log
 
 class Term(object):
     '''
-        A Term is a just group of loci that are related.
+        A Term is a just named group of loci that are related.
+
+        Parameters
+        ----------
+        id : unique identifier 
+        desc: short description
+        loci : iterable of loci that are related
+        ** kwargs : dictionary of other term attributes
+
+        Returns
+        -------
+        A Term Object
+
     '''
     def __init__(self, id, desc='', loci=None, **kwargs):
         self.id = id

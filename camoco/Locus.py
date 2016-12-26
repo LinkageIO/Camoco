@@ -12,15 +12,15 @@ class Locus(object):
         else:
             self._id = str(id)
         self.chrom = str(chrom)
-        self._start = int(start)
-        self._end = int(end) if end is not None else int(start)
+        self._start = int(start) if start is not None else None
+        self._end = int(end) if end is not None else self._start
         self.window = int(window)
         self.attr = kwargs
         self.sub_loci = set(sub_loci) if sub_loci is not None else set()
         if len(self.sub_loci) == 0:
             self.sub_loci.add(self)
         #  Warn us if something seems off
-        if self._start > self._end:
+        if self._start > self._end and self._start is not None:
             raise ValueError("Wonky start and stop positions for: {}".format(self))
 
     def as_dict(self):
@@ -75,10 +75,14 @@ class Locus(object):
 
     @property
     def start(self):
+        if self._start is None:
+            return None
         return max(0,int(self._start))
 
     @property
     def end(self):
+        if self._end is None:
+            return None
         return int(self._end)
 
     @property

@@ -28,6 +28,7 @@ class Expr(Camoco):
         easily access different parts of the gene expression matrix.
     '''
     def __init__(self, name):
+        # Create a camoco object
         super().__init__(name=name, type='Expr')
         # Part I: Load the Expression dataset
         self.log('Loading Expr table')
@@ -104,6 +105,8 @@ class Expr(Camoco):
             max_val = 1100
         elif self.rawtype.upper() == 'MICROARRAY':
             max_val = 100
+        else:
+            max_val = 0
         return self._expr.apply(
             lambda col: np.nanmax(col.values) < max_val, axis=0
         )
@@ -373,7 +376,7 @@ class Expr(Camoco):
                 contained within it i.e. a set of gene ids.
             dry_run : bool (default: False)
                 Used in testing to speed up calculations. Limits the QC
-                dataframe to only have 5000 genes.
+                dataframe to only have 100 genes.
         '''
         self.log('------------Quality Control')
         df = self.expr()
@@ -390,7 +393,6 @@ class Expr(Camoco):
         # If TRUE it passes, if FALSE it fails!!!
         qc_gene = pd.DataFrame({'has_id':True}, index=df.index)
         qc_accession = pd.DataFrame({'has_id':True}, index=df.columns)
-
         # -----------------------------------------
         # Gene Membership test
         if not membership:
@@ -473,7 +475,7 @@ class Expr(Camoco):
         if dry_run:
             # If dry run, take first 100 rows of QC
             self.log.warn("Dry Run")
-            df = df.iloc[0:5000, :]
+            df = df.iloc[0:100,:]
         self._update_values(df, 'quality_control')
 
     @staticmethod

@@ -43,6 +43,7 @@ def cob_health(args):
     if not path.exists('{}_Expr_raw.png'.format(args.out)):
         cob.plot(
             '{}_Expr_raw.png'.format(args.out),
+            include_accession_labels=True,
             raw=True,
             cluster_method=None
         )
@@ -51,7 +52,10 @@ def cob_health(args):
     if not path.exists('{}_Expr_norm.png'.format(args.out)):
         cob.plot(
             '{}_Expr_norm.png'.format(args.out),
-            raw=False
+            include_accession_labels=True,
+            raw=False,
+            cluster_method='leaf',
+            cluster_accessions=True
         )
     else:
         log('Skipped norm.')
@@ -59,7 +63,9 @@ def cob_health(args):
     if not path.exists('{}_Expr_cluster.png'.format(args.out)):
         cob.plot(
             '{}_Expr_cluster.png'.format(args.out),
+            include_accession_labels=True,
             raw=False,
+            cluster_accessions=True,
             avg_by_cluster=True
         )
     else:
@@ -133,13 +139,27 @@ def cob_health(args):
             locality_emp = []
             locality_pvals = []
             term_sizes = []
+            term_desc = []
             terms_tested = 0
-            for term in go.iter_terms():
+            if args.max_terms is not None:
+                log('Limiting to {} GO Terms',args.max_terms)
+                terms = go.rand(
+                    n=args.max_terms,
+                    min_term_size=args.min_term_size,
+                    max_term_size=args.max_term_size
+                )
+            else:
+                terms = go.iter_terms(
+                    min_term_size=args.min_term_size,
+                    max_term_size=args.max_term_size
+                )
+            for term in terms:
                 term.loci = list(filter(lambda x: x in cob, term.loci))
                 if len(term) < args.min_term_size or len(term) > args.max_term_size:
                     continue
                 term_ids.append(term.id)
                 term_sizes.append(len(term))
+                term_desc.append(str(term.desc))
                 # ------ Density 
                 density = cob.density(term.loci)
                 density_emp.append(density)
@@ -177,7 +197,8 @@ def cob_health(args):
                 if terms_tested % 100 == 0 and terms_tested > 0:
                     log('Processed {} terms'.format(terms_tested)) 
             go_enrichment = pd.DataFrame({
-                'id' : term_ids,
+                'GOTerm' : term_ids,
+                'desc' : term_desc,
                 'size' : term_sizes,
                 'density' : density_emp,
                 'density_pval' : density_pvals,
@@ -211,8 +232,9 @@ def cob_health(args):
             fold = sum(np.array(go_enrichment['density_pval'])>1.3)/(0.05 * len(go_enrichment))
             axes[0,0].axhline(y=-1*np.log10(0.05),color='red')
             axes[0,0].text(
-                0, -0.2,
+                min(axes[0,0].get_xlim()),-1*np.log10(0.05),
                 '{:.3g} Fold Enrichement'.format(fold),
+                color='red'
             )
             axes[1,0].scatter(
                 go_enrichment['size'],
@@ -248,8 +270,9 @@ def cob_health(args):
             fold = sum(np.array(go_enrichment['locality_pval'])>1.3)/(0.05 * len(go_enrichment))
             axes[0,1].axhline(y=-1*np.log10(0.05),color='red')
             axes[0,1].text(
-                0, -0.2,
+                min(axes[0,1].get_xlim()),-1*np.log10(0.05),
                 '{:.3g} Fold Enrichement'.format(fold),
+                color='red'
             )
             axes[1,1].scatter(
                 go_enrichment['size'],

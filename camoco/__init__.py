@@ -11,13 +11,16 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-__version__ = '0.2.00'
+__version__ = '0.3.0'
 
 import sys
 import os
+import numpy
 
-#import pyximport
-#pyximport.install()
+import pyximport
+pyximport.install(setup_args={
+    "include_dirs":numpy.get_include() 
+})
 
 from .Config import cf
 from .Camoco import Camoco

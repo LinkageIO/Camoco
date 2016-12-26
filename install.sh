@@ -53,6 +53,15 @@ done
 
 NAME="camoco"
 
+#===================================================
+#----------Check for internet connection------------
+#===================================================
+wget -q --tries=10 --timeout=20 --spider http://github.com
+if [[ $? -ne 0 ]]; then
+        echo "Check your internet connection and try again."
+		exit
+fi
+
 export CWD=$(pwd)
 #===================================================
 #----------Setup the build Environment--------------
@@ -217,12 +226,26 @@ else
     green "apsw installed"
 fi
 
+
+#==================================================
+#---------------Update Setuptools------------------
+#==================================================
+pip install setuptools --upgrade
+
 #==================================================
 #-----------------Install Camoco-------------------
 #=================================================
-echo "Installing Camoco"
+green "Installing Camoco"
 cd $CWD
 python setup.py install
+python -c 'import camoco'
+if [ $? -eq 1 ]
+then
+    red 'Camoco failed to install!'
+    exit 1
+else
+    green 'Camoco installed!'
+fi
 source deactivate 
 
 #===================================================

@@ -6,7 +6,9 @@ from .Camoco import Camoco
 from .RefGen import RefGen
 from .Locus import Locus,Gene
 from .Expr import Expr
-from .Tools import memoize
+from .Tools import memoize,available_datasets
+from .Term import Term
+from .Ontology import Ontology
 
 from math import isinf
 from numpy import matrix, arcsinh, tanh
@@ -52,8 +54,12 @@ class COB(Expr):
         except FeatherError as e:
             self.log("{} is empty ({})", name, e)
         try:
+            if not available_datasets('Ontology','{}MCL'.format(name))\
+                and self.coex != None:
+                self._calculate_clusters()
             self.log('Loading Clusters')
             self.clusters = self._ft('clusters')
+            self.MCL = Ontology('{}MCL'.format(self.name))
         except FeatherError as e:
             self.log('Clusters not loaded for: {} ()', name, e)
 
@@ -78,16 +84,21 @@ class COB(Expr):
             Num Raw Genes: {:,}
             Num Raw Accessions: {}
 
-            QC
+            QC Parameters
             ------------------
-            min expr level: {}
-            max gene missing data: {}
-            min single sample expr: {}
+            min expr level: {} 
+                - expression below this is set to NaN
+            max gene missing data: {} 
+                - genes missing more than this percent are removed
             max accession missing data: {}
+                - Accession missing more than this percent are removed
+            min single sample expr: {} 
+                - genes must have at least this amount of expression in 
+                  on accession
 
             Clusters
             ------------------
-            Num clusters (size > 3): {}
+            Num clusters (size >= 10): {}
 
 
         '''.format(
@@ -109,7 +120,7 @@ class COB(Expr):
             self._global('qc_min_single_sample_expr'),
             self._global('qc_max_accession_missing_data'),
             # Clusters
-            sum(self.clusters.groupby('cluster').apply(len) > 3)
+            sum(self.clusters.groupby('cluster').apply(len) >= 10)
         ), file=file)
 
     def qc_gene(self):
@@ -157,6 +168,8 @@ class COB(Expr):
         del neighbor_indices
         if sig_only:
             edges = edges[edges.significant == 1]
+        if len(edges) == 0:
+            return pd.DataFrame(columns=['score','distance','significant'])
         
         # Find the indexes if necessary
         if names_as_index or names_as_cols:
@@ -240,6 +253,7 @@ class COB(Expr):
             A pandas.DataFrame containing the edges. Columns
             include score, significant (bool), and inter-genic distance.
         '''
+        num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
             df = self.coex.copy()
@@ -247,10 +261,9 @@ class COB(Expr):
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
             ids = np.array([self._expr_index[x.id] for x in gene_list])
-            num_genes = self.num_genes()
             if filter_missing_gene_ids:
                 # filter out the Nones
-                ids = np.array(list(filter(None, ids)))
+                ids = np.array([x for x in ids if x is not None])
             if len(ids) == 0:
                 df = pd.DataFrame(columns=['score','significant','distance'])
             else:
@@ -287,7 +300,7 @@ class COB(Expr):
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
         if sig_only:
-            df = df[df.significant]
+            df = df.ix[df.significant]
         return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
@@ -364,7 +377,6 @@ class COB(Expr):
                 locus_list, flank_limit=flank_limit, chain=True,
                 include_parent_locus=True
             )
-        #self.log("Found {} candidate genes", len(genes_list))
         # Extract the edges for the full set of genes
         edges = self.subnetwork(
             genes_list,
@@ -385,6 +397,7 @@ class COB(Expr):
             gene_split = gene_split.groupby('gene').agg(np.mean)
             if iter_name is not None:
                 gene_split['iter'] = iter_name
+            gene_split.index.name = 'gene'
             return gene_split
         else:
             if return_mean:
@@ -447,6 +460,7 @@ class COB(Expr):
         degree = ldegree.merge(gdegree,left_index=True,right_index=True)
         degree.columns = ['local', 'global']
         degree = degree.sort_values(by='global')
+        degree.index.name = 'gene'
         if include_regression:
             # Add the regression lines
             ols = sm.OLS(degree['local'], degree['global']).fit()
@@ -454,7 +468,7 @@ class COB(Expr):
             degree['fitted'] = ols.fittedvalues
             degree = degree.sort_values(by='resid',ascending=False)
         if iter_name is not None:
-            degree['iter_name'] = iter_name
+            degree['iter'] = iter_name
         return degree
 
     def density(self, gene_list, min_distance=None, by_gene=False):
@@ -842,7 +856,7 @@ class COB(Expr):
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
-             min_cluster_size=10):
+             min_cluster_size=10, cluster_accessions=True):
         '''
             Plots a heatmap of genes x expression.
 
@@ -877,17 +891,21 @@ class COB(Expr):
             min_cluster_size : int ( default: 10)
                 If avg_by_cluster, only cluster sizes larger than min_cluster_size
                 will be included.
+            cluster_accessions : bool (default: True)
+                If true, accessions will be clustered
+            plot_dendrogram : bool (default: True)
+                If true, dendrograms will be plotted
 
             Returns
             -------
             a populated matplotlib figure object
 
         '''
-        # Get leaves
+        # Get leaves of genes
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
-            order = self._ft('leaves').sort('index').index.values
+            order = self._ft('leaves').sort_values(by='index').index.values
         elif cluster_method == 'mcl':
             order = self._ft('clusters').loc[dm.index].\
                     fillna(np.inf).sort_values(by='cluster').index.values
@@ -896,17 +914,36 @@ class COB(Expr):
             order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
+
         # Optional Average by cluster
         if avg_by_cluster == True:
             # Extract clusters
             dm = self.clusters.groupby('cluster').\
-                    filter(lambda x: len(x) > min_cluster_size).\
+                    filter(lambda x: len(x) >= min_cluster_size).\
                     groupby('cluster').\
                     apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
                     apply(lambda x: (x-x.mean())/x.std() ,axis=1)
+            if len(dm) == 0:
+                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
+                return None
+        # Get leaves of accessions
+        if cluster_accessions:
+            accession_pccs = (1 - PCCUP.pair_correlation(
+                np.ascontiguousarray(
+                    # PCCUP expects floats
+                    self._expr.as_matrix().T.astype('float')
+                )
+            ))
+            link = linkage(1-accession_pccs, method='complete')
+            accession_dists = leaves_list(link)
+            # Order by accession distance
+            dm = dm.loc[:,dm.columns[accession_dists]]
+
+
         # Save plot if provided filename
         fig = plt.figure(
-            facecolor='white'
+            facecolor='white',
+            figsize=(20,20)
         )
         ax = fig.add_subplot(111)
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
@@ -915,6 +952,7 @@ class COB(Expr):
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
         im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        # Intelligently add labels
         if (include_accession_labels is None and len(dm.columns) < 30) \
             or include_accession_labels == True:
                 ax.set(
@@ -931,9 +969,11 @@ class COB(Expr):
         fig.colorbar(im)
         # Save if you wish
         if filename is not None:
-            plt.savefig(filename,figsize=(5,10))
+            plt.savefig(filename,dpi=300)
             plt.close()
         return fig
+
+
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         '''
@@ -1089,20 +1129,28 @@ class COB(Expr):
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
         pccs = (1 - PCCUP.pair_correlation(
-            np.ascontiguousarray(self._expr.as_matrix())
+            np.ascontiguousarray(
+                # PCCUP expects floats
+                self._expr.as_matrix().astype('float')
+            )
         ))
         
-        self.log("Running Fisher Transform")
-        pccs = np.arctanh(pccs); gc.collect();
+        self.log("Applying Fisher Transform")
+        pccs[pccs >= 1] = 0.9999999
+        pccs[pccs <= -1] = -0.9999999
+        pccs = np.arctanh(pccs)
+        gc.collect();
         
         self.log("Calculating Mean and STD")
         # Sometimes, with certain datasets, the NaN mask overlap
         # completely for the two genes expression data making its PCC a nan.
         # This affects the mean and std fro the gene.
         pcc_mean = np.ma.masked_array(pccs, np.isnan(pccs)).mean()
-        self._global('pcc_mean', pcc_mean); gc.collect();
+        self._global('pcc_mean', pcc_mean)
+        gc.collect()
         pcc_std = np.ma.masked_array(pccs, np.isnan(pccs)).std()
-        self._global('pcc_std', pcc_std); gc.collect();
+        self._global('pcc_std', pcc_std)
+        gc.collect()
         
         # 2. Calculate Z Scores
         self.log("Finding adjusted scores")
@@ -1111,8 +1159,14 @@ class COB(Expr):
         
         # 3. Build the dataframe
         self.log("Build the dataframe")
-        tbl = pd.DataFrame(pccs, index=np.arange(len(pccs)), columns=['score'], copy=False)
-        del pccs; gc.collect();
+        tbl = pd.DataFrame(
+            pccs, 
+            index=np.arange(len(pccs)), 
+            columns=['score'], 
+            copy=False
+        )
+        del pccs
+        gc.collect()
         
         # 3. Calculate Gene Distance
         self.log("Calculating Gene Distance")
@@ -1121,7 +1175,7 @@ class COB(Expr):
         gc.collect()
         
         # 4. Assign significance
-        self.log("Finding the Significance")
+        self.log("Thresholding Significant Network Interactions")
         self._global('significance_threshold', significance_thresh)
         tbl['significant'] = tbl['score'] >= significance_thresh
         gc.collect()
@@ -1129,12 +1183,14 @@ class COB(Expr):
         # 5. Store the table
         self.log("Storing the coex table")
         self._ft('coex', df=tbl)
-        del tbl; gc.collect();
+        del tbl
+        gc.collect()
         
         # 6. Load the new table into the object
         self.coex = self._ft('coex')
         self.log("Done")
         return self
+
 
     def _calculate_degree(self):
         '''
@@ -1142,29 +1198,25 @@ class COB(Expr):
             them in our feather store.
         '''
         self.log('Building Degree')
-        
         # Get significant expressions and dump coex from memory for time being
-        sigs = self.coex[self.coex.significant]
-        del self.coex
-        
+        # Generate a df that starts all genes at 0
+        names = self._expr.index.values
+        self.degree = pd.DataFrame(0,index=names,columns=['Degree'])
         # Get the index and find the counts
-        self.log('Finding the degrees')
+        self.log('Calculating Gene degree')
+        sigs = self.coex[self.coex.significant]
         sigs = sigs.index.values
         sigs = PCCUP.coex_expr_index(sigs, len(self._expr.index.values))
-        sigs = np.array(list(Counter(chain(*sigs)).items()))
-        
-        # Translate the expr indexes to the gene names
-        self.log('Storing the degrees')
-        names = self._expr.index.values
-        self.degree = pd.DataFrame(sigs, columns=['idx', 'Degree'])
-        self.degree.insert(0,'Gene', names[self.degree['idx']])
-        self.degree.drop('idx', axis=1, inplace=True)
-        self.degree = self.degree.set_index('Gene')
+        sigs = list(Counter(chain(*sigs)).items())
+        if len(sigs) > 0:
+            # Translate the expr indexes to the gene names
+            for i,degree in sigs:
+                self.degree.ix[names[i]] = degree
         self._ft('degree', df=self.degree)
-        
-        # Cleanup and reinstate the coex table
-        del sigs; del names; gc.collect();
-        self.coex = self._ft('coex')
+        # Cleanup
+        del sigs 
+        del names
+        gc.collect()
         return self
         
     def _calculate_leaves(self):
@@ -1183,13 +1235,12 @@ class COB(Expr):
         del self.coex
         
         # Subtract pccs from 1 so we do not get negative distances
-        self.log("Running transformations")
         dists = (dists * pcc_std) + pcc_mean
         dists = np.tanh(dists)
         dists = 1 - dists
         gc.collect()
         
-        # Find the leaves or something
+        # Find the leaves from hierarchical clustering
         self.log("Finding the leaves")
         dists = leaves_list(linkage(dists, method='single'))
         gc.collect()
@@ -1209,12 +1260,29 @@ class COB(Expr):
         '''
         clusters = self.mcl()
         self.log('Building cluster dataframe')
-        self.clusters = pd.DataFrame(
-            data=[(gene.id, i) for i, cluster in enumerate(clusters) \
-                    for gene in cluster],
-            columns=['Gene', 'cluster']
-        ).set_index('Gene')
-        self._ft('clusters', df=self.clusters)
+        names = self._expr.index.values
+        self.clusters = pd.DataFrame(np.nan,index=names,columns=['cluster'])
+        if len(clusters) > 0:
+            self.clusters = pd.DataFrame(
+                data=[(gene.id, i) for i, cluster in enumerate(clusters) \
+                        for gene in cluster],
+                columns=['Gene', 'cluster']
+            ).set_index('Gene')
+            self._ft('clusters', df=self.clusters)
+        self.log('Creating Cluster Ontology')
+        terms = []
+        for i,x in enumerate(self.clusters.groupby('cluster')):
+            genes = self.refgen[x[1].index.values]
+            terms.append(Term(
+                'MCL{}'.format(i),
+                desc='{} MCL Cluster {}'.format(self.name,i),
+                loci = genes
+            ))
+        self.MCL = Ontology.from_terms(
+            terms,
+            '{}MCL'.format(self.name),
+            '{} MCL Clusters'.format(self.name),
+            self.refgen)
         self.log('Finished finding clusters')
         return self
     
@@ -1363,14 +1431,14 @@ class COB(Expr):
             -------
                 a COB object
         '''
+        df = pd.read_table(
+            filename,
+            sep=sep,
+            compression='infer',
+            index_col=index_col
+        )
         return cls.from_DataFrame(
-            pd.read_table(
-                filename,
-                sep=sep,
-                compression='infer',
-                index_col=index_col
-            ),
-            name,description,refgen,
+            df, name, description, refgen,
             rawtype=rawtype,**kwargs
         )
 

@@ -1,13 +1,30 @@
 import camoco as co
 import pandas as pd
 from camoco.Tools import DummyRefGen
+from camoco.Locus import Gene
 
 def build_cob(args):
     # Build the refgen
-    if not args.ignore_refgen_membership:
-        refgen = co.RefGen(args.refgen)
-    else:
-        refgen = DummyRefGen() 
+    refgen = co.RefGen(args.refgen)
+    # Check that the sep is likely right.
+    if len(pd.read_table(args.filename,sep=args.sep).columns) == 1:
+        print(
+            ("Detected only 1 column in {}, are you sure "
+            "colunms are separated by '{}'?").format(args.filename,args.sep)
+        )
+        return None
+    if args.allow_non_membership:
+        refgen = refgen.copy(
+            '{}_tmp'.format(refgen.name), 
+            'temp refgen'.format(refgen.name)
+        )
+        # Add non membership genes
+        for gid in pd.read_table(args.filename,sep=args.sep).index:
+            refgen.add_gene(Gene(None,None,id=gid))
+
+    quality_control = False if args.skip_quality_control else True
+    normalize = False if args.skip_normalization else True
+        
     # Basically just pass all the CLI arguments to the COB class method  
     cob = co.COB.from_table(
         args.filename,
@@ -17,14 +34,17 @@ def build_cob(args):
         # Optional arguments
         sep=args.sep,
         rawtype=args.rawtype,
-        quantile=False,
+        # Data Processing
+        quality_control=quality_control,
+        normalization=normalize,
+        quantile=args.quantile,
+        # Data processing parameters
         max_gene_missing_data=args.max_gene_missing_data,
         max_accession_missing_data=args.max_accession_missing_data,
         min_single_sample_expr=args.min_single_sample_expr,
         min_expr=args.min_expr,
         max_val=args.max_val,
-        dry_run=args.dry_run,
-        quality_control=args.skip_quality_control
+        dry_run=args.dry_run
     )
     print("Build successful!")
     print(cob.summary())
@@ -51,12 +71,17 @@ def build_gont(args):
         args.filename,
         args.name,
         args.description,
-        refgen
+        refgen,
+        go_col=args.go_col,
+        id_col=args.id_col
     )
     print('Build Successful')
 
 def build_GWAS(args):
     df = pd.DataFrame.from_csv(args.filename,sep=args.sep).reset_index()
+    if len(df.columns) == 1:
+        raise ValueError("Only 1 column found, check --sep, see --help")
+    print('Loading {}'.format(args.refgen))
     refgen = co.RefGen(args.refgen)
     gwas = co.GWAS.from_DataFrame(
         df,

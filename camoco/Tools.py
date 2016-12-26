@@ -90,8 +90,7 @@ def del_dataset(type, name, safe=True):
     except CantOpenError:
         return True
     if safe:
-        df = available(type=type,name=name)
-        c.log("Are you sure you want to delete:\n {}", df)
+        c.log("Are you sure you want to delete:\n {}.{}", type, name)
         if input("(Notice CAPS)[Y/n]:") != 'Y':
             c.log("Nothing Deleted")
             return
@@ -105,29 +104,18 @@ def del_dataset(type, name, safe=True):
     except CantOpenError:
         pass
     try:
-        os.remove(
-            os.path.expanduser(os.path.join(
+        dfiles = glob.glob(
+            os.path.join(
                 cf.options.basedir,
                 'databases',
-                '{}.{}.db'.format(type, name)
-                )
+                '{}.{}.*'.format(type,name)
             )
         )
+        for f in dfiles:
+            c.log('Removing {}',f)
+            os.remove(f)
     except FileNotFoundError as e:
         pass
-        #c.log('Database Not Found: {}'.format(e))
-    try:
-        os.remove(
-            os.path.expanduser(os.path.join(
-                cf.options.basedir,
-                'databases',
-                '{}.{}.hd5'.format(type, name)
-                )
-            )
-        )
-    except FileNotFoundError as e:
-        pass
-        #c.log('Database Not Found: {}'.format(e))
     if type == 'Expr':
         # also have to remove the COB specific refgen
         del_dataset('RefGen', 'Filtered'+name, safe=safe)
