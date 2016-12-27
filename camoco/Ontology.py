@@ -351,17 +351,17 @@ class Ontology(Camoco):
             include_genes : boo (default: False)
                 Include comma delimited genes as a field
         '''
+        terms = self.db.cursor().execute('''SELECT DISTINCT term 
+        FROM term_loci WHERE id IN ('{}')
+        '''.format(
+            "','".join([x.id for x in locus_list])
+        )).fetchall()
+        
+        self.log('Getting GOTerm Objects')
         terms = list(
             filter(
                 lambda t: (len(t) >= min_term_size) and (len(t) <= max_term_size),
-                [self[name] for name, in  self.db.cursor().execute(
-                    '''SELECT DISTINCT(term) 
-                    FROM term_loci WHERE id IN ('{}')
-                    '''.format(
-                        "','".join([x.id for x in locus_list])
-                    )
-                ).fetchall()
-                ]
+                [self[name] for name, in terms]
             )
         )
         if num_universe is None:
@@ -372,9 +372,11 @@ class Ontology(Camoco):
                 len(terms), num_universe
             )
         )
+        
         significant_terms = []
+        locus_list = set(locus_list)
         for term in terms:
-            term_genes = term.loci
+            term_genes = set(term.loci)
             if len(term_genes) > max_term_size:
                 continue
             num_common = len(term_genes.intersection(locus_list))
@@ -399,7 +401,6 @@ class Ontology(Camoco):
                         [x.id for x in term_genes.intersection(locus_list)]
                     )
                 significant_terms.append(term)
-
         if return_table == True:
             tbl = []
             for x in significant_terms:

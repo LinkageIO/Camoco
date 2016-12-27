@@ -92,7 +92,8 @@ class GOnt(Ontology):
     @lru_cache(maxsize=2**17)
     def __getitem__(self, id):
         ''' retrieve a term by id '''
-        main_id = self.db.cursor().execute(
+        cur = self.db.cursor()
+        main_id = cur.execute(
             'SELECT main FROM alts WHERE alt = ?',
             (id, )
         ).fetchone()
@@ -100,31 +101,32 @@ class GOnt(Ontology):
             (id,) = main_id
         try:
             # Get the term information
-            (id, desc, name) = self.db.cursor().execute(
+            (id, desc, name) = cur.execute(
                 'SELECT * from terms WHERE id = ?', (id, )).fetchone()
         except TypeError: # Not in database
             raise KeyError('This term is not in the database.')
 
         # Get the loci associated with the term
         term_loci = self.refgen.from_ids([
-            gene_id[0] for gene_id in self.db.cursor().execute(
+            gene_id[0] for gene_id in cur.execute(
             'SELECT id FROM term_loci WHERE term = ?', (id, )).fetchall()
         ])
 
         # Get the isa relationships
-        is_a = set(chain(*self.db.cursor().execute(
+        is_a = set(chain(*cur.execute(
             'SELECT parent FROM rels WHERE child = ?', (id, )).fetchall())
         )
 
         # Get the alternate ids of the term
-        alts = set(chain(*self.db.cursor().execute(
+        alts = set(chain(*cur.execute(
             'SELECT alt FROM alts WHERE main = ?', (id, )).fetchall())
         )
-
-        term_attrs = {k:v for k,v in self.db.cursor().execute(
-            ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
-            )
-        }
+        
+        # Causing issues for me, but I have to rebuild and see if that fixes
+        #term_attrs = {k:v for k,v in self.db.cursor().execute(
+        #    ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
+        #    )
+        #}
 
         return GOTerm(
             id, name=name, desc=desc, alt_id=alts, 

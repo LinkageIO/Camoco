@@ -55,7 +55,7 @@ class COB(Expr):
             self.log("{} is empty ({})", name, e)
         try:
             if not available_datasets('Ontology','{}MCL'.format(name))\
-                and self.coex != None:
+                and self.coex is not None:
                 self._calculate_clusters()
             self.log('Loading Clusters')
             self.clusters = self._ft('clusters')
