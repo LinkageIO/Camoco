@@ -182,7 +182,7 @@ then
     conda config --add envs_dirs $BASE/conda/envs
     conda config --append channels conda-forge
     conda create -y -n $NAME python=3 setuptools pip cython numpy scipy pandas \
-        matplotlib feather-format==0.2.0 nose six pyyaml yaml pyparsing python-dateutil \
+        matplotlib feather-format nose six pyyaml yaml pyparsing python-dateutil \
         pytz numexpr patsy statsmodels networkx mpmath termcolor scikit-learn \
         ipython ipdb pytest-cov flask gunicorn
 else
