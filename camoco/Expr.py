@@ -18,7 +18,6 @@ import matplotlib.pyplot as plt
 import io
 import re
 import string
-from feather import FeatherError
 
 pd.set_option('display.width', 100)
 
@@ -33,9 +32,9 @@ class Expr(Camoco):
         # Part I: Load the Expression dataset
         self.log('Loading Expr table')
         try:
-            self._expr = self._ft('expr')
-            self._gene_qc_status = self._ft('gene_qc_status')
-        except FeatherError as e:
+            self._expr = self._bcolz('expr')
+            self._gene_qc_status = self._bcolz('gene_qc_status')
+        if (self._expr is None) or (self._gene_qc_status is None):
             self._expr = pd.DataFrame()
         
         self.log('Building Expr Index')
@@ -90,7 +89,7 @@ class Expr(Camoco):
         if raw is False:
             return self.refgen.from_ids(self._expr.index)
         else:
-            return self.refgen.from_ids(self._ft('raw_expr').index)
+            return self.refgen.from_ids(self._bcolz('raw_expr').index)
 
     def expr_profile(self, gene):
         '''
@@ -147,7 +146,7 @@ class Expr(Camoco):
         '''
         if raw is True:
             self.log('Extracting raw expression values')
-            df = self._ft('raw_expr')
+            df = self._bcolz('raw_expr')
         else:
             df = self._expr
         if genes is not None:
@@ -164,7 +163,7 @@ class Expr(Camoco):
         '''
             Plot histogram of accession expression values.
         '''
-        raw = self._ft('raw_expr')
+        raw = self._bcolz('raw_expr')
         qcd = self._expr
 
         for name, values in qcd.iteritems():
@@ -254,7 +253,7 @@ class Expr(Camoco):
         # Also, make sure gene names are uppercase
         df.index = [pattern.sub('', str(x)).upper() for x in df.index.values]
         try:
-            self._ft(table, df=df)
+            self._bcolz(table, df=df)
             self._expr = df
         except Exception as e:
             self.log('Unable to update expression table values: {}', e)
@@ -286,10 +285,10 @@ class Expr(Camoco):
         if raw:
             # kill the raw table too
             self.log('Resetting raw expression data')
-            self._ft('raw_expr', df=pd.DataFrame())
+            self._bcolz('raw_expr', df=pd.DataFrame())
         self.log('Resetting expression data')
         self._expr = self.expr(raw=True)
-        self._ft('expr', df=self._expr)
+        self._bcolz('expr', df=self._expr)
         self._transformation_log('reset')
 
 
@@ -459,8 +458,8 @@ class Expr(Camoco):
         )
         df = df.loc[:, qc_accession['PASS_ALL']]
         # Update the database
-        self._ft('qc_accession', df=qc_accession)
-        self._ft('qc_gene', df=qc_gene)
+        self._bcolz('qc_accession', df=qc_accession)
+        self._bcolz('qc_gene', df=qc_gene)
         # Report your findings
         self.log('Genes passing QC:\n{}', str(qc_gene.apply(sum, axis=0)))
         self.log('Accessions passing QC:\n{}', str(qc_accession.apply(sum, axis=0)))
@@ -620,8 +619,8 @@ class Expr(Camoco):
         # Piggy back on the super create method
         self = super().create(name, description,type=type)
         # Create appropriate feather tables
-        self._ft('expr', df=pd.DataFrame())
-        self._ft('raw_expr', df=pd.DataFrame())
+        self._bcolz('expr', df=pd.DataFrame())
+        self._bcolz('raw_expr', df=pd.DataFrame())
         # Delete existing datasets
         self._set_refgen(refgen, filter=False)
         return self

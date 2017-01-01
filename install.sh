@@ -181,8 +181,9 @@ then
     conda remove -y --name $NAME --all
     conda config --add envs_dirs $BASE/conda/envs
     conda config --append channels conda-forge
+    conda config --append channels blaze
     conda create -y -n $NAME python=3 setuptools pip cython numpy scipy pandas \
-        matplotlib feather-format nose six pyyaml yaml pyparsing python-dateutil \
+        matplotlib blaze nose six pyyaml yaml pyparsing python-dateutil \
         pytz numexpr patsy statsmodels networkx mpmath termcolor scikit-learn \
         ipython ipdb pytest-cov flask gunicorn
 else
@@ -205,7 +206,23 @@ if [ $? -eq 1  ]
 then
     pip install powerlaw
 else
-    green "powerlaw installed"
+    green "powerlaw Installed"
+fi
+
+python -c 'import bcolz'
+if [ $? -eq 1  ]
+then
+    pip install bcolz
+else
+    green "bcolz Installed"
+fi
+
+python -c 'import GeneWordSearch'
+if [ $? -eq 1  ]
+then
+    pip install GeneWordSearch
+else
+    green "GeneWordSearch Installed"
 fi
 
 #===================================================
