@@ -31,9 +31,8 @@ class Expr(Camoco):
         super().__init__(name=name, type='Expr')
         # Part I: Load the Expression dataset
         self.log('Loading Expr table')
-        try:
-            self._expr = self._bcolz('expr')
-            self._gene_qc_status = self._bcolz('gene_qc_status')
+        self._expr = self._bcolz('expr')
+        self._gene_qc_status = self._bcolz('gene_qc_status')
         if (self._expr is None) or (self._gene_qc_status is None):
             self._expr = pd.DataFrame()
         
@@ -618,7 +617,7 @@ class Expr(Camoco):
         '''
         # Piggy back on the super create method
         self = super().create(name, description,type=type)
-        # Create appropriate feather tables
+        # Create appropriate bcolz tables
         self._bcolz('expr', df=pd.DataFrame())
         self._bcolz('raw_expr', df=pd.DataFrame())
         # Delete existing datasets

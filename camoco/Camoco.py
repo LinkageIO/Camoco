@@ -91,7 +91,7 @@ class Camoco(object):
             #    df = df.copy()
             #    df['idx'] = df.index
             if isinstance(df,pd.DataFrame):
-                bcz.fromdataframe(df, mode='w'
+                bcz.fromdataframe(df, mode='w',
                     rootdir=os.path.expanduser(
                         os.path.join(
                             cf.options.basedir,
@@ -100,6 +100,7 @@ class Camoco(object):
                         )
                     )
                 )
+                
             #if 'idx' in df.columns.values:
             #    del df
             return
