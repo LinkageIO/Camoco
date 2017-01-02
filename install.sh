@@ -180,15 +180,12 @@ then
     echo "Making the conda virtual environment named $NAME in $BASE"
     conda remove -y --name $NAME --all
     conda config --add envs_dirs $BASE/conda/envs
-    conda create -y -n $NAME --no-update-deps python=3.4 setuptools pip distribute \
-        cython==0.22.1 nose six pyyaml yaml pyparsing python-dateutil pytz numpy \
-        scipy pandas matplotlib==1.4.3 numexpr patsy statsmodels flask networkx \
-        ipython mpmath pytest-cov 
-    #conda remove -y -n $NAME libgfortran --force
-    #conda install -y -n $NAME libgcc --force
-    conda install --no-update-deps -y -n $NAME -c conda-forge feather-format 
-    conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/omnia termcolor
-    conda install --no-update-deps -y -n $NAME -c http://conda.anaconda.org/cpcloud ipdb
+    conda config --append channels conda-forge
+    conda config --append channels blaze
+    conda create -y -n $NAME python=3 setuptools pip cython numpy scipy pandas \
+        matplotlib blaze nose six pyyaml yaml pyparsing python-dateutil \
+        pytz numexpr patsy statsmodels networkx mpmath termcolor scikit-learn \
+        ipython ipdb pytest-cov flask gunicorn
 else
     green 'conda already installed'
 fi
@@ -204,21 +201,28 @@ which python
 #==================================================
 #----------Take care of some pip packages ---------
 #==================================================
-easy_install -U pip
-pip install pip --upgrade
 python -c 'import powerlaw'
 if [ $? -eq 1  ]
 then
     pip install powerlaw
 else
-    green "powerlaw installed"
+    green "powerlaw Installed"
 fi
-python -c 'import sklearn'
-if [ $? -eq 1 ]
+
+python -c 'import bcolz'
+if [ $? -eq 1  ]
 then
-    pip install sklearn
+    pip install bcolz
 else
-    green "sklearn installed"
+    green "bcolz Installed"
+fi
+
+python -c 'import GeneWordSearch'
+if [ $? -eq 1  ]
+then
+    pip install GeneWordSearch
+else
+    green "GeneWordSearch Installed"
 fi
 
 #===================================================
@@ -232,7 +236,7 @@ then
     rm -rf apsw
     git clone https://github.com/rogerbinns/apsw.git
     cd apsw
-    python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions install
+    python setup.py fetch --version=3.15.2 --missing-checksum-ok --all build --enable-all-extensions install
     cd $BASE
     rm -rf apsw
 else
@@ -243,7 +247,7 @@ fi
 #==================================================
 #---------------Update Setuptools------------------
 #==================================================
-pip install setuptools --upgrade
+#pip install setuptools --upgrade
 
 #==================================================
 #-----------------Install Camoco-------------------

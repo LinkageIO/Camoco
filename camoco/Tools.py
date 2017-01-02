@@ -4,6 +4,7 @@ import time
 import re
 import functools
 import glob
+import shutil
 
 from termcolor import colored, cprint
 from itertools import chain
@@ -113,7 +114,10 @@ def del_dataset(type, name, safe=True):
         )
         for f in dfiles:
             c.log('Removing {}',f)
-            os.remove(f)
+            try:
+                os.remove(f)
+            except IsADirectoryError:
+                shutil.rmtree(f)
     except FileNotFoundError as e:
         pass
     if type == 'Expr':

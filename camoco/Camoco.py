@@ -2,8 +2,15 @@
 import apsw as lite
 import os as os
 import tempfile
+import numpy as np
 import pandas as pd
-import feather as ft
+import bcolz as bcz
+
+# Suppress the warning until the next wersion
+import warnings
+from flask.exthook import ExtDeprecationWarning
+warnings.simplefilter('ignore',ExtDeprecationWarning)
+import blaze as blz
 
 from .Tools import log
 from .Config import cf
@@ -56,43 +63,60 @@ class Camoco(object):
             )
         )
 
-    def _ft(self, tblname, dbname=None, type=None, df=None):
+    def _bcolz(self, tblname, dbname=None, type=None, df=None, blaze=False):
         if type is None:
             type = self.type
         if dbname is None:
             dbname = self.name
         if df is None:
             # return the dataframe if it exists 
-            df = ft.read_dataframe(
-                os.path.expanduser(
-                    os.path.join(
-                        cf.options.basedir,
-                        'databases',
-                        "{}.{}.{}.ft".format(type, dbname, tblname)
+            try:
+                df = bcz.open(
+                    os.path.expanduser(
+                        os.path.join(
+                            cf.options.basedir,
+                            'databases',
+                            "{}.{}.{}".format(type, dbname, tblname)
+                        )
                     )
                 )
-            )
-            if 'idx' in df.columns.values:
-                df.set_index('idx', drop=True, inplace=True)
-                df.index.name = None
-            return df
+            except IOError:
+                return None
+            else:
+                if len(df) == 0:
+                    df = pd.DataFrame()
+                    if blaze:
+                        df = blz.data(df)
+                else:
+                    if blaze:
+                        df = blz.data(df)
+                    else:
+                        df = df.todataframe()
+                return df
+            #if 'idx' in df.columns.values:
+            #    df.set_index('idx', drop=True, inplace=True)
+            #    df.index.name = None
         
         else:
-            if not(df.index.dtype_str == 'int64') and not(df.empty):
-                df = df.copy()
-                df['idx'] = df.index
-            ft.write_dataframe(df, 
-                os.path.expanduser(
-                    os.path.join(
-                        cf.options.basedir,
-                        'databases',
-                        "{}.{}.{}.ft".format(type, dbname, tblname)
+            #if not(df.index.dtype_str == 'int64') and not(df.empty):
+            #    df = df.copy()
+            #    df['idx'] = df.index
+            if isinstance(df,pd.DataFrame):
+                path = os.path.expanduser(
+                        os.path.join(
+                            cf.options.basedir,
+                            'databases',
+                            "{}.{}.{}".format(type, dbname, tblname)
+                        )
                     )
-                )
-            )
-            if 'idx' in df.columns.values:
-                del df
-            return 
+                if df.empty:
+                    bcz.fromiter((),dtype=np.int32,mode='w',count=0,rootdir=path)
+                else:
+                    bcz.ctable.fromdataframe(df,mode='w',rootdir=path)
+                
+            #if 'idx' in df.columns.values:
+            #    del df
+            return
 
     def _tmpfile(self):
         # returns a handle to a tmp file

@@ -28,7 +28,6 @@ import pandas as pd
 import numpy as np
 import itertools
 from scipy.misc import comb 
-from feather import FeatherError
 
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
@@ -43,25 +42,25 @@ from scipy.stats import pearsonr
 class COB(Expr):
     def __init__(self, name):
         super().__init__(name=name)
-        try:
-            self.log('Loading coex table')
-            self.coex = self._ft('coex')
-        except FeatherError as e:
-            self.log("{} is empty ({})", name, e)
-        try:
-            self.log('Loading Global Degree')
-            self.degree = self._ft('degree')
-        except FeatherError as e:
-            self.log("{} is empty ({})", name, e)
-        try:
-            if not available_datasets('Ontology','{}MCL'.format(name))\
-                and self.coex != None:
-                self._calculate_clusters()
-            self.log('Loading Clusters')
-            self.clusters = self._ft('clusters')
+        self.log('Loading coex table')
+        self.coex = self._bcolz('coex')
+        if self.coex is None:
+            self.log("{} is empty", name)
+        self.log('Loading Global Degree')
+        self.degree = self._bcolz('degree')
+        if self.degree is None:
+            self.log("{} is empty", name)
+        if not available_datasets('Ontology','{}MCL'.format(name))\
+            and self.coex is not None:
+            self._calculate_clusters()
+        self.log('Loading Clusters')
+        self.clusters = self._bcolz('clusters')
+        if self.clusters is None:
+            self.log('Clusters not loaded for: {} ()', name)
+            self.MCL = None
+        else:
             self.MCL = Ontology('{}MCL'.format(self.name))
-        except FeatherError as e:
-            self.log('Clusters not loaded for: {} ()', name, e)
+
 
     def __repr__(self):
         return '<COB: {}>'.format(self.name)
@@ -124,7 +123,7 @@ class COB(Expr):
         ), file=file)
 
     def qc_gene(self):
-        qc_gene = self._ft('qc_gene')
+        qc_gene = self._bcolz('qc_gene')
         qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index]
         return qc_gene.groupby('chrom').aggregate(sum, axis=0)
 
@@ -544,7 +543,7 @@ class COB(Expr):
             score.to_csv(
                 OUT, columns=['gene_a','gene_b','score'],index=False, sep='\t')
             del score
-            self.coex = self._ft('coex')
+            self.coex = self._bcolz('coex')
             self.log('Done')
 
     def to_graphml(self,file, gene_list=None, sig_only=True, min_distance=0):
@@ -572,15 +571,15 @@ class COB(Expr):
         self.log('Writing the file.')
         nx.write_graphml(net,file)
         del net;
-        self.coex = self._ft('coex')
+        self.coex = self._bcolz('coex')
         return
 
     def to_treeview(self, filename, cluster_method='mcl', gene_normalize=True):
         dm = self.expr(gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
-            order = self._ft('leaves').sort('index').index.values
+            order = self._bcolz('leaves').sort('index').index.values
         elif cluster_method == 'mcl':
-            order = self._ft('clusters').loc[dm.index].\
+            order = self._bcolz('clusters').loc[dm.index].\
                     fillna(np.inf).sort('cluster').index.values
         else:
             order = dm.index
@@ -658,10 +657,10 @@ class COB(Expr):
             with open(filename,'w') as OUT:
                 print(json.dumps(net),file=OUT)
                 del net
-                self.coex = self._ft('coex')
+                self.coex = self._bcolz('coex')
         else:
             net = json.dumps(net)
-            self.coex = self._ft('coex')
+            self.coex = self._bcolz('coex')
             return net
 
 
@@ -905,9 +904,9 @@ class COB(Expr):
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
-            order = self._ft('leaves').sort_values(by='index').index.values
+            order = self._bcolz('leaves').sort_values(by='index').index.values
         elif cluster_method == 'mcl':
-            order = self._ft('clusters').loc[dm.index].\
+            order = self._bcolz('clusters').loc[dm.index].\
                     fillna(np.inf).sort_values(by='cluster').index.values
         else:
             # No cluster order
@@ -1136,8 +1135,8 @@ class COB(Expr):
         ))
         
         self.log("Applying Fisher Transform")
-        pccs[pccs >= 1] = 0.9999999
-        pccs[pccs <= -1] = -0.9999999
+        pccs[pccs >= 1.0] = 0.9999999
+        pccs[pccs <= -1.0] = -0.9999999
         pccs = np.arctanh(pccs)
         gc.collect();
         
@@ -1182,12 +1181,12 @@ class COB(Expr):
         
         # 5. Store the table
         self.log("Storing the coex table")
-        self._ft('coex', df=tbl)
+        self._bcolz('coex', df=tbl)
         del tbl
         gc.collect()
         
         # 6. Load the new table into the object
-        self.coex = self._ft('coex')
+        self.coex = self._bcolz('coex')
         self.log("Done")
         return self
 
@@ -1212,7 +1211,7 @@ class COB(Expr):
             # Translate the expr indexes to the gene names
             for i,degree in sigs:
                 self.degree.ix[names[i]] = degree
-        self._ft('degree', df=self.degree)
+        self._bcolz('degree', df=self.degree)
         # Cleanup
         del sigs 
         del names
@@ -1247,11 +1246,11 @@ class COB(Expr):
         
         # Put them in a dataframe and stow them
         self.leaves = pd.DataFrame(dists,index=self._expr.index,columns=['index'])
-        self._ft('leaves', df=self.leaves)
+        self._bcolz('leaves', df=self.leaves)
         
         # Cleanup and reinstate the coex table
         del dists; gc.collect();
-        self.coex = self._ft('coex')
+        self.coex = self._bcolz('coex')
         return self
     
     def _calculate_clusters(self):
@@ -1268,7 +1267,7 @@ class COB(Expr):
                         for gene in cluster],
                 columns=['Gene', 'cluster']
             ).set_index('Gene')
-            self._ft('clusters', df=self.clusters)
+            self._bcolz('clusters', df=self.clusters)
         self.log('Creating Cluster Ontology')
         terms = []
         for i,x in enumerate(self.clusters.groupby('cluster')):
@@ -1312,12 +1311,12 @@ class COB(Expr):
     @classmethod
     def create(cls, name, description, refgen):
         self = super().create(name, description, refgen)
-        self._ft('gene_qc_status', df=pd.DataFrame())
-        self._ft('accession_qc_status', df=pd.DataFrame())
-        self._ft('coex', df=pd.DataFrame())
-        self._ft('degree', df=pd.DataFrame())
-        self._ft('mcl_cluster', df=pd.DataFrame())
-        self._ft('leaves', df=pd.DataFrame())
+        self._bcolz('gene_qc_status', df=pd.DataFrame())
+        self._bcolz('accession_qc_status', df=pd.DataFrame())
+        self._bcolz('coex', df=pd.DataFrame())
+        self._bcolz('degree', df=pd.DataFrame())
+        self._bcolz('mcl_cluster', df=pd.DataFrame())
+        self._bcolz('leaves', df=pd.DataFrame())
         self._expr_index = defaultdict(
             lambda: None,
             {gene:index for index, gene in enumerate(self._expr.index)}

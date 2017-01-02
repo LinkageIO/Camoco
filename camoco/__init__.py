@@ -22,6 +22,8 @@ pyximport.install(setup_args={
     "include_dirs":numpy.get_include() 
 })
 
+import matplotlib
+matplotlib.use('Agg')
 from .Config import cf
 from .Camoco import Camoco
 from .Expr import Expr
