@@ -1135,8 +1135,8 @@ class COB(Expr):
         ))
         
         self.log("Applying Fisher Transform")
-        pccs[pccs >= 1.0] = 0.99999
-        pccs[pccs <= -1.0] = -0.99999
+        pccs[pccs >= 1.0] = 0.9999999
+        pccs[pccs <= -1.0] = -0.9999999
         pccs = np.arctanh(pccs)
         gc.collect();
         
