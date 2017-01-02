@@ -5,6 +5,11 @@ import tempfile
 import numpy as np
 import pandas as pd
 import bcolz as bcz
+
+# Suppress the warning until the next wersion
+import warnings
+from flask.exthook import ExtDeprecationWarning
+warnings.simplefilter('ignore',ExtDeprecationWarning)
 import blaze as blz
 
 from .Tools import log
