@@ -236,7 +236,7 @@ then
     rm -rf apsw
     git clone https://github.com/rogerbinns/apsw.git
     cd apsw
-    python setup.py fetch --missing-checksum-ok --all build --enable-all-extensions install
+    python setup.py fetch --version=3.15.2 --missing-checksum-ok --all build --enable-all-extensions install
     cd $BASE
     rm -rf apsw
 else
