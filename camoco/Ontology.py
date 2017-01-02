@@ -275,7 +275,7 @@ class Ontology(Camoco):
         '''
         self = cls.create(name,description,refgen)
         self.log('Adding {} terms to the database.',len(terms))
-        self.add_terms(terms, overwrite=False)
+        self.add_terms(terms, overwrite=True)
         # Build the indices
         self.log('Building the indices.')
         self._build_indices()
