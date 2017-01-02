@@ -247,8 +247,10 @@ class Expr(Camoco):
         # Sort the table by genes
         df = df.sort_index()
         # ensure that column names are alphanumeric
-        pattern = re.compile('[^A-Za-z0-9_, ;:().]')
-        df.columns = [pattern.sub('', x) for x in df.columns.values]
+        pattern = re.compile('[^A-Za-z0-9_]')
+        beg_pattern = re.compile('^\d')
+        df.columns = [pattern.sub('_', x).strip('_') for x in df.columns.values]
+        df.columns = [x if not beg_pattern.match(x[0]) else 'Exp_'+x for x in df.columns.values]
         # Also, make sure gene names are uppercase
         df.index = [pattern.sub('', str(x)).upper() for x in df.index.values]
         try:
@@ -741,6 +743,7 @@ class Expr(Camoco):
         self._global('rawtype', rawtype)
         # put raw values into the database
         self.log('Importing Raw Expression Values')
+        df.columns = [title.strip('_') for title in df.columns]
         self._update_values(df, 'Raw'+rawtype, raw=True)
         if quality_control:
             self.log('Performing Quality Control on genes')

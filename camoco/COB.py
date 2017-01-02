@@ -45,19 +45,22 @@ class COB(Expr):
         self.log('Loading coex table')
         self.coex = self._bcolz('coex')
         if self.coex is None:
-            self.log("{} is empty ({})", name, e)
+            self.log("{} is empty", name)
         self.log('Loading Global Degree')
         self.degree = self._bcolz('degree')
         if self.degree is None:
-            self.log("{} is empty ({})", name, e)
+            self.log("{} is empty", name)
         if not available_datasets('Ontology','{}MCL'.format(name))\
             and self.coex is not None:
             self._calculate_clusters()
         self.log('Loading Clusters')
         self.clusters = self._bcolz('clusters')
-        self.MCL = Ontology('{}MCL'.format(self.name))
         if self.clusters is None:
-            self.log('Clusters not loaded for: {} ()', name, e)
+            self.log('Clusters not loaded for: {} ()', name)
+            self.MCL = None
+        else:
+            self.MCL = Ontology('{}MCL'.format(self.name))
+
 
     def __repr__(self):
         return '<COB: {}>'.format(self.name)

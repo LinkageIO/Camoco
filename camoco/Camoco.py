@@ -2,6 +2,7 @@
 import apsw as lite
 import os as os
 import tempfile
+import numpy as np
 import pandas as pd
 import bcolz as bcz
 import blaze as blz
@@ -77,10 +78,15 @@ class Camoco(object):
             except IOError:
                 return None
             else:
-                if blaze:
-                    df = blz.data(df)
+                if len(df) == 0:
+                    df = pd.DataFrame()
+                    if blaze:
+                        df = blz.data(df)
                 else:
-                    df = df.todataframe()
+                    if blaze:
+                        df = blz.data(df)
+                    else:
+                        df = df.todataframe()
                 return df
             #if 'idx' in df.columns.values:
             #    df.set_index('idx', drop=True, inplace=True)
@@ -91,15 +97,17 @@ class Camoco(object):
             #    df = df.copy()
             #    df['idx'] = df.index
             if isinstance(df,pd.DataFrame):
-                bcz.fromdataframe(df, mode='w',
-                    rootdir=os.path.expanduser(
+                path = os.path.expanduser(
                         os.path.join(
                             cf.options.basedir,
                             'databases',
                             "{}.{}.{}".format(type, dbname, tblname)
                         )
                     )
-                )
+                if df.empty:
+                    bcz.fromiter((),dtype=np.int32,mode='w',count=0,rootdir=path)
+                else:
+                    bcz.ctable.fromdataframe(df,mode='w',rootdir=path)
                 
             #if 'idx' in df.columns.values:
             #    del df
