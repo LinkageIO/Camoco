@@ -247,12 +247,13 @@ class Expr(Camoco):
         # Sort the table by genes
         df = df.sort_index()
         # ensure that column names are alphanumeric
-        pattern = re.compile('[^A-Za-z0-9_]')
-        beg_pattern = re.compile('^\d')
-        df.columns = [pattern.sub('_', x).strip('_') for x in df.columns.values]
-        df.columns = [x if not beg_pattern.match(x[0]) else 'Exp_'+x for x in df.columns.values]
+        colP = re.compile('[^A-Za-z0-9_]')
+        begP = re.compile('^\d')
+        df.columns = [colP.sub('_', x).strip('_') for x in df.columns.values]
+        df.columns = [x if not begP.match(x[0]) else 'Exp_'+x for x in df.columns.values]
         # Also, make sure gene names are uppercase
-        df.index = [pattern.sub('', str(x)).upper() for x in df.index.values]
+        idxP = re.compile('[^A-Za-z0-9_, ;:().]')
+        df.index = [idxP.sub('', str(x)).upper() for x in df.index.values]
         try:
             self._bcolz(table, df=df)
             self._expr = df
@@ -457,7 +458,7 @@ class Expr(Camoco):
         qc_accession['PASS_ALL'] = qc_accession.apply(
             lambda row: np.all(row), axis=1
         )
-        df = df.loc[:, qc_accession['PASS_ALL']]
+        df = df.loc[:, qc_accession['PASS_ALL'].index.values]
         # Update the database
         self._bcolz('qc_accession', df=qc_accession)
         self._bcolz('qc_gene', df=qc_gene)
@@ -743,7 +744,6 @@ class Expr(Camoco):
         self._global('rawtype', rawtype)
         # put raw values into the database
         self.log('Importing Raw Expression Values')
-        df.columns = [title.strip('_') for title in df.columns]
         self._update_values(df, 'Raw'+rawtype, raw=True)
         if quality_control:
             self.log('Performing Quality Control on genes')
