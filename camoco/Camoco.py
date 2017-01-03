@@ -92,15 +92,15 @@ class Camoco(object):
                         df = blz.data(df)
                     else:
                         df = df.todataframe()
+                if not blaze and 'idx' in df.columns.values:
+                    df.set_index('idx', drop=True, inplace=True)
+                    df.index.name = None
                 return df
-            #if 'idx' in df.columns.values:
-            #    df.set_index('idx', drop=True, inplace=True)
-            #    df.index.name = None
         
         else:
-            #if not(df.index.dtype_str == 'int64') and not(df.empty):
-            #    df = df.copy()
-            #    df['idx'] = df.index
+            if not(df.index.dtype_str == 'int64') and not(df.empty):
+                df = df.copy()
+                df['idx'] = df.index
             if isinstance(df,pd.DataFrame):
                 path = os.path.expanduser(
                         os.path.join(
@@ -114,8 +114,8 @@ class Camoco(object):
                 else:
                     bcz.ctable.fromdataframe(df,mode='w',rootdir=path)
                 
-            #if 'idx' in df.columns.values:
-            #    del df
+            if 'idx' in df.columns.values:
+                del df
             return
 
     def _tmpfile(self):
