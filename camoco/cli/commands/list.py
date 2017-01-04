@@ -11,4 +11,4 @@ def list_command(args):
     else:
         args.type = '%'
         args.name = '%'
-        print(co.available_datasets(args.type,args.name))
+        print(co.available_datasets(args.type,args.name).to_string())

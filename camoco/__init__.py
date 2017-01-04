@@ -41,3 +41,6 @@ from .GEO import Family
 from .GOnt import GOnt
 from .Annotation import RefGenFunc
 from .Annotation import GWASData
+
+# Create yourself
+Camoco.create('Camoco','Mother Database')
