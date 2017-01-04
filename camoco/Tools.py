@@ -68,7 +68,7 @@ def available_datasets(type='%', name='%'):
             datasets = pd.DataFrame(
                 datasets, 
                 columns=["Type", "Name", "Description", "Date Added"],
-            ).set_index('Type')
+            ).set_index(['Name','Type'])
         else:
             datasets = pd.DataFrame(
                 columns=["Type", "Name", "Description", "Date Added"]
@@ -79,7 +79,8 @@ def available_datasets(type='%', name='%'):
         else:
             return datasets
     except CantOpenError as e:
-        return False
+        raise e
+        
 
 def available(type=None,name=None):
     # Laaaaaaaaazy
