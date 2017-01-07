@@ -396,6 +396,8 @@ class GOnt(Ontology):
         )
         # Assign genes to terms AND to parent terms
         self.log("Adding GO-gene assignments")
+        # Keep a list of missing references to report later
+        missing_terms = set()
         for gene_id,term_ids in genes.items():
             # Get a gene object from the refgen
             try:
@@ -403,7 +405,7 @@ class GOnt(Ontology):
                 for term_id in term_ids:
                     # Add gene to each term its annotated to
                     if term_id not in terms:
-                        self.log("{} not in Ontology",term_id)
+                        missing_terms.add(term_id)
                         continue
                     terms[term_id].loci.add(gene)
                     # Propogate gene to each parental term
@@ -411,8 +413,12 @@ class GOnt(Ontology):
                         terms[parent.id].loci.add(gene)
             except ValueError as e:
                 pass
+        self.log(
+            'The following terms were referenced during import '
+            'but were not found in the Ontology: \n' +
+            '\n'.join(sorted(missing_terms)) + '\n'
+        ) 
         self.add_terms(terms.values(), overwrite=False)
-        self.log('Build Sucessful.')
         return self
 
     def _create_tables(self):
