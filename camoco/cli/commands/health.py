@@ -215,8 +215,15 @@ def cob_health(args):
 
         if not path.exists('{}_GO.png'.format(args.out)):
             # Convert pvals to log10
-            go_enrichment['density_pval'] = -1*np.log10(go_enrichment['density_pval'])
-            go_enrichment['locality_pval'] = -1*np.log10(go_enrichment['locality_pval'])
+            with np.errstate(divide='ignore'):
+                # When no bootstraps are more extreme than the term, the minus log pval yields an infinite
+                go_enrichment['density_pval'] = -1*np.log10(go_enrichment['density_pval'])
+                go_enrichment['locality_pval'] = -1*np.log10(go_enrichment['locality_pval'])
+                # Fix the infinites so they are plotted
+                max_density = np.max(go_enrichment['density_pval'][np.isfinite(go_enrichment['density_pval'])])
+                max_locality = np.max(go_enrichment['locality_pval'][np.isfinite(go_enrichment['locality_pval'])])
+                go_enrichment.loc[np.logical_not(np.isfinite(go_enrichment['density_pval'])),'density_pval'] = max_density + 1
+                go_enrichment.loc[np.logical_not(np.isfinite(go_enrichment['locality_pval'])),'locality_pval'] = max_locality + 1
             plt.clf()
             figure,axes = plt.subplots(3,2,figsize=(12,12))
             # -----------
