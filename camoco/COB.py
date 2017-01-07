@@ -40,6 +40,9 @@ import gc
 from scipy.stats import pearsonr
 
 class COB(Expr):
+    '''
+        A COB object represents an easily browsable Co-expression network. (COB-> co-expression browser)
+    '''
     def __init__(self, name):
         super().__init__(name=name)
         self.log('Loading coex table')
@@ -74,7 +77,7 @@ class COB(Expr):
                 Desc: {}
                 RawType: {}
                 TransformationLog: {}
-                Num Genes: {:,}({:.2g}%)
+                Num Genes: {:,}({:.2g}% of total)
                 Num Accessions: {}
                 Num Edges: {:,}
 
@@ -92,8 +95,8 @@ class COB(Expr):
             max accession missing data: {}
                 - Accession missing more than this percent are removed
             min single sample expr: {} 
-                - genes must have at least this amount of expression in 
-                  on accession
+                - genes must have this amount of expression in 
+                  at least one accession.
 
             Clusters
             ------------------
