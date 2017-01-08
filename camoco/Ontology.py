@@ -192,23 +192,28 @@ class Ontology(Camoco):
         cursor : apsw cursor object
             A initialized cursor object, for batch operation.'''
 
-        if not cursor:
-            cur = self.db.cursor()
-            cur.execute('BEGIN TRANSACTION')
-        else:
-            cur = cursor
+        try:
+            if not cursor:
+                cur = self.db.cursor()
+                cur.execute('BEGIN TRANSACTION')
+            else:
+                cur = cursor
+    
+            if not isinstance(term, str):
+                id = term.id
+            else:
+                id = term
+    
+            cur.execute('''
+                DELETE FROM term_loci WHERE term = ?;
+                DELETE FROM terms WHERE id = ?;
+                ''', (id, id))
+            if not cursor:
+                cur.execute('END TRANSACTION')
+        except Exception as e:
+            cur.execute('ROLLBACK')
+            raise e
 
-        if not isinstance(term, str):
-            id = term.id
-        else:
-            id = term
-
-        cur.execute('''
-            DELETE FROM term_loci WHERE term = ?;
-            DELETE FROM terms WHERE id = ?;
-            ''', (id, id))
-        if not cursor:
-            cur.execute('END TRANSACTION')
 
     def add_terms(self, terms, overwrite=True):
         '''
