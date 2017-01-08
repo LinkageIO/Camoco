@@ -68,7 +68,7 @@ def available_datasets(type='%', name='%'):
             datasets = pd.DataFrame(
                 datasets, 
                 columns=["Type", "Name", "Description", "Date Added"],
-            ).set_index(['Name','Type'])
+            ).set_index(['Type'])
         else:
             datasets = pd.DataFrame(
                 columns=["Type", "Name", "Description", "Date Added"]
