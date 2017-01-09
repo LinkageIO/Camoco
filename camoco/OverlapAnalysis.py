@@ -130,19 +130,27 @@ class OverlapAnalysis(object):
         # Iterate through terms and calculate
         for term in terms:
             self.cob.log(
-                "Calculating Overlap for {} of {} in {}",
+                "Calculating Overlap for {} of {} in {} with window:{} and flank:{}",
                 term.id,
                 self.ont.name,
-                self.cob.name
+                self.cob.name,
+                self.args.candidate_window_size,
+                self.args.candidate_flank_limit
             )
             loci = self.snp2gene(term)
+            if len(loci) < 2:
+                self.cob.log('Not enough genes to perform overlap analysis')
+                continue
             overlap = self.overlap(loci)
             bootstraps = self.generate_bootstraps(loci,overlap)
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
             # Calculate z scores for density
-            overlap['zscore'] = (overlap.score-bs_mean)/bs_std
-            bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
+            if bs_std != 0:
+                overlap['zscore'] = (overlap.score-bs_mean)/bs_std
+                bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
+            else:
+                overlap['zscore'] = bootstraps['zscore'] = 0
             # Calculate FDR
             overlap['fdr'] = np.nan
             max_zscore = int(overlap.zscore.max()) + 1
@@ -167,7 +175,7 @@ class OverlapAnalysis(object):
                 overlap.sort_values(by=['zscore'],ascending=False,inplace=True)
             overlap_pval = (
                 (sum(bootstraps.groupby('iter').apply(lambda x: x.score.mean()) >= overlap.score.mean()))\
-                 / len(bootstraps.iter.unique())
+                / len(bootstraps.iter.unique())
             )
             # This gets collated into all_results below
             overlap['COB'] = self.cob.name
