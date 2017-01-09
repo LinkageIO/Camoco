@@ -150,6 +150,7 @@ class OverlapAnalysis(object):
                 overlap['zscore'] = (overlap.score-bs_mean)/bs_std
                 bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
             else:
+                # If there is no variation, make all Z-scores 0
                 overlap['zscore'] = bootstraps['zscore'] = 0
             # Calculate FDR
             overlap['fdr'] = np.nan
