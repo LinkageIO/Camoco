@@ -385,6 +385,30 @@ def AtRoot(AtTair10):
 ''' -------------------------------------------------------------------------
             GWAS Fixtures
 '''
+@pytest.fixture(scope='module')
+def testGWAS(testRefGen):
+    if cf.test.force.Ontology:
+        co.del_dataset('GWAS','testGWAS',safe=False)
+    df = pd.DataFrame({
+        'Trait' : ['a','a','b','b'],
+        'CHR' : ['chr1','chr2','chr3','chr4'],
+        'POS' : [100,200,300,400],
+        'Start' : [100,200,300,400],
+        'End' : [1000,20000,3000,4000],
+        'id' : ['snp1','snp2','snp3','snp4'],
+        'pval' : [0.05,0.05,0.01,0.01]
+    }) 
+    gwas = co.GWAS.from_DataFrame(
+        df,
+        'testGWAS',
+        'Test GWAS Dataset',
+        testRefGen,
+        chr_col='CHR',
+        pos_col='POS',
+        id_col='id',
+        term_col='Trait'
+    ) 
+    return gwas
 
 @pytest.fixture(scope='module')
 def ZmWallace(Zm5bFGS):
