@@ -137,7 +137,29 @@ class GWAS(Ontology):
     @classmethod
     def create(cls, name, description, refgen, type='GWAS'):
         '''
-            Create an empty GWAS dataset
+            Create an empty GWAS dataset.
+
+            Parameters
+            ----------
+            name : str
+                Name of the GWAS dataset
+            description : str
+                Short description of the GWAS dataset
+            refgen : camoco.RefGen object
+                The corresponding RefGen object that is 
+                affiliated with the GWAS dataset. (For 
+                extracting candidate genes, etc)
+
+            Returns
+            -------
+            A camoco.GWAS object
+
+            Note
+            ----
+            See classmethods: from_DataFrame and from_terms
+            for help building GWAS datasets from other common
+            data types.
+
         '''
         return super().create(name, description, refgen, type='GWAS')
 
