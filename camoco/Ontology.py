@@ -353,8 +353,10 @@ class Ontology(Camoco):
                 co-expression network. If None, the value will be calculated as
                 the total number of distinct genes that are observed in the 
                 ontology.
-            include_genes : boo (default: False)
+            include_genes : bool (default: False)
                 Include comma delimited genes as a field
+            return_table : bool (default: False)
+                If True, return results as a data frame
         '''
         terms = self.db.cursor().execute('''SELECT DISTINCT term 
         FROM term_loci WHERE id IN ('{}')
@@ -399,7 +401,7 @@ class Ontology(Camoco):
                     ('num_universe', num_universe),
                     ('term_size'   , num_in_term),
                     ('num_terms'   , len(self)),
-                    ('sum_sampled' , num_sampled)
+                    ('num_sampled' , num_sampled)
                 ])
                 if include_genes == True:
                     term.attrs['hyper']['genes'] = ",".join(
