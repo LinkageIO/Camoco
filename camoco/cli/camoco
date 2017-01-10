@@ -590,6 +590,14 @@ if __name__ == '__main__':
         default=['all']
     )
     overlapCLI.add_argument(
+        '--skip-terms',
+        nargs='*',
+        default=[],
+        help=(
+            'Terms specified here will be skipped.'    
+        )
+    )
+    overlapCLI.add_argument(
         '--num-bootstraps', 
         default='auto',
         metavar='auto',
