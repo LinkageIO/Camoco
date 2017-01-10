@@ -129,6 +129,8 @@ class OverlapAnalysis(object):
         results = []
         # Iterate through terms and calculate
         for term in terms:
+            if term.id in self.args.skip_terms:
+                self.cob.log('Skipping {} since it was in --skip-terms',term.id)
             self.cob.log(
                 "Calculating Overlap for {} of {} in {} with window:{} and flank:{}",
                 term.id,
@@ -235,7 +237,7 @@ class OverlapAnalysis(object):
         methods = self.results.Method.unique()
         cobs = self.results.COB.unique()
         fig,axes = plt.subplots(len(cobs),len(methods))
-        fig.set_size_inches((8,10))
+        fig.set_size_inches((15,10))
         def get_axis(i,j,axes):
             if len(axes.shape) == 1:
                 return axes[i]
@@ -286,7 +288,7 @@ class OverlapAnalysis(object):
                     axis.set_xticks(np.arange(len(data.columns))+0.5)
                     axis.set_xticklabels(
                         [re.sub('\d','',x) for x in data.columns.values], 
-                        rotation=45,
+                        rotation=90,
                         size=7
                     )
                 else:
