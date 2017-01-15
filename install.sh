@@ -232,13 +232,16 @@ python -c 'import apsw'
 if [ $? -eq 1 ]
 then
     echo "Installing apsw into the conda environment"
-    cd $BASE
-    rm -rf apsw
-    git clone https://github.com/rogerbinns/apsw.git
-    cd apsw
-    python setup.py fetch --version=3.15.2 --missing-checksum-ok --all build --enable-all-extensions install
-    cd $BASE
-    rm -rf apsw
+    #cd $BASE
+    #rm -rf apsw
+    #git clone https://github.com/rogerbinns/apsw.git
+    #cd apsw
+    #python setup.py fetch --version=3.15.2 --missing-checksum-ok --all build --enable-all-extensions install
+    #cd $BASE
+    #rm -rf apsw
+    pip install --user https://github.com/rogerbinns/apsw/releases/download/3.15.2-r1/apsw-3.15.2-r1.zip \
+        --global-option=fetch --global-option=--version --global-option=3.15.2 --global-option=--all \
+        --global-option=build --global-option=--enable-all-extensions
 else
     green "apsw installed"
 fi

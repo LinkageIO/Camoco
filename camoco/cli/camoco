@@ -34,7 +34,7 @@ from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
 # Analysis Commands
-from camoco.cli.commands.OverlapAnalysis import OverlapAnalysis
+from camoco.OverlapAnalysis import OverlapAnalysis
 
 from camoco import cf
 
@@ -590,12 +590,22 @@ if __name__ == '__main__':
         default=['all']
     )
     overlapCLI.add_argument(
+        '--skip-terms',
+        nargs='*',
+        default=[],
+        help=(
+            'Terms specified here will be skipped.'    
+        )
+    )
+    overlapCLI.add_argument(
         '--num-bootstraps', 
         default='auto',
-        metavar=100,
+        metavar='auto',
         help=(
             'The number of bootstraps to perform in order '
-            'to estimate a null distribution. (default: 100)'
+            'to estimate a null distribution. If auto the algorithm '
+            'will bootstrap *until* the term is not significant at n=1000 '
+            '*or* 1000 bootstraps have been performed. (default: auto)'
         )
     )
     overlapCLI.add_argument(
@@ -621,14 +631,17 @@ if __name__ == '__main__':
     overlapCLI.add_argument(
         '--snp2gene', 
         type=str, 
-        default='strongest',
+        default='effective',
         choices=['strongest','effective'],
-        metavar='strongest',
+        metavar='effective',
         help=(
-            'The SNP to gene mapping to use. Specifying multiple mappings '
-            ' will result in multiple results. Must be in: '
-            "['effective','strongest'] "
-            "(default: strongest)"
+            'The SNP to gene mapping to use. If *effective*, SNPs with '
+            'overlappingn windows will be collapsed into genomic intervals '
+            'resulting in all genes within the intervals to be used. If '
+            '*strongest* is specified, SNPs with lower values designated from '
+            '--strongest-attr (e.g. pvals) will be dropped when SNPs have overlapping '
+            'windows. Value must be in ["effective","strongest"]. ' 
+            '(default: effective)'
         )
     )
     overlapCLI.add_argument(

@@ -138,9 +138,9 @@ class SimulationAnalysis(object):
                 else:
                     axes[i].set_ylabel('Number Significant Terms')
             axes[i].set_xlabel(noise_source)
-        lgd = axes[i].legend(bbox_to_anchor=(2.0,0.5))
+        lgd = axes[i].legend(bbox_to_anchor=(2.0,1))
         if filename is not None:
-            plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight')
+            plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight',dpi=300)
         print(breakdown)
         return (fig,axes)
 
@@ -271,14 +271,17 @@ class SimulationAnalysis(object):
                 labels.insert(0,'/'.join(map(str,wid)))
             if filename is not None:
                 axes[1,i].boxplot(boxes,labels=labels,vert=False)
+                axes[1,i].set_xlabel('FCR')
             # if we are on the left, plot the label
             if i == 0:
-                axes[0,i].set_ylabel('Signal (Fraction Terms Significant)')
+                if normalize_num_sig:
+                    axes[0,i].set_ylabel('Signal (Fraction Terms Significant)')
+                else:
+                    axes[0,i].set_ylabel('Signal (Number Terms Significant)')
                 axes[1,i].set_ylabel('Windowing Parameters')
-        lgd = axes[0,i].legend(bbox_to_anchor=(2.0,0.5))
+        lgd = axes[0,i].legend(bbox_to_anchor=(2.0,1))
         if filename is not None:
-            plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight')
-
+            plt.savefig(filename,bbox_extra_artists=(lgd,),bbox_inches='tight',dpi=300)
         return (fig,axes)
 
        

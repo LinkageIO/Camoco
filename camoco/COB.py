@@ -41,6 +41,9 @@ import gc
 from scipy.stats import pearsonr
 
 class COB(Expr):
+    '''
+        A COB object represents an easily browsable Co-expression network. (COB-> co-expression browser)
+    '''
     def __init__(self, name):
         super().__init__(name=name)
         self.log('Loading coex table')
@@ -75,7 +78,7 @@ class COB(Expr):
                 Desc: {}
                 RawType: {}
                 TransformationLog: {}
-                Num Genes: {:,}({:.2g}%)
+                Num Genes: {:,}({:.2g}% of total)
                 Num Accessions: {}
                 Num Edges: {:,}
 
@@ -93,8 +96,8 @@ class COB(Expr):
             max accession missing data: {}
                 - Accession missing more than this percent are removed
             min single sample expr: {} 
-                - genes must have at least this amount of expression in 
-                  on accession
+                - genes must have this amount of expression in 
+                  at least one accession.
 
             Clusters
             ------------------
@@ -141,7 +144,8 @@ class COB(Expr):
     def set_sig_edge_zscore(self,zscore):
         self.coex.significant = self.coex.score >= zscore
 
-    def neighbors(self, gene, sig_only=True, names_as_index=True, names_as_cols=False):
+    def neighbors(self, gene, sig_only=True, names_as_index=True, 
+                  names_as_cols=False, return_gene_set=False):
         '''
             Returns a DataFrame containing the neighbors for gene.
 
@@ -155,10 +159,14 @@ class COB(Expr):
                 Include gene names as the index.
             names_as_cols : bool (default: False)
                 Include gene names as two columns named 'gene_a' and 'gene_b'.
+            return_gene_set: bool (default: False)
+                Return the set of neighbors instead of a dataframe
 
             Returns
             -------
-            A DataFrame containing edges
+            - A DataFrame containing edges 
+            - A Gene set IF return_gene_set is true
+
         '''
         # Find the neighbors
         gene_id = self._expr_index[gene.id]
@@ -170,7 +178,13 @@ class COB(Expr):
         if sig_only:
             edges = edges[edges.significant == 1]
         if len(edges) == 0:
-            return pd.DataFrame(columns=['score','distance','significant'])
+            edges = pd.DataFrame(columns=['gene_a','gene_b','score','distance','significant'])
+            if names_as_cols:
+                return edges
+            else:
+                return edges.set_index(['gene_a','gene_b'])
+        if return_gene_set:
+            names_as_index = True
         
         # Find the indexes if necessary
         if names_as_index or names_as_cols:
@@ -180,6 +194,8 @@ class COB(Expr):
             edges.insert(0,'gene_a', names[ids[:,0]])
             edges.insert(1,'gene_b', names[ids[:,1]])
             del ids; del names;
+        if return_gene_set:
+            return set(self.refgen[set(edges['gene_a']).union(edges['gene_b'])])
         if names_as_index:
             edges = edges.set_index(['gene_a','gene_b'])
         
@@ -933,8 +949,6 @@ class COB(Expr):
             accession_dists = leaves_list(link)
             # Order by accession distance
             dm = dm.loc[:,dm.columns[accession_dists]]
-
-
         # Save plot if provided filename
         fig = plt.figure(
             facecolor='white',
