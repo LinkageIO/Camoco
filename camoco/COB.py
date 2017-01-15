@@ -27,6 +27,7 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import itertools
+from odo import odo
 from scipy.misc import comb 
 
 from matplotlib import rcParams
@@ -43,7 +44,7 @@ class COB(Expr):
     def __init__(self, name):
         super().__init__(name=name)
         self.log('Loading coex table')
-        self.coex = self._bcolz('coex')
+        self.coex = self._bcolz('coex',blaze=True)
         if self.coex is None:
             self.log("{} is empty", name)
         self.log('Loading Global Degree')
@@ -131,7 +132,7 @@ class COB(Expr):
     @memoize
     def edge_FDR(self):
         # get the percent of significant edges
-        num_sig = np.sum(self.coex['significant'])/len(self.coex)
+        num_sig = self.coex.significant.coerce(to='int32').sum()/len(self.coex)
         # calulate the number expected
         num_exp = 1-norm.cdf(int(self._global('significance_threshold')))
         # FDR is the percentage expected over the percentage found
@@ -163,7 +164,8 @@ class COB(Expr):
         gene_id = self._expr_index[gene.id]
         neighbor_indices = PCCUP.coex_neighbors(gene_id, self.num_genes())
         neighbor_indices.sort()
-        edges = self.coex.iloc[neighbor_indices]
+        edges = odo(self.coex[neighbor_indices],pd.DataFrame)
+        edges.set_index(neighbor_indices,inplace=True)
         del neighbor_indices
         if sig_only:
             edges = edges[edges.significant == 1]
@@ -255,7 +257,7 @@ class COB(Expr):
         num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
-            df = self.coex.copy()
+            df = odo(self.coex,pd.DataFrame)
         else:
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
@@ -269,8 +271,11 @@ class COB(Expr):
                 # Grab the coexpression indices for the genes
                 ids = PCCUP.coex_index(ids, num_genes)
                 ids.sort()
-                df = self.coex.iloc[ids]
+                df = odo(self.coex[ids],pd.DataFrame)
+                df.set_index(ids,inplace=True)
                 del ids
+        if sig_only:
+            df = df.ix[df.significant]
         if min_distance is not None:
             df = df[df.distance >= min_distance]
         if names_as_index or names_as_cols or trans_locus_only:
@@ -298,8 +303,6 @@ class COB(Expr):
                 parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
-        if sig_only:
-            df = df.ix[df.significant]
         return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
@@ -525,7 +528,6 @@ class COB(Expr):
             score = self.subnetwork(gene_list, sig_only=sig_only, 
             min_distance=min_distance, names_as_index=False,
             names_as_cols=False)
-            del self.coex
             
             # Drop unecessary columns
             score.drop(['distance','significant'], axis=1, inplace=True)
@@ -543,7 +545,6 @@ class COB(Expr):
             score.to_csv(
                 OUT, columns=['gene_a','gene_b','score'],index=False, sep='\t')
             del score
-            self.coex = self._bcolz('coex')
             self.log('Done')
 
     def to_graphml(self,file, gene_list=None, sig_only=True, min_distance=0):
@@ -552,7 +553,6 @@ class COB(Expr):
         edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
         min_distance=min_distance, names_as_index=False,
         names_as_cols=False).index.values
-        del self.coex
         
         # Find the ids from those
         names = self._expr.index.values
@@ -570,8 +570,7 @@ class COB(Expr):
         # Print the file
         self.log('Writing the file.')
         nx.write_graphml(net,file)
-        del net;
-        self.coex = self._bcolz('coex')
+        del net
         return
 
     def to_treeview(self, filename, cluster_method='mcl', gene_normalize=True):
@@ -640,7 +639,6 @@ class COB(Expr):
         edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
         min_distance=min_distance, names_as_index=False,
         names_as_cols=True)
-        del self.coex
     
         for source,target,score,significant,distance in subnet.itertuples(index=False):
             net['edges'].append(
@@ -657,10 +655,8 @@ class COB(Expr):
             with open(filename,'w') as OUT:
                 print(json.dumps(net),file=OUT)
                 del net
-                self.coex = self._bcolz('coex')
         else:
             net = json.dumps(net)
-            self.coex = self._bcolz('coex')
             return net
 
 
@@ -990,7 +986,7 @@ class COB(Expr):
         fig = plt.figure(figsize=(8, 6))
         # grab the scores only and put in a
         # np array to save space (pandas DF was HUGE)
-        scores = self.coex.score.dropna().values
+        scores = odo(self.coex.score,np.ndarray)[~np.isnan(self.coex.score)]
         if pcc:
             self.log('Transforming scores')
             scores = (scores * float(self._global('pcc_std'))) \
@@ -1119,12 +1115,6 @@ class COB(Expr):
             Generates pairwise PCCs for gene expression profiles in self._expr.
             Also calculates pairwise gene distance.
         '''
-        # Drop the old Coex table to save memory
-        try:
-            del self.coex
-        except AttributeError:
-            pass
-
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
         pccs = (1 - PCCUP.pair_correlation(
@@ -1157,39 +1147,27 @@ class COB(Expr):
         gc.collect()
         
         # 3. Build the dataframe
-        self.log("Build the dataframe")
-        tbl = pd.DataFrame(
-            pccs, 
-            index=np.arange(len(pccs)), 
-            columns=['score'], 
-            copy=False
-        )
+        self.log("Build the dataframe and set the significance threshold")
+        self._global('significance_threshold', significance_thresh)
+        raw_coex = _raw_coex(pccs, significance_thresh)
         del pccs
         gc.collect()
         
-        # 3. Calculate Gene Distance
+        # 4. Calculate Gene Distance
         self.log("Calculating Gene Distance")
-        tbl['distance'] = self.refgen.pairwise_distance(
-            gene_list=self.refgen.from_ids(self._expr.index))
+        raw_coex.addcol(self.refgen.pairwise_distance(
+            gene_list=self.refgen.from_ids(self._expr.index)), pos=1, name='distance')
         gc.collect()
         
-        # 4. Assign significance
-        self.log("Thresholding Significant Network Interactions")
-        self._global('significance_threshold', significance_thresh)
-        tbl['significant'] = tbl['score'] >= significance_thresh
-        gc.collect()
-        
-        # 5. Store the table
-        self.log("Storing the coex table")
-        self._bcolz('coex', df=tbl)
-        del tbl
+        # 5. Cleanup
+        raw_coex.flush()
+        del raw_coex
         gc.collect()
         
         # 6. Load the new table into the object
-        self.coex = self._bcolz('coex')
+        self.coex = self._bcolz('coex',blaze=True)
         self.log("Done")
         return self
-
 
     def _calculate_degree(self):
         '''
@@ -1203,8 +1181,7 @@ class COB(Expr):
         self.degree = pd.DataFrame(0,index=names,columns=['Degree'])
         # Get the index and find the counts
         self.log('Calculating Gene degree')
-        sigs = self.coex[self.coex.significant]
-        sigs = sigs.index.values
+        sigs = np.arange(len(self.coex))[odo(self.coex.significant,np.ndarray)]
         sigs = PCCUP.coex_expr_index(sigs, len(self._expr.index.values))
         sigs = list(Counter(chain(*sigs)).items())
         if len(sigs) > 0:
@@ -1230,8 +1207,7 @@ class COB(Expr):
         pcc_std  = float(self._global('pcc_std'))
         
         # Get score column and dump coex from memory for time being
-        dists = self.coex.score
-        del self.coex
+        dists = odo(self.coex.score,np.ndarray)
         
         # Subtract pccs from 1 so we do not get negative distances
         dists = (dists * pcc_std) + pcc_mean
@@ -1249,8 +1225,8 @@ class COB(Expr):
         self._bcolz('leaves', df=self.leaves)
         
         # Cleanup and reinstate the coex table
-        del dists; gc.collect();
-        self.coex = self._bcolz('coex')
+        del dists
+        gc.collect()
         return self
     
     def _calculate_clusters(self):
