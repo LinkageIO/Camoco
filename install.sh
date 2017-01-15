@@ -125,8 +125,8 @@ then
     rm -rf icu_4.8.1.1.orig.tar.gz
     cd icu/source
     ./configure --prefix=$BASE
-    make -s
-    make -s install
+    make
+    make install
     cd $BASE
     rm -rf icu/
 else
@@ -141,7 +141,7 @@ then
     tar xzf qhull-2012.1-src.tgz
     rm -rf qhull-2012.1-src.tgz
     cd qhull-2012.1
-    make -s
+    make
     mv bin/* $BASE/bin/
     mv lib/* $BASE/lib/
     ln -s $BASE/lib/libqhull.so $BASE/lib/libqhull.so.5
@@ -160,12 +160,12 @@ then
     cd $BASE
     wget http://micans.org/mcl/src/mcl-latest.tar.gz
     echo "Extracting the taball"
-    tar xzvf mcl-latest.tar.gz
+    tar xzf mcl-latest.tar.gz
     rm -rf mcl-latest.tar.gz
     cd $(find . -name 'mcl-*' -type d | head -n 1)
     ./configure --prefix=$BASE
-    make -s
-    make -s install
+    make
+    make install
     cd $BASE
     rm -rf $(find . -name 'mcl-*' -type d | head -n 1)
 else
