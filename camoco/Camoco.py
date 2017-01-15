@@ -117,6 +117,7 @@ class Camoco(object):
             if 'idx' in df.columns.values:
                 del df
             return
+    
     def _raw_coex(self,scores,significance_threshold):
         path = os.path.expanduser(
                 os.path.join(

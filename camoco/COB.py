@@ -1163,7 +1163,7 @@ class COB(Expr):
         # 3. Build the dataframe
         self.log("Build the dataframe and set the significance threshold")
         self._global('significance_threshold', significance_thresh)
-        raw_coex = _raw_coex(pccs, significance_thresh)
+        raw_coex = self._raw_coex(pccs, significance_thresh)
         del pccs
         gc.collect()
         
