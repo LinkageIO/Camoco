@@ -126,7 +126,8 @@ class Camoco(object):
                     "{}.{}.{}".format(self.type, self.name, 'coex')
                 )
             )
-        sigs = scores > significance_threshold
+        self._global('current_significance_threshold',significance_threshold)
+        sigs = scores >= significance_threshold
         return bcz.ctable(columns=[scores,sigs], names=['score','significant'], mode='w', rootdir=path)
         
 

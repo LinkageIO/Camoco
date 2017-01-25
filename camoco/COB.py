@@ -46,10 +46,11 @@ class COB(Expr):
     '''
     def __init__(self, name):
         super().__init__(name=name)
-        self.log('Loading coex table')
+        self.log('Loading Coex table')
         self.coex = self._bcolz('coex',blaze=True)
         if self.coex is None:
             self.log("{} is empty", name)
+        self.set_sig_edge_zscore(float(self._global('significance_threshold')))
         self.log('Loading Global Degree')
         self.degree = self._bcolz('degree')
         if self.degree is None:
@@ -137,12 +138,28 @@ class COB(Expr):
         # get the percent of significant edges
         num_sig = self.coex.significant.coerce(to='int32').sum()/len(self.coex)
         # calulate the number expected
-        num_exp = 1-norm.cdf(int(self._global('significance_threshold')))
+        num_exp = 1-norm.cdf(float(self._global('significance_threshold')))
         # FDR is the percentage expected over the percentage found
         return num_exp/num_sig
 
     def set_sig_edge_zscore(self,zscore):
-        self.coex.significant = self.coex.score >= zscore
+        # Don't do anything if there isn't a coex table
+        if self.coex is None:
+            return
+        # Only update if needed
+        cur_sig = self._global('current_significance_threshold')
+        if cur_sig is None or not(float(cur_sig) == zscore):   
+            # If the column doesn't exist because of an error it may fail
+            try:
+                self.coex.data.delcol(name='significant')
+            except ValueError:
+                pass
+            # Add the column to the underlying data structure
+            self.coex.data.addcol(
+                self.coex.data.eval('score >= '+str(zscore)), pos=2, name='significant')
+            self.coex.data.flush()
+            # Keep track of the current threshold
+            self._global('current_significance_threshold',zscore)
 
     def neighbors(self, gene, sig_only=True, names_as_index=True, 
                   names_as_cols=False, return_gene_set=False):
