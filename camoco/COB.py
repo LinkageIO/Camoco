@@ -35,6 +35,7 @@ rcParams.update({'figure.autolayout': True})
 
 import statsmodels.api as sm
 import sys
+import pdb
 import json
 import gc
 
@@ -187,11 +188,12 @@ class COB(Expr):
         '''
         # Find the neighbors
         gene_id = self._expr_index[gene.id]
-        neighbor_indices = PCCUP.coex_neighbors(gene_id, self.num_genes())
-        neighbor_indices.sort()
-        edges = odo(self.coex[neighbor_indices],pd.DataFrame)
-        edges.set_index(neighbor_indices,inplace=True)
-        del neighbor_indices
+        ids = PCCUP.coex_neighbors(gene_id, self.num_genes())
+        ids.sort()
+        edges = pd.DataFrame.from_items(
+            ((key, self.coex.data[key][ids]) for key in self.coex.data.names))
+        edges.set_index(ids,inplace=True)
+        del ids
         if sig_only:
             edges = edges[edges.significant == 1]
         if len(edges) == 0:
@@ -290,7 +292,7 @@ class COB(Expr):
         num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
-            df = odo(self.coex,pd.DataFrame)
+            df = self.coex.data.todataframe()
         else:
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
@@ -304,7 +306,8 @@ class COB(Expr):
                 # Grab the coexpression indices for the genes
                 ids = PCCUP.coex_index(ids, num_genes)
                 ids.sort()
-                df = odo(self.coex[ids],pd.DataFrame)
+                df = pd.DataFrame.from_items(
+                    ((key, self.coex.data[key][ids]) for key in self.coex.data.names))
                 df.set_index(ids,inplace=True)
                 del ids
         if sig_only:
