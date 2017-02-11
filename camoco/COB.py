@@ -1220,6 +1220,7 @@ class COB(Expr):
         
         # 6. Load the new table into the object
         self.coex = self._bcolz('coex',blaze=True)
+        self.set_sig_edge_zscore(float(self._global('significance_threshold')))
         self.log("Done")
         return self
 
