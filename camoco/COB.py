@@ -49,6 +49,7 @@ class COB(Expr):
         super().__init__(name=name)
         self.log('Loading Coex table')
         self.coex = self._bcolz('coex',blaze=True)
+        self.sigs = None
         if self.coex is None:
             self.log("{} is empty", name)
         self.set_sig_edge_zscore(float(self._global('significance_threshold')))
@@ -147,9 +148,13 @@ class COB(Expr):
         # Don't do anything if there isn't a coex table
         if self.coex is None:
             return
+            
         # Only update if needed
         cur_sig = self._global('current_significance_threshold')
-        if cur_sig is None or not(float(cur_sig) == zscore):   
+        new_sig = cur_sig is None or not(float(cur_sig) == zscore)
+        
+        # Set the new significant value
+        if new_sig:
             # If the column doesn't exist because of an error it may fail
             try:
                 self.coex.data.delcol(name='significant')
@@ -159,9 +164,33 @@ class COB(Expr):
             self.coex.data.addcol(
                 self.coex.data.eval('score >= '+str(zscore)), pos=2, name='significant')
             self.coex.data.flush()
+            
             # Keep track of the current threshold
             self._global('current_significance_threshold',zscore)
-
+        
+        # Rebuild significant index set
+        if new_sig or self.sigs == None:
+            self.sigs = np.array([ind for ind in self.coex.data['significant'].wheretrue()])
+            self.sigs.sort()
+    
+    def _coex_DataFrame(self,ids=None,sig_only=True):
+        # If no ids are provided, get all of them
+        if ids == None:
+            if sig_only:
+                ids = self.sigs
+            else:
+                return self.coex.data.todataframe()
+        else:
+            ids.sort()
+            if sig_only:
+                ids = np.intersect1d(ids, self.sigs, assume_unique=True)
+        
+        # Get the DataFrame
+        df = pd.DataFrame.from_items(
+            ((key, self.coex.data[key][ids]) for key in self.coex.data.names))
+        df.set_index(ids,inplace=True)
+        return df
+    
     def neighbors(self, gene, sig_only=True, names_as_index=True, 
                   names_as_cols=False, return_gene_set=False):
         '''
@@ -189,13 +218,8 @@ class COB(Expr):
         # Find the neighbors
         gene_id = self._expr_index[gene.id]
         ids = PCCUP.coex_neighbors(gene_id, self.num_genes())
-        ids.sort()
-        edges = pd.DataFrame.from_items(
-            ((key, self.coex.data[key][ids]) for key in self.coex.data.names))
-        edges.set_index(ids,inplace=True)
+        edges = self._coex_DataFrame(ids=ids,sig_only=sig_only)
         del ids
-        if sig_only:
-            edges = edges[edges.significant == 1]
         if len(edges) == 0:
             edges = pd.DataFrame(columns=['gene_a','gene_b','score','distance','significant'])
             if names_as_cols:
@@ -292,7 +316,7 @@ class COB(Expr):
         num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
-            df = self.coex.data.todataframe()
+            df = self._coex_DataFrame(sig_only=sig_only)
         else:
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
@@ -305,13 +329,8 @@ class COB(Expr):
             else:
                 # Grab the coexpression indices for the genes
                 ids = PCCUP.coex_index(ids, num_genes)
-                ids.sort()
-                df = pd.DataFrame.from_items(
-                    ((key, self.coex.data[key][ids]) for key in self.coex.data.names))
-                df.set_index(ids,inplace=True)
+                df = self._coex_DataFrame(ids=ids,sig_only=sig_only)
                 del ids
-        if sig_only:
-            df = df.ix[df.significant]
         if min_distance is not None:
             df = df[df.distance >= min_distance]
         if names_as_index or names_as_cols or trans_locus_only:
@@ -1314,7 +1333,7 @@ class COB(Expr):
         z = (z - float(self._global('pcc_mean'))) \
             / float(self._global('pcc_std'))
         return z
-
+        
     ''' -----------------------------------------------------------------------
             Class Methods -- Factory Methods
     '''
