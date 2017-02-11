@@ -52,7 +52,8 @@ class COB(Expr):
         self.sigs = None
         if self.coex is None:
             self.log("{} is empty", name)
-        self.set_sig_edge_zscore(float(self._global('significance_threshold')))
+        if not self._global('significance_threshold') is None:
+            self.set_sig_edge_zscore(float(self._global('significance_threshold')))
         self.log('Loading Global Degree')
         self.degree = self._bcolz('degree')
         if self.degree is None:
