@@ -11,14 +11,19 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-__version__ = '0.2.00'
+__version__ = '0.3.0'
 
 import sys
 import os
+import numpy
 
-#import pyximport
-#pyximport.install()
+import pyximport
+pyximport.install(setup_args={
+    "include_dirs":numpy.get_include() 
+})
 
+import matplotlib
+matplotlib.use('Agg')
 from .Config import cf
 from .Camoco import Camoco
 from .Expr import Expr
@@ -34,5 +39,7 @@ from .Tools import available_datasets,del_dataset
 from .Tools import mv_dataset,redescribe_dataset
 from .GEO import Family
 from .GOnt import GOnt
-from .Annotation import RefGenFunc
 from .Annotation import GWASData
+
+# Create yourself
+Camoco.create('Camoco','Mother Database')

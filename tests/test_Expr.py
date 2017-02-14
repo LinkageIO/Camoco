@@ -15,4 +15,3 @@ def test_inplace_nansort(testCOB):
         x[i] = np.nan
     sorted_x = testCOB.inplace_nansort(x)
     assert all(np.isnan(x) == np.isnan(sorted_x))
-

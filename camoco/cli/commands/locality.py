@@ -13,10 +13,6 @@ import pandas as pd
 import matplotlib.pylab as plt
 import statsmodels.api as sm
 
-from camoco.Tools import confidence_interval, \
-                         mean_confidence_interval,\
-                         NearestDict
-
 from camoco.Tools import log as coblog
 
 from collections import namedtuple
@@ -100,6 +96,6 @@ def generate_data(cob,term,args):
     record = namedtuple('Record',['COB','Term','WindowSize','FlankLimit','Locality','PVal','Size'])
     # Give em the gold
     return record(
-        cob.name, args.candidate_window_size, args.candidate_flank_limit, 
-        term.id, loc, pval, len(loci)
+        cob.name, term.id, args.candidate_window_size, 
+        args.candidate_flank_limit, loc, pval, len(loci)
     )

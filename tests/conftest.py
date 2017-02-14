@@ -49,6 +49,24 @@ def Zm5bFGS():
     return co.RefGen('Zm5bFGS')
 
 @pytest.fixture(scope="module")
+def Zm5bFGS_duplicate(Zm5bFGS):
+    # Build a refgen over an already built refgen 
+    # We have to build it
+    gff = os.path.expanduser(
+        os.path.join(
+            cf.options.testdir,
+            'raw', 'RefGen', 'ZmB73_5b_FGS.gff.gz'
+        )
+    )
+    # This is stupid and necessary because pytables wont let me open
+    # more than one table
+    co.RefGen.from_gff(
+        gff, 'Zm5bFGS', 'Maize 5b Filtered Gene Set', '5b', 'Zea Mays'
+    )
+    return co.RefGen('Zm5bFGS')
+
+
+@pytest.fixture(scope="module")
 def AtTair10():
     if cf.test.force.RefGen:
         co.del_dataset('RefGen', 'AtTair10', safe=False)
@@ -367,6 +385,30 @@ def AtRoot(AtTair10):
 ''' -------------------------------------------------------------------------
             GWAS Fixtures
 '''
+@pytest.fixture(scope='module')
+def testGWAS(testRefGen):
+    if cf.test.force.Ontology:
+        co.del_dataset('GWAS','testGWAS',safe=False)
+    df = pd.DataFrame({
+        'Trait' : ['a','a','b','b'],
+        'CHR' : ['chr1','chr2','chr3','chr4'],
+        'POS' : [100,200,300,400],
+        'Start' : [100,200,300,400],
+        'End' : [1000,20000,3000,4000],
+        'id' : ['snp1','snp2','snp3','snp4'],
+        'pval' : [0.05,0.05,0.01,0.01]
+    }) 
+    gwas = co.GWAS.from_DataFrame(
+        df,
+        'testGWAS',
+        'Test GWAS Dataset',
+        testRefGen,
+        chr_col='CHR',
+        pos_col='POS',
+        id_col='id',
+        term_col='Trait'
+    ) 
+    return gwas
 
 @pytest.fixture(scope='module')
 def ZmWallace(Zm5bFGS):
@@ -539,6 +581,29 @@ def AtLeafHydroIonome(AtTair10):
 '''----------------------------------------------------------------------------
     GOnt Fixtures
 ----------------------------------------------------------------------------'''
+
+@pytest.fixture(scope='module')
+def TestGO(Zm5bFGS):
+    if cf.test.force.Ontology:
+        co.del_dataset('GOnt','TestGO',safe=False)
+    if not co.available_datasets('GOnt','TestGO'):
+        obo = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.test.obo'
+        )
+        gene_map_file = os.path.join(
+            cf.options.testdir,
+            'raw','GOnt','go.test.tsv'
+        )
+        return co.GOnt.from_obo(
+           obo, gene_map_file, 'TestGO',
+           'Test GO', Zm5bFGS
+        )
+    else:
+        return co.GOnt('TestGO')
+
+
+
 @pytest.fixture(scope="module")
 def ZmGO(Zm5bFGS):
     if cf.test.force.Ontology:

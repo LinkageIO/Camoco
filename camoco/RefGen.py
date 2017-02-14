@@ -27,6 +27,8 @@ class RefGen(Camoco):
     def __init__(self,name):
         # initialize camoco instance
         super().__init__(name,type="RefGen")
+        self._create_tables()
+        self._build_indices()
 
     @property
     def genome(self):
@@ -86,7 +88,7 @@ class RefGen(Camoco):
 
     def random_genes(self,n,**kwargs):
         '''
-            Return random genes from the RefGen
+            Return random genes from the RefGen, without replacement. 
 
             Parameters
             ----------
@@ -97,10 +99,10 @@ class RefGen(Camoco):
 
             Returns
             -------
-            An iterable containing random genes
+            An iterable containing n (unique) random genes
 
         '''
-        rand_nums = np.random.randint(1,high=self.num_genes(),size=n)
+        rand_nums = np.random.choice(self.num_genes()+1,n,replace=False)
         gene_info = self.db.cursor().executemany(
                 "SELECT chromosome,start,end,id from genes WHERE rowid = ?",
                 [[int(rownum)] for rownum in rand_nums]
@@ -191,6 +193,7 @@ class RefGen(Camoco):
                     raise e
         return genes
 
+    # NOTE: Dont LRU cache this, it gets cached in from_id
     def __getitem__(self,item):
         '''
             A convenience method to extract loci from the reference genome.
@@ -272,13 +275,14 @@ class RefGen(Camoco):
         return [
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
-                SELECT chromosome,start,end,id FROM genes
+                SELECT chromosome,start,end,id FROM genes 
+                INDEXED BY gene_start_end
                 WHERE chromosome = ?
+                AND start >= ?  -- Gene must end AFTER locus window (upstream) 
                 AND start < ? -- Gene must start BEFORE locus
-                AND end >= ?  -- Gene must end AFTER locus window (upstream) 
                 ORDER BY start DESC
                 LIMIT ?
-            ''',(locus.chrom, locus.start, upstream, gene_limit)
+            ''',(locus.chrom, upstream,locus.start, gene_limit)
         )]
 
     def downstream_genes(self,locus,gene_limit=1000,window_size=None):
@@ -311,6 +315,7 @@ class RefGen(Camoco):
             self.Gene(*x,build=self.build,organism=self.organism) \
             for x in self.db.cursor().execute('''
                 SELECT chromosome,start,end,id FROM genes
+                INDEXED BY gene_start_end
                 WHERE chromosome = ?
                 AND start > ?
                 AND start <= ?
@@ -430,14 +435,16 @@ class RefGen(Camoco):
             # Iterate through candidate genes and propagate the 
             # parental info
             for i,gene in enumerate(genes):
-                gene.update({'num_effective_loci':len(locus.sub_loci)})
+                #gene.update({'num_effective_loci':len(locus.sub_loci)})
                 # include parent locus id if thats specified
                 if include_parent_locus == True:
                     gene.update({'parent_locus':locus.id})
                 if include_rank_intervening == True:
                     gene.update({'intervening_rank':ranks[i]})
                 # update all the parent_attrs
-                if include_parent_attrs:
+                if include_parent_attrs and len(include_parent_attrs) > 0:
+                    if 'all' in include_parent_attrs: 
+                        include_parent_attrs = locus.attr.keys()
                     for attr in include_parent_attrs:
                         attr_name = 'parent_{}'.format(attr)
                         gene.update({attr_name: locus[attr]})
@@ -455,8 +462,6 @@ class RefGen(Camoco):
                     elif gene < locus:
                         gene.update({'num_intervening':num_up})
                         num_up += 1
-
-        
             if include_num_siblings == True:
                 for gene in genes:
                     gene.update({'num_siblings':len(genes)})
@@ -736,10 +741,21 @@ class RefGen(Camoco):
     def _build_indices(self):
         self.log('Building Indices')
         cur = self.db.cursor()
+        #cur.execute('DROP INDEX IF EXISTS gene_start_end;')
+        #cur.execute('DROP INDEX IF EXISTS gene_end_start;')
+        #cur.execute('DROP INDEX IF EXISTS gene_start;')
+        #cur.execute('DROP INDEX IF EXISTS gene_end;')
+        #cur.execute('DROP INDEX IF EXISTS geneid')
+        #cur.execute('DROP INDEX IF EXISTS geneattr')
         cur.execute('''
-            CREATE INDEX IF NOT EXISTS genepos ON genes (chromosome,start);
+            CREATE INDEX IF NOT EXISTS gene_start_end ON genes (chromosome,start DESC, end ASC, id);
+            CREATE INDEX IF NOT EXISTS gene_end_start ON genes (chromosome,end DESC,start DESC,id);
+            CREATE INDEX IF NOT EXISTS gene_start ON genes (chromosome,start);
+            CREATE INDEX IF NOT EXISTS gene_end ON genes (chromosome,end);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
             CREATE INDEX IF NOT EXISTS geneattr ON gene_attrs (id);
+            CREATE INDEX IF NOT EXISTS id ON func(id);
+            CREATE INDEX IF NOT EXISTS id ON ortho_func(id);
         ''')
 
     def add_gene(self,gene,refgen=None):
@@ -853,6 +869,102 @@ class RefGen(Camoco):
                     als[id] = [al]
             return als
 
+    def has_annotations(self):
+        cur = self.db.cursor()
+        cur.execute('SELECT count(*) FROM func;')
+        return (int(cur.fetchone()[0]) > 0)
+    
+    def get_annotations(self,item):
+        # Build the query from all the genes provided
+        if isinstance(item,(set,list)):
+            ls = "{}".format("','".join([str(x) for x in item]))
+            single = False
+        else:
+            ls = item
+            single = True
+        query = "SELECT * FROM func WHERE id IN ('{}');".format(ls)
+        
+        # Run the query and turn the result into a list of tuples
+        cur = self.db.cursor()
+        cur.execute(query)
+        annotes = cur.fetchall()
+        
+        # If a list of genes was passed in, return a dictionary of lists
+        if not single:
+            res = {}
+            for id,desc in annotes:
+                if id in res:
+                    res[id].append(desc)
+                else:
+                    res[id] = [desc]
+        
+        # Otherwise just return the list annotations
+        else:
+            res = []
+            for id,desc in annotes:
+                res.append(desc)
+        return res
+    
+    def export_annotations(self, filename=None, sep="\t"):
+        '''
+            Make a table of all functional annotations.
+        '''
+        # Find the default filename
+        if filename == None:
+            filename = self.name + '_func.tsv'
+        
+        # Pull them all from sqlite
+        cur = self.db.cursor()
+        cur.execute("SELECT * FROM func;")
+        
+        # Used pandas to save it
+        df = pd.DataFrame(cur.fetchall(),columns=['gene','desc']).set_index('gene')
+        df.to_csv(filename,sep=sep)
+    
+    def add_annotations(self, filename, sep="\t", gene_col=0, skip_cols=None):
+        ''' 
+            Imports Annotation relationships from a csv file. By default will
+            assume gene names are first column
+        '''
+        # import from file, assume right now that in correct order
+        tbl = pd.read_table(filename,sep=sep,dtype=object)
+        idx_name = tbl.columns[gene_col]
+        tbl[idx_name] = tbl[idx_name].str.upper()
+        
+        # Drop columns if we need to
+        if skip_cols is not None:
+            # removing certain columns
+            tbl.drop(tbl.columns[skip_cols],axis=1,inplace=True)
+        
+        # Get rid of any genes not in the refence genome
+        cur = self.db.cursor()
+        cur.execute('SELECT id FROM genes;')
+        rm = set(tbl[idx_name]) - set([id[0] for id in cur.fetchall()])
+        tbl.drop(rm,axis=0,inplace=True)
+        del rm, cur
+        
+        # One Annotation per row, drop the nulls and duplicates
+        tbl = pd.melt(tbl,id_vars=idx_name,var_name='col',value_name='desc')
+        tbl.drop('col',axis=1,inplace=True)
+        tbl.dropna(axis=0,inplace=True)
+        tbl.drop_duplicates(inplace=True)
+        
+        # Run the transaction to throw them in there
+        cur = self.db.cursor()
+        try:
+            cur.execute('BEGIN TRANSACTION')
+            cur.executemany(
+                'INSERT INTO func VALUES (?,?)'
+                ,tbl.itertuples(index=False))
+            cur.execute('END TRANSACTION')
+        
+        except Exception as e:
+            self.log("import failed: {}",e)
+            cur.execute('ROLLBACK')
+        
+        # Make sure the indices are built
+        self._build_indices()
+
     @classmethod
     def create(cls,name,description,type):
         self = super().create(name,description,type=type)
@@ -861,6 +973,8 @@ class RefGen(Camoco):
             DROP TABLE IF EXISTS genes;
             DROP TABLE IF EXISTS gene_attrs;
             DROP TABLE IF EXISTS aliases;
+            DROP TABLE IF EXISTS func;
+            DROP TABLE IF EXISTS ortho_func;
             ''')
         self._create_tables()
         self._build_indices()
@@ -969,6 +1083,32 @@ class RefGen(Camoco):
         self._build_indices()
         return self
 
+    def copy(self,name,description):
+        '''
+            Creates a copy of a refgen with a new name and description.
+
+            Parameters
+            ----------
+                name : str
+                    Name of the copy refgen
+                description : str
+                    Short description of the reference genome
+            Returns
+            -------
+                co.RefGen object containing the same genes and 
+                chromosomems as the original.
+        '''
+        copy = self.create(name,description,'RefGen')
+        copy._global('build',self.build)
+        copy._global('organism',self.organism)
+        # Should have the same chromosomems
+        for chrom in self.iter_chromosomes():
+            copy.add_chromosome(chrom)
+        # Should have the same gene list
+        copy.add_gene(self.iter_genes(),refgen=self)
+        copy._build_indices()
+        return copy
+
     @classmethod
     def filtered_refgen(cls,name,description,refgen,gene_list):
         '''
@@ -1007,4 +1147,14 @@ class RefGen(Camoco):
             CREATE TABLE IF NOT EXISTS aliases (
                 alias TEXT UNIQUE,
                 id TEXT
+            );
+            CREATE TABLE IF NOT EXISTS func (
+                id TEXT,
+                desc TEXT,
+                UNIQUE(id,desc) ON CONFLICT IGNORE
+            );
+            CREATE TABLE IF NOT EXISTS ortho_func (
+                id TEXT,
+                desc TEXT,
+                UNIQUE(id,desc) ON CONFLICT IGNORE
             );''');

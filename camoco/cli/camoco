@@ -20,18 +20,21 @@ from camoco.Tools import log
 import pandas as pd
 pd.set_option('display.width',200)
 
-from camoco.cli.commands.plotGWAS import plot_gwas
-from camoco.cli.commands.density import density
-from camoco.cli.commands.locality import locality
-from camoco.cli.commands.health import cob_health
-from camoco.cli.commands.crossRef import crossref
+# House Keeping commands
+from camoco.cli.commands.build import build_cob,build_refgen,build_gont,build_GWAS
 from camoco.cli.commands.remove import remove 
 from camoco.cli.commands.list import list_command
+# Functional and Validation commands
+from camoco.cli.commands.health import cob_health
 from camoco.cli.commands.simulateGWAS import simulateGWAS
+from camoco.cli.commands.plotGWAS import plot_gwas
+# Information Commands
+from camoco.cli.commands.crossRef import crossref
 from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
-from camoco.cli.commands.build import build_cob,build_refgen,build_gont,build_GWAS
+# Analysis Commands
+from camoco.OverlapAnalysis import OverlapAnalysis
 
 from camoco import cf
 
@@ -42,6 +45,22 @@ if __name__ == '__main__':
         Main Arguments 
     --------------------------'''
     parser = argparse.ArgumentParser(
+        description=(
+	"      ___           ___           ___           ___           ___           ___      \n"
+	"     /  /\         /  /\         /__/\         /  /\         /  /\         /  /\     \n"
+	"    /  /:/        /  /::\       |  |::\       /  /::\       /  /:/        /  /::\    \n"
+	"   /  /:/        /  /:/\:\      |  |:|:\     /  /:/\:\     /  /:/        /  /:/\:\   \n"
+	"  /  /:/  ___   /  /:/~/::\   __|__|:|\:\   /  /:/  \:\   /  /:/  ___   /  /:/  \:\  \n"
+	" /__/:/  /  /\ /__/:/ /:/\:\ /__/::::| \:\ /__/:/ \__\:\ /__/:/  /  /\ /__/:/ \__\:\ \n"
+	" \  \:\ /  /:/ \  \:\/:/__\/ \  \:\~~\__\/ \  \:\ /  /:/ \  \:\ /  /:/ \  \:\ /  /:/ \n"
+	"  \  \:\  /:/   \  \::/       \  \:\        \  \:\  /:/   \  \:\  /:/   \  \:\  /:/  \n"
+	"   \  \:\/:/     \  \:\        \  \:\        \  \:\/:/     \  \:\/:/     \  \:\/:/   \n"
+	"    \  \::/       \  \:\        \  \:\        \  \::/       \  \::/       \  \::/    \n"
+	"     \__\/         \__\/         \__\/         \__\/         \__\/         \__\/ \n\n\n" 
+        "Camoco (Co-analysis of Molecular Components) inter-relates and co-analyzes different \n"
+        "levels of genomic data. Namely it integrates genes present near and around GWAS loci\n"
+        "using unbiased, functional information derived from co-expression networks."
+	),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog= "\n".join([
             'version: {}'.format(co.__version__),
@@ -62,11 +81,12 @@ if __name__ == '__main__':
         help='Initiate an ipdb session right before exiting.'
     )
     parser.add_argument(
-        '--overlook',
+        '--force',
         action='store_true',
         default=False,
-        help='Skip analysis if files produced by --out exists.'
+        help='Overwrite output files from previous analyses.'
     )
+    parser.set_defaults(func=lambda x: parser.print_help())
     subparsers = parser.add_subparsers(
         title='Camoco CLI program',
         metavar='Available Commands',
@@ -161,6 +181,18 @@ if __name__ == '__main__':
         'refgen',
         help='Camoco reference Genome name.'
     )
+    bldgo.add_argument(
+        '--go-col',
+        default=1,
+        type=int,
+        help='The GO Term ID column in Gene-term map file (default:1)'
+    )
+    bldgo.add_argument(
+        '--id-col',
+        default=0,
+        type=int,
+        help='The gene ID column in Gene-term map file (default:0)'
+    )
     bldgo.set_defaults(func=build_gont)
     
 
@@ -208,31 +240,39 @@ if __name__ == '__main__':
     )
     bldref.add_argument(
         '--chrom-feature',
+        default='chromosome',
+        metavar='chromosome',
         help=(
             'The name of the feature (in column 3) that designates a '
-            'a chromosome. '
+            'a chromosome. default: "chromosome"'
         )
     )
     bldref.add_argument(
         '--gene-feature',
+        default='gene',
+        metavar='gene',
         help=(
             'The name of the feature (in column 2) that designates a '
             'gene. These features will be the main object that the RefGen '
-            'encompasses. '
+            'encompasses. default: "gene"'
         )
     )
     bldref.add_argument(
         '--ID-attr',
+        default='ID',
+        metavar='ID',
         help=(
             'The key in the attribute column which designates the ID or '
-            'name of the feature. '
+            'name of the feature. default: "ID"'
         )
     )
     bldref.add_argument(
         '--attr-split',
         default='=',
+        metavar='=',
         help=(
-            'The delimiter for keys and values in the attribute column '
+            'The delimiter for keys and values in the attribute column. '
+            'default: "="'
         )
     )
     bldref.set_defaults(func=build_refgen)
@@ -288,29 +328,17 @@ if __name__ == '__main__':
             'for gene names.'
         )
     )  
-    bldcob.add_argument(
-        '--normalize',
-        default=True,
-        help=(
-            "Flag indicating if table values need to be normalized. "
-            "Specifies whether or not to normalize the data so raw expression "
-            "values lie within a log space. This is best practices for "
-            "generating interpretable expression analyses. See Expr._normalize "
-            "method for more information. "
-            "Default: True"
-        )
-    )
-    bldcob.add_argument(
-        '--norm_method',
-        help=(
-            'The normalization method to use. This can be inferred '
-            'from the raw data type. By default RNASEQ uses np.arcsinh and '
-            'MICROARRAY data uses np.log2. A different normalization function '
-            'can be passed directly in. '
-            'Default: None (inferred from Expr.rawtype)'
-    
-        )
-    )
+    #bldcob.add_argument(
+    #    '--norm_method',
+    #    help=(
+    #        'The normalization method to use. This can be inferred '
+    #        'from the raw data type. By default RNASEQ uses np.arcsinh and '
+    #        'MICROARRAY data uses np.log2. A different normalization function '
+    #        'can be passed directly in. '
+    #        'Default: None (inferred from Expr.rawtype)'
+    #
+    #    )
+    #)
     bldcob.add_argument(
         '--max-val',
         type=float,
@@ -333,20 +361,31 @@ if __name__ == '__main__':
     ) 
     bldcob.add_argument(
         '--skip-quality-control',
-        action='store_false',
+        default=False,
+        action='store_true', 
         help=(
-            "A Flag indicating on whether or not to perform quality control "
-            "on expression data."
+            "A Flag indicating to skip quality control procedure "
+            "on expression data. "
+            "Default: False"
         )
     )  
     bldcob.add_argument(
+        '--skip-normalization',
+        default=False,
+        action='store_true',
+        help=(
+            "Flag indicating that expression normaliztion should be skipped. "
+            "Default: False"
+        )
+    )
+    bldcob.add_argument(
         '--min-expr',
-        default=1,
+        default=0,
         type=float,
         help=(
             "Expression values (e.g. FPKM) under this threshold will be set "
             "to NaN and not used during correlation calculations. "
-            "default: 1"
+            "default: 0"
         )
     )  
     bldcob.add_argument(
@@ -381,14 +420,15 @@ if __name__ == '__main__':
         )
     )  
     bldcob.add_argument(
-        '--ignore-refgen-membership',
+        '--allow-non-membership',
         action='store_true',
         help=(
             "Flag indicating that feature (genes, metabolites, etc) should "
             "not be filtered out of the expression matrix because they are "
             "not present in the reference genome. This is useful for "
             "features, such as metabolites, that cannot be anchored to "
-            "a RefGen."
+            "a RefGen. If true, features will be added to the RefGen with "
+            "unknown coordinates"
         )
     )
     bldcob.add_argument(
@@ -516,22 +556,30 @@ if __name__ == '__main__':
     plotgwas.set_defaults(func=plot_gwas) 
 
     ''' --------------------------
-        density 
+        Overlap (density/locality) 
     --------------------------'''
-    densityCLI = subparsers.add_parser(
-        'density',
-        help='Calculate network density among GWAS results'
+    overlapCLI = subparsers.add_parser(
+        'overlap',
+        help='Calculate network overlap among GWAS results. See --method for details.'
     )
     # Data Set Arguments
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         'cob',
         help='The camoco network to use.'
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         'gwas', 
         help='The camoco GWAS to use.'
     )
-    densityCLI.add_argument(
+
+    # keyword args
+    overlapCLI.add_argument(
+        'method',
+        default='density',
+        choices=['density','locality'],
+        help='The metric used to evaulate overlap between Loci and the Network'
+    )
+    overlapCLI.add_argument(
         '--terms',
         nargs='*', 
         help=(
@@ -541,17 +589,26 @@ if __name__ == '__main__':
         ),
         default=['all']
     )
-    densityCLI.add_argument(
-        '--num-bootstraps', 
-        default=100,
-        type=int, 
-        metavar=100,
+    overlapCLI.add_argument(
+        '--skip-terms',
+        nargs='*',
+        default=[],
         help=(
-            'The number of bootstraps to perform in order '
-            'to estimate a null distribution. (default: 50)'
+            'Terms specified here will be skipped.'    
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
+        '--num-bootstraps', 
+        default='auto',
+        metavar='auto',
+        help=(
+            'The number of bootstraps to perform in order '
+            'to estimate a null distribution. If auto the algorithm '
+            'will bootstrap *until* the term is not significant at n=1000 '
+            '*or* 1000 bootstraps have been performed. (default: auto)'
+        )
+    )
+    overlapCLI.add_argument(
         '--candidate-window-size',
         type=int,
         default=10000, 
@@ -561,7 +618,7 @@ if __name__ == '__main__':
             '(default: 10000)'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--candidate-flank-limit',
         type=int,
         default=1, 
@@ -571,20 +628,23 @@ if __name__ == '__main__':
             'on each side of the locus. (default: 2)' 
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--snp2gene', 
         type=str, 
-        default='strongest',
+        default='effective',
         choices=['strongest','effective'],
-        metavar='strongest',
+        metavar='effective',
         help=(
-            'The SNP to gene mapping to use. Specifying multiple mappings '
-            ' will result in multiple results. Must be in: '
-            "['effective','strongest'] "
-            "(default: strongest)"
+            'The SNP to gene mapping to use. If *effective*, SNPs with '
+            'overlappingn windows will be collapsed into genomic intervals '
+            'resulting in all genes within the intervals to be used. If '
+            '*strongest* is specified, SNPs with lower values designated from '
+            '--strongest-attr (e.g. pvals) will be dropped when SNPs have overlapping '
+            'windows. Value must be in ["effective","strongest"]. ' 
+            '(default: effective)'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--strongest-attr', 
         default='pval', 
         type=str, 
@@ -594,7 +654,7 @@ if __name__ == '__main__':
             'strongest locus. (defualt=pval).'
         )
     )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--strongest-higher',
         action='store_false',
         default=True,
@@ -604,136 +664,14 @@ if __name__ == '__main__':
             'lower values as stronger (i.e. p-vals)'
         )
     )
-    densityCLI.add_argument(
-        '--gene-specific',
-        action='store_true',
-        default=False,
-        help=(
-            'Flag indicating whether or not to perform'
-            'gene specific density.'
-        )
-    )
-    densityCLI.add_argument(
+    overlapCLI.add_argument(
         '--out', 
         default=None,
         help='OutputFile Name (default: Standard Out)'
     )
-    densityCLI.set_defaults(func=density)
+    overlapCLI.set_defaults(func=OverlapAnalysis.from_CLI)
 
 
-    ''' --------------------------------------------------------------------
-        locality
-        --------------------------------------------------------------------'''
-    localityCLI = subparsers.add_parser(
-        'locality',
-        description=(
-            'Calculate subnetwork locality. Creates a grid using permutable '
-            'parameters (see --permutable) which interrogates locality.'
-        ),
-        help='Calculate subnetwork locality'
-    )
-    # -----------------Data Set Arguments -----------------------------------
-    localityCLI.add_argument(
-        'cob', 
-        help='The camoco network to use.'
-    )
-    localityCLI.add_argument(
-        'gwas',
-        help='The camoco GWAS to use.'
-    )
-    localityCLI.add_argument(
-        '--terms',
-        nargs='*', 
-        metavar='TERM',
-        help='The term within the ontology to use. (default: all)',
-        default=['all']
-    )
-    localityCLI.add_argument(
-       '--num-bootstraps', 
-       type=int,
-       default=100,
-       metavar=100, 
-       help='''The number of bootstraps to perform in order
-             to estimate a null distribution.'''
-    )
-    # SNP2Gene Mapping
-    localityCLI.add_argument(
-        '--snp2gene', 
-        type=str,
-        default='strongest', 
-        metavar='strongest', 
-        choices=['strongest','effective'],
-        help=(
-            'The SNP to gene mapping to use. Specifying multiple mappings '
-            ' will result in multiple results. Must be in: '
-            "['effective','strongest'] "
-            "(default:strongest)"
-        )
-    )
-    localityCLI.add_argument(
-        '--strongest-attr', 
-        type=str,
-        default='pval', 
-        metavar='pval',
-        help=(
-            'The locus attribute used to determine which locus is the'
-            'strongest locus. (defualt=pval).'
-        )
-    )
-    localityCLI.add_argument(
-        '--strongest-higher',
-        action='store_false',
-        default=True,
-        help=(
-            'Flag indicating the value in --strongest-attr is'
-            'stronger if higher. Default behavior is to treat'
-            'lower values as stronger (i.e. p-vals)'
-        )
-    )
-    localityCLI.add_argument(
-        '--candidate-window-size',
-        type=int,  
-        default=10000,
-        metavar=10000,
-        help='The window size for mapping effective SNPs to genes.'
-    )
-    localityCLI.add_argument(
-        '--candidate-flank-limit',
-        default=1,
-        metavar=1,
-        type=int,
-        help= (
-           'The number of flanking genes (each side) '
-            'included in SNP to gene mapping'
-            )
-    )
-    localityCLI.add_argument(
-        '--out',
-        type=str,
-        default='.',
-        help='Basename of output file (pngs and csvs will be produced.)'
-    )
-    localityCLI.add_argument(
-        '--sig-edge-zscore',
-        type=float,
-        metavar=3,
-        default=None,
-        help=(
-           'Redefine what a significant zscore for an interaction. '
-           '(defaut: 3)'
-        )
-    )
-    localityCLI.add_argument(
-        '--gene-specific',
-        action='store_true',
-        default=False,
-        help=(
-            'Flag indicating whether or not to perform'
-            'gene specific calculations.'
-        )
-    )
-    localityCLI.set_defaults(func=locality)
-    
     ''' --------------------------
         Health
     --------------------------'''
@@ -773,6 +711,12 @@ if __name__ == '__main__':
         default=300,
         type=int,
         help='Maximum GO term size to consider in health (defualt: 300)'
+    )
+    health.add_argument(
+        '--max-terms',
+        default=None,
+        type=int,
+        help='If specified, limits the number of total GO terms tested (i.e. Subsampling)'
     )
     health.add_argument(
         '--num-bootstraps',
@@ -849,6 +793,12 @@ if __name__ == '__main__':
         )
     )
     simulateGWASCLI.add_argument(
+        '--method',
+        default='density',
+        choices=['density','locality'],
+        help='The metric used to evaluate overlap between the loci and the network'
+    )
+    simulateGWASCLI.add_argument(
         '--max-term-size',
         type=int,
         default=100,
@@ -881,8 +831,7 @@ if __name__ == '__main__':
     )
     simulateGWASCLI.add_argument(
         '--num-bootstraps', 
-        type=int, 
-        default=100,
+        default='auto',
         metavar=100,
         help=(
             'The number of bootstraps to perform in order '
@@ -892,34 +841,35 @@ if __name__ == '__main__':
     simulateGWASCLI.add_argument(                                                  
         '--percent-fcr',                                                        
         type=int,                                                             
-        default=None,                                                           
+        default=0,                                                           
         metavar=0,                                                            
         help=(                                                                  
-            'False Cadidate Rate: '
+            '(FCR) False Cadidate Rate: '
             'The percentage of the term loci to be replaced with '              
             'random loci, simulating noise or false positives '                 
             'within the term. (Default: 0)'                                                   
         )                                                                       
     )  
     simulateGWASCLI.add_argument(
-        '--percent-SNPs-missed',
+        '--percent-mcr',
         metavar=0,
         type=int,
-        default=None,
+        default=0,
         help=(
+            '(MCR) Missing Candidate Rate: '
             'Percentage of input SNPs that were missed by '
             'simulated GWAS. e.g. if GWAS term SNPs ideally '
-            'tag 10 GO genes and --percent-missed=0.50 half '
+            'tag 10 GO genes and --percent-mcr=50 half '
             'of the genes in the GO term will be removed resulting '
             'in an input network of 5 genes. (Default=0)'
         )
     )
     simulateGWASCLI.add_argument(
         '--out', 
-        default=sys.stdout,
-        help='OutputFile Name (default: Standard Out)'
+        default=None,
+        help='OutputFile Name'
     )
-    simulateGWASCLI.set_defaults(func=simulateGWAS)
+    simulateGWASCLI.set_defaults(func=simulateGWAS.from_CLI)
 
     '''----------------------------------
         CisTrans
@@ -1108,27 +1058,24 @@ if __name__ == '__main__':
         sys.excepthook = ultratb.FormattedTB(
             mode='Verbose', color_scheme='Linux', call_pdb=1
         )
-    # SKip analyses that already happened (if --overlook is provided)
-    if args.overlook is True and len(glob.glob(args.out+'*')):
-        print("Skipping {}* because files already exist.".format(args.out))
-    else:
-        try:
-            return_value = args.func(args)
-        except AttributeError as e:
-            log.warn('Command not found. Use --help to see available commands.')
-            if args.debug:
-                raise e
+    # Execute the command
+    try:
+        return_value = args.func(args)
+    except AttributeError as e:
+        if args.debug:
+            raise e
+        sys.exit(e)
+    except Exception as e:
+        log.warn("A baaaad thing happened.\n\n" + str(e))
+        if args.debug:
+            raise e
+        else:
             sys.exit(1)
-        except Exception as e:
-            log.warn("A bad thing happened.\n\n" + str(e))
-            if args.debug:
-                raise e
-            sys.exit(1)
-        if args.interactive is True:
-            from IPython.core import ultratb
-            sys.excepthook = ultratb.FormattedTB(
-                mode='Verbose', color_scheme='Linux', call_pdb=1
-            )
-            from camoco.Exceptions import CamocoInteractive
-            raise CamocoInteractive()
-        sys.exit(return_value)
+    if args.interactive is True:
+        from IPython.core import ultratb
+        sys.excepthook = ultratb.FormattedTB(
+            mode='Verbose', color_scheme='Linux', call_pdb=1
+        )
+        from camoco.Exceptions import CamocoInteractive
+        raise CamocoInteractive()
+    sys.exit(return_value)

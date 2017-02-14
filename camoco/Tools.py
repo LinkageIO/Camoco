@@ -4,6 +4,7 @@ import time
 import re
 import functools
 import glob
+import shutil
 
 from termcolor import colored, cprint
 from itertools import chain
@@ -67,7 +68,7 @@ def available_datasets(type='%', name='%'):
             datasets = pd.DataFrame(
                 datasets, 
                 columns=["Type", "Name", "Description", "Date Added"],
-            ).set_index('Type')
+            ).set_index(['Type'])
         else:
             datasets = pd.DataFrame(
                 columns=["Type", "Name", "Description", "Date Added"]
@@ -78,7 +79,8 @@ def available_datasets(type='%', name='%'):
         else:
             return datasets
     except CantOpenError as e:
-        return False
+        raise e
+        
 
 def available(type=None,name=None):
     # Laaaaaaaaazy
@@ -90,8 +92,7 @@ def del_dataset(type, name, safe=True):
     except CantOpenError:
         return True
     if safe:
-        df = available(type=type,name=name)
-        c.log("Are you sure you want to delete:\n {}", df)
+        c.log("Are you sure you want to delete:\n {}.{}", type, name)
         if input("(Notice CAPS)[Y/n]:") != 'Y':
             c.log("Nothing Deleted")
             return
@@ -105,29 +106,21 @@ def del_dataset(type, name, safe=True):
     except CantOpenError:
         pass
     try:
-        os.remove(
-            os.path.expanduser(os.path.join(
+        dfiles = glob.glob(
+            os.path.join(
                 cf.options.basedir,
                 'databases',
-                '{}.{}.db'.format(type, name)
-                )
+                '{}.{}.*'.format(type,name)
             )
         )
+        for f in dfiles:
+            c.log('Removing {}',f)
+            try:
+                os.remove(f)
+            except IsADirectoryError:
+                shutil.rmtree(f)
     except FileNotFoundError as e:
         pass
-        #c.log('Database Not Found: {}'.format(e))
-    try:
-        os.remove(
-            os.path.expanduser(os.path.join(
-                cf.options.basedir,
-                'databases',
-                '{}.{}.hd5'.format(type, name)
-                )
-            )
-        )
-    except FileNotFoundError as e:
-        pass
-        #c.log('Database Not Found: {}'.format(e))
     if type == 'Expr':
         # also have to remove the COB specific refgen
         del_dataset('RefGen', 'Filtered'+name, safe=safe)
