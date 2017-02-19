@@ -18,7 +18,7 @@ import argparse
 from camoco.Tools import log 
 
 import pandas as pd
-pd.set_option('display.width',200)
+pd.set_option('display.width',300)
 
 # House Keeping commands
 from camoco.cli.commands.build import build_cob,build_refgen,build_gont,build_GWAS
@@ -909,8 +909,12 @@ if __name__ == '__main__':
         )
     )
     snp2gene_cmd.add_argument(
-        'cob',
-        default=None
+        'refgen',
+        default=None,
+        help=(
+            'The reference genome to use. Can also provide the name of a '
+            'COB object to use that refgen object'
+        )
     )
     snp2gene_cmd.add_argument(
         'gwas',

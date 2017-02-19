@@ -8,6 +8,10 @@ import camoco as co
 
 from itertools import chain
 
+from camoco.Tools import log
+# Initialize a new log object
+log = log()
+
 def snp2gene(args):
     '''
         Perform SNP (locus) to candidate gene mapping
@@ -25,7 +29,13 @@ def snp2gene(args):
             )
             return None
 
-    cob = co.COB(args.cob)
+    
+    # Create the refgen (option to create it from a COB)
+    if co.available_datasets('Expr',args.refgen):
+        refgen = co.COB(args.refgen).refgen
+    elif co.available_datasets('RefGen',args.refgen):
+        refgen = co.RefGen(args.refgen)
+    # Create the GWAS object
     ont = co.GWAS(args.gwas)
 
     if 'all' in args.terms:
@@ -47,43 +57,50 @@ def snp2gene(args):
                 attr=args.strongest_attr,
                 lowest=args.strongest_higher
             )
- 
+
         genes = pd.DataFrame([ x.as_dict() for x in 
-            cob.refgen.candidate_genes(
+            refgen.candidate_genes(
                 effective_loci,
                 flank_limit=args.candidate_flank_limit,
-                attrs={'Term':term.id},
                 include_parent_locus=True,
                 include_num_siblings=True,
                 include_num_intervening=True,
                 include_rank_intervening=True,
-                include_parent_attrs=args.include_parent_attrs
+                include_SNP_distance=True,
+                include_parent_attrs=args.include_parent_attrs,
+                attrs={'Term':term.id},
             )
         ])
        
         data = pd.concat([data,genes])
-    data['COB'] = cob.name
+    data['RefGen'] = refgen.name
     data['FlankLimit'] = args.candidate_flank_limit
     data['WindowSize'] = args.candidate_window_size
 
     # Add data from gene info files
     original_number_genes = len(data)
     for info_file in args.gene_info:
-        cob.log('Adding info for {}',info_file)
+        log('Adding info for {}',info_file)
         # Assume the file is a table
         info = pd.read_table(info_file,sep='\t')
         if len(info.columns) == 1:
             info = pd.read_table(info_file,sep=',')
         # try to match as many columns as possible
         matching_columns = set(data.columns).intersection(info.columns)
-        cob.log("Joining SNP2Gene mappings with info file on: {}",','.join(matching_columns))
+        log("Joining SNP2Gene mappings with info file on: {}",','.join(matching_columns))
         data = pd.merge(data,info,how='left')
         if len(data) != original_number_genes:
-            cob.log.warn(
+            log.warn(
                 'There were multiple info rows for some genes. '
                 'Beware of potential duplicate candidate gene entries! '
             )
     
     # Generate the output file
     data.to_csv(args.out,index=None,sep='\t')
-        
+
+    log("Summary stats")
+    print('-'*100)
+    print('With {}kb windows and up to {} flanking genes'.format(int(args.candidate_window_size/1000),args.candidate_flank_limit))
+    print("Mapped {} SNPs to {} genes".format(len(data.parent_locus.unique()),len(data.ID.unique())))
+    print("Number of candidate genes per term:")
+    print(data.groupby('Term').apply(lambda df: len(df.ID)))
