@@ -139,6 +139,8 @@ class OverlapAnalysis(object):
                 self.args.candidate_window_size,
                 self.args.candidate_flank_limit
             )
+            if args.dry_run:
+                continue
             loci = self.snp2gene(term)
             if len(loci) < 2:
                 self.cob.log('Not enough genes to perform overlap analysis')
@@ -192,8 +194,9 @@ class OverlapAnalysis(object):
             overlap['NumBootstraps'] = len(bootstraps.iter.unique())
             overlap['Method'] = self.args.method
             results.append(overlap.reset_index())
-        self.results = pd.concat(results)
-        self.results.to_csv(self.args.out,sep='\t',index=None)
+        if not args.dry_run:
+            self.results = pd.concat(results)
+            self.results.to_csv(self.args.out,sep='\t',index=None)
 
     def overlap(self,loci,bootstrap=False,iter_name=None):
         '''

@@ -670,6 +670,11 @@ if __name__ == '__main__':
         help='OutputFile Name (default: Standard Out)'
     )
     overlapCLI.set_defaults(func=OverlapAnalysis.from_CLI)
+    overlapCLI.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Do not perform the expensive computations'
+    )
 
 
     ''' --------------------------
