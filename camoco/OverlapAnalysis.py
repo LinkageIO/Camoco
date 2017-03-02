@@ -28,19 +28,25 @@ import glob as glob
 
 class OverlapAnalysis(object):
     def __init__(self):
+        # See @classmethods for intelligent ways to build an OverlapAnalysis
+        self.args = None
+        self.cob = None
+        self.ont = None
         self.results = pd.DataFrame()
 
     def generate_output_name(self):
         # Handle the different output schemes
         if self.args.out is None:
-            self.args.out = '{}_{}_{}_{}_{}'.format(
+            self.args.out = '{}_{}_{}_{}_{}_{}.tsv'.format(
                 self.cob.name,
                 self.ont.name,
                 self.args.candidate_window_size,
                 self.args.candidate_flank_limit,
+                self.args.method,
                 ':'.join(self.args.terms)
             )
-        self.args.out = os.path.splitext(self.args.out)[0] + '.{}.overlap.tsv'.format(self.args.method)
+        if not self.args.out.endswith('.overlap.tsv'):
+            self.args.out = self.args.out + '.overlap.tsv'
         if os.path.dirname(self.args.out) != '':
             os.makedirs(os.path.dirname(self.args.out),exist_ok=True)
         if os.path.exists(self.args.out) and self.args.force != True:
@@ -226,7 +232,7 @@ class OverlapAnalysis(object):
 
     def num_below_fdr(self,fdr_cutoff=0.3):
         return pd.pivot_table(
-            x.results,
+            self.results,
             index=['Method','COB','WindowSize','FlankLimit'],
             columns='Term',
             values='fdr',
@@ -254,8 +260,8 @@ class OverlapAnalysis(object):
                 If provided, terms in the iterable will
                 not be plotted
         '''
-        methods = self.results.Method.unique()
-        cobs = self.results.COB.unique()
+        methods = sorted(self.results.Method.unique())
+        cobs = sorted(self.results.COB.unique())
         fig,axes = plt.subplots(len(cobs),len(methods))
         fig.set_size_inches(figsize)
         def get_axis(i,j,axes):
@@ -309,7 +315,7 @@ class OverlapAnalysis(object):
                 axis.yaxis.set_ticks_position('left')
                 axis.invert_yaxis()
                 if i == 0:
-                    axis.set_title(method,y=3,size=15)
+                    axis.set_title(method,y=1.1,size=15)
                     axis.xaxis.tick_top()
                     axis.set_xticks(np.arange(len(data.columns))+0.5)
                     axis.set_xticklabels(
