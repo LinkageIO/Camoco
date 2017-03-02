@@ -925,6 +925,23 @@ class RefGen(Camoco):
         ''' 
             Imports Annotation relationships from a csv file. By default will
             assume gene names are first column
+
+            Parameters
+            ----------
+            filename : str 
+                The file containing the annotations
+            sep : str (default: \t)
+                The delimiter for the columns in the annotation file
+            gene_col : int (default: 0)
+                The index of the column containing the gene IDs
+            skip_cols : default:None
+                Optional names of columns to drop before adding 
+                annotations
+
+            Returns
+            -------
+            None if successful
+
         '''
         # import from file, assume right now that in correct order
         tbl = pd.read_table(filename,sep=sep,dtype=object)
@@ -1129,16 +1146,27 @@ class RefGen(Camoco):
     def _create_tables(self):
         cur = self.db.cursor()
         cur.execute('''
+            /* 
+                Create a table that has chromosome lengths 
+            */
             CREATE TABLE IF NOT EXISTS chromosomes (
                 id TEXT NOT NULL UNIQUE,
                 length INTEGER NOT NULL
             );
+            /*
+                Create a table the contains gene start and
+                end positions (with chromosome)
+            */
             CREATE TABLE IF NOT EXISTS genes (
                 id TEXT NOT NULL UNIQUE,
                 chromosome TEXT NOT NULL,
                 start INTEGER,
                 end INTEGER
             );
+            /*
+                Create a table that contains gene attribute
+                mappings
+            */
             CREATE TABLE IF NOT EXISTS gene_attrs (
                 id TEXT NOT NULL,
                 key TEXT,
