@@ -28,19 +28,25 @@ import glob as glob
 
 class OverlapAnalysis(object):
     def __init__(self):
+        # See @classmethods for intelligent ways to build an OverlapAnalysis
+        self.args = None
+        self.cob = None
+        self.ont = None
         self.results = pd.DataFrame()
 
     def generate_output_name(self):
         # Handle the different output schemes
         if self.args.out is None:
-            self.args.out = '{}_{}_{}_{}_{}'.format(
+            self.args.out = '{}_{}_{}_{}_{}_{}.tsv'.format(
                 self.cob.name,
                 self.ont.name,
                 self.args.candidate_window_size,
                 self.args.candidate_flank_limit,
+                self.args.method,
                 ':'.join(self.args.terms)
             )
-        self.args.out = os.path.splitext(self.args.out)[0] + '.{}.overlap.tsv'.format(self.args.method)
+        if not self.args.out.endswith('.overlap.tsv'):
+            self.args.out = self.args.out + '.overlap.tsv'
         if os.path.dirname(self.args.out) != '':
             os.makedirs(os.path.dirname(self.args.out),exist_ok=True)
         if os.path.exists(self.args.out) and self.args.force != True:
@@ -139,6 +145,8 @@ class OverlapAnalysis(object):
                 self.args.candidate_window_size,
                 self.args.candidate_flank_limit
             )
+            if args.dry_run:
+                continue
             loci = self.snp2gene(term)
             if len(loci) < 2:
                 self.cob.log('Not enough genes to perform overlap analysis')
@@ -192,8 +200,9 @@ class OverlapAnalysis(object):
             overlap['NumBootstraps'] = len(bootstraps.iter.unique())
             overlap['Method'] = self.args.method
             results.append(overlap.reset_index())
-        self.results = pd.concat(results)
-        self.results.to_csv(self.args.out,sep='\t',index=None)
+        if not args.dry_run:
+            self.results = pd.concat(results)
+            self.results.to_csv(self.args.out,sep='\t',index=None)
 
     def overlap(self,loci,bootstrap=False,iter_name=None):
         '''
@@ -223,21 +232,38 @@ class OverlapAnalysis(object):
 
     def num_below_fdr(self,fdr_cutoff=0.3):
         return pd.pivot_table(
-            x.results,
+            self.results,
             index=['Method','COB','WindowSize','FlankLimit'],
             columns='Term',
             values='fdr',
             aggfunc=lambda x: sum(x<=fdr_cutoff)
         )
             
-    def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05):
+    def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05,
+                          collapse_snp2gene=False,figsize=(15,10),
+                          skip_terms=None):
         '''
             Generate a heatmap based on TermPVal
+
+            Parameters
+            ----------
+            filename : str
+                output file name
+            pval_cutoff : float (default:0.05)
+                The term p-value cutoff for shading the heatmap
+            collapse_snp2gene : bool (default: False)
+                If true, candidates will be collapsed around
+                snp to gene mapping parameters
+            figsize : tuple(int,int) (default:(15,10))
+                Control the size of the figure
+            skip_terms : iter (default:None)
+                If provided, terms in the iterable will
+                not be plotted
         '''
-        methods = self.results.Method.unique()
-        cobs = self.results.COB.unique()
+        methods = sorted(self.results.Method.unique())
+        cobs = sorted(self.results.COB.unique())
         fig,axes = plt.subplots(len(cobs),len(methods))
-        fig.set_size_inches((15,10))
+        fig.set_size_inches(figsize)
         def get_axis(i,j,axes):
             if len(axes.shape) == 1:
                 return axes[i]
@@ -253,6 +279,11 @@ class OverlapAnalysis(object):
                     values='TermPValue',
                     aggfunc=np.mean
                 )
+                if collapse_snp2gene:
+                    data = pd.DataFrame(data.apply(min)).T
+                if skip_terms:
+                    for term in skip_terms:
+                        del data[term]
                 #data[data > pval_cutoff] = np.nan
                 #data[data < pval_cutoff] = 0
                 axis.set_frame_on(False)
@@ -269,6 +300,7 @@ class OverlapAnalysis(object):
                 # Make the layout more natural
                 if j == len(methods) - 1 :
                     axis.set_ylabel(cob,fontsize=10)
+                    axis.set_yticklabels(data.index.values,rotation='45')
                     axis.yaxis.set_label_position("right")
                 if j == 0:
                     axis.set_yticklabels(
@@ -283,12 +315,13 @@ class OverlapAnalysis(object):
                 axis.yaxis.set_ticks_position('left')
                 axis.invert_yaxis()
                 if i == 0:
-                    axis.set_title(method,y=1.15,size=15)
+                    axis.set_title(method,y=1.1,size=15)
                     axis.xaxis.tick_top()
                     axis.set_xticks(np.arange(len(data.columns))+0.5)
                     axis.set_xticklabels(
                         [re.sub('\d','',x) for x in data.columns.values], 
-                        rotation=90,
+                        rotation='45',
+                        ha='left',
                         size=7
                     )
                 else:
