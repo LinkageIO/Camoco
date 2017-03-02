@@ -11,7 +11,7 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.0-dev'
 
 import sys
 import os
