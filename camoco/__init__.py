@@ -11,7 +11,7 @@ __license__ = """
     http://creativecommons.org/licenses/by-nc/4.0/
 """
 
-__version__ = '0.3.0-dev'
+__version__ = '0.3.1.dev'
 
 import sys
 import os
@@ -39,7 +39,8 @@ from .Tools import available_datasets,del_dataset
 from .Tools import mv_dataset,redescribe_dataset
 from .GEO import Family
 from .GOnt import GOnt
-from .Annotation import GWASData
+from .Overlap import Overlap
+#from .Annotation import GWASData
 
 # Create yourself
 Camoco.create('Camoco','Mother Database')
