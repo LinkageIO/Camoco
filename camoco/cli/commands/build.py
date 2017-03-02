@@ -1,6 +1,6 @@
 import camoco as co
 import pandas as pd
-from camoco.Tools import DummyRefGen
+from camoco.Tools import DummyRefGen,log
 from camoco.Locus import Gene
 
 def build_cob(args):
@@ -83,6 +83,9 @@ def build_GWAS(args):
         raise ValueError("Only 1 column found, check --sep, see --help")
     print('Loading {}'.format(args.refgen))
     refgen = co.RefGen(args.refgen)
+    # Filter out traits that are in args.skip_trait
+    df = df[[x not in args.skip_traits for x in df[args.trait_col]]]
+    # Build
     gwas = co.GWAS.from_DataFrame(
         df,
         args.name,
