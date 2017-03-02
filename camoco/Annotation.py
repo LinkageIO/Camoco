@@ -94,7 +94,7 @@ class GWASData(Camoco):
             tbl = pd.read_table(fn,sep=sep,dtype=object)
             tbl = tbl[['gene','COB','Term','WindowSize','FlankLimit','score',
                 'zscore','fdr','num_real','num_random','bs_mean','bs_std',
-                'NumSNPs','NumBootstraps']]
+                'TermLoci','NumBootstraps']]
             try:
                 cur.executemany('''
                     INSERT INTO gwas_data VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
