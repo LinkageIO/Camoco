@@ -7,12 +7,12 @@ import matplotlib.pylab as plt
 matplotlib.style.use('ggplot')
 #matplotlib.use('Agg')
 
-
 import argparse
 import sys
 import os
 import copy
 import re
+import sqlite3
 
 import numpy as np
 import scipy as sp
@@ -25,14 +25,104 @@ import pandas as pd
 pd.set_option('display.width',300)
 import glob as glob
 
+from .Camoco import Camoco
+from .Tools import log
 
-class OverlapAnalysis(object):
-    def __init__(self):
-        # See @classmethods for intelligent ways to build an OverlapAnalysis
-        self.args = None
-        self.cob = None
-        self.ont = None
-        self.results = pd.DataFrame()
+class Overlap(Camoco):
+    '''
+        The Overlap class represents the statistical enrichment of co-expression
+        among a set of loci. 
+
+    '''
+    def __init__(self,gwas):
+        if not isinstance(gwas, str):
+            gwas = gwas.name
+        super().__init__(gwas,type='Overlap')
+        self._global('gwas',gwas)
+        self._create_tables()
+        # Read the overlap results in from the database
+        # It is unfortunate that we need to use the sqlite3 package here
+        self.results = pd.read_sql(
+            'SELECT * FROM overlap;',
+            sqlite3.connect(self.db.filename)
+        )
+
+    '''
+        Private Methods
+    '''
+
+    def _create_tables(self):
+        cur = self.db.cursor()
+        cur.execute('''
+                CREATE TABLE IF NOT EXISTS "overlap" (
+                  "COB" TEXT,
+                  "FlankLimit" INTEGER,
+                  "Method" TEXT,
+                  "NumBootstraps" INTEGER,
+                  "Ontology" TEXT,
+                  "Term" TEXT,
+                  "TermCollapsedLoci" INTEGER,
+                  "TermLoci" INTEGER,
+                  "TermPValue" REAL,
+                  "WindowSize" INTEGER,
+                  "bs_mean" REAL,
+                  "bs_std" REAL,
+                  "fdr" REAL,
+                  "fitted" REAL,
+                  "gene" TEXT,
+                  "global" REAL,
+                  "local" REAL,
+                  "num_random" REAL,
+                  "num_real" REAL,
+                  "score" REAL,
+                  "zscore" REAL
+                );
+        ''')
+
+    def _build_indices(self):
+        cur = self.db.cursor()
+        cur.execute('CREATE INDEX IF NOT EXISTS gene ON overlap(gene)')
+
+    '''
+        Methods
+    '''
+    def get_data(self, gene=None, cob=None, term=None,
+        windowSize=None, flankLimit=None):
+        '''
+            Function to get data using any of the parameters it is normaly queried by
+        '''
+        # Base section of query
+        query = "SELECT * FROM overlap WHERE"
+        
+        # Throw arguments into a dictionary for effective looping
+        args = {
+            'gene':gene, 'COB':cob, 'Term':term,
+            'WindowSize':windowSize, 'FlankLimit':flankLimit}
+        
+        # For each argument, add a clase to the SQL query
+        for k,v in args.items():
+            if not(v is None):
+                if isinstance(v,(set,list)):
+                    ls = "{}".format("','".join([str(x) for x in v]))
+                else:
+                    ls = v
+                query += " {} IN ('{}') AND".format(k,ls)
+        
+        # Peel off unneeded things at the end of the query, depending args
+        if query.endswith(' AND'):
+            query = query.rstrip(' AND')
+        if query.endswith(' WHERE'):
+            query = query.rstrip(' WHERE')
+        query += ';'
+        
+        # Run the query
+        cur = self.db.cursor()
+        print('Executing: {}'.format(query))
+        cur.execute(query)
+        
+        # Throw the results into a DataFrame for conviniece
+        return pd.read_sql(query,sqlite3.connect(self.db.filename)).set_index('gene')
+
 
     def generate_output_name(self):
         # Handle the different output schemes
@@ -103,106 +193,6 @@ class OverlapAnalysis(object):
             ]
         return pd.concat(bs)
 
-    @classmethod
-    def from_csv(cls,dir='./',sep='\t'):
-        self = cls()
-        # Read in Gene specific data
-        self.results = pd.concat(
-            [pd.read_table(x,sep=sep) \
-                for x in glob.glob(dir+"/*.overlap.tsv") ]
-        )
-        return self
-
-    @classmethod
-    def from_CLI(cls,args):
-        '''
-            Implements an interface for the CLI to perform overlap analysis
-        '''
-        self = cls()
-        # Build base camoco objects
-        self.args = args
-        self.cob = co.COB(args.cob)
-        self.ont = co.GWAS(args.gwas)
-        self.generate_output_name()
-
-        # Generate a terms iterable
-        if 'all' in self.args.terms:
-            terms = self.ont.iter_terms()
-        else:
-            terms = [self.ont[term] for term in self.args.terms]
-        all_results = list()
-
-        results = []
-        # Iterate through terms and calculate
-        for term in terms:
-            if term.id in self.args.skip_terms:
-                self.cob.log('Skipping {} since it was in --skip-terms',term.id)
-            self.cob.log(
-                "Calculating Overlap for {} of {} in {} with window:{} and flank:{}",
-                term.id,
-                self.ont.name,
-                self.cob.name,
-                self.args.candidate_window_size,
-                self.args.candidate_flank_limit
-            )
-            if args.dry_run:
-                continue
-            loci = self.snp2gene(term)
-            if len(loci) < 2:
-                self.cob.log('Not enough genes to perform overlap analysis')
-                continue
-            overlap = self.overlap(loci)
-            bootstraps = self.generate_bootstraps(loci,overlap)
-            bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
-            bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
-            # Calculate z scores for density
-            if bs_std != 0:
-                overlap['zscore'] = (overlap.score-bs_mean)/bs_std
-                bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
-            else:
-                # If there is no variation, make all Z-scores 0
-                overlap['zscore'] = bootstraps['zscore'] = 0
-            # Calculate FDR
-            overlap['fdr'] = np.nan
-            max_zscore = int(overlap.zscore.max()) + 1
-            for zscore in np.arange(0, max_zscore,0.25):
-                num_random = bootstraps\
-                        .groupby('iter')\
-                        .apply(lambda df: sum(df.zscore >= zscore))\
-                        .mean()
-                num_real = sum(overlap.zscore >= zscore)
-                # Calculate FDR
-                if num_real != 0 and num_random != 0:
-                    fdr = num_random / num_real
-                elif num_real != 0 and num_random == 0:
-                    fdr = 0
-                else:
-                    fdr = 1
-                overlap.loc[overlap.zscore >= zscore,'fdr'] = fdr
-                overlap.loc[overlap.zscore >= zscore,'num_real'] = num_real
-                overlap.loc[overlap.zscore >= zscore,'num_random'] = num_random
-                overlap.loc[overlap.zscore >= zscore,'bs_mean'] = bs_mean
-                overlap.loc[overlap.zscore >= zscore,'bs_std'] = bs_std
-                overlap.sort_values(by=['zscore'],ascending=False,inplace=True)
-            overlap_pval = (
-                (sum(bootstraps.groupby('iter').apply(lambda x: x.score.mean()) >= overlap.score.mean()))\
-                / len(bootstraps.iter.unique())
-            )
-            # This gets collated into all_results below
-            overlap['COB'] = self.cob.name
-            overlap['Ontology'] = self.ont.name
-            overlap['Term'] = term.id
-            overlap['WindowSize'] = self.args.candidate_window_size
-            overlap['FlankLimit'] = self.args.candidate_flank_limit
-            overlap['TermLoci'] = len(term.loci)
-            overlap['TermCollapsedLoci'] = len(loci)
-            overlap['TermPValue'] = overlap_pval
-            overlap['NumBootstraps'] = len(bootstraps.iter.unique())
-            overlap['Method'] = self.args.method
-            results.append(overlap.reset_index())
-        if not args.dry_run:
-            self.results = pd.concat(results)
-            self.results.to_csv(self.args.out,sep='\t',index=None)
 
     def overlap(self,loci,bootstrap=False,iter_name=None):
         '''
@@ -396,5 +386,122 @@ class OverlapAnalysis(object):
             aggfunc=lambda x: len(set(x))
         ).fillna(0).astype(int)
 
+    
+    ''' ----------------------------------------------------------------------------------
+        Class Methods
+    '''
+    @classmethod
+    def create(cls, gwas, description=None):
+        if not isinstance(gwas, str):
+            gwas = gwas.name
+        self = super().create(gwas, description, type='Overlap')
+        return self
+ 
+    @classmethod
+    def from_csv(cls,dir='./',sep='\t'):
+        # Read in Gene specific data
+        results = pd.concat(
+            [pd.read_table(x,sep=sep) \
+                for x in glob.glob(dir+"/*.overlap.tsv") ]
+        )
+        gwas = results.Ontology.unique()[0]
+        self = cls.create(gwas)
+        self.results = results
+        # Add the results to the sqlite table
+        #self._bcolz('overlap',df=self.results)
+        self.results.to_sql('overlap',sqlite3.connect(self.db.filename),if_exists='replace') 
+        return self
+
+    @classmethod
+    def from_CLI(cls,args):
+        '''
+            Implements an interface for the CLI to perform overlap
+            Analysis
+        '''
+        self = cls()
+        # Build base camoco objects
+        self.args = args
+        self.cob = co.COB(args.cob)
+        self.ont = co.GWAS(args.gwas)
+        self.generate_output_name()
+
+        # Generate a terms iterable
+        if 'all' in self.args.terms:
+            terms = self.ont.iter_terms()
+        else:
+            terms = [self.ont[term] for term in self.args.terms]
+        all_results = list()
+
+        results = []
+        # Iterate through terms and calculate
+        for term in terms:
+            if term.id in self.args.skip_terms:
+                self.cob.log('Skipping {} since it was in --skip-terms',term.id)
+            self.cob.log(
+                "Calculating Overlap for {} of {} in {} with window:{} and flank:{}",
+                term.id,
+                self.ont.name,
+                self.cob.name,
+                self.args.candidate_window_size,
+                self.args.candidate_flank_limit
+            )
+            if args.dry_run:
+                continue
+            loci = self.snp2gene(term)
+            if len(loci) < 2:
+                self.cob.log('Not enough genes to perform overlap')
+                continue
+            overlap = self.overlap(loci)
+            bootstraps = self.generate_bootstraps(loci,overlap)
+            bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
+            bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
+            # Calculate z scores for density
+            if bs_std != 0:
+                overlap['zscore'] = (overlap.score-bs_mean)/bs_std
+                bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
+            else:
+                # If there is no variation, make all Z-scores 0
+                overlap['zscore'] = bootstraps['zscore'] = 0
+            # Calculate FDR
+            overlap['fdr'] = np.nan
+            max_zscore = int(overlap.zscore.max()) + 1
+            for zscore in np.arange(0, max_zscore,0.25):
+                num_random = bootstraps\
+                        .groupby('iter')\
+                        .apply(lambda df: sum(df.zscore >= zscore))\
+                        .mean()
+                num_real = sum(overlap.zscore >= zscore)
+                # Calculate FDR
+                if num_real != 0 and num_random != 0:
+                    fdr = num_random / num_real
+                elif num_real != 0 and num_random == 0:
+                    fdr = 0
+                else:
+                    fdr = 1
+                overlap.loc[overlap.zscore >= zscore,'fdr'] = fdr
+                overlap.loc[overlap.zscore >= zscore,'num_real'] = num_real
+                overlap.loc[overlap.zscore >= zscore,'num_random'] = num_random
+                overlap.loc[overlap.zscore >= zscore,'bs_mean'] = bs_mean
+                overlap.loc[overlap.zscore >= zscore,'bs_std'] = bs_std
+                overlap.sort_values(by=['zscore'],ascending=False,inplace=True)
+            overlap_pval = (
+                (sum(bootstraps.groupby('iter').apply(lambda x: x.score.mean()) >= overlap.score.mean()))\
+                / len(bootstraps.iter.unique())
+            )
+            # This gets collated into all_results below
+            overlap['COB'] = self.cob.name
+            overlap['Ontology'] = self.ont.name
+            overlap['Term'] = term.id
+            overlap['WindowSize'] = self.args.candidate_window_size
+            overlap['FlankLimit'] = self.args.candidate_flank_limit
+            overlap['TermLoci'] = len(term.loci)
+            overlap['TermCollapsedLoci'] = len(loci)
+            overlap['TermPValue'] = overlap_pval
+            overlap['NumBootstraps'] = len(bootstraps.iter.unique())
+            overlap['Method'] = self.args.method
+            results.append(overlap.reset_index())
+        if not args.dry_run:
+            self.results = pd.concat(results)
+            self.results.to_csv(self.args.out,sep='\t',index=None)
 
 
