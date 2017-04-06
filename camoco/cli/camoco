@@ -34,7 +34,7 @@ from camoco.cli.commands.cistrans import cistrans
 from camoco.cli.commands.snp2gene import snp2gene
 from camoco.cli.commands.geneneighbors import geneneighbors
 # Analysis Commands
-from camoco.OverlapAnalysis import OverlapAnalysis
+from camoco.Overlap import Overlap
 
 from camoco import cf
 
@@ -677,7 +677,7 @@ if __name__ == '__main__':
         default=None,
         help='OutputFile Name (default: Standard Out)'
     )
-    overlapCLI.set_defaults(func=OverlapAnalysis.from_CLI)
+    overlapCLI.set_defaults(func=Overlap.from_CLI)
     overlapCLI.add_argument(
         '--dry-run',
         action='store_true',

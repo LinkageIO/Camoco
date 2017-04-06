@@ -1226,8 +1226,7 @@ class COB(Expr):
 
     def _calculate_degree(self):
         '''
-            Calculates degrees of genes within network. Stores
-            them in our feather store.
+            Calculates degrees of genes within network. 
         '''
         self.log('Building Degree')
         # Get significant expressions and dump coex from memory for time being
@@ -1272,7 +1271,7 @@ class COB(Expr):
         
         # Find the leaves from hierarchical clustering
         self.log("Finding the leaves")
-        dists = leaves_list(linkage(dists, method='single'))
+        dists = leaves_list(linkage(dists, method='complete'))
         gc.collect()
         
         # Put them in a dataframe and stow them

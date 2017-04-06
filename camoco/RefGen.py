@@ -955,6 +955,8 @@ class RefGen(Camoco):
         tbl = pd.read_table(filename,sep=sep,dtype=object)
         idx_name = tbl.columns[gene_col]
         tbl[idx_name] = tbl[idx_name].str.upper()
+        # Set thie index to be the specified gene column
+        tbl.set_index(idx_name,inplace=True)        
         
         # Drop columns if we need to
         if skip_cols is not None:
@@ -964,11 +966,12 @@ class RefGen(Camoco):
         # Get rid of any genes not in the refence genome
         cur = self.db.cursor()
         cur.execute('SELECT id FROM genes;')
-        rm = set(tbl[idx_name]) - set([id[0] for id in cur.fetchall()])
+        rm = set(tbl.index.values) - set([id[0] for id in cur.fetchall()])
         tbl.drop(rm,axis=0,inplace=True)
         del rm, cur
         
         # One Annotation per row, drop the nulls and duplicates
+        tbl = tbl.reset_index()
         tbl = pd.melt(tbl,id_vars=idx_name,var_name='col',value_name='desc')
         tbl.drop('col',axis=1,inplace=True)
         tbl.dropna(axis=0,inplace=True)
@@ -989,6 +992,9 @@ class RefGen(Camoco):
         
         # Make sure the indices are built
         self._build_indices()
+
+    def remove_annotations(self):
+        self.db.cursor().execute('DROP FROM func;')
 
     @classmethod
     def create(cls,name,description,type):
