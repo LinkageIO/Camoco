@@ -458,6 +458,7 @@ if __name__ == '__main__':
     lstcmd.add_argument(
         'type', 
         nargs='?',
+        default=None,
         help=(
             'The type of dataset you want to list. e.g. GWAS. '
             'Also accepts SQLite wildcards.'    
@@ -466,9 +467,17 @@ if __name__ == '__main__':
     lstcmd.add_argument(
         'name', 
         nargs='?',
+        default=None,
         help = (
             'The name of the dataset you want to list. '
             'Also accepts SQLite wildcards.' 
+        )
+    )
+    lstcmd.add_argument(
+        '--terms',
+        action='store_true',
+        help=(
+            'Flag indicating to list the terms within the Ontology or GWAS' 
         )
     )
     lstcmd.set_defaults(func=list_command)
