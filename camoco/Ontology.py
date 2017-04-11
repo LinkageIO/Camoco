@@ -325,7 +325,7 @@ class Ontology(Camoco):
 
     def enrichment(self, locus_list, pval_cutoff=0.05, max_term_size=300,
                    min_term_size=2, num_universe=None, return_table=False,
-                   include_genes=False):
+                   label=None,include_genes=False,bonferroni_correction=True):
         '''
             Evaluates enrichment of loci within the locus list in terms within
             the ontology. NOTE: this only tests terms that have at least one
@@ -339,6 +339,8 @@ class Ontology(Camoco):
                 the Ontology.
             pval_cutoff : float (default: 0.05)
                 Report terms with a pval lower than this value
+            bonferroni_correction : bool (default: True)
+                correct for testing multiple terms using Bonferroni correction
             max_term_size : int (default: 300)
                 The maximum term size for which to test enrichment. Useful
                 for filtering out large terms that would otherwise be 
@@ -357,7 +359,10 @@ class Ontology(Camoco):
                 Include comma delimited genes as a field
             return_table : bool (default: False)
                 If True, return results as a data frame
+            label: str (default: None)
+                If a label is specified and 
         '''
+        locus_list = set(locus_list)
         terms = self.db.cursor().execute('''SELECT DISTINCT term 
         FROM term_loci WHERE id IN ('{}')
         '''.format(
@@ -381,7 +386,6 @@ class Ontology(Camoco):
         )
         
         significant_terms = []
-        locus_list = set(locus_list)
         for term in terms:
             term_genes = set(term.loci)
             if len(term_genes) > max_term_size:
@@ -390,10 +394,34 @@ class Ontology(Camoco):
             num_in_term = len(term_genes)
             num_sampled = len(locus_list)
             # the reason this is num_common - 1 is because we are looking for 1 - cdf
-            # and we need to greater than OR equal to
+            # and we need to greater than OR EQUAL TO num_common
+            # Look. Do this in ipython:
+            '''
+                In [99]: probs = [hypergeom.pmf(x,100,5,10) for x in range(0,6)]
+                In [100]: probs
+                Out[100]: 
+                [0.58375236692612187,
+                 0.33939091100357333,
+                 0.070218809173150043,
+                 0.006383528106649855,
+                 0.00025103762217164457,
+                 3.3471682956218215e-06]
+                In [103]: 1-sum(probs[0:3]) 
+                # Get the probs of drawing 3 or more
+                Out[103]: 0.006637912897154763
+                # Remember slicing is exclusive for the end value
+                In [105]: hypergeom.sf(3,100,5,10)
+                # That aint right
+                Out[105]: 0.00025438479046726637
+                In [106]: hypergeom.sf(3-1,100,5,10)
+                # See Dog? You wnat num_common - 1
+                Out[106]: 0.0066379128971171221
+                # can we go back to drinking coffee now?
+            '''
             pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
             if pval <= pval_cutoff:
-                term.attrs['pval'] = pval
+                if label != None:
+                    term.attrs['label'] = label
                 term.attrs['hyper'] = OrderedDict([
                     ('pval'        , pval),
                     ('term_tested' , len(terms)),
@@ -403,6 +431,12 @@ class Ontology(Camoco):
                     ('num_terms'   , len(self)),
                     ('num_sampled' , num_sampled)
                 ])
+                if bonferroni_correction == True:
+                    if pval > pval_cutoff / num_sampled:
+                        term.attrs['hyper']['bonferroni'] = False
+                    else:
+                        term.attrs['hyper']['bonferroni'] = True
+                term.attrs['pval'] = pval
                 if include_genes == True:
                     term.attrs['hyper']['genes'] = ",".join(
                         [x.id for x in term_genes.intersection(locus_list)]
@@ -411,13 +445,22 @@ class Ontology(Camoco):
         if return_table == True:
             tbl = []
             for x in significant_terms:
+                try:
+                    x.name = x.name
+                except AttributeError as e:
+                    x.name = ''
                 val = OrderedDict([
                     ('term', x.name),
                     ('id'  , x.id)
                 ])
                 val.update(x.attrs['hyper'])
                 tbl.append(val)
-            return DataFrame.from_records(tbl).sort_values(by='pval')
+            tbl = DataFrame.from_records(tbl)
+            if label != None:
+                tbl['label'] = label
+            if len(tbl) > 0:
+                tbl = tbl.sort_values(by='pval')
+            return tbl
         else:
             return sorted(significant_terms,key=lambda x: x.attrs['pval'])
 
