@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 pd.set_option('display.width',300)
 
-from ggplot import *
+#from ggplot import *
 
 class SimulationAnalysis(object):
 
@@ -204,6 +204,7 @@ class SimulationAnalysis(object):
     @staticmethod
     def plot_all_terms(df,filename='SimulatedFCR_Signal_vs_Noise.png',figsize=(16,8)):
         # Get the number of COBs there are
+        raise NotImplementedError()
         return ggplot(df.reset_index(drop=True), aes(x='FCR',y='-logpval',color='id')) +\
             geom_line() + geom_point(alpha=0.1) + xlab('FCR') +\
             ylab('-log10(PVal)') + facet_wrap('COB') + ggtitle('Signal/Noise')
