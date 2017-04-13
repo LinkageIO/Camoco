@@ -20,6 +20,7 @@ from scipy.misc import comb
 from scipy.stats import norm
 from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
+from flask import jsonify
 
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
@@ -175,6 +176,30 @@ class COB(Expr):
             self.sigs.sort()
     
     def _coex_DataFrame(self,ids=None,sig_only=True):
+        '''
+            Converts the underlying coexpression table into
+            a pandas dataframe 
+
+            Parameters
+            ----------
+                ids : array-like of ints (default: None)
+                    Indices to include in the data frame. Usually
+                    computed from another COB method (e.g. 
+                    PCCUP.coex_index). If None, then all indices
+                    will be included.
+                sig_only : bool (default: True)
+                    If true, only "significant" edges will be 
+                    included in the table. If False, all edges will
+                    be included.
+
+            Returns
+            -------
+                A Pandas Dataframe
+
+
+            .. warning:: This will put the entire gene-by-accession
+                         dataframe into memory.
+        '''
         # If no ids are provided, get all of them
         if ids == None:
             if sig_only:
@@ -652,26 +677,87 @@ class COB(Expr):
         dm.to_csv(filename)
 
 
-    def to_json(self, gene_list=None, filename=None, sig_only=True, min_distance=None):
+    def to_json(self, gene_list=None, filename=None, sig_only=True, 
+            min_distance=None, max_edges=None, remove_orphans=True):
         '''
             Produce a JSON network object that can be loaded in cytoscape.js
             or Cytoscape v3+.
+
+            Parameters
+            ----------
+            gene_list : iterable of Locus objects
+                These loci or more specifically, genes,
+                must be in the COB RefGen object,
+                they are the genes in the network.
+            filename : str (default None)
+                If specified, the JSON string will be output to 
+                file. 
+            sig_only : bool (default: True)
+                Flag specifying whether or not to only
+                include the significant edges only. If
+                False, **All pairwise interactions** will
+                be included. (warning: it can be large).
+            min_distance : bool (default: None)
+                If specified, only interactions between
+                genes larger than this distance will be 
+                included. This corrects for potential 
+                cis-biased co-expression.
+            max_edges : int (default: None)
+                If specified, only the maximum number of 
+                edges will be included. Priority of edges
+                is assigned based on score.
+            remove_orphans : bool (default: True)
+                Remove genes that have no edges in the 
+                network.
+
+            Returns
+            -------
+            A JSON string or None if a filename is specified
         '''
         net = {
             'nodes' : [],
             'edges' : []
         }
+        # Get the edge indexes
+        self.log('Getting the network.')
+        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
+            min_distance=min_distance, names_as_index=False,
+            names_as_cols=True
+        )
+        if max_edges != None:
+            # Filter out only the top X edges by score 
+            edges = edges.sort_values(by='score',ascending=False)[0:max_edges]
+        # Add edges to json data structure 
+        for source,target,score,distance,significant in edges.itertuples(index=False):
+            net['edges'].append(
+                {'data':{
+                    'source': source,
+                    'target' : target,
+                    'score' : float(score),
+                    'distance' : float(fix_val(distance))
+                }}
+            )
+
+
         parents = defaultdict(list)
         # generate the subnetwork for the genes
+        if gene_list == None:
+            gene_list = list(self.refgen.iter_genes())
+        else:
+            gene_list = set(gene_list)
+        if remove_orphans == True:
+            # get a list of all the genes with edges
+            has_edges = set(edges.gene_a).union(edges.gene_b)
+            gene_list = [x for x in gene_list if x.id in has_edges]
         for gene in gene_list:
-            net['nodes'].append(
-                    {'data':{
+            node = {'data':{
                         'id':str(gene.id),
-                        'parent':str(gene.attr['parent_locus']),
                         'classes':'gene'
-                    }}
-            )
-            parents[str(gene.attr['parent_locus'])].append(gene.id)
+            }}
+            node['data'].update(gene.attr)
+            net['nodes'].append(node)
+            if 'parent_locus' in gene.attr:
+                parents[str(gene.attr['parent_locus'])].append(gene.id)
         # Add parents first
         for parent,children in parents.items():
             net['nodes'].insert(0,
@@ -690,21 +776,6 @@ class COB(Expr):
                         'distance' : 0
                     }}
                 )
-        # Get the edge indexes
-        self.log('Getting the network.')
-        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
-        min_distance=min_distance, names_as_index=False,
-        names_as_cols=True)
-    
-        for source,target,score,significant,distance in subnet.itertuples(index=False):
-            net['edges'].append(
-                {'data':{
-                    'source': source,
-                    'target' : target,
-                    'score' : score,
-                    'distance' : fix_val(distance)
-                }}
-            )
         # Return the correct output
         net = {'elements' : net}
         if filename:
@@ -782,6 +853,8 @@ class COB(Expr):
         '''
             Returns the local degree of a list of genes
 
+            Parameters
+            ----------
             gene_list : iterable (co.Locus object)
                 a list of genes for which to retrieve local degree for. The
                 genes must be in the COB object (of course)
@@ -789,7 +862,6 @@ class COB(Expr):
                 only count edges if they are from genes originating from
                 different loci. Each gene MUST have 'parent_locus' set in
                 its attr object.
-
         '''
         subnetwork = self.subnetwork(
             gene_list, sig_only=True, trans_locus_only=trans_locus_only
@@ -814,6 +886,16 @@ class COB(Expr):
     def global_degree(self, gene_list, trans_locus_only=False):
         '''
             Returns the global degree of a list of genes
+    
+            Parameters
+            ----------
+            gene_list : iterable (co.Locus object)
+                a list of genes for which to retrieve local degree for. The
+                genes must be in the COB object (of course)
+            trans_locus_only : bool (default: False)
+                only count edges if they are from genes originating from
+                different loci. Each gene MUST have 'parent_locus' set in
+                its attr object.
         '''
         try:
             if isinstance(gene_list, Locus):
@@ -830,10 +912,13 @@ class COB(Expr):
 
     def cis_degree(self, gene_list):
         '''
-            Returns the number of cis interactions for each gene in the gene
-            list. **each gene object MUST have its 'parent_locus' attr set!!
+            Returns the number of *cis* interactions for each gene in the gene
+            list. Two genes are is *cis* if they share the same parent locus.
+            **Therefore: each gene object MUST have its 'parent_locus' attr set!!**
 
-            gene_list : iterable of co.Gene
+            Parameters
+            ----------
+            gene_list : iterable of Gene Objects
         '''
         subnetwork = self.subnetwork(
             gene_list, sig_only=True, trans_locus_only=True
@@ -1384,9 +1469,9 @@ class COB(Expr):
                        refgen, rawtype=None, **kwargs):
         '''
             The method will read the table in (as a pandas dataframe),
-            build the Expr object passing all keyword arguments in **kwargs
+            build the Expr object passing all keyword arguments in ``**``kwargs
             to the classmethod Expr.from_DataFrame(...). See additional
-            **kwargs in COB.from_Expr(...)
+            ``**``kwargs in COB.from_Expr(...)
 
             Parameters
             ----------
@@ -1407,7 +1492,7 @@ class COB(Expr):
                 This is noted here to reinforce the impotance of the rawtype
                 passed to camoco.Expr.from_DataFrame. See docs there
                 for more information.
-            **kwargs : key,value pairs
+            \*\*kwargs : key,value pairs
                 additional parameters passed to subsequent methods.
                 (see Expr.from_DataFrame)
 
