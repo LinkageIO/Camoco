@@ -16,7 +16,8 @@ import sqlite3
 
 import numpy as np
 import scipy as sp
-import scipy.stats
+from scipy.stats import hypergeom
+from scipy import tril_indices,triu_indices
 
 from itertools import chain
 
@@ -424,17 +425,37 @@ class Overlap(Camoco):
 
     def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3):
         '''
-            Return the number of shared genes by Term
+            Return a matrix showing the number of shared HPO genes by Term.
+            The diagonal of the matrix is the number of genes discoverd by that 
+            term. The upper diagonal shows the overlap between the row and column
+            and the lower diagonal shows the hypergeomitric pval for the overlap
+            between the two terms. The universe used is the number of unique genes
+            in the overlap results.
         '''
         df = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
-
+        # 
         x={df[0]:set(df[1].gene) for df in df.groupby('Term')}                     
         adj = []                                                                        
+        #num_universe = len(set(chain(*x.values())))
+        num_universe = len(self.results.gene.unique())
         for a in x.keys():                                                              
             for b in x.keys():                                                          
-                adj.append((a,b,len(set(x[a]).intersection(x[b]))))                     
+                num_common = len(set(x[a]).intersection(x[b]))
+                if a != b:
+                    pval = hypergeom.sf(num_common-1,num_universe,len(x[a]),len(x[b]))
+                else:
+                    # This will make the diagonal of the matrix be the number HPO genes
+                    # for the element
+                    pval = len(x[a])
+                adj.append((a,b,num_common,pval)) 
         adj = pd.DataFrame(adj)                                                         
-        return pd.pivot_table(adj,index=0,columns=1,values=2)    
+        overlap = pd.pivot_table(adj,index=0,columns=1,values=2)
+        # Mask out the lower diagonal on the overalp matrix
+        overlap.values[tril_indices(len(overlap))] = 0
+        pvals = pd.pivot_table(adj,index=0,columns=1,values=3)
+        # Mask out the upper tringular on the pvals matrix
+        pvals.values[triu_indices(len(pvals),1)] = 0
+        return overlap+pvals
 
     def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
         candidates = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
