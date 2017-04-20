@@ -44,7 +44,8 @@ def build_cob(args):
         min_single_sample_expr=args.min_single_sample_expr,
         min_expr=args.min_expr,
         max_val=args.max_val,
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
+        index_col=args.index_col
     )
     print("Build successful!")
     print(cob.summary())

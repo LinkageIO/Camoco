@@ -678,7 +678,9 @@ class COB(Expr):
 
 
     def to_json(self, gene_list=None, filename=None, sig_only=True, 
-            min_distance=None, max_edges=None, remove_orphans=True):
+            min_distance=None, max_edges=None, remove_orphans=True
+            
+            ):
         '''
             Produce a JSON network object that can be loaded in cytoscape.js
             or Cytoscape v3+.
@@ -1535,7 +1537,7 @@ class COB(Expr):
                 Specifies the delimiter of the file referenced by the
                 filename parameter.
             index_col : str (default: None)
-                If not None, this column will be set as the gene index
+                If not None, this column will be set as the **gene index**
                 column. Useful if there is a column name in the text file
                 for gene names.
             **kwargs : key value pairs
