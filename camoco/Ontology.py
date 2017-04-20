@@ -86,6 +86,47 @@ class Ontology(Camoco):
         except TypeError as e: # Not in database
             raise e
 
+    def terms_containing(self,locus_list,max_term_size=10e10,min_term_size=0):
+        '''
+            Retrurns the set of terms which contains the 
+            specified loci.
+
+            Parameters
+            ----------
+            locus_list : iterable of type Locus
+                The list of loci for which to retrieve 
+                corresponding terms.
+            max_term_size : int (default: 10e10)
+                The maximum term size for which to test enrichment. Useful
+                for filtering out large terms that would otherwise be 
+                uninformative (e.g. top level GO terms)
+            min_term_size : int (default: 0)
+                The minimum term size for which to test enrichment. Useful
+                for filtering out very small terms that would be uninformative
+                (e.g. single gene terms)
+
+            Returns
+            -------
+            list of terms which contain provided loci
+        '''
+        # Filter to unique set
+        locus_list = set(locus_list)
+        # query the database
+        terms = self.db.cursor().execute('''SELECT DISTINCT term 
+        FROM term_loci WHERE id IN ('{}')
+        '''.format(
+            "','".join([x.id for x in locus_list])
+        )).fetchall()
+        # Fetch the terms with the proper size
+        terms = list(
+            filter(
+                lambda t: (len(t) >= min_term_size) and (len(t) <= max_term_size),
+                [self[name] for name, in terms]
+            )
+        )
+        return terms
+
+
     def num_distinct_loci(self):
         return self.db.cursor().execute(
             'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
@@ -158,6 +199,7 @@ class Ontology(Camoco):
             passed in cursor has executed the "BEGIN TRANSACTION" command.
         overwrite : bool
             Indication to delete any existing entry before writing'''
+
         if overwrite:
             self.del_term(term.id)
         if not cursor:
@@ -258,6 +300,49 @@ class Ontology(Camoco):
         self._global('refgen', refgen.name)
         # build the tables
         self._create_tables()
+        return self
+    
+    @classmethod
+    def from_DataFrame(cls, dataframe, name, description, refgen,
+                      gene_col='gene',term_col='Term'):
+        '''
+            Convenience function to create a Ontology from an iterable
+            terms object. 
+
+            Parameters
+            ----------
+            dataframe : pandas.DataFrame
+                A pandas dataframe containing the mapping betweeen gene ids
+                and 
+            name : str
+                The name of the camoco object to be stored in the database.
+            description : str
+                A short message describing the dataset.
+            refgen : camoco.RefGen
+                A RefGen object describing the genes in the dataset
+
+            Optional Parameters
+            -------------------
+            gene_col : str (default: gene)
+                The string designating the column in the dataframe containing
+                gene names (ids)
+            term_col : str (default: Term)
+                The string designating the column in the dataframe containing
+                the term name.
+
+        '''
+        self = cls.create(name,description,refgen)
+        # create terms from 
+        terms = [
+            Term(id,loci=refgen[set(df[gene_col])]) \
+            for id,df in dataframe.groupby(term_col)
+        ]
+        self.log('Adding {} terms to the database.',len(terms))
+        self.add_terms(terms, overwrite=True)
+        # Build the indices
+        self.log('Building the indices.')
+        self._build_indices()
+        self.log('Your gene ontology is built.')
         return self
 
     @classmethod
@@ -362,19 +447,10 @@ class Ontology(Camoco):
             label: str (default: None)
                 If a label is specified and 
         '''
-        locus_list = set(locus_list)
-        terms = self.db.cursor().execute('''SELECT DISTINCT term 
-        FROM term_loci WHERE id IN ('{}')
-        '''.format(
-            "','".join([x.id for x in locus_list])
-        )).fetchall()
-        
-        self.log('Getting GOTerm Objects')
-        terms = list(
-            filter(
-                lambda t: (len(t) >= min_term_size) and (len(t) <= max_term_size),
-                [self[name] for name, in terms]
-            )
+        terms = self.terms_containing(
+            locus_list,
+            min_term_size=min_term_size,
+            max_term_size=max_term_size
         )
         if num_universe is None:
             #num_universe = len(set(chain(*[x.loci for x in terms])))
