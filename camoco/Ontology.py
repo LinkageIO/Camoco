@@ -40,6 +40,9 @@ class Ontology(Camoco):
         '''
         return self.num_terms(min_term_size=1)
 
+    def __iter__(sefl):
+        return self.iter_terms()
+
     def num_terms(self,min_term_size=0,max_term_size=10e10):
         '''
             Returns the number of terms in the Ontology
@@ -132,7 +135,7 @@ class Ontology(Camoco):
             'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
         ).fetchone()[0]
 
-    def iter_terms(self,min_term_size=0,max_term_size=10000000):
+    def iter_terms(self,min_term_size=0,max_term_size=10e10):
         '''
             Return a generator that iterates over each term in the ontology.
         '''
