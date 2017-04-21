@@ -24,6 +24,11 @@ def build_cob(args):
 
     quality_control = False if args.skip_quality_control else True
     normalize = False if args.skip_normalization else True
+
+    # Check to see if this dataset is already built
+    if co.available_datasets('Expr',args.name):
+        print('Warning! This dataset has already been built.')
+        co.del_dataset('Expr',args.name,safe=args.force)
         
     # Basically just pass all the CLI arguments to the COB class method  
     cob = co.COB.from_table(
