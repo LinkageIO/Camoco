@@ -78,6 +78,8 @@ class COB(Expr):
         return self.__repr__()
 
     def summary(self,file=sys.stdout):
+        '''
+        '''
         print( '''
             COB Dataset: {}
                 Desc: {}
@@ -132,6 +134,8 @@ class COB(Expr):
         ), file=file)
 
     def qc_gene(self):
+        '''
+        '''
         qc_gene = self._bcolz('qc_gene')
         qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index]
         return qc_gene.groupby('chrom').aggregate(sum, axis=0)
@@ -139,6 +143,8 @@ class COB(Expr):
     @property
     @memoize
     def edge_FDR(self):
+        '''
+        '''
         # get the percent of significant edges
         num_sig = self.coex.significant.coerce(to='int32').sum()/len(self.coex)
         # calulate the number expected
@@ -147,6 +153,8 @@ class COB(Expr):
         return num_exp/num_sig
 
     def set_sig_edge_zscore(self,zscore):
+        '''
+        '''
         # Don't do anything if there isn't a coex table
         if self.coex is None:
             return
@@ -310,7 +318,7 @@ class COB(Expr):
             what information to report, see Parameters.
 
             Parameters
-            ---------
+            ----------
             gene_list : iter of Loci
                 The genes from which to extract a subnetwork.
                 If gene_list is None, the function will assume
@@ -629,6 +637,8 @@ class COB(Expr):
             self.log('Done')
 
     def to_graphml(self,file, gene_list=None, sig_only=True, min_distance=0):
+        '''
+        '''
         # Get the edge indexes
         self.log('Getting the network.')
         edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
@@ -678,8 +688,8 @@ class COB(Expr):
 
 
     def to_json(self, gene_list=None, filename=None, sig_only=True, 
-            min_distance=None, max_edges=None, remove_orphans=True
-            
+            min_distance=None, max_edges=None, remove_orphans=True,
+            ontology=None 
             ):
         '''
             Produce a JSON network object that can be loaded in cytoscape.js
@@ -711,6 +721,12 @@ class COB(Expr):
             remove_orphans : bool (default: True)
                 Remove genes that have no edges in the 
                 network.
+            ontology : camoco.Ontology (default: None)
+                If an ontology is specified, genes will
+                be annotated to belonging to terms within 
+                the ontology. This is useful for highlighting 
+                groups of genes once they are inside of
+                cytoscape(.js).
 
             Returns
             -------
@@ -739,7 +755,13 @@ class COB(Expr):
                     'distance' : float(fix_val(distance))
                 }}
             )
-
+        # Handle any ontological business
+        if ontology != None:
+            # Make a map from gene name to ontology
+            ont_map = defaultdict(set)
+            for term in ontology.iter_terms():
+                for locus in term.loci:
+                   ont_map[locus.id].add(term.id) 
 
         parents = defaultdict(list)
         # generate the subnetwork for the genes
@@ -756,6 +778,9 @@ class COB(Expr):
                         'id':str(gene.id),
                         'classes':'gene'
             }}
+            if ontology != None and gene.id in ont_map:
+                for x in ont_map[gene.id]:
+                    node['data'][x] = True
             node['data'].update(gene.attr)
             net['nodes'].append(node)
             if 'parent_locus' in gene.attr:
@@ -1427,6 +1452,8 @@ class COB(Expr):
     '''
     @classmethod
     def create(cls, name, description, refgen):
+        '''
+        '''
         self = super().create(name, description, refgen)
         self._bcolz('gene_qc_status', df=pd.DataFrame())
         self._bcolz('accession_qc_status', df=pd.DataFrame())
@@ -1537,7 +1564,7 @@ class COB(Expr):
                 Specifies the delimiter of the file referenced by the
                 filename parameter.
             index_col : str (default: None)
-                If not None, this column will be set as the **gene index**
+                If not None, this column will be set as the gene index
                 column. Useful if there is a column name in the text file
                 for gene names.
             **kwargs : key value pairs
