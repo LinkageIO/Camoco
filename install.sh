@@ -160,7 +160,7 @@ then
     cd $BASE
     wget http://micans.org/mcl/src/mcl-latest.tar.gz
     echo "Extracting the taball"
-    tar xzvf mcl-latest.tar.gz
+    tar xzf mcl-latest.tar.gz
     rm -rf mcl-latest.tar.gz
     cd $(find . -name 'mcl-*' -type d | head -n 1)
     ./configure --prefix=$BASE
