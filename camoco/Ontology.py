@@ -148,8 +148,8 @@ class Ontology(Camoco):
         for id, in terms:
             yield self[id]
 
-    def terms(self):
-        return list(self.iter_terms())
+    def terms(self,min_term_size=0,max_term_size=10e10):
+        return list(self.iter_terms(min_term_size=min_term_size,max_term_size=max_term_size))
 
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(
