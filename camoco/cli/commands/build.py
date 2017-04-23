@@ -72,7 +72,12 @@ def build_refgen(args):
 
 def build_gont(args):
     refgen = co.RefGen(args.refgen)
-    co.GOnt.from_obo(
+    # Check to see if this dataset is already built
+    if co.available_datasets('GOnt',args.name):
+        print('Warning! This dataset has already been built.')
+        co.del_dataset('Expr',args.name,force=args.force)
+ 
+    go = co.GOnt.from_obo(
         args.obo_filename,
         args.filename,
         args.name,
@@ -81,6 +86,7 @@ def build_gont(args):
         go_col=args.go_col,
         id_col=args.id_col
     )
+    print("Done: {}".format(go.summary()))
     print('Build Successful')
 
 def build_GWAS(args):
