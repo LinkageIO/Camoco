@@ -29,6 +29,7 @@ class SimulationAnalysis(object):
         for col in ['MCR','FCR','WindowSize','FlankLimit','COB','Term']:
             if col not in self.df.columns:
                 self.df[col] = 0
+        self.all_results = self.df
         self.df = pd.pivot_table(
             self.df,
             index=['COB','Term','WindowSize','FlankLimit','MCR','FCR'],
