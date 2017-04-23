@@ -23,6 +23,7 @@ from statsmodels.sandbox.regression.predstd import wls_prediction_std
 from flask import jsonify
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import statsmodels.api as sm
 import networkx as nx
 import pandas as pd
@@ -1019,7 +1020,8 @@ class COB(Expr):
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
-             min_cluster_size=10, cluster_accessions=True):
+             min_cluster_size=10, cluster_accessions=True,
+             plot_dendrogram=False):
         '''
             Plots a heatmap of genes x expression.
 
@@ -1073,11 +1075,10 @@ class COB(Expr):
             order = self._bcolz('clusters').loc[dm.index].\
                     fillna(np.inf).sort_values(by='cluster').index.values
         else:
-            # No cluster order
+            # No cluster order.
             order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
-
         # Optional Average by cluster
         if avg_by_cluster == True:
             # Extract clusters
@@ -1097,16 +1098,31 @@ class COB(Expr):
                     self._expr.as_matrix().T.astype('float')
                 )
             ))
-            link = linkage(1-accession_pccs, method='complete')
-            accession_dists = leaves_list(link)
+            accession_link = linkage(1-accession_pccs, method='single')
+            accession_dists = leaves_list(accession_link)
             # Order by accession distance
             dm = dm.loc[:,dm.columns[accession_dists]]
         # Save plot if provided filename
-        fig = plt.figure(
-            facecolor='white',
-            figsize=(20,20)
-        )
-        ax = fig.add_subplot(111)
+        if plot_dendrogram == False:
+            fig = plt.figure(
+                facecolor='white',
+                figsize=(20,20)
+            )
+            ax = fig.add_subplot(111)
+        else:
+            gs = gridspec.GridSpec(
+                2, 2, 
+                height_ratios=[3,1], 
+                width_ratios=[3,1],
+                hspace=0, wspace=0
+            )
+            ax = plt.subplot(gs[0])
+            # make the axes for the dendrograms
+            right_ax   = plt.subplot(gs[1])
+            right_ax.set_xticks([])
+            right_ax.set_yticks([])
+            bottom_ax = plt.subplot(gs[2])
+        # Plot the Expression matrix 
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
         cmap = self._cmap
         cmap.set_bad('grey', 1.0)
@@ -1127,14 +1143,24 @@ class COB(Expr):
                     yticks=np.arange(len(dm.index)),
                     yticklabels=dm.index.values
                 )
-        fig.colorbar(im)
+        #ax.figure.colorbar(im)
+        if plot_dendrogram == True:
+            # Plot the accession dendrogram
+            dendrogram(accession_link,ax=bottom_ax,orientation='bottom')
+            bottom_ax.set_xticks([])
+            bottom_ax.set_yticks([])
+            # Plot the gene dendrogram
+            import sys
+            sys.setrecursionlimit(100000)
+            gene_link = self._calculate_gene_distance()
+            dendrogram(gene_link,ax=right_ax,orientation='right')
+            right_ax.set_xticks([])
+            right_ax.set_yticks([])
         # Save if you wish
         if filename is not None:
-            plt.savefig(filename,dpi=300)
+            plt.savefig(filename,dpi=300,figsize=(20,20))
             plt.close()
-        return fig
-
-
+        return ax.figure
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         '''
@@ -1360,38 +1386,48 @@ class COB(Expr):
         del names
         gc.collect()
         return self
-        
-    def _calculate_leaves(self):
+
+    def _calculate_gene_distance(self,method='single'):
         '''
-            This calculates the leaves of the dendrogram from the coex
+            Calculate the hierarchical gene distance for the Expr matrix
+            using the coex data.
+
+            Notes
+            -----
+            This is kind of expenive.
         '''
         # We need to recreate the original PCCs
-        self.log('Calculating Leaves')
+        self.log('Calculating Leaves using {}'.format(method))
         if len(self.coex) == 0:
             raise ValueError('Cannot calculate leaves without coex')
         pcc_mean = float(self._global('pcc_mean'))
         pcc_std  = float(self._global('pcc_std'))
-        
         # Get score column and dump coex from memory for time being
         dists = odo(self.coex.score,np.ndarray)
-        
         # Subtract pccs from 1 so we do not get negative distances
         dists = (dists * pcc_std) + pcc_mean
         dists = np.tanh(dists)
         dists = 1 - dists
         gc.collect()
-        
         # Find the leaves from hierarchical clustering
+        gene_link = linkage(dists, method=method)
+        return gene_link
+
+    def _calculate_leaves(self,method='single'):
+        '''
+            This calculates the leaves of the dendrogram from the coex
+        '''
+        gene_link = self._calculate_gene_distance(method=method)
         self.log("Finding the leaves")
-        dists = leaves_list(linkage(dists, method='complete'))
+        leaves = leaves_list(gene_link)
         gc.collect()
         
         # Put them in a dataframe and stow them
-        self.leaves = pd.DataFrame(dists,index=self._expr.index,columns=['index'])
+        self.leaves = pd.DataFrame(leaves,index=self._expr.index,columns=['index'])
+        self._gene_link = gene_link
         self._bcolz('leaves', df=self.leaves)
         
         # Cleanup and reinstate the coex table
-        del dists
         gc.collect()
         return self
     
@@ -1621,6 +1657,87 @@ class COB(Expr):
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene'''
         raise NotImplementedError()
+
+
+
+def _sparse_fruchterman_reingold(A, dim=2, k=None, pos=None, fixed=None, 
+                                 iterations=50):
+    '''
+        Copyright (C) 2004-2016, NetworkX Developers
+        Aric Hagberg <hagberg@lanl.gov>
+        Dan Schult <dschult@colgate.edu>
+        Pieter Swart <swart@lanl.gov>
+        All rights reserved.
+    '''
+    # Position nodes in adjacency matrix A using Fruchterman-Reingold  
+    # Entry point for NetworkX graph is fruchterman_reingold_layout()
+    # Sparse version
+    try:
+        import numpy as np
+    except ImportError:
+        raise ImportError("_sparse_fruchterman_reingold() requires numpy: http://scipy.org/ ")
+    try:
+        nnodes,_=A.shape
+    except AttributeError:
+        raise nx.NetworkXError(
+            "fruchterman_reingold() takes an adjacency matrix as input")
+    try:
+        from scipy.sparse import spdiags,coo_matrix
+    except ImportError:
+        raise ImportError("_sparse_fruchterman_reingold() scipy numpy: http://scipy.org/ ")
+    # make sure we have a LIst of Lists representation
+    try:
+        A=A.tolil()
+    except:
+        A=(coo_matrix(A)).tolil()
+
+    if pos==None:
+        # random initial positions
+        pos=np.asarray(np.random.random((nnodes,dim)),dtype=A.dtype)
+    else:
+        # make sure positions are of same type as matrix
+        pos=pos.astype(A.dtype)
+
+    # no fixed nodes
+    if fixed==None:
+        fixed=[]
+
+    # optimal distance between nodes
+    if k is None:
+        k=np.sqrt(1.0/nnodes)
+    # the initial "temperature"  is about .1 of domain area (=1x1)
+    # this is the largest step allowed in the dynamics.
+    t=0.1
+    # simple cooling scheme.
+    # linearly step down by dt on each iteration so last iteration is size dt.
+    dt=t/float(iterations+1)
+
+    displacement=np.zeros((dim,nnodes))
+    for iteration in range(iterations):
+        displacement*=0
+        # loop over rows
+        for i in range(A.shape[0]):
+            if i in fixed:
+                continue
+            # difference between this row's node position and all others
+            delta=(pos[i]-pos).T
+            # distance between points
+            distance=np.sqrt((delta**2).sum(axis=0))
+            # enforce minimum distance of 0.01
+            distance=np.where(distance<0.01,0.01,distance)
+            # the adjacency matrix row
+            Ai=np.asarray(A.getrowview(i).toarray())
+            # displacement "force"
+            displacement[:,i]+=\
+                (delta*(k*k/distance**2-Ai*distance/k)).sum(axis=1)
+        # update positions
+        length=np.sqrt((displacement**2).sum(axis=0))
+        length=np.where(length<0.01,0.1,length)
+        pos+=(displacement*t/length).T
+        # cool temperature
+        t-=dt
+    return pos
+
 
 def fix_val(val):
     if isinf(val):
