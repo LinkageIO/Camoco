@@ -911,7 +911,7 @@ if __name__ == '__main__':
         '--cis-distance',
         default=50000,
         type=int,
-        help='Distance used to determine if two genes are in cis.'
+        help='Distance used to determine if two genes are in cis. (default: 50 kb)'
     )
     cis_trans.add_argument(
         '--out',
