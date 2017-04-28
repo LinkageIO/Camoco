@@ -1152,7 +1152,7 @@ class COB(Expr):
             # Plot the gene dendrogram
             import sys
             sys.setrecursionlimit(100000)
-            gene_link = self._calculate_gene_distance()
+            gene_link = self._calculate_gene_hierarchy()
             dendrogram(gene_link,ax=right_ax,orientation='right')
             right_ax.set_xticks([])
             right_ax.set_yticks([])
@@ -1387,7 +1387,7 @@ class COB(Expr):
         gc.collect()
         return self
 
-    def _calculate_gene_distance(self,method='single'):
+    def _calculate_gene_hierarchy(self,method='single'):
         '''
             Calculate the hierarchical gene distance for the Expr matrix
             using the coex data.
@@ -1417,7 +1417,7 @@ class COB(Expr):
         '''
             This calculates the leaves of the dendrogram from the coex
         '''
-        gene_link = self._calculate_gene_distance(method=method)
+        gene_link = self._calculate_gene_hierarchy(method=method)
         self.log("Finding the leaves")
         leaves = leaves_list(gene_link)
         gc.collect()
