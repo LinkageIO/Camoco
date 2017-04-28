@@ -124,6 +124,7 @@ def del_dataset(type, name, force=False):
     if type == 'Expr':
         # also have to remove the COB specific refgen
         del_dataset('RefGen', 'Filtered'+name, force=force)
+        del_dataset('Ontology', name+'MCL', force=force)
     return True
 
 def mv_dataset(type,name,new_name):
