@@ -128,8 +128,8 @@ class COB(Expr):
             # QC
             self._global('qc_min_expr'),
             self._global('qc_max_gene_missing_data'),
-            self._global('qc_min_single_sample_expr'),
             self._global('qc_max_accession_missing_data'),
+            self._global('qc_min_single_sample_expr'),
             # Clusters
             sum(self.clusters.groupby('cluster').apply(len) >= 10)
         ), file=file)
