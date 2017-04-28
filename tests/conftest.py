@@ -32,7 +32,7 @@ def testCOB(ZmRNASeqTissueAtlas):
 @pytest.fixture(scope="module")
 def Zm5bFGS():
     if cf.test.force.RefGen:
-        co.del_dataset('RefGen', 'Zm5bFGS', safe=False)
+        co.del_dataset('RefGen', 'Zm5bFGS', force=True)
     if not co.available_datasets('RefGen', 'Zm5bFGS'):
         # We have to build it
         gff = os.path.expanduser(
@@ -69,7 +69,7 @@ def Zm5bFGS_duplicate(Zm5bFGS):
 @pytest.fixture(scope="module")
 def AtTair10():
     if cf.test.force.RefGen:
-        co.del_dataset('RefGen', 'AtTair10', safe=False)
+        co.del_dataset('RefGen', 'AtTair10', force=True)
     if not co.available_datasets('RefGen', 'AtTair10'):
         gff = os.path.expanduser(
             os.path.join(
@@ -91,8 +91,8 @@ def AtTair10():
 @pytest.fixture(scope="module")
 def ZmRNASeqTissueAtlas(Zm5bFGS):
     if cf.test.force.COB:
-        co.del_dataset('COB', 'ZmRNASeqTissueAtlas', safe=False)
-        co.del_dataset('Expr', 'ZmRNASeqTissueAtlas', safe=False)
+        co.del_dataset('COB', 'ZmRNASeqTissueAtlas', force=True)
+        co.del_dataset('Expr', 'ZmRNASeqTissueAtlas', force=True)
     if not co.available_datasets('Expr', 'ZmRNASeqTissueAtlas'):
         # Build it
         return co.COB.from_table(
@@ -118,7 +118,7 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
 @pytest.fixture(scope="module")
 def ZmRoot(Zm5bFGS):
     if cf.test.force.COB:
-        co.del_dataset('Expr','ZmRoot',safe=False)
+        co.del_dataset('Expr','ZmRoot',force=True)
     if not co.available_datasets('Expr','ZmRoot'):
         return co.COB.from_table(
             os.path.join(
@@ -143,7 +143,7 @@ def ZmRoot(Zm5bFGS):
 @pytest.fixture(scope="module")
 def ZmSAM(Zm5bFGS):
     if cf.test.force.COB:
-        co.del_dataset('Expr','ZmSAM',safe=False)
+        co.del_dataset('Expr','ZmSAM',force=True)
     if not co.available_datasets('Expr','ZmSAM'):
         return co.COB.from_table(
             os.path.join(
@@ -167,7 +167,7 @@ def ZmSAM(Zm5bFGS):
 @pytest.fixture(scope="module")
 def ZmSAM2(Zm5bFGS):
     if cf.test.force.COB:
-        co.del_dataset('Expr','ZmSAM2',safe=False)
+        co.del_dataset('Expr','ZmSAM2',force=True)
     if not co.available_datasets('Expr','ZmSAM2'):
         return co.COB.from_table(
             os.path.join(
@@ -193,7 +193,7 @@ def ZmSAM2(Zm5bFGS):
 @pytest.fixture(scope="module")
 def ZmPAN2(Zm5bFGS):
     if cf.test.force.COB:
-        co.del_dataset('Expr','ZmPAN2',safe=False)
+        co.del_dataset('Expr','ZmPAN2',force=True)
     if not co.available_datasets('Expr','ZmPAN2'):
         return co.COB.from_table(
             os.path.join(
@@ -220,7 +220,7 @@ def ZmPAN2(Zm5bFGS):
 @pytest.fixture(scope="module")
 def ZmPAN(Zm5bFGS):
     if cf.test.force.COB:
-        co.del_dataset('Expr','ZmPAN',safe=False)
+        co.del_dataset('Expr','ZmPAN',force=True)
     if not co.available_datasets('Expr','ZmPAN'):
         return co.COB.from_table(
             os.path.join(
@@ -247,7 +247,7 @@ def ZmPAN(Zm5bFGS):
 @pytest.fixture(scope="module")
 def AtSeed(AtTair10):
     if cf.test.force.COB:
-        co.del_dataset('Expr', 'AtSeed', safe=False)
+        co.del_dataset('Expr', 'AtSeed', force=True)
     if not co.available_datasets('Expr', 'AtSeed'):
         Seed = ['GSE12404', #'GSE30223',
                 'GSE1051', 'GSE11852', 'GSE5634']
@@ -281,7 +281,7 @@ def AtSeed(AtTair10):
 @pytest.fixture(scope="module")
 def AtGen(AtTair10):
     if cf.test.force.COB:
-        co.del_dataset('Expr', 'AtGen', safe=False)
+        co.del_dataset('Expr', 'AtGen', force=True)
     if not co.available_datasets('Expr', 'AtGen'):
         General = ['GSE18975', 'GSE39384', 'GSE19271', 'GSE5632', 'GSE39385',
                 'GSE5630', 'GSE15617', 'GSE5617', 'GSE5686', 'GSE2473',
@@ -315,7 +315,7 @@ def AtGen(AtTair10):
 @pytest.fixture(scope="module")
 def AtLeaf(AtTair10):
     if cf.test.force.COB:
-        co.del_dataset('Expr', 'AtLeaf', safe=False)
+        co.del_dataset('Expr', 'AtLeaf', force=True)
     if not co.available_datasets('Expr', 'AtLeaf'):
         Leaf = ['GSE14578', 'GSE5630', 'GSE13739', #'GSE26199',
                 'GSE5686', 'GSE5615', 'GSE5620', 'GSE5628',
@@ -351,7 +351,7 @@ def AtLeaf(AtTair10):
 @pytest.fixture(scope="module")
 def AtRoot(AtTair10):
     if cf.test.force.COB:
-        co.del_dataset('Expr', 'AtRoot', safe=False)
+        co.del_dataset('Expr', 'AtRoot', force=True)
     if not co.available_datasets('Expr', 'AtRoot'):
         Root = ['GSE14578', 'GSE46205', 'GSE7631', 'GSE10576', 'GSE42007',
                 'GSE34130', 'GSE21611', 'GSE22966', 'GSE7641', 'GSE5620',
@@ -388,7 +388,7 @@ def AtRoot(AtTair10):
 @pytest.fixture(scope='module')
 def testGWAS(testRefGen):
     if cf.test.force.Ontology:
-        co.del_dataset('GWAS','testGWAS',safe=False)
+        co.del_dataset('GWAS','testGWAS',force=True)
     df = pd.DataFrame({
         'Trait' : ['a','a','b','b'],
         'CHR' : ['chr1','chr2','chr3','chr4'],
@@ -413,7 +413,7 @@ def testGWAS(testRefGen):
 @pytest.fixture(scope='module')
 def ZmWallace(Zm5bFGS):
     if cf.test.force.Ontology:
-        co.del_dataset('GWAS','ZmWallace',safe=False)
+        co.del_dataset('GWAS','ZmWallace',force=True)
     if not co.available_datasets('GWAS','ZmWallace'):
         # Grab path the csv
         csv = os.path.join(
@@ -438,7 +438,7 @@ def ZmWallace(Zm5bFGS):
 def ZmIonome(Zm5bFGS):
         # Delete the old dataset
     if cf.test.force.Ontology:
-        co.del_dataset('GWAS','ZmIonome',safe=False)
+        co.del_dataset('GWAS','ZmIonome',force=True)
     if not co.available_datasets('GWAS','ZmIonome'):
         # Grab path the csv
         csv = os.path.join(
@@ -465,7 +465,7 @@ def ZmIonome(Zm5bFGS):
 @pytest.fixture(scope="module")
 def AtSeedIonome(AtTair10):
     if cf.test.force.Ontology:
-        co.del_dataset('GWAS', 'AtSeedIonome', safe=False)
+        co.del_dataset('GWAS', 'AtSeedIonome', force=True)
     if not co.available_datasets('GWAS', 'AtSeedIonome'):
         # glob glob is god
         csvs = glob.glob(
@@ -498,7 +498,7 @@ def AtSeedIonome(AtTair10):
 @pytest.fixture(scope="module")
 def AtLeafIonome(AtTair10):
     if cf.test.force.Ontology:
-        co.del_dataset('GWAS', 'AtLeafIonome', safe=False)
+        co.del_dataset('GWAS', 'AtLeafIonome', force=True)
     if not co.available_datasets('GWAS', 'AtLeafIonome'):
         # glob glob is god
         csvs = glob.glob(os.path.join(
@@ -527,7 +527,7 @@ def AtLeafIonome(AtTair10):
 @pytest.fixture(scope="module")
 def AtRootHydroIonome(AtTair10):
     if cf.test.force.Ontology:
-        co.del_dataset('GWAS','AtRootHydroIonome',safe=False)
+        co.del_dataset('GWAS','AtRootHydroIonome',force=True)
     if not co.available_datasets('GWAS', 'AtRootHydroIonome'):
         # glob glob is god
         csvs = glob.glob(os.path.join(
@@ -555,7 +555,7 @@ def AtRootHydroIonome(AtTair10):
 @pytest.fixture(scope="module")
 def AtLeafHydroIonome(AtTair10):
     if cf.test.force.Ontology:
-        co.del_dataset('GWAS','AtLeafHydroIonome',safe=False)
+        co.del_dataset('GWAS','AtLeafHydroIonome',force=True)
     if not co.available_datasets('GWAS', 'AtLeafHydroIonome'):
         # glob glob is god
         csvs = glob.glob(os.path.join(
@@ -585,7 +585,7 @@ def AtLeafHydroIonome(AtTair10):
 @pytest.fixture(scope='module')
 def TestGO(Zm5bFGS):
     if cf.test.force.Ontology:
-        co.del_dataset('GOnt','TestGO',safe=False)
+        co.del_dataset('GOnt','TestGO',force=True)
     if not co.available_datasets('GOnt','TestGO'):
         obo = os.path.join(
             cf.options.testdir,
@@ -607,7 +607,7 @@ def TestGO(Zm5bFGS):
 @pytest.fixture(scope="module")
 def ZmGO(Zm5bFGS):
     if cf.test.force.Ontology:
-        co.del_dataset('GOnt','ZmGO',safe=False)
+        co.del_dataset('GOnt','ZmGO',force=True)
     if not co.available_datasets('GOnt','ZmGO'):
         obo = os.path.join(
             cf.options.testdir,
@@ -628,7 +628,7 @@ def ZmGO(Zm5bFGS):
 @pytest.fixture(scope="module")
 def AtGO(AtTair10):
     if cf.test.force.Ontology:
-        co.del_dataset('GOnt','AtGO',safe=False)
+        co.del_dataset('GOnt','AtGO',force=True)
     if not co.available_datasets('GOnt','AtGO'):
         obo = os.path.join(
             cf.options.testdir,

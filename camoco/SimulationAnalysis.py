@@ -85,7 +85,7 @@ class SimulationAnalysis(object):
             [fdr.loc[x,y,:,:] for x,y in terms_with_signal[['COB','Term']].values]
         )
     
-    def plot_signal_vs_noise(self,filename=None, figsize=(16,8), alpha=0.05,
+    def plot_signal_vs_noise(self,filename=None, figsize=(16,6), alpha=0.05,
                              figaxes=None, label=None, noise_source='MCR',
                              max_pval=0.05, min_pval=0, 
                              normalize_num_sig=False,
@@ -113,6 +113,7 @@ class SimulationAnalysis(object):
         # Get the number of unique cobs in the dataset
         cobs = breakdown.COB.unique()
         if figaxes == None:
+            plt.clf()
             fig, axes = plt.subplots(1,len(cobs),figsize=figsize,sharey=True)
         else:
             fig,axes = figaxes
@@ -126,12 +127,12 @@ class SimulationAnalysis(object):
                 signal = data['num_sig']
             # Plot Signal vs Noise
             axes[i].plot(
-                np.append(data[noise_source],100),
+                np.append(data[noise_source],1),
                 np.append(signal,0),
                 label=label,
                 marker='o'
             )
-            axes[i].set_title("{} Terms".format(cob))
+            axes[i].set_title("{} signal vs {}".format(cob,noise_source))
             if i == 0:
                 if normalize_num_sig:
                     axes[i].set_ylim(0,1.05)
