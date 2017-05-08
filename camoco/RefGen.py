@@ -86,6 +86,22 @@ class RefGen(Camoco):
             **kwargs
         )
 
+    def interection(self,gene_list):
+        '''
+            Return the subset of genes that are in the refgen.
+            
+            Parameters
+            ----------
+            gene_list : list-like of co.Locus
+                a list of Gene (Locus) objects
+
+            Returns
+            -------
+            a list like object containing genes that
+            are in the refgen.
+        '''
+        return [x for x in gene_list if x in self]
+
     def random_genes(self,n,**kwargs):
         '''
             Return random genes from the RefGen, without replacement. 
