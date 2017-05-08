@@ -35,6 +35,7 @@ from scipy.misc import comb
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
 
+import operator
 import statsmodels.api as sm
 import sys
 import pdb
@@ -88,7 +89,11 @@ class COB(Expr):
                 TransformationLog: {}
                 Num Genes: {:,}({:.2g}% of total)
                 Num Accessions: {}
-                Num Edges: {:,}
+
+            Network Stats
+            -------------
+            Unthresholded Interactions: {:,}
+            Thresholded (Z >= {}): {:,}
 
             Raw
             ------------------
@@ -122,6 +127,8 @@ class COB(Expr):
             (self.num_genes()/self.num_genes(raw=True))*100,
             self.num_accessions(),
             len(self.coex),
+            self._global('current_significance_threshold'),
+            len(self.sigs),
             # Raw
             len(self.expr(raw=True)),
             len(self.expr(raw=True).columns),
@@ -155,15 +162,21 @@ class COB(Expr):
 
     def set_sig_edge_zscore(self,zscore):
         '''
+            Sets the 'significance' threshold for the coex network. This will
+            affect thresholded network metrics that use degree (e.g. locality)
+            It will not affect unthresholded metrics like Density. 
+
+            Parameters
+            ----------
+            zscore : the new significance threshold
         '''
         # Don't do anything if there isn't a coex table
         if self.coex is None:
             return
-            
         # Only update if needed
         cur_sig = self._global('current_significance_threshold')
         new_sig = cur_sig is None or not(float(cur_sig) == zscore)
-        
+         
         # Set the new significant value
         if new_sig:
             # If the column doesn't exist because of an error it may fail
@@ -180,7 +193,7 @@ class COB(Expr):
             self._global('current_significance_threshold',zscore)
         
         # Rebuild significant index set
-        if new_sig or self.sigs == None:
+        if new_sig or self.sigs is None:
             self.sigs = np.array([ind for ind in self.coex.data['significant'].wheretrue()])
             self.sigs.sort()
     
@@ -210,7 +223,7 @@ class COB(Expr):
                          dataframe into memory.
         '''
         # If no ids are provided, get all of them
-        if ids == None:
+        if ids is None:
             if sig_only:
                 ids = self.sigs
             else:
@@ -235,13 +248,15 @@ class COB(Expr):
             ----------
             gene : co.Locus
                 The gene for which to extract neighbors
-            sig_only : bool
+            sig_only : bool (default: True)
                 A flag to include only significant interactions.
             names_as_index : bool (default: True)
-                Include gene names as the index.
+                Include gene names as the index. If this and `names_as_cols` are
+                both False, only the interactions are returned which is a faster
+                operation than including gene names.
             names_as_cols : bool (default: False)
                 Include gene names as two columns named 'gene_a' and 'gene_b'.
-            return_gene_set: bool (default: False)
+            return_gene_set : bool (default: False)
                 Return the set of neighbors instead of a dataframe
 
             Returns
@@ -263,7 +278,6 @@ class COB(Expr):
                 return edges.set_index(['gene_a','gene_b'])
         if return_gene_set:
             names_as_index = True
-        
         # Find the indexes if necessary
         if names_as_index or names_as_cols:
             names = self._expr.index.values
@@ -273,12 +287,90 @@ class COB(Expr):
             edges.insert(1,'gene_b', names[ids[:,1]])
             del ids; del names;
         if return_gene_set:
-            return set(self.refgen[set(edges['gene_a']).union(edges['gene_b'])])
-        if names_as_index:
+            neighbors = set(self.refgen[set(edges['gene_a']).union(edges['gene_b'])])
+            if len(neighbors) == 1:
+                return set()
+            neighbors.remove(gene)
+            return neighbors
+        if names_as_index and not names_as_cols:
             edges = edges.set_index(['gene_a','gene_b'])
-        
+         
         return edges
+
+    def neighborhood(self, gene_list, return_genes=False, neighbors_only=False):
+        ''' 
+            Find the genes that have network connections the the gene_list.
         
+            Parameters
+            ----------
+            Input: A gene List
+                The gene list used to obtain the neighborhood.
+            
+            Returns
+            -------
+            A Dataframe containing gene ids which have at least
+            one edge with another gene in the input list. Also returns
+            global degree
+        '''
+        if isinstance(gene_list,Locus):
+            gene_list = [gene_list]
+        gene_list = set(gene_list)
+        neighbors = set()
+        for gene in gene_list:
+            neighbors.update(self.neighbors(gene,sig_only=True,return_gene_set=True))
+        # Remove the neighbors who are in the gene_list
+        neighbors = neighbors.difference(gene_list)
+        if return_genes == False:
+            neighbors = pd.DataFrame({'gene':[x.id for x in neighbors]})
+            neighbors['neighbor'] = True
+            local = pd.DataFrame({'gene':[x.id for x in gene_list]})
+            local['neighbor'] = False
+            if neighbors_only == False:
+                return pd.concat([local,neighbors]) 
+            else:
+                return neighbors 
+        elif return_genes == True:
+            if neighbors_only == False:
+                neighbors.update(gene_list)
+                return neighbors
+            else:
+                return neighbors
+
+    def next_neighbors(self, gene_list, n, return_list=False, include_query=False):
+        ''' 
+            Given a set of input genes, return the next (n) neighbors
+            that have the stronges connection to the input set.
+
+            Parameters
+            ----------
+            gene_list : list-like of co.Locus
+                An iterable of genes for which the next neighbors will be 
+                calculated.
+            n : int
+                The number of next neighbors to return.
+
+            Returns
+            -------
+            returns a list containing the strongest connected neighbors 
+        '''
+        neighbors = defaultdict(lambda: 0)
+        for gene in set(gene_list):
+            edges = self.neighbors(gene,names_as_cols=True)
+            source_id = gene.id
+            for g1,g2,score in zip(edges['gene_a'],edges['gene_b'],edges['score']):
+                if g1 == source_id:
+                    neighbors[g2] += score
+                else:
+                    neighbors[g1] += score
+        neighbors = sorted(neighbors.items(), key=operator.itemgetter(1), reverse=True)[:n]
+        if return_list == True:
+            return neighbors
+        else:
+            neighbors = set(self.refgen[[x[0] for x in neighbors]])
+            if include_query == True:
+                neighbors.update(gene_list)
+            return neighbors
+
     def coexpression(self, gene_a, gene_b):
         '''
             Returns a coexpression z-score between two genes. This
@@ -294,7 +386,6 @@ class COB(Expr):
                 The second gene
 
             Returns
-            -------
             Coexpression Z-Score
 
         '''
@@ -1626,38 +1717,11 @@ class COB(Expr):
         Unimplemented ---------------------------------------------------------------------------------
     '''
 
-    def next_neighbors(self, gene_list):
-        ''' returns a list containing the strongest connected neighbors '''
-        raise NotImplementedError()
-
-    def neighborhood(self, gene_list):
-        ''' Input: A gene List
-            Output: a Dataframe containing gene ids which have at least
-            one edge with another gene in the input list. Also returns
-            global degree
-        '''
-        raise NotImplementedError()
-
-    def lcc(self, gene_list, min_distance=None):
-        ''' returns an igraph of the largest connected component in graph '''
-        raise NotImplementedError()
-
-    def seed(self, gene_list, limit=65):
-        ''' Input: given a set of nodes, add on the next X strongest connected
-            nodes '''
-        raise NotImplementedError()
-
-    def graph(self, gene_list, min_distance=None):
-        ''' Input: a gene list
-            Output: a iGraph object '''
-        raise NotImplementedError()
-
     def coordinates(self, gene_list, layout=None):
         ''' returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene'''
         raise NotImplementedError()
-
 
 
 def _sparse_fruchterman_reingold(A, dim=2, k=None, pos=None, fixed=None, 
