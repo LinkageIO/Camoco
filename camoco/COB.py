@@ -6,7 +6,9 @@ from .Camoco import Camoco
 from .RefGen import RefGen
 from .Locus import Locus,Gene
 from .Expr import Expr
-from .Tools import memoize
+from .Tools import memoize,available_datasets
+from .Term import Term
+from .Ontology import Ontology
 
 from math import isinf
 from numpy import matrix, arcsinh, tanh
@@ -18,44 +20,58 @@ from scipy.misc import comb
 from scipy.stats import norm
 from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
+from flask import jsonify
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import statsmodels.api as sm
 import networkx as nx
 import pandas as pd
 import numpy as np
 import itertools
+from odo import odo
 from scipy.misc import comb 
-from feather import FeatherError
 
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
 
+import operator
 import statsmodels.api as sm
 import sys
+import pdb
 import json
 import gc
 
 from scipy.stats import pearsonr
 
 class COB(Expr):
+    '''
+        A COB object represents an easily browsable Co-expression network. (COB-> co-expression browser)
+    '''
     def __init__(self, name):
         super().__init__(name=name)
-        try:
-            self.log('Loading coex table')
-            self.coex = self._ft('coex')
-        except FeatherError as e:
-            self.log("{} is empty ({})", name, e)
-        try:
-            self.log('Loading Global Degree')
-            self.degree = self._ft('degree')
-        except FeatherError as e:
-            self.log("{} is empty ({})", name, e)
-        try:
-            self.log('Loading Clusters')
-            self.clusters = self._ft('clusters')
-        except FeatherError as e:
-            self.log('Clusters not loaded for: {} ()', name, e)
+        self.log('Loading Coex table')
+        self.coex = self._bcolz('coex',blaze=True)
+        self.sigs = None
+        if self.coex is None:
+            self.log("{} is empty", name)
+        if not self._global('significance_threshold') is None:
+            self.set_sig_edge_zscore(float(self._global('significance_threshold')))
+        self.log('Loading Global Degree')
+        self.degree = self._bcolz('degree')
+        if self.degree is None:
+            self.log("{} is empty", name)
+        if not available_datasets('Ontology','{}MCL'.format(name))\
+            and self.coex is not None:
+            self._calculate_clusters()
+        self.log('Loading Clusters')
+        self.clusters = self._bcolz('clusters')
+        if self.clusters is None:
+            self.log('Clusters not loaded for: {} ()', name)
+            self.MCL = None
+        else:
+            self.MCL = Ontology('{}MCL'.format(self.name))
+
 
     def __repr__(self):
         return '<COB: {}>'.format(self.name)
@@ -64,14 +80,20 @@ class COB(Expr):
         return self.__repr__()
 
     def summary(self,file=sys.stdout):
+        '''
+        '''
         print( '''
             COB Dataset: {}
                 Desc: {}
                 RawType: {}
                 TransformationLog: {}
-                Num Genes: {:,}({:.2g}%)
+                Num Genes: {:,}({:.2g}% of total)
                 Num Accessions: {}
-                Num Edges: {:,}
+
+            Network Stats
+            -------------
+            Unthresholded Interactions: {:,}
+            Thresholded (Z >= {}): {:,}
 
             Raw
             ------------------
@@ -87,12 +109,12 @@ class COB(Expr):
             max accession missing data: {}
                 - Accession missing more than this percent are removed
             min single sample expr: {} 
-                - genes must have at least this amount of expression in 
-                  on accession
+                - genes must have this amount of expression in 
+                  at least one accession.
 
             Clusters
             ------------------
-            Num clusters (size > 3): {}
+            Num clusters (size >= 10): {}
 
 
         '''.format(
@@ -105,37 +127,120 @@ class COB(Expr):
             (self.num_genes()/self.num_genes(raw=True))*100,
             self.num_accessions(),
             len(self.coex),
+            self._global('current_significance_threshold'),
+            len(self.sigs),
             # Raw
             len(self.expr(raw=True)),
             len(self.expr(raw=True).columns),
             # QC
             self._global('qc_min_expr'),
             self._global('qc_max_gene_missing_data'),
-            self._global('qc_min_single_sample_expr'),
             self._global('qc_max_accession_missing_data'),
+            self._global('qc_min_single_sample_expr'),
             # Clusters
-            sum(self.clusters.groupby('cluster').apply(len) > 3)
+            sum(self.clusters.groupby('cluster').apply(len) >= 10)
         ), file=file)
 
     def qc_gene(self):
-        qc_gene = self._ft('qc_gene')
+        '''
+        '''
+        qc_gene = self._bcolz('qc_gene')
         qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index]
         return qc_gene.groupby('chrom').aggregate(sum, axis=0)
 
     @property
     @memoize
     def edge_FDR(self):
+        '''
+        '''
         # get the percent of significant edges
-        num_sig = np.sum(self.coex['significant'])/len(self.coex)
+        num_sig = self.coex.significant.coerce(to='int32').sum()/len(self.coex)
         # calulate the number expected
-        num_exp = 1-norm.cdf(int(self._global('significance_threshold')))
+        num_exp = 1-norm.cdf(float(self._global('significance_threshold')))
         # FDR is the percentage expected over the percentage found
         return num_exp/num_sig
 
     def set_sig_edge_zscore(self,zscore):
-        self.coex.significant = self.coex.score >= zscore
+        '''
+            Sets the 'significance' threshold for the coex network. This will
+            affect thresholded network metrics that use degree (e.g. locality)
+            It will not affect unthresholded metrics like Density. 
 
-    def neighbors(self, gene, sig_only=True, names_as_index=True, names_as_cols=False):
+            Parameters
+            ----------
+            zscore : the new significance threshold
+        '''
+        # Don't do anything if there isn't a coex table
+        if self.coex is None:
+            return
+        # Only update if needed
+        cur_sig = self._global('current_significance_threshold')
+        new_sig = cur_sig is None or not(float(cur_sig) == zscore)
+         
+        # Set the new significant value
+        if new_sig:
+            # If the column doesn't exist because of an error it may fail
+            try:
+                self.coex.data.delcol(name='significant')
+            except ValueError:
+                pass
+            # Add the column to the underlying data structure
+            self.coex.data.addcol(
+                self.coex.data.eval('score >= '+str(zscore)), pos=2, name='significant')
+            self.coex.data.flush()
+            
+            # Keep track of the current threshold
+            self._global('current_significance_threshold',zscore)
+        
+        # Rebuild significant index set
+        if new_sig or self.sigs is None:
+            self.sigs = np.array([ind for ind in self.coex.data['significant'].wheretrue()])
+            self.sigs.sort()
+    
+    def _coex_DataFrame(self,ids=None,sig_only=True):
+        '''
+            Converts the underlying coexpression table into
+            a pandas dataframe 
+
+            Parameters
+            ----------
+                ids : array-like of ints (default: None)
+                    Indices to include in the data frame. Usually
+                    computed from another COB method (e.g. 
+                    PCCUP.coex_index). If None, then all indices
+                    will be included.
+                sig_only : bool (default: True)
+                    If true, only "significant" edges will be 
+                    included in the table. If False, all edges will
+                    be included.
+
+            Returns
+            -------
+                A Pandas Dataframe
+
+
+            .. warning:: This will put the entire gene-by-accession
+                         dataframe into memory.
+        '''
+        # If no ids are provided, get all of them
+        if ids is None:
+            if sig_only:
+                ids = self.sigs
+            else:
+                return self.coex.data.todataframe()
+        else:
+            ids.sort()
+            if sig_only:
+                ids = np.intersect1d(ids, self.sigs, assume_unique=True)
+        
+        # Get the DataFrame
+        df = pd.DataFrame.from_items(
+            ((key, self.coex.data[key][ids]) for key in self.coex.data.names))
+        df.set_index(ids,inplace=True)
+        return df
+    
+    def neighbors(self, gene, sig_only=True, names_as_index=True, 
+                  names_as_cols=False, return_gene_set=False):
         '''
             Returns a DataFrame containing the neighbors for gene.
 
@@ -143,26 +248,36 @@ class COB(Expr):
             ----------
             gene : co.Locus
                 The gene for which to extract neighbors
-            sig_only : bool
+            sig_only : bool (default: True)
                 A flag to include only significant interactions.
             names_as_index : bool (default: True)
-                Include gene names as the index.
+                Include gene names as the index. If this and `names_as_cols` are
+                both False, only the interactions are returned which is a faster
+                operation than including gene names.
             names_as_cols : bool (default: False)
                 Include gene names as two columns named 'gene_a' and 'gene_b'.
+            return_gene_set : bool (default: False)
+                Return the set of neighbors instead of a dataframe
 
             Returns
             -------
-            A DataFrame containing edges
+            - A DataFrame containing edges 
+            - A Gene set IF return_gene_set is true
+
         '''
         # Find the neighbors
         gene_id = self._expr_index[gene.id]
-        neighbor_indices = PCCUP.coex_neighbors(gene_id, self.num_genes())
-        neighbor_indices.sort()
-        edges = self.coex.iloc[neighbor_indices]
-        del neighbor_indices
-        if sig_only:
-            edges = edges[edges.significant == 1]
-        
+        ids = PCCUP.coex_neighbors(gene_id, self.num_genes())
+        edges = self._coex_DataFrame(ids=ids,sig_only=sig_only)
+        del ids
+        if len(edges) == 0:
+            edges = pd.DataFrame(columns=['gene_a','gene_b','score','distance','significant'])
+            if names_as_cols:
+                return edges
+            else:
+                return edges.set_index(['gene_a','gene_b'])
+        if return_gene_set:
+            names_as_index = True
         # Find the indexes if necessary
         if names_as_index or names_as_cols:
             names = self._expr.index.values
@@ -171,11 +286,91 @@ class COB(Expr):
             edges.insert(0,'gene_a', names[ids[:,0]])
             edges.insert(1,'gene_b', names[ids[:,1]])
             del ids; del names;
-        if names_as_index:
+        if return_gene_set:
+            neighbors = set(self.refgen[set(edges['gene_a']).union(edges['gene_b'])])
+            if len(neighbors) == 1:
+                return set()
+            neighbors.remove(gene)
+            return neighbors
+        if names_as_index and not names_as_cols:
             edges = edges.set_index(['gene_a','gene_b'])
-        
+         
         return edges
+
+    def neighborhood(self, gene_list, return_genes=False, neighbors_only=False):
+        ''' 
+            Find the genes that have network connections the the gene_list.
         
+            Parameters
+            ----------
+            Input: A gene List
+                The gene list used to obtain the neighborhood.
+            
+            Returns
+            -------
+            A Dataframe containing gene ids which have at least
+            one edge with another gene in the input list. Also returns
+            global degree
+        '''
+        if isinstance(gene_list,Locus):
+            gene_list = [gene_list]
+        gene_list = set(gene_list)
+        neighbors = set()
+        for gene in gene_list:
+            neighbors.update(self.neighbors(gene,sig_only=True,return_gene_set=True))
+        # Remove the neighbors who are in the gene_list
+        neighbors = neighbors.difference(gene_list)
+        if return_genes == False:
+            neighbors = pd.DataFrame({'gene':[x.id for x in neighbors]})
+            neighbors['neighbor'] = True
+            local = pd.DataFrame({'gene':[x.id for x in gene_list]})
+            local['neighbor'] = False
+            if neighbors_only == False:
+                return pd.concat([local,neighbors]) 
+            else:
+                return neighbors 
+        elif return_genes == True:
+            if neighbors_only == False:
+                neighbors.update(gene_list)
+                return neighbors
+            else:
+                return neighbors
+
+    def next_neighbors(self, gene_list, n, return_list=False, include_query=False):
+        ''' 
+            Given a set of input genes, return the next (n) neighbors
+            that have the stronges connection to the input set.
+
+            Parameters
+            ----------
+            gene_list : list-like of co.Locus
+                An iterable of genes for which the next neighbors will be 
+                calculated.
+            n : int
+                The number of next neighbors to return.
+
+            Returns
+            -------
+            returns a list containing the strongest connected neighbors 
+        '''
+        neighbors = defaultdict(lambda: 0)
+        for gene in set(gene_list):
+            edges = self.neighbors(gene,names_as_cols=True)
+            source_id = gene.id
+            for g1,g2,score in zip(edges['gene_a'],edges['gene_b'],edges['score']):
+                if g1 == source_id:
+                    neighbors[g2] += score
+                else:
+                    neighbors[g1] += score
+        neighbors = sorted(neighbors.items(), key=operator.itemgetter(1), reverse=True)[:n]
+        if return_list == True:
+            return neighbors
+        else:
+            neighbors = set(self.refgen[[x[0] for x in neighbors]])
+            if include_query == True:
+                neighbors.update(gene_list)
+            return neighbors
+
     def coexpression(self, gene_a, gene_b):
         '''
             Returns a coexpression z-score between two genes. This
@@ -191,7 +386,6 @@ class COB(Expr):
                 The second gene
 
             Returns
-            -------
             Coexpression Z-Score
 
         '''
@@ -216,7 +410,7 @@ class COB(Expr):
             what information to report, see Parameters.
 
             Parameters
-            ---------
+            ----------
             gene_list : iter of Loci
                 The genes from which to extract a subnetwork.
                 If gene_list is None, the function will assume
@@ -248,21 +442,20 @@ class COB(Expr):
         num_genes = self.num_genes()
         if gene_list is None:
             # Return the entire DataFrame
-            df = self.coex.copy()
+            df = self._coex_DataFrame(sig_only=sig_only)
         else:
             # Extract the ids for each Gene
             gene_list = set(sorted(gene_list))
             ids = np.array([self._expr_index[x.id] for x in gene_list])
             if filter_missing_gene_ids:
                 # filter out the Nones
-                ids = np.array(list(filter(None, ids)))
+                ids = np.array([x for x in ids if x is not None])
             if len(ids) == 0:
                 df = pd.DataFrame(columns=['score','significant','distance'])
             else:
                 # Grab the coexpression indices for the genes
                 ids = PCCUP.coex_index(ids, num_genes)
-                ids.sort()
-                df = self.coex.iloc[ids]
+                df = self._coex_DataFrame(ids=ids,sig_only=sig_only)
                 del ids
         if min_distance is not None:
             df = df[df.distance >= min_distance]
@@ -291,8 +484,6 @@ class COB(Expr):
                 parents[gene_a] != parents[gene_b] for gene_a,gene_b in \
                 zip(df.index.get_level_values(0),df.index.get_level_values(1))
             ]
-        if sig_only:
-            df = df.ix[df.significant]
         return df
 
     def cluster_coefficient(self, locus_list, flank_limit,
@@ -369,7 +560,6 @@ class COB(Expr):
                 locus_list, flank_limit=flank_limit, chain=True,
                 include_parent_locus=True
             )
-        #self.log("Found {} candidate genes", len(genes_list))
         # Extract the edges for the full set of genes
         edges = self.subnetwork(
             genes_list,
@@ -390,6 +580,7 @@ class COB(Expr):
             gene_split = gene_split.groupby('gene').agg(np.mean)
             if iter_name is not None:
                 gene_split['iter'] = iter_name
+            gene_split.index.name = 'gene'
             return gene_split
         else:
             if return_mean:
@@ -452,6 +643,7 @@ class COB(Expr):
         degree = ldegree.merge(gdegree,left_index=True,right_index=True)
         degree.columns = ['local', 'global']
         degree = degree.sort_values(by='global')
+        degree.index.name = 'gene'
         if include_regression:
             # Add the regression lines
             ols = sm.OLS(degree['local'], degree['global']).fit()
@@ -459,7 +651,7 @@ class COB(Expr):
             degree['fitted'] = ols.fittedvalues
             degree = degree.sort_values(by='resid',ascending=False)
         if iter_name is not None:
-            degree['iter_name'] = iter_name
+            degree['iter'] = iter_name
         return degree
 
     def density(self, gene_list, min_distance=None, by_gene=False):
@@ -517,7 +709,6 @@ class COB(Expr):
             score = self.subnetwork(gene_list, sig_only=sig_only, 
             min_distance=min_distance, names_as_index=False,
             names_as_cols=False)
-            del self.coex
             
             # Drop unecessary columns
             score.drop(['distance','significant'], axis=1, inplace=True)
@@ -535,16 +726,16 @@ class COB(Expr):
             score.to_csv(
                 OUT, columns=['gene_a','gene_b','score'],index=False, sep='\t')
             del score
-            self.coex = self._ft('coex')
             self.log('Done')
 
     def to_graphml(self,file, gene_list=None, sig_only=True, min_distance=0):
+        '''
+        '''
         # Get the edge indexes
         self.log('Getting the network.')
         edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
         min_distance=min_distance, names_as_index=False,
         names_as_cols=False).index.values
-        del self.coex
         
         # Find the ids from those
         names = self._expr.index.values
@@ -562,16 +753,15 @@ class COB(Expr):
         # Print the file
         self.log('Writing the file.')
         nx.write_graphml(net,file)
-        del net;
-        self.coex = self._ft('coex')
+        del net
         return
 
     def to_treeview(self, filename, cluster_method='mcl', gene_normalize=True):
         dm = self.expr(gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
-            order = self._ft('leaves').sort('index').index.values
+            order = self._bcolz('leaves').sort('index').index.values
         elif cluster_method == 'mcl':
-            order = self._ft('clusters').loc[dm.index].\
+            order = self._bcolz('clusters').loc[dm.index].\
                     fillna(np.inf).sort('cluster').index.values
         else:
             order = dm.index
@@ -589,26 +779,104 @@ class COB(Expr):
         dm.to_csv(filename)
 
 
-    def to_json(self, gene_list=None, filename=None, sig_only=True, min_distance=None):
+    def to_json(self, gene_list=None, filename=None, sig_only=True, 
+            min_distance=None, max_edges=None, remove_orphans=True,
+            ontology=None 
+            ):
         '''
             Produce a JSON network object that can be loaded in cytoscape.js
             or Cytoscape v3+.
+
+            Parameters
+            ----------
+            gene_list : iterable of Locus objects
+                These loci or more specifically, genes,
+                must be in the COB RefGen object,
+                they are the genes in the network.
+            filename : str (default None)
+                If specified, the JSON string will be output to 
+                file. 
+            sig_only : bool (default: True)
+                Flag specifying whether or not to only
+                include the significant edges only. If
+                False, **All pairwise interactions** will
+                be included. (warning: it can be large).
+            min_distance : bool (default: None)
+                If specified, only interactions between
+                genes larger than this distance will be 
+                included. This corrects for potential 
+                cis-biased co-expression.
+            max_edges : int (default: None)
+                If specified, only the maximum number of 
+                edges will be included. Priority of edges
+                is assigned based on score.
+            remove_orphans : bool (default: True)
+                Remove genes that have no edges in the 
+                network.
+            ontology : camoco.Ontology (default: None)
+                If an ontology is specified, genes will
+                be annotated to belonging to terms within 
+                the ontology. This is useful for highlighting 
+                groups of genes once they are inside of
+                cytoscape(.js).
+
+            Returns
+            -------
+            A JSON string or None if a filename is specified
         '''
         net = {
             'nodes' : [],
             'edges' : []
         }
+        # Get the edge indexes
+        self.log('Getting the network.')
+        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
+            min_distance=min_distance, names_as_index=False,
+            names_as_cols=True
+        )
+        if max_edges != None:
+            # Filter out only the top X edges by score 
+            edges = edges.sort_values(by='score',ascending=False)[0:max_edges]
+        # Add edges to json data structure 
+        for source,target,score,distance,significant in edges.itertuples(index=False):
+            net['edges'].append(
+                {'data':{
+                    'source': source,
+                    'target' : target,
+                    'score' : float(score),
+                    'distance' : float(fix_val(distance))
+                }}
+            )
+        # Handle any ontological business
+        if ontology != None:
+            # Make a map from gene name to ontology
+            ont_map = defaultdict(set)
+            for term in ontology.iter_terms():
+                for locus in term.loci:
+                   ont_map[locus.id].add(term.id) 
+
         parents = defaultdict(list)
         # generate the subnetwork for the genes
+        if gene_list == None:
+            gene_list = list(self.refgen.iter_genes())
+        else:
+            gene_list = set(gene_list)
+        if remove_orphans == True:
+            # get a list of all the genes with edges
+            has_edges = set(edges.gene_a).union(edges.gene_b)
+            gene_list = [x for x in gene_list if x.id in has_edges]
         for gene in gene_list:
-            net['nodes'].append(
-                    {'data':{
+            node = {'data':{
                         'id':str(gene.id),
-                        'parent':str(gene.attr['parent_locus']),
                         'classes':'gene'
-                    }}
-            )
-            parents[str(gene.attr['parent_locus'])].append(gene.id)
+            }}
+            if ontology != None and gene.id in ont_map:
+                for x in ont_map[gene.id]:
+                    node['data'][x] = True
+            node['data'].update(gene.attr)
+            net['nodes'].append(node)
+            if 'parent_locus' in gene.attr:
+                parents[str(gene.attr['parent_locus'])].append(gene.id)
         # Add parents first
         for parent,children in parents.items():
             net['nodes'].insert(0,
@@ -627,32 +895,14 @@ class COB(Expr):
                         'distance' : 0
                     }}
                 )
-        # Get the edge indexes
-        self.log('Getting the network.')
-        edges = self.subnetwork(gene_list=gene_list, sig_only=sig_only,
-        min_distance=min_distance, names_as_index=False,
-        names_as_cols=True)
-        del self.coex
-    
-        for source,target,score,significant,distance in subnet.itertuples(index=False):
-            net['edges'].append(
-                {'data':{
-                    'source': source,
-                    'target' : target,
-                    'score' : score,
-                    'distance' : fix_val(distance)
-                }}
-            )
         # Return the correct output
         net = {'elements' : net}
         if filename:
             with open(filename,'w') as OUT:
                 print(json.dumps(net),file=OUT)
                 del net
-                self.coex = self._ft('coex')
         else:
             net = json.dumps(net)
-            self.coex = self._ft('coex')
             return net
 
 
@@ -722,6 +972,8 @@ class COB(Expr):
         '''
             Returns the local degree of a list of genes
 
+            Parameters
+            ----------
             gene_list : iterable (co.Locus object)
                 a list of genes for which to retrieve local degree for. The
                 genes must be in the COB object (of course)
@@ -729,7 +981,6 @@ class COB(Expr):
                 only count edges if they are from genes originating from
                 different loci. Each gene MUST have 'parent_locus' set in
                 its attr object.
-
         '''
         subnetwork = self.subnetwork(
             gene_list, sig_only=True, trans_locus_only=trans_locus_only
@@ -754,6 +1005,16 @@ class COB(Expr):
     def global_degree(self, gene_list, trans_locus_only=False):
         '''
             Returns the global degree of a list of genes
+    
+            Parameters
+            ----------
+            gene_list : iterable (co.Locus object)
+                a list of genes for which to retrieve local degree for. The
+                genes must be in the COB object (of course)
+            trans_locus_only : bool (default: False)
+                only count edges if they are from genes originating from
+                different loci. Each gene MUST have 'parent_locus' set in
+                its attr object.
         '''
         try:
             if isinstance(gene_list, Locus):
@@ -770,10 +1031,13 @@ class COB(Expr):
 
     def cis_degree(self, gene_list):
         '''
-            Returns the number of cis interactions for each gene in the gene
-            list. **each gene object MUST have its 'parent_locus' attr set!!
+            Returns the number of *cis* interactions for each gene in the gene
+            list. Two genes are is *cis* if they share the same parent locus.
+            **Therefore: each gene object MUST have its 'parent_locus' attr set!!**
 
-            gene_list : iterable of co.Gene
+            Parameters
+            ----------
+            gene_list : iterable of Gene Objects
         '''
         subnetwork = self.subnetwork(
             gene_list, sig_only=True, trans_locus_only=True
@@ -847,7 +1111,8 @@ class COB(Expr):
              gene_normalize=True, raw=False,
              cluster_method='mcl', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
-             min_cluster_size=10, cluster_accessions=True):
+             min_cluster_size=10, cluster_accessions=True,
+             plot_dendrogram=False):
         '''
             Plots a heatmap of genes x expression.
 
@@ -896,16 +1161,26 @@ class COB(Expr):
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
-            order = self._ft('leaves').sort_values(by='index').index.values
+            order = self._bcolz('leaves').sort_values(by='index').index.values
         elif cluster_method == 'mcl':
-            order = self._ft('clusters').loc[dm.index].\
+            order = self._bcolz('clusters').loc[dm.index].\
                     fillna(np.inf).sort_values(by='cluster').index.values
         else:
-            # No cluster order
+            # No cluster order.
             order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
-
+        # Optional Average by cluster
+        if avg_by_cluster == True:
+            # Extract clusters
+            dm = self.clusters.groupby('cluster').\
+                    filter(lambda x: len(x) >= min_cluster_size).\
+                    groupby('cluster').\
+                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
+                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
+            if len(dm) == 0:
+                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
+                return None
         # Get leaves of accessions
         if cluster_accessions:
             accession_pccs = (1 - PCCUP.pair_correlation(
@@ -914,28 +1189,31 @@ class COB(Expr):
                     self._expr.as_matrix().T.astype('float')
                 )
             ))
-            link = linkage(1-accession_pccs, method='complete')
-            accession_dists = leaves_list(link)
+            accession_link = linkage(1-accession_pccs, method='single')
+            accession_dists = leaves_list(accession_link)
             # Order by accession distance
             dm = dm.loc[:,dm.columns[accession_dists]]
-
-        # Optional Average by cluster
-        if avg_by_cluster == True:
-            # Extract clusters
-            dm = self.clusters.groupby('cluster').\
-                    filter(lambda x: len(x) > min_cluster_size).\
-                    groupby('cluster').\
-                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
-                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
-            if len(dm) == 0:
-                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
-                return None
         # Save plot if provided filename
-        fig = plt.figure(
-            facecolor='white',
-            figsize=(20,20)
-        )
-        ax = fig.add_subplot(111)
+        if plot_dendrogram == False:
+            fig = plt.figure(
+                facecolor='white',
+                figsize=(20,20)
+            )
+            ax = fig.add_subplot(111)
+        else:
+            gs = gridspec.GridSpec(
+                2, 2, 
+                height_ratios=[3,1], 
+                width_ratios=[3,1],
+                hspace=0, wspace=0
+            )
+            ax = plt.subplot(gs[0])
+            # make the axes for the dendrograms
+            right_ax   = plt.subplot(gs[1])
+            right_ax.set_xticks([])
+            right_ax.set_yticks([])
+            bottom_ax = plt.subplot(gs[2])
+        # Plot the Expression matrix 
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
         cmap = self._cmap
         cmap.set_bad('grey', 1.0)
@@ -956,12 +1234,24 @@ class COB(Expr):
                     yticks=np.arange(len(dm.index)),
                     yticklabels=dm.index.values
                 )
-        fig.colorbar(im)
+        #ax.figure.colorbar(im)
+        if plot_dendrogram == True:
+            # Plot the accession dendrogram
+            dendrogram(accession_link,ax=bottom_ax,orientation='bottom')
+            bottom_ax.set_xticks([])
+            bottom_ax.set_yticks([])
+            # Plot the gene dendrogram
+            import sys
+            sys.setrecursionlimit(100000)
+            gene_link = self._calculate_gene_hierarchy()
+            dendrogram(gene_link,ax=right_ax,orientation='right')
+            right_ax.set_xticks([])
+            right_ax.set_yticks([])
         # Save if you wish
         if filename is not None:
-            plt.savefig(filename,dpi=300)
+            plt.savefig(filename,dpi=300,figsize=(20,20))
             plt.close()
-        return fig
+        return ax.figure
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         '''
@@ -979,7 +1269,7 @@ class COB(Expr):
         fig = plt.figure(figsize=(8, 6))
         # grab the scores only and put in a
         # np array to save space (pandas DF was HUGE)
-        scores = self.coex.score.dropna().values
+        scores = odo(self.coex.score,np.ndarray)[~np.isnan(self.coex.score)]
         if pcc:
             self.log('Transforming scores')
             scores = (scores * float(self._global('pcc_std'))) \
@@ -1108,12 +1398,6 @@ class COB(Expr):
             Generates pairwise PCCs for gene expression profiles in self._expr.
             Also calculates pairwise gene distance.
         '''
-        # Drop the old Coex table to save memory
-        try:
-            del self.coex
-        except AttributeError:
-            pass
-
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
         pccs = (1 - PCCUP.pair_correlation(
@@ -1124,8 +1408,8 @@ class COB(Expr):
         ))
         
         self.log("Applying Fisher Transform")
-        pccs[pccs >= 1] = 0.9999999
-        pccs[pccs <= -1] = -0.9999999
+        pccs[pccs >= 1.0] = 0.9999999
+        pccs[pccs <= -1.0] = -0.9999999
         pccs = np.arctanh(pccs)
         gc.collect();
         
@@ -1146,44 +1430,32 @@ class COB(Expr):
         gc.collect()
         
         # 3. Build the dataframe
-        self.log("Build the dataframe")
-        tbl = pd.DataFrame(
-            pccs, 
-            index=np.arange(len(pccs)), 
-            columns=['score'], 
-            copy=False
-        )
+        self.log("Build the dataframe and set the significance threshold")
+        self._global('significance_threshold', significance_thresh)
+        raw_coex = self._raw_coex(pccs, significance_thresh)
         del pccs
         gc.collect()
         
-        # 3. Calculate Gene Distance
+        # 4. Calculate Gene Distance
         self.log("Calculating Gene Distance")
-        tbl['distance'] = self.refgen.pairwise_distance(
-            gene_list=self.refgen.from_ids(self._expr.index))
+        raw_coex.addcol(self.refgen.pairwise_distance(
+            gene_list=self.refgen.from_ids(self._expr.index)), pos=1, name='distance')
         gc.collect()
         
-        # 4. Assign significance
-        self.log("Thresholding Significant Network Interactions")
-        self._global('significance_threshold', significance_thresh)
-        tbl['significant'] = tbl['score'] >= significance_thresh
-        gc.collect()
-        
-        # 5. Store the table
-        self.log("Storing the coex table")
-        self._ft('coex', df=tbl)
-        del tbl
+        # 5. Cleanup
+        raw_coex.flush()
+        del raw_coex
         gc.collect()
         
         # 6. Load the new table into the object
-        self.coex = self._ft('coex')
+        self.coex = self._bcolz('coex',blaze=True)
+        self.set_sig_edge_zscore(float(self._global('significance_threshold')))
         self.log("Done")
         return self
 
-
     def _calculate_degree(self):
         '''
-            Calculates degrees of genes within network. Stores
-            them in our feather store.
+            Calculates degrees of genes within network. 
         '''
         self.log('Building Degree')
         # Get significant expressions and dump coex from memory for time being
@@ -1192,54 +1464,62 @@ class COB(Expr):
         self.degree = pd.DataFrame(0,index=names,columns=['Degree'])
         # Get the index and find the counts
         self.log('Calculating Gene degree')
-        sigs = self.coex[self.coex.significant]
-        sigs = sigs.index.values
+        sigs = np.arange(len(self.coex))[odo(self.coex.significant,np.ndarray)]
         sigs = PCCUP.coex_expr_index(sigs, len(self._expr.index.values))
         sigs = list(Counter(chain(*sigs)).items())
         if len(sigs) > 0:
             # Translate the expr indexes to the gene names
             for i,degree in sigs:
                 self.degree.ix[names[i]] = degree
-        self._ft('degree', df=self.degree)
+        self._bcolz('degree', df=self.degree)
         # Cleanup
         del sigs 
         del names
         gc.collect()
         return self
-        
-    def _calculate_leaves(self):
+
+    def _calculate_gene_hierarchy(self,method='single'):
         '''
-            This calculates the leaves of the dendrogram from the coex
+            Calculate the hierarchical gene distance for the Expr matrix
+            using the coex data.
+
+            Notes
+            -----
+            This is kind of expenive.
         '''
         # We need to recreate the original PCCs
-        self.log('Calculating Leaves')
+        self.log('Calculating Leaves using {}'.format(method))
         if len(self.coex) == 0:
             raise ValueError('Cannot calculate leaves without coex')
         pcc_mean = float(self._global('pcc_mean'))
         pcc_std  = float(self._global('pcc_std'))
-        
         # Get score column and dump coex from memory for time being
-        dists = self.coex.score
-        del self.coex
-        
+        dists = odo(self.coex.score,np.ndarray)
         # Subtract pccs from 1 so we do not get negative distances
         dists = (dists * pcc_std) + pcc_mean
         dists = np.tanh(dists)
         dists = 1 - dists
         gc.collect()
-        
         # Find the leaves from hierarchical clustering
+        gene_link = linkage(dists, method=method)
+        return gene_link
+
+    def _calculate_leaves(self,method='single'):
+        '''
+            This calculates the leaves of the dendrogram from the coex
+        '''
+        gene_link = self._calculate_gene_hierarchy(method=method)
         self.log("Finding the leaves")
-        dists = leaves_list(linkage(dists, method='single'))
+        leaves = leaves_list(gene_link)
         gc.collect()
         
         # Put them in a dataframe and stow them
-        self.leaves = pd.DataFrame(dists,index=self._expr.index,columns=['index'])
-        self._ft('leaves', df=self.leaves)
+        self.leaves = pd.DataFrame(leaves,index=self._expr.index,columns=['index'])
+        self._gene_link = gene_link
+        self._bcolz('leaves', df=self.leaves)
         
         # Cleanup and reinstate the coex table
-        del dists; gc.collect();
-        self.coex = self._ft('coex')
+        gc.collect()
         return self
     
     def _calculate_clusters(self):
@@ -1256,7 +1536,21 @@ class COB(Expr):
                         for gene in cluster],
                 columns=['Gene', 'cluster']
             ).set_index('Gene')
-            self._ft('clusters', df=self.clusters)
+            self._bcolz('clusters', df=self.clusters)
+        self.log('Creating Cluster Ontology')
+        terms = []
+        for i,x in enumerate(self.clusters.groupby('cluster')):
+            genes = self.refgen[x[1].index.values]
+            terms.append(Term(
+                'MCL{}'.format(i),
+                desc='{} MCL Cluster {}'.format(self.name,i),
+                loci = genes
+            ))
+        self.MCL = Ontology.from_terms(
+            terms,
+            '{}MCL'.format(self.name),
+            '{} MCL Clusters'.format(self.name),
+            self.refgen)
         self.log('Finished finding clusters')
         return self
     
@@ -1279,19 +1573,21 @@ class COB(Expr):
         z = (z - float(self._global('pcc_mean'))) \
             / float(self._global('pcc_std'))
         return z
-
+        
     ''' -----------------------------------------------------------------------
             Class Methods -- Factory Methods
     '''
     @classmethod
     def create(cls, name, description, refgen):
+        '''
+        '''
         self = super().create(name, description, refgen)
-        self._ft('gene_qc_status', df=pd.DataFrame())
-        self._ft('accession_qc_status', df=pd.DataFrame())
-        self._ft('coex', df=pd.DataFrame())
-        self._ft('degree', df=pd.DataFrame())
-        self._ft('mcl_cluster', df=pd.DataFrame())
-        self._ft('leaves', df=pd.DataFrame())
+        self._bcolz('gene_qc_status', df=pd.DataFrame())
+        self._bcolz('accession_qc_status', df=pd.DataFrame())
+        self._bcolz('coex', df=pd.DataFrame())
+        self._bcolz('degree', df=pd.DataFrame())
+        self._bcolz('mcl_cluster', df=pd.DataFrame())
+        self._bcolz('leaves', df=pd.DataFrame())
         self._expr_index = defaultdict(
             lambda: None,
             {gene:index for index, gene in enumerate(self._expr.index)}
@@ -1329,9 +1625,9 @@ class COB(Expr):
                        refgen, rawtype=None, **kwargs):
         '''
             The method will read the table in (as a pandas dataframe),
-            build the Expr object passing all keyword arguments in **kwargs
+            build the Expr object passing all keyword arguments in ``**``kwargs
             to the classmethod Expr.from_DataFrame(...). See additional
-            **kwargs in COB.from_Expr(...)
+            ``**``kwargs in COB.from_Expr(...)
 
             Parameters
             ----------
@@ -1352,7 +1648,7 @@ class COB(Expr):
                 This is noted here to reinforce the impotance of the rawtype
                 passed to camoco.Expr.from_DataFrame. See docs there
                 for more information.
-            **kwargs : key,value pairs
+            \*\*kwargs : key,value pairs
                 additional parameters passed to subsequent methods.
                 (see Expr.from_DataFrame)
 
@@ -1421,37 +1717,91 @@ class COB(Expr):
         Unimplemented ---------------------------------------------------------------------------------
     '''
 
-    def next_neighbors(self, gene_list):
-        ''' returns a list containing the strongest connected neighbors '''
-        raise NotImplementedError()
-
-    def neighborhood(self, gene_list):
-        ''' Input: A gene List
-            Output: a Dataframe containing gene ids which have at least
-            one edge with another gene in the input list. Also returns
-            global degree
-        '''
-        raise NotImplementedError()
-
-    def lcc(self, gene_list, min_distance=None):
-        ''' returns an igraph of the largest connected component in graph '''
-        raise NotImplementedError()
-
-    def seed(self, gene_list, limit=65):
-        ''' Input: given a set of nodes, add on the next X strongest connected
-            nodes '''
-        raise NotImplementedError()
-
-    def graph(self, gene_list, min_distance=None):
-        ''' Input: a gene list
-            Output: a iGraph object '''
-        raise NotImplementedError()
-
     def coordinates(self, gene_list, layout=None):
         ''' returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene'''
         raise NotImplementedError()
+
+
+def _sparse_fruchterman_reingold(A, dim=2, k=None, pos=None, fixed=None, 
+                                 iterations=50):
+    '''
+        Copyright (C) 2004-2016, NetworkX Developers
+        Aric Hagberg <hagberg@lanl.gov>
+        Dan Schult <dschult@colgate.edu>
+        Pieter Swart <swart@lanl.gov>
+        All rights reserved.
+    '''
+    # Position nodes in adjacency matrix A using Fruchterman-Reingold  
+    # Entry point for NetworkX graph is fruchterman_reingold_layout()
+    # Sparse version
+    try:
+        import numpy as np
+    except ImportError:
+        raise ImportError("_sparse_fruchterman_reingold() requires numpy: http://scipy.org/ ")
+    try:
+        nnodes,_=A.shape
+    except AttributeError:
+        raise nx.NetworkXError(
+            "fruchterman_reingold() takes an adjacency matrix as input")
+    try:
+        from scipy.sparse import spdiags,coo_matrix
+    except ImportError:
+        raise ImportError("_sparse_fruchterman_reingold() scipy numpy: http://scipy.org/ ")
+    # make sure we have a LIst of Lists representation
+    try:
+        A=A.tolil()
+    except:
+        A=(coo_matrix(A)).tolil()
+
+    if pos==None:
+        # random initial positions
+        pos=np.asarray(np.random.random((nnodes,dim)),dtype=A.dtype)
+    else:
+        # make sure positions are of same type as matrix
+        pos=pos.astype(A.dtype)
+
+    # no fixed nodes
+    if fixed==None:
+        fixed=[]
+
+    # optimal distance between nodes
+    if k is None:
+        k=np.sqrt(1.0/nnodes)
+    # the initial "temperature"  is about .1 of domain area (=1x1)
+    # this is the largest step allowed in the dynamics.
+    t=0.1
+    # simple cooling scheme.
+    # linearly step down by dt on each iteration so last iteration is size dt.
+    dt=t/float(iterations+1)
+
+    displacement=np.zeros((dim,nnodes))
+    for iteration in range(iterations):
+        displacement*=0
+        # loop over rows
+        for i in range(A.shape[0]):
+            if i in fixed:
+                continue
+            # difference between this row's node position and all others
+            delta=(pos[i]-pos).T
+            # distance between points
+            distance=np.sqrt((delta**2).sum(axis=0))
+            # enforce minimum distance of 0.01
+            distance=np.where(distance<0.01,0.01,distance)
+            # the adjacency matrix row
+            Ai=np.asarray(A.getrowview(i).toarray())
+            # displacement "force"
+            displacement[:,i]+=\
+                (delta*(k*k/distance**2-Ai*distance/k)).sum(axis=1)
+        # update positions
+        length=np.sqrt((displacement**2).sum(axis=0))
+        length=np.where(length<0.01,0.1,length)
+        pos+=(displacement*t/length).T
+        # cool temperature
+        t-=dt
+    return pos
+
 
 def fix_val(val):
     if isinf(val):

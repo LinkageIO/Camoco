@@ -8,12 +8,29 @@ from camoco.Config import cf
 def simple_Locus():
     return Locus(1,100,200) 
 
+@pytest.fixture
+def LocusX():
+    return Locus(1,100,200) 
+
+@pytest.fixture
+def LocusY():
+    return Locus(1,300,400) 
+
 def test_locus_initialization(simple_Locus):
     # numeric chromosomes
     assert simple_Locus.chrom == '1'
     assert simple_Locus.start == 100
     assert simple_Locus.end == 200
-    assert len(simple_Locus) == 100
+    assert len(simple_Locus) == 101
+
+def test_distance_between_loci():
+    x = Locus(1,100,200) 
+    y = Locus(1,300,400) 
+    assert x - y == 99
+
+def test_combine_loci(LocusX,LocusY):
+    z = LocusX + LocusY
+    assert len(z) == 301
 
 def test_candidate_vs_bootstrap_length(testRefGen,testGWAS):
     Term = next(testGWAS.iter_terms())

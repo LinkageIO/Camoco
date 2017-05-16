@@ -1,6 +1,6 @@
 import camoco as co
 import pandas as pd
-from camoco.Tools import DummyRefGen
+from camoco.Tools import DummyRefGen,log
 from camoco.Locus import Gene
 
 def build_cob(args):
@@ -24,6 +24,11 @@ def build_cob(args):
 
     quality_control = False if args.skip_quality_control else True
     normalize = False if args.skip_normalization else True
+
+    # Check to see if this dataset is already built
+    if co.available_datasets('Expr',args.name):
+        print('Warning! This dataset has already been built.')
+        co.del_dataset('Expr',args.name,safe=args.force)
         
     # Basically just pass all the CLI arguments to the COB class method  
     cob = co.COB.from_table(
@@ -44,7 +49,8 @@ def build_cob(args):
         min_single_sample_expr=args.min_single_sample_expr,
         min_expr=args.min_expr,
         max_val=args.max_val,
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
+        index_col=args.index_col
     )
     print("Build successful!")
     print(cob.summary())
@@ -66,7 +72,12 @@ def build_refgen(args):
 
 def build_gont(args):
     refgen = co.RefGen(args.refgen)
-    co.GOnt.from_obo(
+    # Check to see if this dataset is already built
+    if co.available_datasets('GOnt',args.name):
+        print('Warning! This dataset has already been built.')
+        co.del_dataset('Expr',args.name,force=args.force)
+ 
+    go = co.GOnt.from_obo(
         args.obo_filename,
         args.filename,
         args.name,
@@ -75,6 +86,7 @@ def build_gont(args):
         go_col=args.go_col,
         id_col=args.id_col
     )
+    print("Done: {}".format(go.summary()))
     print('Build Successful')
 
 def build_GWAS(args):
@@ -83,6 +95,9 @@ def build_GWAS(args):
         raise ValueError("Only 1 column found, check --sep, see --help")
     print('Loading {}'.format(args.refgen))
     refgen = co.RefGen(args.refgen)
+    # Filter out traits that are in args.skip_trait
+    df = df[[x not in args.skip_traits for x in df[args.trait_col]]]
+    # Build
     gwas = co.GWAS.from_DataFrame(
         df,
         args.name,

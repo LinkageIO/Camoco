@@ -5,6 +5,7 @@ camoco/*.c
 analyses/*
 build/*
 sensitive/*
+docs/_build
 dist/
 *.pyc
 *.py.swp

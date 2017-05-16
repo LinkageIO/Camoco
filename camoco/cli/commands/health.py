@@ -63,7 +63,9 @@ def cob_health(args):
     if not path.exists('{}_Expr_cluster.png'.format(args.out)):
         cob.plot(
             '{}_Expr_cluster.png'.format(args.out),
+            include_accession_labels=True,
             raw=False,
+            cluster_accessions=True,
             avg_by_cluster=True
         )
     else:
@@ -81,7 +83,7 @@ def cob_health(args):
         if not path.exists('{}_qc_gene.txt'.format(args.out)):
             # Print out the breakdown of QC Values
             refgen = co.RefGen(args.refgen)
-            gene_qc = cob._ft('qc_gene')
+            gene_qc = cob._bcolz('qc_gene')
             gene_qc = gene_qc[gene_qc.pass_membership]
             gene_qc['chrom'] = ['chr'+str(refgen[x].chrom) for x in gene_qc.index]
             gene_qc = gene_qc.groupby('chrom').agg(sum,axis=0)
@@ -170,6 +172,7 @@ def cob_health(args):
                     density_emp.append(density)
                 term_ids.append(term.id)
                 term_sizes.append(len(term))
+                term_desc.append(str(term.desc))
                 # ------ Density 
                 # Calculate PVals
                 density_bs = np.array([
@@ -206,7 +209,7 @@ def cob_health(args):
                     log('Processed {} terms'.format(terms_tested)) 
             go_enrichment = pd.DataFrame({
                 'GOTerm' : term_ids,
-                'desc' : str(term.desc),
+                'desc' : term_desc,
                 'size' : term_sizes,
                 'density' : density_emp,
                 'density_pval' : density_pvals,
@@ -223,8 +226,15 @@ def cob_health(args):
 
         if not path.exists('{}_GO.png'.format(args.out)):
             # Convert pvals to log10
-            go_enrichment['density_pval'] = -1*np.log10(go_enrichment['density_pval'])
-            go_enrichment['locality_pval'] = -1*np.log10(go_enrichment['locality_pval'])
+            with np.errstate(divide='ignore'):
+                # When no bootstraps are more extreme than the term, the minus log pval yields an infinite
+                go_enrichment['density_pval'] = -1*np.log10(go_enrichment['density_pval'])
+                go_enrichment['locality_pval'] = -1*np.log10(go_enrichment['locality_pval'])
+                # Fix the infinites so they are plotted
+                max_density = np.max(go_enrichment['density_pval'][np.isfinite(go_enrichment['density_pval'])])
+                max_locality = np.max(go_enrichment['locality_pval'][np.isfinite(go_enrichment['locality_pval'])])
+                go_enrichment.loc[np.logical_not(np.isfinite(go_enrichment['density_pval'])),'density_pval'] = max_density + 1
+                go_enrichment.loc[np.logical_not(np.isfinite(go_enrichment['locality_pval'])),'locality_pval'] = max_locality + 1
             plt.clf()
             figure,axes = plt.subplots(3,2,figsize=(12,12))
             # -----------
@@ -278,8 +288,9 @@ def cob_health(args):
             fold = sum(np.array(go_enrichment['locality_pval'])>1.3)/(0.05 * len(go_enrichment))
             axes[0,1].axhline(y=-1*np.log10(0.05),color='red')
             axes[0,1].text(
-                0, -0.2,
+                min(axes[0,1].get_xlim()),-1*np.log10(0.05),
                 '{:.3g} Fold Enrichement'.format(fold),
+                color='red'
             )
             axes[1,1].scatter(
                 go_enrichment['size'],

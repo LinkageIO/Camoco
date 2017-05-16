@@ -149,7 +149,7 @@ class Locus(object):
         if self.start == self.end:
             return 1
         else:
-            return self.end - self.start
+            return self.end - self.start + 1
 
     def __cmp__(self,locus):
         if self.chrom == locus.chrom:
@@ -179,7 +179,7 @@ class Locus(object):
         else:
             # sort them
             a,b = sorted([self,other])
-            return b.start - a.end
+            return b.start - a.end - 1
 
     def __str__(self):
         return '''<{}>{}:{}-{}+{}({})'''.format(

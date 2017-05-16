@@ -1,12 +1,12 @@
 import pytest
 import camoco as co
+from camoco import cf
 
 from camoco import Locus
 
 '''
     Unit tests
 '''
-
 
 def test_from_ids(testRefGen):
     random_genes = sorted(testRefGen.random_genes(n=10))
@@ -174,7 +174,7 @@ def test_refgen_length(testRefGen):
     assert from_sql == len(testRefGen)
 
 def test_filtered_refgen(testRefGen):
-    co.del_dataset('RefGen','test_filtered_refgen',safe=False) 
+    co.del_dataset('RefGen','test_filtered_refgen',force=True) 
     random_genes = set(testRefGen.random_genes(n=500))
     test_filtered_refgen = testRefGen.filtered_refgen(
         'test_filtered_refgen',
@@ -185,7 +185,19 @@ def test_filtered_refgen(testRefGen):
     assert len(test_filtered_refgen) == len(random_genes)
     for x in random_genes:
         assert x in test_filtered_refgen
-    co.del_dataset('RefGen','test_filtered_refgen',safe=False) 
+    co.del_dataset('RefGen','test_filtered_refgen',force=True) 
 
-def test_rowid_equals_1_after_refgen_rebuild(testRefGen):
-    assert False
+def test_rowid_equals_1_after_refgen_rebuild(Zm5bFGS_duplicate):
+    '''
+        This was a regression bug where when a refgen was rebuilt
+        the rowid was not reset resulting in weird random_gene 
+        method which relies on rowid 
+    '''
+    assert Zm5bFGS_duplicate\
+        .db.cursor().execute(
+            "SELECT MIN(rowid) from genes"
+        ).fetchone()[0] == 1
+
+
+def test_random_genes_returns_correct_n(testRefGen):
+    assert len(testRefGen.random_genes(n=cf.test.num)) == cf.test.num

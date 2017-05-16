@@ -4,6 +4,7 @@ import time
 import re
 import functools
 import glob
+import shutil
 
 from termcolor import colored, cprint
 from itertools import chain
@@ -67,7 +68,7 @@ def available_datasets(type='%', name='%'):
             datasets = pd.DataFrame(
                 datasets, 
                 columns=["Type", "Name", "Description", "Date Added"],
-            ).set_index('Type')
+            ).set_index(['Type'])
         else:
             datasets = pd.DataFrame(
                 columns=["Type", "Name", "Description", "Date Added"]
@@ -78,20 +79,21 @@ def available_datasets(type='%', name='%'):
         else:
             return datasets
     except CantOpenError as e:
-        return False
+        raise e
+        
 
 def available(type=None,name=None):
     # Laaaaaaaaazy
     return available_datasets(type=type,name=name)
 
-def del_dataset(type, name, safe=True):
+def del_dataset(type, name, force=False):
     try:
         c = co.Camoco("Camoco")
     except CantOpenError:
         return True
-    if safe:
+    if force == False:
         c.log("Are you sure you want to delete:\n {}.{}", type, name)
-        if input("(Notice CAPS)[Y/n]:") != 'Y':
+        if input("[Y/n] (Notice CAPS):") != 'Y':
             c.log("Nothing Deleted")
             return
     c.log("Deleting {}", name)
@@ -113,12 +115,16 @@ def del_dataset(type, name, safe=True):
         )
         for f in dfiles:
             c.log('Removing {}',f)
-            os.remove(f)
+            try:
+                os.remove(f)
+            except IsADirectoryError:
+                shutil.rmtree(f)
     except FileNotFoundError as e:
         pass
     if type == 'Expr':
         # also have to remove the COB specific refgen
-        del_dataset('RefGen', 'Filtered'+name, safe=safe)
+        del_dataset('RefGen', 'Filtered'+name, force=force)
+        del_dataset('Ontology', name+'MCL', force=force)
     return True
 
 def mv_dataset(type,name,new_name):
