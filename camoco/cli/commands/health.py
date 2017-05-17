@@ -157,12 +157,23 @@ def cob_health(args):
                 term.loci = list(filter(lambda x: x in cob, term.loci))
                 if len(term) < args.min_term_size or len(term) > args.max_term_size:
                     continue
+                #set density value for two tailed go so we only test it once
+                density = cob.density(term.loci)
+                #one tailed vs two tailed test
+                if args.two_tailed_GO is True:
+                    #run one tail for only positive values
+                    if density > 0:
+                        density_emp.append(density)
+                    #skip negative density values
+                    else:
+                        continue
+                #if two_tailed_go is not none
+                else:
+                    density_emp.append(density)
                 term_ids.append(term.id)
                 term_sizes.append(len(term))
                 term_desc.append(str(term.desc))
                 # ------ Density 
-                density = cob.density(term.loci)
-                density_emp.append(density)
                 # Calculate PVals
                 density_bs = np.array([
                     cob.density(cob.refgen.random_genes(n=len(term.loci))) \

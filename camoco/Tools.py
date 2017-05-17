@@ -86,14 +86,14 @@ def available(type=None,name=None):
     # Laaaaaaaaazy
     return available_datasets(type=type,name=name)
 
-def del_dataset(type, name, safe=True):
+def del_dataset(type, name, force=False):
     try:
         c = co.Camoco("Camoco")
     except CantOpenError:
         return True
-    if safe:
+    if force == False:
         c.log("Are you sure you want to delete:\n {}.{}", type, name)
-        if input("(Notice CAPS)[Y/n]:") != 'Y':
+        if input("[Y/n] (Notice CAPS):") != 'Y':
             c.log("Nothing Deleted")
             return
     c.log("Deleting {}", name)
@@ -123,7 +123,8 @@ def del_dataset(type, name, safe=True):
         pass
     if type == 'Expr':
         # also have to remove the COB specific refgen
-        del_dataset('RefGen', 'Filtered'+name, safe=safe)
+        del_dataset('RefGen', 'Filtered'+name, force=force)
+        del_dataset('Ontology', name+'MCL', force=force)
     return True
 
 def mv_dataset(type,name,new_name):

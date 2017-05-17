@@ -46,7 +46,7 @@ def test_effective_loci_custom_windoe(testTerm):
     assert len(testTerm.effective_loci(window_size=150)) == 4
 
 def test_effective_loci_lens(testTerm):
-    assert list(map(len,testTerm.effective_loci())) == [600,400,100,200,1]
+    assert list(map(len,testTerm.effective_loci())) == [601,401,101,201,1]
 
 def test_strongest_loci(testTerm):
     assert list(

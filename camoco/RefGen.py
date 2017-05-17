@@ -86,6 +86,22 @@ class RefGen(Camoco):
             **kwargs
         )
 
+    def interection(self,gene_list):
+        '''
+            Return the subset of genes that are in the refgen.
+            
+            Parameters
+            ----------
+            gene_list : list-like of co.Locus
+                a list of Gene (Locus) objects
+
+            Returns
+            -------
+            a list like object containing genes that
+            are in the refgen.
+        '''
+        return [x for x in gene_list if x in self]
+
     def random_genes(self,n,**kwargs):
         '''
             Return random genes from the RefGen, without replacement. 
@@ -762,6 +778,8 @@ class RefGen(Camoco):
             CREATE INDEX IF NOT EXISTS gene_end ON genes (chromosome,end);
             CREATE INDEX IF NOT EXISTS geneid ON genes (id);
             CREATE INDEX IF NOT EXISTS geneattr ON gene_attrs (id);
+            CREATE INDEX IF NOT EXISTS id ON func(id);
+            CREATE INDEX IF NOT EXISTS id ON ortho_func(id);
         ''')
 
     def add_gene(self,gene,refgen=None):
@@ -875,6 +893,125 @@ class RefGen(Camoco):
                     als[id] = [al]
             return als
 
+    def has_annotations(self):
+        cur = self.db.cursor()
+        cur.execute('SELECT count(*) FROM func;')
+        return (int(cur.fetchone()[0]) > 0)
+    
+    def get_annotations(self,item):
+        # Build the query from all the genes provided
+        if isinstance(item,(set,list)):
+            ls = "{}".format("','".join([str(x) for x in item]))
+            single = False
+        else:
+            ls = item
+            single = True
+        query = "SELECT * FROM func WHERE id IN ('{}');".format(ls)
+        
+        # Run the query and turn the result into a list of tuples
+        cur = self.db.cursor()
+        cur.execute(query)
+        annotes = cur.fetchall()
+        
+        # If a list of genes was passed in, return a dictionary of lists
+        if not single:
+            res = {}
+            for id,desc in annotes:
+                if id in res:
+                    res[id].append(desc)
+                else:
+                    res[id] = [desc]
+        
+        # Otherwise just return the list annotations
+        else:
+            res = []
+            for id,desc in annotes:
+                res.append(desc)
+        return res
+    
+    def export_annotations(self, filename=None, sep="\t"):
+        '''
+            Make a table of all functional annotations.
+        '''
+        # Find the default filename
+        if filename == None:
+            filename = self.name + '_func.tsv'
+        
+        # Pull them all from sqlite
+        cur = self.db.cursor()
+        cur.execute("SELECT * FROM func;")
+        
+        # Used pandas to save it
+        df = pd.DataFrame(cur.fetchall(),columns=['gene','desc']).set_index('gene')
+        df.to_csv(filename,sep=sep)
+    
+    def add_annotations(self, filename, sep="\t", gene_col=0, skip_cols=None):
+        ''' 
+            Imports Annotation relationships from a csv file. By default will
+            assume gene names are first column
+
+            Parameters
+            ----------
+            filename : str 
+                The file containing the annotations
+            sep : str (default: \t)
+                The delimiter for the columns in the annotation file
+            gene_col : int (default: 0)
+                The index of the column containing the gene IDs
+            skip_cols : default:None
+                Optional names of columns to drop before adding 
+                annotations
+
+            Returns
+            -------
+            None if successful
+
+        '''
+        # import from file, assume right now that in correct order
+        tbl = pd.read_table(filename,sep=sep,dtype=object)
+        idx_name = tbl.columns[gene_col]
+        tbl[idx_name] = tbl[idx_name].str.upper()
+        # Set thie index to be the specified gene column
+        tbl.set_index(idx_name,inplace=True)        
+        
+        # Drop columns if we need to
+        if skip_cols is not None:
+            # removing certain columns
+            tbl.drop(tbl.columns[skip_cols],axis=1,inplace=True)
+        
+        # Get rid of any genes not in the refence genome
+        cur = self.db.cursor()
+        cur.execute('SELECT id FROM genes;')
+        rm = set(tbl.index.values) - set([id[0] for id in cur.fetchall()])
+        tbl.drop(rm,axis=0,inplace=True)
+        del rm, cur
+        
+        # One Annotation per row, drop the nulls and duplicates
+        tbl = tbl.reset_index()
+        tbl = pd.melt(tbl,id_vars=idx_name,var_name='col',value_name='desc')
+        tbl.drop('col',axis=1,inplace=True)
+        tbl.dropna(axis=0,inplace=True)
+        tbl.drop_duplicates(inplace=True)
+        
+        # Run the transaction to throw them in there
+        cur = self.db.cursor()
+        try:
+            cur.execute('BEGIN TRANSACTION')
+            cur.executemany(
+                'INSERT INTO func VALUES (?,?)'
+                ,tbl.itertuples(index=False))
+            cur.execute('END TRANSACTION')
+        
+        except Exception as e:
+            self.log("import failed: {}",e)
+            cur.execute('ROLLBACK')
+        
+        # Make sure the indices are built
+        self._build_indices()
+
+    def remove_annotations(self):
+        self.db.cursor().execute('DROP FROM func;')
+
     @classmethod
     def create(cls,name,description,type):
         self = super().create(name,description,type=type)
@@ -883,6 +1020,8 @@ class RefGen(Camoco):
             DROP TABLE IF EXISTS genes;
             DROP TABLE IF EXISTS gene_attrs;
             DROP TABLE IF EXISTS aliases;
+            DROP TABLE IF EXISTS func;
+            DROP TABLE IF EXISTS ortho_func;
             ''')
         self._create_tables()
         self._build_indices()
@@ -1037,16 +1176,27 @@ class RefGen(Camoco):
     def _create_tables(self):
         cur = self.db.cursor()
         cur.execute('''
+            /* 
+                Create a table that has chromosome lengths 
+            */
             CREATE TABLE IF NOT EXISTS chromosomes (
                 id TEXT NOT NULL UNIQUE,
                 length INTEGER NOT NULL
             );
+            /*
+                Create a table the contains gene start and
+                end positions (with chromosome)
+            */
             CREATE TABLE IF NOT EXISTS genes (
                 id TEXT NOT NULL UNIQUE,
                 chromosome TEXT NOT NULL,
                 start INTEGER,
                 end INTEGER
             );
+            /*
+                Create a table that contains gene attribute
+                mappings
+            */
             CREATE TABLE IF NOT EXISTS gene_attrs (
                 id TEXT NOT NULL,
                 key TEXT,
@@ -1055,4 +1205,14 @@ class RefGen(Camoco):
             CREATE TABLE IF NOT EXISTS aliases (
                 alias TEXT UNIQUE,
                 id TEXT
+            );
+            CREATE TABLE IF NOT EXISTS func (
+                id TEXT,
+                desc TEXT,
+                UNIQUE(id,desc) ON CONFLICT IGNORE
+            );
+            CREATE TABLE IF NOT EXISTS ortho_func (
+                id TEXT,
+                desc TEXT,
+                UNIQUE(id,desc) ON CONFLICT IGNORE
             );''');

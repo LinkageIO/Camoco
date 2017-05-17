@@ -27,7 +27,7 @@ def test_fromDataFrame(testRefGen):
     '''
         Test GWAS creation from DataFrame
     '''
-    co.del_dataset('GWAS','testGWAS',safe=False)
+    co.del_dataset('GWAS','testGWAS',force=True)
     df = pd.DataFrame({
         'Trait' : ['a','a','b','b'],
         'CHR' : ['chr1','chr2','chr3','chr4'],

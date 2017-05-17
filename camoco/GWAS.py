@@ -95,6 +95,10 @@ class GWAS(Ontology):
             DELETE FROM loci_attr WHERE term = ?
         ''',(id,))
 
+
+       
+        
+
     ''' -----------------------------------------------------------------------
             Internal Methods -- Factory Methods
     '''
