@@ -83,7 +83,7 @@ def cob_health(args):
         if not path.exists('{}_qc_gene.txt'.format(args.out)):
             # Print out the breakdown of QC Values
             refgen = co.RefGen(args.refgen)
-            gene_qc = cob._ft('qc_gene')
+            gene_qc = cob._bcolz('qc_gene')
             gene_qc = gene_qc[gene_qc.pass_membership]
             gene_qc['chrom'] = ['chr'+str(refgen[x].chrom) for x in gene_qc.index]
             gene_qc = gene_qc.groupby('chrom').agg(sum,axis=0)
@@ -215,8 +215,15 @@ def cob_health(args):
 
         if not path.exists('{}_GO.png'.format(args.out)):
             # Convert pvals to log10
-            go_enrichment['density_pval'] = -1*np.log10(go_enrichment['density_pval'])
-            go_enrichment['locality_pval'] = -1*np.log10(go_enrichment['locality_pval'])
+            with np.errstate(divide='ignore'):
+                # When no bootstraps are more extreme than the term, the minus log pval yields an infinite
+                go_enrichment['density_pval'] = -1*np.log10(go_enrichment['density_pval'])
+                go_enrichment['locality_pval'] = -1*np.log10(go_enrichment['locality_pval'])
+                # Fix the infinites so they are plotted
+                max_density = np.max(go_enrichment['density_pval'][np.isfinite(go_enrichment['density_pval'])])
+                max_locality = np.max(go_enrichment['locality_pval'][np.isfinite(go_enrichment['locality_pval'])])
+                go_enrichment.loc[np.logical_not(np.isfinite(go_enrichment['density_pval'])),'density_pval'] = max_density + 1
+                go_enrichment.loc[np.logical_not(np.isfinite(go_enrichment['locality_pval'])),'locality_pval'] = max_locality + 1
             plt.clf()
             figure,axes = plt.subplots(3,2,figsize=(12,12))
             # -----------

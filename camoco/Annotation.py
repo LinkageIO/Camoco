@@ -222,7 +222,7 @@ class GWASData(Camoco):
         cur.execute('BEGIN TRANSACTION')
         
         # Find all the files in the folder related to our GWAS
-        fileList = glob.glob(os.path.join(dir, ('*' + self.name +'*.[tc]sv')))
+        fileList = glob.glob(os.path.join(dir, ('*.[tc]sv')))
 
         # For each file, import to the db
         for fn in fileList:

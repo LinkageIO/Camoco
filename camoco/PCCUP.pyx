@@ -53,7 +53,6 @@ def pair_correlation(double[:, ::1] x):
                     pccs[index] = np.nan
                 else:
                     r = 1 - n / (du * dv)
-                    # Avoid putting nans  
                     pccs[index] = r
             index += 1
     # Return the base of the memory view

@@ -4,6 +4,7 @@ import time
 import re
 import functools
 import glob
+import shutil
 
 from termcolor import colored, cprint
 from itertools import chain
@@ -67,7 +68,7 @@ def available_datasets(type='%', name='%'):
             datasets = pd.DataFrame(
                 datasets, 
                 columns=["Type", "Name", "Description", "Date Added"],
-            ).set_index('Type')
+            ).set_index(['Type'])
         else:
             datasets = pd.DataFrame(
                 columns=["Type", "Name", "Description", "Date Added"]
@@ -78,7 +79,8 @@ def available_datasets(type='%', name='%'):
         else:
             return datasets
     except CantOpenError as e:
-        return False
+        raise e
+        
 
 def available(type=None,name=None):
     # Laaaaaaaaazy
@@ -113,7 +115,10 @@ def del_dataset(type, name, safe=True):
         )
         for f in dfiles:
             c.log('Removing {}',f)
-            os.remove(f)
+            try:
+                os.remove(f)
+            except IsADirectoryError:
+                shutil.rmtree(f)
     except FileNotFoundError as e:
         pass
     if type == 'Expr':

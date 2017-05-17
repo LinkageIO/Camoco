@@ -362,7 +362,7 @@ class RefGen(Camoco):
         chain=True, window_size=None, include_parent_locus=False,
         include_parent_attrs=False, include_num_intervening=False, 
         include_rank_intervening=False, include_num_siblings=False,
-        attrs=None):
+        include_SNP_distance=False,attrs=None):
         '''
             Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -407,6 +407,9 @@ class RefGen(Camoco):
                 Optional argument which adds an attribute to each
                 candidate gene containing the number of total 
                 candidates (siblings) identifies at the locus.
+            include_SNP_distance : bool (default:False)
+                Include the distance from the canadidate gene and
+                the parent SNP
             attrs : dict (default: None)
                 An optional dictionary which will be updated to each
                 candidate genes attr value.
@@ -465,6 +468,10 @@ class RefGen(Camoco):
             if include_num_siblings == True:
                 for gene in genes:
                     gene.update({'num_siblings':len(genes)})
+            if include_SNP_distance == True:
+                for gene in genes:
+                    distance = abs(gene - locus)
+                    gene.update({'SNP_distance':distance})
             if attrs is not None:
                 for gene in genes:
                     gene.update(attrs)
@@ -484,6 +491,7 @@ class RefGen(Camoco):
                     include_num_intervening=include_num_intervening,
                     include_rank_intervening=include_rank_intervening,
                     include_num_siblings=include_num_siblings,
+                    include_SNP_distance=include_SNP_distance,
                     attrs=attrs
                 ) for locus in iterator
             ]
