@@ -344,7 +344,7 @@ class Expr(Camoco):
 
     def _quality_control(self, min_expr=0.01, max_gene_missing_data=0.2, \
         min_single_sample_expr=5, max_accession_missing_data=0.3, \
-        membership=None, dry_run=False, presence_absense=False, **kwargs):
+        membership=None, dry_run=False, presence_absence=False, **kwargs):
         '''
             Perform Quality Control on raw expression data. This method filters
             genes based on membership to some RefGen instance, filters based on
@@ -415,13 +415,13 @@ class Expr(Camoco):
         self.log("Filtering expression values lower than {}", min_expr)
         df_flt = df.copy()
         # Presence absence variable et
-        if presence_absense == True:
-           self.log("Allowing for presence absense variation")
+        if presence_absence == True:
+           self.log("Allowing for presence absence variation")
            #find out which values equalt 0
            zero_index = df_flt == 0
         # Filter the min expression genes
         df_flt[df < min_expr] = np.nan
-        if presence_absense == True:
+        if presence_absence == True:
             #change out original 0's index to a small value
             df_flt[zero_index] = 0.001
         df = df_flt
