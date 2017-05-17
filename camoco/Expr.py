@@ -381,7 +381,7 @@ class Expr(Camoco):
             presence_absence : bool (default: False)
                 Used to convert 0's within the data to a 0.001 after min 
                 expression values are filtered out to allow for presence
-                absense variation
+                absence variation
         '''
         self.log('------------Quality Control')
         df = self.expr()
