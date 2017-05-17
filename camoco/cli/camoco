@@ -722,8 +722,9 @@ if __name__ == '__main__':
     )
     health.add_argument(
         '--two_tailed_GO',
-        default=None,
-        help='Include negative density values for GO statistics (default: None)'
+        action='store_true',
+        default=False,
+        help='Include negative density values for GO statistics (default: False)'
     )
     health.add_argument(
         '--min-term-size',
