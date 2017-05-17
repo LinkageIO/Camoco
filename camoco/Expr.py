@@ -552,7 +552,7 @@ class Expr(Camoco):
 
     @property
     def _parent_refgen(self):
-        return RefGen(self._global['parent_refgen'])
+        return RefGen(self._global('parent_refgen'))
 
     def _set_refgen(self, refgen, filter=True):
         '''

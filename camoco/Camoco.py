@@ -117,6 +117,19 @@ class Camoco(object):
             if 'idx' in df.columns.values:
                 del df
             return
+    
+    def _raw_coex(self,scores,significance_threshold):
+        path = os.path.expanduser(
+                os.path.join(
+                    cf.options.basedir,
+                    'databases',
+                    "{}.{}.{}".format(self.type, self.name, 'coex')
+                )
+            )
+        self._global('current_significance_threshold',significance_threshold)
+        sigs = scores >= significance_threshold
+        return bcz.ctable(columns=[scores,sigs], names=['score','significant'], mode='w', rootdir=path)
+        
 
     def _tmpfile(self):
         # returns a handle to a tmp file

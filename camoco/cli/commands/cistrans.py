@@ -22,11 +22,12 @@ def cistrans(args):
     # np.newaxis adds an empty axis in that position of the slice
     # the sklearn module requires the values to be in the rows:
     # http://scikit-learn.org/stable/auto_examples/neighbors/plot_kde_1d.html
-    cis = cob.coex \
-            .score[cob.coex.distance <= args.cis_distance]\
+    coex = cob._coex_DataFrame(sig_only=False)
+    cis = coex \
+            .score[coex.distance <= args.cis_distance]\
             .values[:,np.newaxis]
-    trans = cob.coex\
-            .score[np.isinf(cob.coex.distance)]\
+    trans = coex\
+            .score[np.isinf(coex.distance)]\
             .values[:,np.newaxis]
     X_plot = np.linspace(-10,10,1000)[:,np.newaxis]
     str = 'Found {:,} cis interactions and {:,} trans interactions'.format(

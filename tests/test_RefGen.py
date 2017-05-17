@@ -174,7 +174,7 @@ def test_refgen_length(testRefGen):
     assert from_sql == len(testRefGen)
 
 def test_filtered_refgen(testRefGen):
-    co.del_dataset('RefGen','test_filtered_refgen',safe=False) 
+    co.del_dataset('RefGen','test_filtered_refgen',force=True) 
     random_genes = set(testRefGen.random_genes(n=500))
     test_filtered_refgen = testRefGen.filtered_refgen(
         'test_filtered_refgen',
@@ -185,7 +185,7 @@ def test_filtered_refgen(testRefGen):
     assert len(test_filtered_refgen) == len(random_genes)
     for x in random_genes:
         assert x in test_filtered_refgen
-    co.del_dataset('RefGen','test_filtered_refgen',safe=False) 
+    co.del_dataset('RefGen','test_filtered_refgen',force=True) 
 
 def test_rowid_equals_1_after_refgen_rebuild(Zm5bFGS_duplicate):
     '''
