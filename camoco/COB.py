@@ -28,6 +28,7 @@ import statsmodels.api as sm
 import networkx as nx
 import pandas as pd
 import numpy as np
+from numpy import nan
 import itertools
 from odo import odo
 from scipy.misc import comb 
@@ -1092,8 +1093,11 @@ class COB(Expr):
         degree.columns = ['global', 'local']
         degree = degree.sort_values(by='global')
         if include_regression:
+            #set up variables to use astype to aviod pandas sm.OLS error
+            loc_deg = degree['local']
+            glob_deg = degree['global']
             # Add the regression lines
-            ols = sm.OLS(degree['local'], degree['global']).fit()
+            ols = sm.OLS(loc_deg.astype(float), glob_deg.astype(float)).fit()
             degree['resid'] = ols.resid
             degree['fitted'] = ols.fittedvalues
             degree = degree.sort_values(by='resid',ascending=False)
@@ -1499,6 +1503,8 @@ class COB(Expr):
         dists = (dists * pcc_std) + pcc_mean
         dists = np.tanh(dists)
         dists = 1 - dists
+        #convert nan to 0's, linkage can only use finite values
+        dists[np.isnan(dists)] = 0
         gc.collect()
         # Find the leaves from hierarchical clustering
         gene_link = linkage(dists, method=method)
