@@ -587,6 +587,7 @@ class Overlap(Camoco):
             results.append(overlap.reset_index())
         if not args.dry_run:
             self.results = pd.concat(results)
+            self.results.to_sql('overlap',sqlite3.connect(self.db.filename),if_exists='replace')
             self.results.to_csv(self.args.out,sep='\t',index=None)
 
 
