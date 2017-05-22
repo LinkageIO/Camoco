@@ -175,7 +175,7 @@ class Overlap(Camoco):
         bs = []
         if self.args.num_bootstraps == 'auto':
             # Create a bullshit generator... err bootstraps
-            bs_generator = (self.overlap(loci,bootstrap=True,iter_name=x) \
+            bs_generator = (co.Overlap.overlap(self,loci,bootstrap=True,iter_name=x) \
                 for x in range(max_bs)
             )
             while num_bs <= 50 and len(bs) < 1000: 
@@ -189,7 +189,7 @@ class Overlap(Camoco):
                 )
         else:
             # Be a lil broke back noodle and explicitly bootstrap
-            bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
+            bs = [co.Overlap.overlap(self, loci,bootstrap=True,iter_name=x) \
                 for x in range(int(self.args.num_bootstraps))
             ]
         return pd.concat(bs)
@@ -501,12 +501,12 @@ class Overlap(Camoco):
             Implements an interface for the CLI to perform overlap
             Analysis
         '''
-        self = cls()
+        self = lambda:None 
         # Build base camoco objects
         self.args = args
         self.cob = co.COB(args.cob)
         self.ont = co.GWAS(args.gwas)
-        self.generate_output_name()
+        self.generate_output_name = co.Overlap.generate_output_name(self)
 
         # Generate a terms iterable
         if 'all' in self.args.terms:
@@ -531,12 +531,13 @@ class Overlap(Camoco):
             if args.dry_run:
                 continue
             # Generate SNP2Gene Loci
-            loci = self.snp2gene(term)
+            loci = co.Overlap.snp2gene(self,term)
             if len(loci) < 2:
                 self.cob.log('Not enough genes to perform overlap')
                 continue
-            overlap = self.overlap(loci)
-            bootstraps = self.generate_bootstraps(loci,overlap)
+            self.overlap = co.Overlap.overlap(self, loci)
+            overlap = co.Overlap.overlap(self, loci)
+            bootstraps = co.Overlap.generate_bootstraps(self,loci,overlap)
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
             # Calculate z scores for density
