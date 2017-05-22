@@ -458,6 +458,7 @@ if __name__ == '__main__':
     lstcmd.add_argument(
         'type', 
         nargs='?',
+        default=None,
         help=(
             'The type of dataset you want to list. e.g. GWAS. '
             'Also accepts SQLite wildcards.'    
@@ -466,9 +467,17 @@ if __name__ == '__main__':
     lstcmd.add_argument(
         'name', 
         nargs='?',
+        default=None,
         help = (
             'The name of the dataset you want to list. '
             'Also accepts SQLite wildcards.' 
+        )
+    )
+    lstcmd.add_argument(
+        '--terms',
+        action='store_true',
+        help=(
+            'Flag indicating to list the terms within the Ontology or GWAS' 
         )
     )
     lstcmd.set_defaults(func=list_command)
@@ -712,6 +721,12 @@ if __name__ == '__main__':
         help='Perform Gene Ontology Statistics. (default: None)'
     )
     health.add_argument(
+        '--two_tailed_GO',
+        action='store_true',
+        default=False,
+        help='Include negative density values for GO statistics (default: False)'
+    )
+    health.add_argument(
         '--min-term-size',
         default=10,
         metavar=10,
@@ -902,7 +917,7 @@ if __name__ == '__main__':
         '--cis-distance',
         default=50000,
         type=int,
-        help='Distance used to determine if two genes are in cis.'
+        help='Distance used to determine if two genes are in cis. (default: 50 kb)'
     )
     cis_trans.add_argument(
         '--out',

@@ -16,9 +16,10 @@ import sqlite3
 
 import numpy as np
 import scipy as sp
-import scipy.stats
+from scipy.stats import hypergeom
+from scipy import tril_indices,triu_indices
 
-from collections import OrderedDict
+from itertools import chain
 
 import camoco as co
 import pandas as pd
@@ -174,7 +175,7 @@ class Overlap(Camoco):
         bs = []
         if self.args.num_bootstraps == 'auto':
             # Create a bullshit generator... err bootstraps
-            bs_generator = (self.overlap(loci,bootstrap=True,iter_name=x) \
+            bs_generator = (co.Overlap.overlap(self,loci,bootstrap=True,iter_name=x) \
                 for x in range(max_bs)
             )
             while num_bs <= 50 and len(bs) < 1000: 
@@ -188,7 +189,7 @@ class Overlap(Camoco):
                 )
         else:
             # Be a lil broke back noodle and explicitly bootstrap
-            bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
+            bs = [co.Overlap.overlap(self, loci,bootstrap=True,iter_name=x) \
                 for x in range(int(self.args.num_bootstraps))
             ]
         return pd.concat(bs)
@@ -228,7 +229,62 @@ class Overlap(Camoco):
             values='fdr',
             aggfunc=lambda x: sum(x<=fdr_cutoff)
         )
-            
+
+    def SNP2Gene_breakdown(self,COB=None):
+        '''
+        Provides a breakdown of SNP to gene mapping parameters for each term in the Overlap.
+        Includes the number of initial Loci, the number of collapsed Loci (within a window)
+        and the number of candidate genes (within a window and up to a flank limit)
+
+        Parameters
+        ----------
+        COB : str (default: 'average')
+            If specfified, the results will be composed only of SNP to gene
+            mappings from a single COB network. If 'average' is specified,
+            the results will be the SET of genes across all COB networks.
+        '''
+        # Get some help
+        def bp_to_kb(bp):
+            return "{}KB".format(int(bp/1000))
+        def get_level(df,level):
+            ''' Returns the level values by name '''
+            level_index = df.columns.names.index(level)
+            return df.columns.levels[level_index]
+        # Prepare the data frame results
+        if COB == None:
+            results = self.results
+        else:
+            results = self.results.query('COB=="{}"'.format(COB))
+        # Total for the Ionome
+        ont = co.GWAS(self.results.Ontology.unique()[0])
+        ref = co.COB(self.results.COB.unique()[0])._parent_refgen
+        # Make an aggregate term
+        total = co.Term('total',loci=set(chain(* [x.loci for x in ont.terms()])))
+        # Calculate number of SNPs
+        snps = pd.DataFrame(pd.pivot_table(results,index="Term",values='TermLoci'))
+        snps.columns = pd.MultiIndex.from_product([['GWAS SNPs'],['-'],['-']],names=['Name','WindowSize','FlankLimit'])
+        snps.ix['Total'] = len(total.loci)
+        # Calculate number of Candidate Loci
+        loci = pd.pivot_table(results,index="Term",columns=['WindowSize'],values='TermCollapsedLoci')
+        for window_size in loci.columns:
+            loci.ix['Total',window_size] = len(total.effective_loci(window_size))
+        loci.columns = pd.MultiIndex.from_product([['Collapsed Loci'],list(map(bp_to_kb,loci.columns)),['-']],names=['Name','WindowSize','FlankLimit'])
+        # Calculate number of Candidate Genes
+        genes = pd.pivot_table(results,index='Term',columns=['WindowSize','FlankLimit'],values='gene',aggfunc=lambda x: len(set(x)))
+        for window_size in get_level(genes,'WindowSize'):
+            for flank_limit in get_level(genes,'FlankLimit'):
+                genes.ix['Total',(window_size,flank_limit)] = len(ref.candidate_genes(total.effective_loci(window_size=window_size),flank_limit=flank_limit))
+        genes.columns = pd.MultiIndex.from_product(
+            [['Candidate Genes'],
+                list(map(bp_to_kb,get_level(genes,"WindowSize"))),
+                get_level(genes,'FlankLimit')
+            ],
+            names=['Name','WindowSize','FlankLimit']
+        )
+        results = snps.join(loci).join(genes)
+        #ionome_eff_loci = [len()]
+        return results.astype(int)
+     
     def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05,
                           collapse_snp2gene=False,figsize=(15,10),
                           skip_terms=None):
@@ -342,9 +398,15 @@ class Overlap(Camoco):
         df = df[df.fdr <= fdr_cutoff]
         # Filter out genes that do not occur at 2+ SNP to gene mappings, 
         # they will never be included
+        #df['fdr'] = fdr_cutoff
         df = df.groupby(
             ['COB','Term','Method','gene']
         ).filter(lambda df: len(df)>=min_snp2gene_obs).copy()
+        # Find genes that were significant in either density or locality
+        either = df.copy()
+        either.loc[:,'Method'] = 'either'
+        either.loc[:,'COB'] = 'Any'
+        either.drop_duplicates(inplace=True)
         # Find genes that are significant in both density and locality 
         # in the same element and the same network
         both_same_net = df.groupby(
@@ -359,28 +421,49 @@ class Overlap(Camoco):
         both_any_net.loc[:,'Method'] = 'both_any_net'
         both_any_net['COB'] = 'Any'
         # Concatenate
-        return pd.concat([df,both_same_net,both_any_net])
+        return pd.concat([df,both_same_net,both_any_net,either])
 
     def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3):
         '''
-            Return the number of shared genes by Term
+            Return a matrix showing the number of shared HPO genes by Term.
+            The diagonal of the matrix is the number of genes discoverd by that 
+            term. The upper diagonal shows the overlap between the row and column
+            and the lower diagonal shows the hypergeomitric pval for the overlap
+            between the two terms. The universe used is the number of unique genes
+            in the overlap results.
         '''
         df = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
-
+        # 
         x={df[0]:set(df[1].gene) for df in df.groupby('Term')}                     
         adj = []                                                                        
+        #num_universe = len(set(chain(*x.values())))
+        num_universe = len(self.results.gene.unique())
         for a in x.keys():                                                              
             for b in x.keys():                                                          
-                adj.append((a,b,len(set(x[a]).intersection(x[b]))))                     
+                num_common = len(set(x[a]).intersection(x[b]))
+                if a != b:
+                    pval = hypergeom.sf(num_common-1,num_universe,len(x[a]),len(x[b]))
+                else:
+                    # This will make the diagonal of the matrix be the number HPO genes
+                    # for the element
+                    pval = len(x[a])
+                adj.append((a,b,num_common,pval)) 
         adj = pd.DataFrame(adj)                                                         
-        return pd.pivot_table(adj,index=0,columns=1,values=2)    
+        overlap = pd.pivot_table(adj,index=0,columns=1,values=2)
+        # Mask out the lower diagonal on the overalp matrix
+        overlap.values[tril_indices(len(overlap))] = 0
+        pvals = pd.pivot_table(adj,index=0,columns=1,values=3)
+        # Mask out the upper tringular on the pvals matrix
+        pvals.values[triu_indices(len(pvals),1)] = 0
+        return overlap+pvals
 
     def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
         candidates = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
+        candidates['fdr'] = fdr_cutoff
         # Pivot and aggregate
         return pd.pivot_table(
             candidates,
-            columns=['Method','COB'],
+            columns=['fdr','Method','COB'],
             index=['Term'],
             values='gene',
             aggfunc=lambda x: len(set(x))
@@ -418,12 +501,12 @@ class Overlap(Camoco):
             Implements an interface for the CLI to perform overlap
             Analysis
         '''
-        self = cls()
+        self = lambda:None 
         # Build base camoco objects
         self.args = args
         self.cob = co.COB(args.cob)
         self.ont = co.GWAS(args.gwas)
-        self.generate_output_name()
+        self.generate_output_name = co.Overlap.generate_output_name(self)
 
         # Generate a terms iterable
         if 'all' in self.args.terms:
@@ -447,12 +530,14 @@ class Overlap(Camoco):
             )
             if args.dry_run:
                 continue
-            loci = self.snp2gene(term)
+            # Generate SNP2Gene Loci
+            loci = co.Overlap.snp2gene(self,term)
             if len(loci) < 2:
                 self.cob.log('Not enough genes to perform overlap')
                 continue
-            overlap = self.overlap(loci)
-            bootstraps = self.generate_bootstraps(loci,overlap)
+            self.overlap = co.Overlap.overlap(self, loci)
+            overlap = co.Overlap.overlap(self, loci)
+            bootstraps = co.Overlap.generate_bootstraps(self,loci,overlap)
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
             # Calculate z scores for density

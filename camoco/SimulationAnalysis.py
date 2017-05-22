@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 pd.set_option('display.width',300)
 
-from ggplot import *
+#from ggplot import *
 
 class SimulationAnalysis(object):
 
@@ -29,6 +29,7 @@ class SimulationAnalysis(object):
         for col in ['MCR','FCR','WindowSize','FlankLimit','COB','Term']:
             if col not in self.df.columns:
                 self.df[col] = 0
+        self.all_results = self.df
         self.df = pd.pivot_table(
             self.df,
             index=['COB','Term','WindowSize','FlankLimit','MCR','FCR'],
@@ -84,7 +85,7 @@ class SimulationAnalysis(object):
             [fdr.loc[x,y,:,:] for x,y in terms_with_signal[['COB','Term']].values]
         )
     
-    def plot_signal_vs_noise(self,filename=None, figsize=(16,8), alpha=0.05,
+    def plot_signal_vs_noise(self,filename=None, figsize=(16,6), alpha=0.05,
                              figaxes=None, label=None, noise_source='MCR',
                              max_pval=0.05, min_pval=0, 
                              normalize_num_sig=False,
@@ -112,6 +113,7 @@ class SimulationAnalysis(object):
         # Get the number of unique cobs in the dataset
         cobs = breakdown.COB.unique()
         if figaxes == None:
+            plt.clf()
             fig, axes = plt.subplots(1,len(cobs),figsize=figsize,sharey=True)
         else:
             fig,axes = figaxes
@@ -125,12 +127,12 @@ class SimulationAnalysis(object):
                 signal = data['num_sig']
             # Plot Signal vs Noise
             axes[i].plot(
-                np.append(data[noise_source],100),
+                np.append(data[noise_source],1),
                 np.append(signal,0),
                 label=label,
                 marker='o'
             )
-            axes[i].set_title("{} Terms".format(cob))
+            axes[i].set_title("{} signal vs {}".format(cob,noise_source))
             if i == 0:
                 if normalize_num_sig:
                     axes[i].set_ylim(0,1.05)
@@ -204,6 +206,7 @@ class SimulationAnalysis(object):
     @staticmethod
     def plot_all_terms(df,filename='SimulatedFCR_Signal_vs_Noise.png',figsize=(16,8)):
         # Get the number of COBs there are
+        raise NotImplementedError()
         return ggplot(df.reset_index(drop=True), aes(x='FCR',y='-logpval',color='id')) +\
             geom_line() + geom_point(alpha=0.1) + xlab('FCR') +\
             ylab('-log10(PVal)') + facet_wrap('COB') + ggtitle('Signal/Noise')

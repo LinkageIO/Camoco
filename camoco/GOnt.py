@@ -85,7 +85,9 @@ class GOTerm(Term):
         
 
 class GOnt(Ontology):
-    '''Ontology extension for GO'''
+    '''
+        Ontology extension for GO
+    '''
     def __init__(self, name, type='GOnt'):
         super().__init__(name, type=type)
 
@@ -137,7 +139,6 @@ class GOnt(Ontology):
     def add_term(self, term, cursor=None, overwrite=False):
         ''' 
             Add a single term to the ontology 
-        
         '''
         self.__getitem__.cache_clear()
         if overwrite:
