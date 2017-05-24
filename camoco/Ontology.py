@@ -228,6 +228,14 @@ class Ontology(Camoco):
                     VALUES (?, ?)
                     ''', (term.id, locus.id))
 
+        # Add the term attrs
+        if term.attrs:
+            for key,val in term.attrs.items():
+                cur.execute('''
+                    INSERT OR ABORT INTO term_attrs (term,key,val)
+                    VALUES (?,?)
+                ''',(term.id,key,val))
+
         if not cursor:
             cur.execute('END TRANSACTION')
 
@@ -466,7 +474,8 @@ class Ontology(Camoco):
                     term.loci,
                     label=term.id,
                     return_table=return_table,
-                    min_overlap=min_overlap
+                    min_overlap=min_overlap,
+                    include_genes=include_genes
                 ) \
                 for term in ontology
             ]
@@ -536,7 +545,8 @@ class Ontology(Camoco):
                     ('num_sampled' , num_sampled)
                 ])
                 if bonferroni_correction == True:
-                    if pval > pval_cutoff / num_sampled:
+                    #if pval > pval_cutoff / num_sampled:
+                    if pval > pval_cutoff / len(terms):
                         term.attrs['hyper']['bonferroni'] = False
                     else:
                         term.attrs['hyper']['bonferroni'] = True

@@ -96,6 +96,7 @@ class GOnt(Ontology):
     def __getitem__(self, id):
         ''' retrieve a term by id '''
         cur = self.db.cursor()
+        # look to see if this is an alt id first
         main_id = cur.execute(
             'SELECT main FROM alts WHERE alt = ?',
             (id, )
@@ -124,18 +125,15 @@ class GOnt(Ontology):
         alts = set(chain(*cur.execute(
             'SELECT alt FROM alts WHERE main = ?', (id, )).fetchall())
         )
-        
-        # Causing issues for me, but I have to rebuild and see if that fixes
-        #term_attrs = {k:v for k,v in self.db.cursor().execute(
-        #    ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
-        #    )
-        #}
-
+        # retrieve the stored term attrs
+        term_attrs = {k:v for k,v in self.db.cursor().execute(
+            ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
+            )
+        }
         return GOTerm(
             id, name=name, desc=desc, alt_id=alts, 
-            is_a=is_a, loci=term_loci
+            is_a=is_a, loci=term_loci, **term_attrs
         )
-
 
     def add_term(self, term, cursor=None, overwrite=False):
         ''' 
@@ -160,6 +158,13 @@ class GOnt(Ontology):
                 'INSERT OR REPLACE INTO term_loci (term, id) VALUES (?, ?)', 
                 [(term.id, locus.id) for locus in term.loci]
             )
+        # Add the term attrs
+        if term.attrs:
+            for key,val in term.attrs.items():
+                cur.execute('''
+                    INSERT OR ABORT INTO term_attrs (term,key,val)
+                    VALUES (?,?,?)
+                ''',(term.id,key,val))
         if term.is_a:
             cur.executemany(
                 'INSERT OR REPLACE INTO rels (parent, child) VALUES (?, ?)',
