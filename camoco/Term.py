@@ -55,6 +55,40 @@ class Term(object):
         '''
         return [flank for flank in self.loci if abs(locus-flank) <= window_size]
 
+    def copy(self,name,desc='',loci=None,**kwargs):
+        '''
+            Creates a copy of a term with the option to 
+            expand loci and attrs. 
+
+            Parameters
+            ----------
+            name : str
+                A required name for the new term.
+            desc : str
+                An optional short description for the term.
+            loci : iterable of co.Loci objects
+                These loci will be added to the Term object
+                in addition to the loci objects that were
+                in the original Term.
+            **kwargs : key value pairs
+                Additional key value pairs will be added 
+                as attributes to the term object.
+
+            Returns
+            -------
+            A Term object.
+        '''
+        if loci == None:
+            loci = set()
+        loci = self.loci.union(loci)
+        new_attrs = self.attrs.copy()
+        new_attrs.update(**kwargs)
+        return Term(
+            name,
+            desc=desc,
+            loci=loci,
+            **new_attrs
+        )
     
     def effective_loci(self, window_size=None):
         '''
