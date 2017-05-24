@@ -20,7 +20,6 @@ from scipy.misc import comb
 from scipy.stats import norm
 from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
-from flask import jsonify
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -28,7 +27,6 @@ import statsmodels.api as sm
 import networkx as nx
 import pandas as pd
 import numpy as np
-from numpy import nan
 import itertools
 from odo import odo
 from scipy.misc import comb 
@@ -267,7 +265,7 @@ class COB(Expr):
 
         '''
         # Find the neighbors
-        gene_id = self._expr_index[gene.id]
+        gene_id = self._get_gene_index(gene)
         ids = PCCUP.coex_neighbors(gene_id, self.num_genes())
         edges = self._coex_DataFrame(ids=ids,sig_only=sig_only)
         del ids
@@ -1096,7 +1094,6 @@ class COB(Expr):
             #set up variables to use astype to aviod pandas sm.OLS error
             loc_deg = degree['local']
             glob_deg = degree['global']
-            # Add the regression lines
             ols = sm.OLS(loc_deg.astype(float), glob_deg.astype(float)).fit()
             degree['resid'] = ols.resid
             degree['fitted'] = ols.fittedvalues
