@@ -91,6 +91,7 @@ def AtTair10():
 @pytest.fixture(scope="module")
 def ZmRNASeqTissueAtlas(Zm5bFGS):
     if cf.test.force.COB:
+        print('Rebuilding ZmRNASeqTissueAtlas')
         co.del_dataset('COB', 'ZmRNASeqTissueAtlas', force=True)
         co.del_dataset('Expr', 'ZmRNASeqTissueAtlas', force=True)
     if not co.available_datasets('Expr', 'ZmRNASeqTissueAtlas'):
