@@ -13,6 +13,8 @@ from collections import OrderedDict
 
 import sys
 import numpy
+import camoco as co
+import pandas as pd
 
 class Ontology(Camoco):
     '''
@@ -40,7 +42,7 @@ class Ontology(Camoco):
         '''
         return self.num_terms(min_term_size=1)
 
-    def __iter__(sefl):
+    def __iter__(self):
         return self.iter_terms()
 
     def num_terms(self,min_term_size=0,max_term_size=10e10):
@@ -190,7 +192,8 @@ class Ontology(Camoco):
             return terms
 
     def add_term(self, term, cursor=None, overwrite=False):
-        ''' This will add a single term to the ontology
+        ''' 
+        This will add a single term to the ontology
 
         Parameters
         ----------
@@ -201,7 +204,8 @@ class Ontology(Camoco):
             allow for adding many terms in one transaction as long as the 
             passed in cursor has executed the "BEGIN TRANSACTION" command.
         overwrite : bool
-            Indication to delete any existing entry before writing'''
+            Indication to delete any existing entry before writing
+        '''
 
         if overwrite:
             self.del_term(term.id)
@@ -413,7 +417,8 @@ class Ontology(Camoco):
 
     def enrichment(self, locus_list, pval_cutoff=0.05, max_term_size=300,
                    min_term_size=2, num_universe=None, return_table=False,
-                   label=None,include_genes=False,bonferroni_correction=True):
+                   label=None,include_genes=False,bonferroni_correction=True,
+                   min_overlap=1):
         '''
             Evaluates enrichment of loci within the locus list in terms within
             the ontology. NOTE: this only tests terms that have at least one
@@ -448,8 +453,28 @@ class Ontology(Camoco):
             return_table : bool (default: False)
                 If True, return results as a data frame
             label: str (default: None)
-                If a label is specified and 
+                If a label is specified, it will be inlcuded in the results
+            min_overlap : int (default: 1)
+                The minimum overlap between genes in the term and genes in
+                the locus list. Increasing this value can minimize spurious
+                or uninformative terms
         '''
+        if isinstance(locus_list,co.Ontology):
+            ontology = locus_list
+            enrich = [
+                self.enrichment(
+                    term.loci,
+                    label=term.id,
+                    return_table=return_table,
+                    min_overlap=min_overlap
+                ) \
+                for term in ontology
+            ]
+            if return_table:
+                return pd.concat(enrich)
+            else:
+                return enrich
+
         terms = self.terms_containing(
             locus_list,
             min_term_size=min_term_size,
@@ -498,7 +523,7 @@ class Ontology(Camoco):
                 # can we go back to drinking coffee now?
             '''
             pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
-            if pval <= pval_cutoff:
+            if pval <= pval_cutoff and num_common >= min_overlap:
                 if label != None:
                     term.attrs['label'] = label
                 term.attrs['hyper'] = OrderedDict([
