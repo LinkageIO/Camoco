@@ -55,7 +55,7 @@ class Term(object):
         '''
         return [flank for flank in self.loci if abs(locus-flank) <= window_size]
 
-    def copy(self,name,desc='',loci=None,**kwargs):
+    def copy(self,name=None,desc='',loci=None,**kwargs):
         '''
             Creates a copy of a term with the option to 
             expand loci and attrs. 
@@ -80,6 +80,8 @@ class Term(object):
         '''
         if loci == None:
             loci = set()
+        if name != None:
+            name = self.name
         loci = self.loci.union(loci)
         new_attrs = self.attrs.copy()
         new_attrs.update(**kwargs)
