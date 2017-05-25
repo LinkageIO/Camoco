@@ -63,6 +63,14 @@ class GOTerm(Term):
         self.is_a = set(is_a) if is_a else set()
         self.alt_id = set(alt_id) if alt_id else set()
 
+    def copy(self,id=None,desc='',**kwargs):
+        is_a = self.is_a.copy() 
+        alt_id = self.alt_id.copy()
+        super().__init__(self.id,desc=desc,loci=self.loci,**kwargs)
+        self.is_a = is_a
+        self.alt_id = alt_id
+        return self
+
     @property
     def namespace(self):
         return self.attrs['namespace']
@@ -260,16 +268,26 @@ class GOnt(Ontology):
                 Terms with less than this enrichment overlap will be ignored.
                 See the docstring for Camoco.Ontology.enrichment.
         '''
-        enrich = list(chain(*[
-            self.enrichment(term.loci,label=term.id,return_table=False,min_overlap=min_overlap) \
-            for term in terms
-        ]))
-        # collapse down that silly fucking hyper shit
+        enrich = []
+        for term in terms:
+            enrich.extend(
+                self.enrichment(term.loci,label=term.id,return_table=False,min_overlap=min_overlap) \
+            )
+        # collapse down the hyper attr value that the enrichment returns
+        unique_terms = {}
         for term in enrich:
             if 'hyper' in term.attrs:
                 term.attrs.update(term.attrs['hyper'])
                 del term.attrs['hyper']
-        return self.to_json(terms=enrich,filename=filename)
+            if term.id not in unique_terms:
+                unique_terms[term.id] = term
+            else:
+                #update with new info
+                x = unique_terms[term.id]
+                if x.attrs['pval'] > term.attrs['pval']:
+                    x.attrs['pval'] = term.attrs['pval']
+                x.attrs['label'] = '{},{}'.format(x.attrs['label'],term.attrs['label'])
+        return self.to_json(terms=unique_terms.values(),filename=filename)
 
     def to_json(self,filename=None,terms=None):
         '''
@@ -296,7 +314,10 @@ class GOnt(Ontology):
             node_data.update(term.attrs)
             if term.id not in seen_nodes:
                 seen_nodes[term.id] = node_data
-            seen_nodes[term.id].update(node_data)
+            else:
+
+                seen_nodes[term.id].update(node_data)
+            #seen_nodes[term.id].update(node_data)
             for parent in term.is_a:
                 if (term.id,parent) not in seen_edges:
                     net['edges'].append({
