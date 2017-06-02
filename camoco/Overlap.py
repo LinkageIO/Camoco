@@ -507,6 +507,7 @@ class Overlap(Camoco):
         self.cob = co.COB(args.cob)
         self.ont = co.GWAS(args.gwas)
         self.generate_output_name = co.Overlap.generate_output_name(self)
+        self.args.out = args.out
 
         # Generate a terms iterable
         if 'all' in self.args.terms:
@@ -587,7 +588,7 @@ class Overlap(Camoco):
             results.append(overlap.reset_index())
         if not args.dry_run:
             self.results = pd.concat(results)
-            self.results.to_sql('overlap',sqlite3.connect(self.db.filename),if_exists='replace')
+            #self.results.to_sql('overlap',sqlite3.connect(self.db.filename),if_exists='replace')
             self.results.to_csv(self.args.out,sep='\t',index=None)
 
 
