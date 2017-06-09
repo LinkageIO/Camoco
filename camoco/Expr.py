@@ -3,7 +3,8 @@
 from .Camoco import Camoco
 from .RefGen import RefGen
 from .Tools import memoize
-from .Exceptions import CamocoGeneNameError,CamocoAccessionNameError
+from .Locus import Locus
+from .Exceptions import CamocoGeneNameError,CamocoAccessionNameError,CamocoGeneAbsentError
 
 from scipy.spatial.distance import pdist, squareform, euclidean
 from scipy.stats import hypergeom, pearsonr
@@ -266,6 +267,33 @@ class Expr(Camoco):
             {gene:index for index, gene in enumerate(self._expr.index)}
         )
         return self
+
+    def _get_gene_index(self,gene):
+        '''
+            Retrieve the row index for a gene.
+            
+            Parameters
+            ----------
+            gene : co.Locus object
+                The gene object the get the index for
+
+            Returns
+            -------
+            an integer containing the expr dataframe index
+
+            Raises
+            ------
+            CamocoGeneAbsentError
+                If the gene requested is not in the Expr dataframe
+        '''
+        if isinstance(gene,Locus):
+            id = gene.id
+        else:
+            id = gene
+        index = self._expr_index[id]
+        if index == None:
+            raise CamocoGeneAbsentError('{} not in {}'.format(id,self.name))
+        return index
 
     def _transformation_log(self, transform=None):
         if transform is None:

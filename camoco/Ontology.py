@@ -12,7 +12,10 @@ from functools import lru_cache
 from collections import OrderedDict
 
 import sys
+import copy
 import numpy
+import camoco as co
+import pandas as pd
 
 class Ontology(Camoco):
     '''
@@ -40,7 +43,7 @@ class Ontology(Camoco):
         '''
         return self.num_terms(min_term_size=1)
 
-    def __iter__(sefl):
+    def __iter__(self):
         return self.iter_terms()
 
     def num_terms(self,min_term_size=0,max_term_size=10e10):
@@ -190,7 +193,8 @@ class Ontology(Camoco):
             return terms
 
     def add_term(self, term, cursor=None, overwrite=False):
-        ''' This will add a single term to the ontology
+        ''' 
+        This will add a single term to the ontology
 
         Parameters
         ----------
@@ -201,7 +205,8 @@ class Ontology(Camoco):
             allow for adding many terms in one transaction as long as the 
             passed in cursor has executed the "BEGIN TRANSACTION" command.
         overwrite : bool
-            Indication to delete any existing entry before writing'''
+            Indication to delete any existing entry before writing
+        '''
 
         if overwrite:
             self.del_term(term.id)
@@ -223,6 +228,14 @@ class Ontology(Camoco):
                     INSERT OR ABORT INTO term_loci (term, id)
                     VALUES (?, ?)
                     ''', (term.id, locus.id))
+
+        # Add the term attrs
+        if term.attrs:
+            for key,val in term.attrs.items():
+                cur.execute('''
+                    INSERT OR ABORT INTO term_attrs (term,key,val)
+                    VALUES (?,?)
+                ''',(term.id,key,val))
 
         if not cursor:
             cur.execute('END TRANSACTION')
@@ -413,9 +426,10 @@ class Ontology(Camoco):
 
     def enrichment(self, locus_list, pval_cutoff=0.05, max_term_size=300,
                    min_term_size=2, num_universe=None, return_table=False,
-                   label=None,include_genes=False,bonferroni_correction=True):
+                   label=None,include_genes=False,bonferroni_correction=True,
+                   min_overlap=1):
         '''
-            Evaluates enrichment of loci within the locus list in terms within
+            Evaluates enrichment of loci within the locus list for terms within
             the ontology. NOTE: this only tests terms that have at least one
             locus that exists in locus_list.
 
@@ -448,19 +462,42 @@ class Ontology(Camoco):
             return_table : bool (default: False)
                 If True, return results as a data frame
             label: str (default: None)
-                If a label is specified and 
+                If a label is specified, it will be inlcuded in the results
+            min_overlap : int (default: 1)
+                The minimum overlap between genes in the term and genes in
+                the locus list. Increasing this value can minimize spurious
+                or uninformative terms
         '''
-        terms = self.terms_containing(
+        if isinstance(locus_list,co.Ontology):
+            ontology = locus_list
+            self.log('Calculating enrichment for an  Ontology: {}',ontology.name)
+            enrich = []
+            for term in ontology:
+                e = self.enrichment(
+                    term.loci,
+                    label=term.id,
+                    return_table=return_table,
+                    min_overlap=min_overlap,
+                    include_genes=include_genes
+                ) 
+                enrich.append((term.id,e))
+            if return_table:
+                return pd.concat(enrich)
+            else:
+                return enrich
+        # return a new copy of each 
+        terms = [copy.copy(term) for term in self.terms_containing(
             locus_list,
             min_term_size=min_term_size,
             max_term_size=max_term_size
-        )
+        )]
+        
+        # Calculate the size of the Universe
         if num_universe is None:
-            #num_universe = len(set(chain(*[x.loci for x in terms])))
             num_universe = self.num_distinct_loci() 
         self.log(
-            'Loci occur in {} terms, containing {} genes'.format(
-                len(terms), num_universe
+            '{}: Loci occur in {} terms, containing {} genes'.format(
+                label,len(terms), num_universe
             )
         )
         
@@ -498,7 +535,7 @@ class Ontology(Camoco):
                 # can we go back to drinking coffee now?
             '''
             pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
-            if pval <= pval_cutoff:
+            if pval <= pval_cutoff and num_common >= min_overlap:
                 if label != None:
                     term.attrs['label'] = label
                 term.attrs['hyper'] = OrderedDict([
@@ -511,7 +548,9 @@ class Ontology(Camoco):
                     ('num_sampled' , num_sampled)
                 ])
                 if bonferroni_correction == True:
-                    if pval > pval_cutoff / num_sampled:
+                    # Right now this isn't true bonferroni, its only correcting for
+                    # the number of terms that had term genes in it
+                    if pval > pval_cutoff / len(terms):
                         term.attrs['hyper']['bonferroni'] = False
                     else:
                         term.attrs['hyper']['bonferroni'] = True
@@ -521,6 +560,7 @@ class Ontology(Camoco):
                         [x.id for x in term_genes.intersection(locus_list)]
                     )
                 significant_terms.append(term)
+        self.log('\t\tFound {} was significant for {} terms',label,len(significant_terms))
         if return_table == True:
             tbl = []
             for x in significant_terms:

@@ -75,7 +75,7 @@ def build_gont(args):
     # Check to see if this dataset is already built
     if co.available_datasets('GOnt',args.name):
         print('Warning! This dataset has already been built.')
-        co.del_dataset('Expr',args.name,force=args.force)
+        co.del_dataset('GOnt',args.name,force=args.force)
  
     go = co.GOnt.from_obo(
         args.obo_filename,

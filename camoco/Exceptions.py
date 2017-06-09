@@ -22,6 +22,16 @@ class CamocoGeneNameError(CamocoError):
         self.expr = expr
         self.message = 'Gene names must be unique:' + message.format(args)
 
+class CamocoGeneAbsentError(CamocoError):
+    '''
+        Gene is missing from dataset
+    '''
+    def __init__(self,expr,message='',*args):
+        self.expr = expr
+        self.message = (
+            'This gene is not in the dataset:' + message.format(args)
+        )
+
 class CamocoAccessionNameError(CamocoError):
     '''
         Accession names must be Unique.

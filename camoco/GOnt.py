@@ -16,6 +16,7 @@ import apsw as lite
 import numpy as np
 import networkx as nx
 import re
+import json
 
 class GOTerm(Term):
     '''
@@ -95,6 +96,7 @@ class GOnt(Ontology):
     def __getitem__(self, id):
         ''' retrieve a term by id '''
         cur = self.db.cursor()
+        # look to see if this is an alt id first
         main_id = cur.execute(
             'SELECT main FROM alts WHERE alt = ?',
             (id, )
@@ -123,18 +125,15 @@ class GOnt(Ontology):
         alts = set(chain(*cur.execute(
             'SELECT alt FROM alts WHERE main = ?', (id, )).fetchall())
         )
-        
-        # Causing issues for me, but I have to rebuild and see if that fixes
-        #term_attrs = {k:v for k,v in self.db.cursor().execute(
-        #    ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
-        #    )
-        #}
-
+        # retrieve the stored term attrs
+        term_attrs = {k:v for k,v in self.db.cursor().execute(
+            ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
+            )
+        }
         return GOTerm(
             id, name=name, desc=desc, alt_id=alts, 
-            is_a=is_a, loci=term_loci
+            is_a=is_a, loci=term_loci, **term_attrs
         )
-
 
     def add_term(self, term, cursor=None, overwrite=False):
         ''' 
@@ -159,6 +158,13 @@ class GOnt(Ontology):
                 'INSERT OR REPLACE INTO term_loci (term, id) VALUES (?, ?)', 
                 [(term.id, locus.id) for locus in term.loci]
             )
+        # Add the term attrs
+        if term.attrs:
+            for key,val in term.attrs.items():
+                cur.execute('''
+                    INSERT OR ABORT INTO term_attrs (term,key,val)
+                    VALUES (?,?,?)
+                ''',(term.id,key,val))
         if term.is_a:
             cur.executemany(
                 'INSERT OR REPLACE INTO rels (parent, child) VALUES (?, ?)',
@@ -225,7 +231,7 @@ class GOnt(Ontology):
         '''
         # Create the graph object
         if terms == None:
-            terms = self.iter_terms()
+            terms = list(self.iter_terms())
         else:
             # terms include 
             terms = list(chain(*[self.parents(term) for term in terms]))
@@ -241,6 +247,74 @@ class GOnt(Ontology):
         G.add_edges_from(edges)
         return G
 
+    def GOGraph(self,terms,filename=None,min_overlap=1):
+        '''
+            Create a cytoscape compatible GO Network from a set of 
+            terms. Nodes in the nework will be tagged with enrichment 
+
+            terms : iterable of co.Terms
+                The terms to include in the GOGraph
+            filename : str (default: None)
+                If provided, the graph will be output to this filename
+            min_overlap : int (default: 1)
+                Terms with less than this enrichment overlap will be ignored.
+                See the docstring for Camoco.Ontology.enrichment.
+        '''
+        enrich = list(chain(*[
+            self.enrichment(term.loci,label=term.id,return_table=False,min_overlap=min_overlap) \
+            for term in terms
+        ]))
+        # collapse down that silly fucking hyper shit
+        for term in enrich:
+            if 'hyper' in term.attrs:
+                term.attrs.update(term.attrs['hyper'])
+                del term.attrs['hyper']
+        return self.to_json(terms=enrich,filename=filename)
+
+    def to_json(self,filename=None,terms=None):
+        '''
+            Create a JSON representation of a Gene Ontology
+        '''
+        if terms == None:
+            terms = self.iter_terms()
+        else:
+            # terms include 
+            parents = list(chain(*[self.parents(term) for term in terms]))
+            terms.extend(parents)
+        net = {
+            'nodes' : [],
+            'edges' : []
+        }
+        seen_nodes = dict()
+        seen_edges = set()
+        for term in terms:
+            node_data = {
+                   'id' : term.id,
+                   'name' : term.name,
+                   'desc' : term.desc
+            }   
+            node_data.update(term.attrs)
+            if term.id not in seen_nodes:
+                seen_nodes[term.id] = node_data
+            seen_nodes[term.id].update(node_data)
+            for parent in term.is_a:
+                if (term.id,parent) not in seen_edges:
+                    net['edges'].append({
+                        'data':{
+                            'source' : term.id,
+                            'target' : parent
+                        }   
+                    })
+                    seen_edges.add((term.id,parent))
+        net['nodes'] = [{'data':n} for n in seen_nodes.values()]
+        net = {'elements' : net}
+        if filename:
+            with open(filename,'w') as OUT:
+                print(json.dumps(net),file=OUT)
+                del net
+        else:
+            net = json.dumps(net)
+            return net
 
     @classmethod
     def create(cls, name, description, refgen, overwrite=True, type='GOnt'):
