@@ -505,6 +505,7 @@ class Overlap(Camoco):
         self.cob = co.COB(args.cob)
         self.ont = co.GWAS(args.gwas)
         self.generate_output_name = co.Overlap.generate_output_name(self)
+        self.args.out = args.out
 
         # Generate a terms iterable
         if 'all' in self.args.terms:

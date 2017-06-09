@@ -101,6 +101,10 @@ def cob_health(args):
     log('Plotting Degree Distribution ---------------------------------------')
     if not path.exists('{}_DegreeDist.png'.format(args.out)):
         degree = cob.degree['Degree'].values
+        #Using powerlaw makes run-time warning the first time you use it.
+        #This is still an open issue on the creators github.
+        #The creator recommends removing this warning as long as there is a fit.
+        np.seterr(divide='ignore', invalid='ignore')
         fit = powerlaw.Fit(degree,discrete=True,xmin=1)
         # get an axis
         ax = plt.subplot()
@@ -160,7 +164,7 @@ def cob_health(args):
                 #set density value for two tailed go so we only test it once
                 density = cob.density(term.loci)
                 #one tailed vs two tailed test
-                if args.two_tailed_GO is True:
+                if args.two_tailed_GO is False:
                     #run one tail for only positive values
                     if density > 0:
                         density_emp.append(density)
