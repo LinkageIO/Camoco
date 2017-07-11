@@ -930,6 +930,9 @@ class RefGen(Camoco):
                     als[id] = [al]
             return als
 
+    def remove_aliases(self):
+        self.db.cursor().execute('DELETE FROM aliases;')
+
     def has_annotations(self):
         cur = self.db.cursor()
         cur.execute('SELECT count(*) FROM func;')
@@ -991,7 +994,7 @@ class RefGen(Camoco):
             ----------
             filename : str 
                 The file containing the annotations
-            sep : str (default: \t)
+            sep : str (default: \\t)
                 The delimiter for the columns in the annotation file
             gene_col : int (default: 0)
                 The index of the column containing the gene IDs
@@ -1047,7 +1050,7 @@ class RefGen(Camoco):
         self._build_indices()
 
     def remove_annotations(self):
-        self.db.cursor().execute('DROP FROM func;')
+        self.db.cursor().execute('DELETE FROM func;')
 
     @classmethod
     def create(cls,name,description,type):
