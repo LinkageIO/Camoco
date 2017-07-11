@@ -63,13 +63,15 @@ class GOTerm(Term):
         self.is_a = set(is_a) if is_a else set()
         self.alt_id = set(alt_id) if alt_id else set()
 
-    def copy(self,id=None,desc='',**kwargs):
+    def copy(self,id=None,name='',desc='',**kwargs):
         is_a = self.is_a.copy() 
         alt_id = self.alt_id.copy()
-        super().__init__(self.id,desc=desc,loci=self.loci,**kwargs)
-        self.is_a = is_a
-        self.alt_id = alt_id
-        return self
+        copy = super().copy(self.id,desc=desc,loci=self.loci,**kwargs)
+        copy.is_a = is_a
+        copy.alt_id = alt_id
+        if name == '':
+            copy.name = self.name
+        return copy
 
     @property
     def namespace(self):
@@ -284,10 +286,11 @@ class GOnt(Ontology):
             else:
                 #update with new info
                 x = unique_terms[term.id]
-                if x.attrs['pval'] > term.attrs['pval']:
+                if 'pval' in x.attrs and  x.attrs['pval'] > term.attrs['pval']:
                     x.attrs['pval'] = term.attrs['pval']
-                x.attrs['label'] = '{},{}'.format(x.attrs['label'],term.attrs['label'])
-        return self.to_json(terms=unique_terms.values(),filename=filename)
+                if 'label' in x.attrs:
+                    x.attrs['label'] = '{},{}'.format(x.attrs['label'],term.attrs['label'])
+        return self.to_json(terms=list(unique_terms.values()),filename=filename)
 
     def to_json(self,filename=None,terms=None):
         '''
@@ -510,8 +513,8 @@ class GOnt(Ontology):
             except ValueError as e:
                 pass
         self.log(
-            'The following terms were referenced during import '
-            'but were not found in the Ontology: \n' +
+            'The following terms were referenced in the obo file '
+            'but were not found in the gene-term mapping: \n' +
             '\n'.join(sorted(missing_terms)) + '\n'
         ) 
         self.add_terms(terms.values(), overwrite=False)
