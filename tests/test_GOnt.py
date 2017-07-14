@@ -13,6 +13,18 @@ def test_len_of_GO(TestGO):
 def test_go_term_propagation(TestGO):
     assert len(TestGO['GO:0000001'].loci) == 15
 
+def test_go_namespace_in_attrs(TestGO):
+    assert TestGO['GO:0000001'].attrs['namespace'] == 'biological_process'
+    assert TestGO['GO:0000002'].attrs['namespace'] == 'biological_process'
+    assert TestGO['GO:0000003'].attrs['namespace'] == 'biological_process'
+    assert TestGO['GO:0000004'].attrs['namespace'] == 'molecular_function'
+    assert TestGO['GO:0000005'].attrs['namespace'] == 'molecular_function' 
+    assert TestGO['GO:0000006'].attrs['namespace'] == 'molecular_function'
+    assert TestGO['GO:0000007'].attrs['namespace'] == 'molecular_function'
+    assert TestGO['GO:0000008'].attrs['namespace'] == 'molecular_function'
+    assert TestGO['GO:0000009'].attrs['namespace'] == 'molecular_function'
+    assert TestGO['GO:0000010'].attrs['namespace'] == 'biological_process'
+
 def test_is_a_propagation(TestGO):
     # Looks like:
     #       5

@@ -232,6 +232,43 @@ class RefGen(Camoco):
         except Exception as e:
             self.log("No chromosome where id = {}. Error: {}",id,e)
 
+    def encompassing_genes(self,loci,chain=True):
+        '''
+            Returns the gene encompassing the locus. In other words
+            if a locus (e.g. a SNP) is inside of a gene, i.e. the
+            start of the gene is upstream and the end of the gene
+            is downstream of the locus boundaries, this method will
+            return it. Not to be confused with candidate genes, which
+            will return genes upstream and downstream surrounding a locus.
+
+            Parameters
+            ----------
+            loci : an iterable of loci
+                The method will return encompassing genes for each
+                locus in ther iterable. If a single locus is passed,
+                a single result will be returned.
+            chain : bool (defualt: True)
+                Specifies whether or not to chain results. If true
+                a single list will be returned, if False, a result for
+                each locus passed in will be returned.
+        '''
+        if isinstance(loci,Locus):
+            return [
+                self.Gene(*x,build=self.build,organism=self.organism) \
+                for x in self.db.cursor().execute('''
+                    SELECT chromosome,start,end,id FROM genes
+                    WHERE chromosome = ?
+                    AND start <= ? AND end >= ?
+                    ''',
+                    (loci.chrom,loci.start,loci.end))
+            ]
+        else:
+            iterator = iter(loci)
+            genes = [self.encompassing_genes(locus,chain=chain) for locus in iterator]
+            if chain:
+                genes = list(itertools.chain(*genes))
+            return genes
+
     def genes_within(self,loci,chain=True):
         '''
             Returns the genes that START within a locus 
@@ -893,6 +930,9 @@ class RefGen(Camoco):
                     als[id] = [al]
             return als
 
+    def remove_aliases(self):
+        self.db.cursor().execute('DELETE FROM aliases;')
+
     def has_annotations(self):
         cur = self.db.cursor()
         cur.execute('SELECT count(*) FROM func;')
@@ -954,7 +994,7 @@ class RefGen(Camoco):
             ----------
             filename : str 
                 The file containing the annotations
-            sep : str (default: \t)
+            sep : str (default: \\t)
                 The delimiter for the columns in the annotation file
             gene_col : int (default: 0)
                 The index of the column containing the gene IDs
@@ -1010,7 +1050,7 @@ class RefGen(Camoco):
         self._build_indices()
 
     def remove_annotations(self):
-        self.db.cursor().execute('DROP FROM func;')
+        self.db.cursor().execute('DELETE FROM func;')
 
     @classmethod
     def create(cls,name,description,type):

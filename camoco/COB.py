@@ -20,7 +20,6 @@ from scipy.misc import comb
 from scipy.stats import norm
 from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
-from flask import jsonify
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -28,7 +27,6 @@ import statsmodels.api as sm
 import networkx as nx
 import pandas as pd
 import numpy as np
-from numpy import nan
 import itertools
 from odo import odo
 from scipy.misc import comb 
@@ -267,7 +265,7 @@ class COB(Expr):
 
         '''
         # Find the neighbors
-        gene_id = self._expr_index[gene.id]
+        gene_id = self._get_gene_index(gene)
         ids = PCCUP.coex_neighbors(gene_id, self.num_genes())
         edges = self._coex_DataFrame(ids=ids,sig_only=sig_only)
         del ids
@@ -337,7 +335,7 @@ class COB(Expr):
             else:
                 return neighbors
 
-    def next_neighbors(self, gene_list, n, return_list=False, include_query=False):
+    def next_neighbors(self, gene_list, n=None, return_table=False, include_query=False):
         ''' 
             Given a set of input genes, return the next (n) neighbors
             that have the stronges connection to the input set.
@@ -347,13 +345,22 @@ class COB(Expr):
             gene_list : list-like of co.Locus
                 An iterable of genes for which the next neighbors will be 
                 calculated.
-            n : int
-                The number of next neighbors to return.
+            n : int (default: None)
+                The number of next neighbors to return. If None, the method
+                will return ALL neighbors
+            return_table : bool (default:False)
+                If true, a table with neighbors and scores will be 
+                returned
+            include_query : bool (default:False)
+                If True (and return table is False) the query gene(s) will
+                be included in the return list
 
             Returns
             -------
             returns a list containing the strongest connected neighbors 
         '''
+        if isinstance(gene_list,Locus):
+            gene_list = [gene_list]
         neighbors = defaultdict(lambda: 0)
         for gene in set(gene_list):
             edges = self.neighbors(gene,names_as_cols=True)
@@ -363,9 +370,12 @@ class COB(Expr):
                     neighbors[g2] += score
                 else:
                     neighbors[g1] += score
-        neighbors = sorted(neighbors.items(), key=operator.itemgetter(1), reverse=True)[:n]
-        if return_list == True:
-            return neighbors
+
+        neighbors = sorted(neighbors.items(), key=operator.itemgetter(1), reverse=True)
+        if n != None:
+            neighbors = neighbors[:n]
+        if return_table == True:
+            return pd.DataFrame(neighbors,columns=['neighbor','score'])
         else:
             neighbors = set(self.refgen[[x[0] for x in neighbors]])
             if include_query == True:
@@ -1096,7 +1106,6 @@ class COB(Expr):
             #set up variables to use astype to aviod pandas sm.OLS error
             loc_deg = degree['local']
             glob_deg = degree['global']
-            # Add the regression lines
             ols = sm.OLS(loc_deg.astype(float), glob_deg.astype(float)).fit()
             degree['resid'] = ols.resid
             degree['fitted'] = ols.fittedvalues
@@ -1165,12 +1174,16 @@ class COB(Expr):
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
         if cluster_method == 'leaf':
-            order = self._bcolz('leaves').sort_values(by='index').index.values
+            self.log('Ordering rows by leaf')
+            order = self._bcolz('leaves').loc[dm.index].\
+                    fillna(np.inf).sort_values(by='index').index.values
         elif cluster_method == 'mcl':
+            self.log('Ordering rows by MCL cluster')
             order = self._bcolz('clusters').loc[dm.index].\
                     fillna(np.inf).sort_values(by='cluster').index.values
         else:
             # No cluster order.
+            self.log('Unknown row ordering: {}, no ordering performed', cluster_method)
             order = dm.index
         # rearrange expression by leaf order
         dm = dm.loc[order, :]

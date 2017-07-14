@@ -389,41 +389,101 @@ class Overlap(Camoco):
             plt.close()
         return (fig,axes)
 
-    def high_priority_candidates(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
+    def high_priority_candidates(self,fdr_cutoff=0.3,min_snp2gene_obs=2,
+                                 original_COB_only=False):
         '''
             Return the number of candidate genes, seen at multiple SNP2Gene
             mappings and in multiple networks (both)
+
+            Parameters
+            ----------
+            fdr_cutoff : float (default: 0.3)
+                The FDR cutoff required to be high priority
+            min_snp2gene_obs : int (default: 2)
+                The minimum number of SNP to gene mappings that
+                must be observed to be "high priority"
+            original_COB_only: bool (default: False)
+                If true, only include HPO genes that were observed
+                strictly in the original COBs. I.e. do not include
+                HPO genes that were discovered in "any" network.
+                e.g. 100kb/1Flank in network X and 50kb/2Flank in
+                network Y.
         '''
         df = self.results[np.isfinite(self.results.fdr)]
         df = df[df.fdr <= fdr_cutoff]
+        breakdowns = []
         # Filter out genes that do not occur at 2+ SNP to gene mappings, 
         # they will never be included
         #df['fdr'] = fdr_cutoff
         df = df.groupby(
             ['COB','Term','Method','gene']
         ).filter(lambda df: len(df)>=min_snp2gene_obs).copy()
-        # Find genes that were significant in either density or locality
-        either = df.copy()
-        either.loc[:,'Method'] = 'either'
-        either.loc[:,'COB'] = 'Any'
-        either.drop_duplicates(inplace=True)
-        # Find genes that are significant in both density and locality 
-        # in the same element and the same network
-        both_same_net = df.groupby(
-            ['COB','Term','gene']
-        ).filter(lambda df: len(df.Method.unique()) == 2).copy()
-        both_same_net.loc[:,'Method'] = 'both_same_net'
-        # Find genes that are significant in both density and locality 
-        # in the same element but any network
-        both_any_net = df.groupby(
-            ['Term','gene']
-        ).filter(lambda df: len(df.Method.unique()) == 2).copy()
-        both_any_net.loc[:,'Method'] = 'both_any_net'
-        both_any_net['COB'] = 'Any'
+        breakdowns.append(df)
+        if not original_COB_only:
+            # Find "any net" by methd
+            for method in df.Method.unique():
+                method_any = df.query('Method == "{}"'.format(method)).copy()
+                method_any.loc[:,'COB'] = 'Any'
+                method_any.drop_duplicates(inplace=True)
+                breakdowns.append(method_any)
+            # Find genes that were significant in either density or locality
+            either = df.copy()
+            either.loc[:,'Method'] = 'either'
+            either.loc[:,'COB'] = 'Any'
+            either.drop_duplicates(inplace=True)
+            breakdowns.append(either)
+            # Find genes that are significant in both density and locality 
+            # in the same element and the same network
+            both_same_net = df.groupby(
+                ['COB','Term','gene']
+            ).filter(lambda df: len(df.Method.unique()) == 2).copy()
+            both_same_net.loc[:,'Method'] = 'both_same_net'
+            breakdowns.append(both_same_net)
+            # Find genes that are significant in both density and locality 
+            # in the same element but any network
+            both_any_net = df.groupby(
+                ['Term','gene']
+            ).filter(lambda df: len(df.Method.unique()) == 2).copy()
+            both_any_net.loc[:,'Method'] = 'both_any_net'
+            both_any_net['COB'] = 'Any'
+            breakdowns.append(both_any_net)
         # Concatenate
-        return pd.concat([df,both_same_net,both_any_net,either])
+        return pd.concat(breakdowns)
 
-    def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3):
+     
+    def parent_snp_info(self,gwas,cob_list):
+        '''
+            This is a function that recovers parental SNP information
+            from a completed overlap. It matches the COBs that are in 
+            the self.results.COB dataframe
+        '''
+        all_candidates = []
+        windows = self.results.WindowSize.unique()
+        flanks = self.results.FlankLimit.unique()
+        for cob in cob_list:
+            for term in gwas:
+                for window in windows:
+                    loci = term.strongest_loci(attr='numIterations',window_size=window,lowest=False)
+                    for flank in flanks:
+                        candidates = cob.refgen.candidate_genes(
+                            loci,
+                            flank_limit=flank,
+                            chain=True,
+                            include_num_intervening=True,
+                            include_num_siblings=True,
+                            include_parent_locus=True,
+                            include_SNP_distance=True,
+                            attrs = {
+                                'COB' : cob.name,
+                                'Term' : term.id,
+                                'WindowSize' : window,
+                                'FlankLimit' : flank
+                            }
+                        )
+                        all_candidates.extend([x.as_dict() for x in candidates])
+        return pd.DataFrame(all_candidates)
+
+    def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3,return_genes=False):
         '''
             Return a matrix showing the number of shared HPO genes by Term.
             The diagonal of the matrix is the number of genes discoverd by that 
@@ -431,15 +491,28 @@ class Overlap(Camoco):
             and the lower diagonal shows the hypergeomitric pval for the overlap
             between the two terms. The universe used is the number of unique genes
             in the overlap results.
+
+            min_snp2gene_obs : int (default: 2)
+                The min SNP2gene mappinging observations needed to be HPO
+            fdr_cutoff: float (default: 0.3)
+                The FDR cutoff the be considered HPO
+            return_genes : bool (default: False)
+                Return the candidate gene list instead of the overlap table
         '''
-        df = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
+        df = self.high_priority_candidates(
+                fdr_cutoff=fdr_cutoff,
+                min_snp2gene_obs=min_snp2gene_obs,
+                original_COB_only=True)
         # 
         x={df[0]:set(df[1].gene) for df in df.groupby('Term')}                     
         adj = []                                                                        
         #num_universe = len(set(chain(*x.values())))
         num_universe = len(self.results.gene.unique())
-        for a in x.keys():                                                              
-            for b in x.keys():                                                          
+        for i,a in enumerate(x.keys()):                                                              
+            for j,b in enumerate(x.keys()):  
+                if j < i:
+                    continue
+                common = set(x[a]).intersection(x[b])
                 num_common = len(set(x[a]).intersection(x[b]))
                 if a != b:
                     pval = hypergeom.sf(num_common-1,num_universe,len(x[a]),len(x[b]))
@@ -447,27 +520,44 @@ class Overlap(Camoco):
                     # This will make the diagonal of the matrix be the number HPO genes
                     # for the element
                     pval = len(x[a])
-                adj.append((a,b,num_common,pval)) 
+                adj.append((a,b,num_common,pval,','.join(common))) 
         adj = pd.DataFrame(adj)                                                         
-        overlap = pd.pivot_table(adj,index=0,columns=1,values=2)
-        # Mask out the lower diagonal on the overalp matrix
-        overlap.values[tril_indices(len(overlap))] = 0
-        pvals = pd.pivot_table(adj,index=0,columns=1,values=3)
-        # Mask out the upper tringular on the pvals matrix
-        pvals.values[triu_indices(len(pvals),1)] = 0
-        return overlap+pvals
+        adj.columns = ['Term1','Term2','num_common','pval','common']
+        # Stop early if we just want to return the lists 
+        if return_genes == True:
+            adj = adj[adj.num_common>0] 
+            adj = adj[np.logical_not(adj.Term1==adj.Term2)]
+            return adj.drop_duplicates()
+        else:
+            overlap = pd.pivot_table(adj,index='Term1',columns='Term2',values='num_common')
+            # Mask out the lower diagonal on the overalp matrix
+            overlap.values[tril_indices(len(overlap))] = 0
+            pvals = pd.pivot_table(adj,index='Term2',columns='Term1',values='pval')
+            # Mask out the upper tringular on the pvals matrix
+            pvals.values[triu_indices(len(pvals),1)] = 0
+            return (overlap+pvals).astype(float)
 
-    def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2):
+    def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2,dropna=False):
         candidates = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
         candidates['fdr'] = fdr_cutoff
+        # Calculate Totals
+        total = pd.DataFrame(pd.pivot_table(
+            candidates,
+            columns=['fdr','Method','COB'],
+            values='gene',
+            dropna=dropna,
+            aggfunc=lambda x: len(set(x))
+        ).fillna(0).astype(int),columns=['Total']).T
         # Pivot and aggregate
-        return pd.pivot_table(
+        by_term =  pd.pivot_table(
             candidates,
             columns=['fdr','Method','COB'],
             index=['Term'],
             values='gene',
+            dropna=dropna,
             aggfunc=lambda x: len(set(x))
         ).fillna(0).astype(int)
+        return by_term.append(total)
 
     
     ''' ----------------------------------------------------------------------------------
