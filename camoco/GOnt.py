@@ -155,7 +155,7 @@ class GOnt(Ontology):
         ''' 
             Add a single term to the ontology 
         '''
-        self.__getitem__.cache_clear()
+        self.get_term.cache_clear()
         if overwrite:
             self.del_term(term.id)
         if not cursor:
