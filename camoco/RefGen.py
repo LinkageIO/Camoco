@@ -415,7 +415,7 @@ class RefGen(Camoco):
         chain=True, window_size=None, include_parent_locus=False,
         include_parent_attrs=False, include_num_intervening=False, 
         include_rank_intervening=False, include_num_siblings=False,
-        include_SNP_distance=False,attrs=None):
+        include_SNP_distance=False,attrs=None,return_table=False):
         '''
             Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -466,6 +466,8 @@ class RefGen(Camoco):
             attrs : dict (default: None)
                 An optional dictionary which will be updated to each
                 candidate genes attr value.
+            return_table : bool(default: False)
+                If True, return a Pandas table (DataFrame)
 
             Returns
             -------
@@ -528,6 +530,8 @@ class RefGen(Camoco):
             if attrs is not None:
                 for gene in genes:
                     gene.update(attrs)
+            if return_table == True:
+                genes = pd.DataFrame([x.as_dict() for x in genes])
             return genes
 
         else:
@@ -545,11 +549,15 @@ class RefGen(Camoco):
                     include_rank_intervening=include_rank_intervening,
                     include_num_siblings=include_num_siblings,
                     include_SNP_distance=include_SNP_distance,
+                    return_table=return_table,
                     attrs=attrs
                 ) for locus in iterator
             ]
             if chain:
-                genes = list(set(itertools.chain(*genes)))
+                if return_table:
+                    genes = pd.concat(genes)
+                else:
+                    genes = list(set(itertools.chain(*genes)))
             return genes
 
     def bootstrap_candidate_genes(self, loci, flank_limit=2,
