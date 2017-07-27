@@ -102,8 +102,14 @@ class GOnt(Ontology):
     def __init__(self, name, type='GOnt'):
         super().__init__(name, type=type)
 
-    @lru_cache(maxsize=2**17)
     def __getitem__(self, id):
+        if isinstance(id,str):
+            return self.get_term(id)
+        else:
+            return [self.get_term(x) for x in id]
+
+    @lru_cache(maxsize=2**17)
+    def get_term(self,id,attrs=None):
         ''' retrieve a term by id '''
         cur = self.db.cursor()
         # look to see if this is an alt id first
