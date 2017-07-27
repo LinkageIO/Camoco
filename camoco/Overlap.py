@@ -23,6 +23,9 @@ from itertools import chain
 
 import camoco as co
 import pandas as pd
+from pandas.core.groupby import DataError
+
+
 pd.set_option('display.width',300)
 import glob as glob
 
@@ -591,11 +594,16 @@ class Overlap(Camoco):
             Implements an interface for the CLI to perform overlap
             Analysis
         '''
-        self = cls()
+        self = cls.create(args.gwas,description='CLI Overlap')
         # Build base camoco objects
         self.args = args
         self.cob = co.COB(args.cob)
-        self.ont = co.GWAS(args.gwas)
+        if args.go:
+            self.ont = co.GOnt(args.gwas)
+            args.candidate_window_size = 1
+            args.candidate_flank_limit = 0
+        else:
+            self.ont = co.GWAS(args.gwas)
         self.generate_output_name()
 
         # Generate a terms iterable
@@ -610,22 +618,31 @@ class Overlap(Camoco):
         for term in terms:
             if term.id in self.args.skip_terms:
                 self.cob.log('Skipping {} since it was in --skip-terms',term.id)
+            # Generate SNP2Gene Loci
+            loci = self.snp2gene(term)
+            if len(loci) < 2 or len(loci) < args.min_term_size:
+                self.cob.log('Not enough genes to perform overlap')
+                continue
+            if args.max_term_size != None and len(loci) > args.max_term_size:
+                self.cob.log('Too many genes to perform overlap')
+                continue
+            # Send some output to the terminal
             self.cob.log(
-                "Calculating Overlap for {} of {} in {} with window:{} and flank:{}",
+                "Calculating Overlap for {} of {} in {} with window:{} and flank:{} ({} Loci)",
                 term.id,
                 self.ont.name,
                 self.cob.name,
                 self.args.candidate_window_size,
-                self.args.candidate_flank_limit
+                self.args.candidate_flank_limit,
+                len(loci)
             )
             if args.dry_run:
                 continue
-            # Generate SNP2Gene Loci
-            loci = self.snp2gene(term)
-            if len(loci) < 2:
-                self.cob.log('Not enough genes to perform overlap')
+            # Do the dirty
+            try:
+                overlap = self.overlap(loci)
+            except DataError as e:
                 continue
-            overlap = self.overlap(loci)
             bootstraps = self.generate_bootstraps(loci,overlap)
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
