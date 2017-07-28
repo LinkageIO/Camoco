@@ -594,15 +594,6 @@ class Overlap(Camoco):
             Implements an interface for the CLI to perform overlap
             Analysis
         '''
-<<<<<<< HEAD
-        self = lambda:None 
-        # Build base camoco objects
-        self.args = args
-        self.cob = co.COB(args.cob)
-        self.ont = co.GWAS(args.gwas)
-        self.generate_output_name = co.Overlap.generate_output_name(self)
-        self.args.out = args.out
-=======
         self = cls.create(args.gwas,description='CLI Overlap')
         # Build base camoco objects
         self.args = args
@@ -614,7 +605,6 @@ class Overlap(Camoco):
         else:
             self.ont = co.GWAS(args.gwas)
         self.generate_output_name()
->>>>>>> upstream/dev
 
         # Generate a terms iterable
         if 'all' in self.args.terms:
