@@ -638,23 +638,12 @@ class Overlap(Camoco):
             )
             if args.dry_run:
                 continue
-<<<<<<< HEAD
-            # Generate SNP2Gene Loci
-            loci = co.Overlap.snp2gene(self,term)
-            if len(loci) < 2:
-                self.cob.log('Not enough genes to perform overlap')
-                continue
-            self.overlap = co.Overlap.overlap(self, loci)
-            overlap = co.Overlap.overlap(self, loci)
-            bootstraps = co.Overlap.generate_bootstraps(self,loci,overlap)
-=======
             # Do the dirty
             try:
                 overlap = self.overlap(loci)
             except DataError as e:
                 continue
             bootstraps = self.generate_bootstraps(loci,overlap)
->>>>>>> upstream/dev
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
             # Calculate z scores for density
