@@ -78,7 +78,7 @@ class Overlap(Camoco):
                   "num_real" REAL,
                   "score" REAL,
                   "zscore" REAL,
-                  UNIQUE (COB, Ontology, Term, gene, WindowSize, FlankLimit, SNP2Gene) ON CONFLICT REPLACE
+                  UNIQUE (COB, Ontology, Term, gene, WindowSize, FlankLimit, SNP2Gene, Method) ON CONFLICT REPLACE
                 );
         ''')
 
@@ -90,7 +90,7 @@ class Overlap(Camoco):
         Methods
     '''
     def get_data(self, gene=None, cob=None, term=None,
-        windowSize=None, flankLimit=None, snp2gene=None):
+        windowSize=None, flankLimit=None, snp2gene=None, method=None):
         '''
             Function to get data using any of the parameters it is normaly queried by
         '''
@@ -104,7 +104,9 @@ class Overlap(Camoco):
             'Term':term,
             'WindowSize':windowSize,
             'FlankLimit':flankLimit,
-            'SNP2Gene':snp2gene}
+            'SNP2Gene':snp2gene,
+            'Method':method,
+            }
         
         # For each argument, add a clase to the SQL query
         for k,v in args.items():
