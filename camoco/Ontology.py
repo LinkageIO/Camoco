@@ -435,10 +435,11 @@ class Ontology(Camoco):
 
             Parameters
             ----------
-            locus_list : list of co.Locus
+            locus_list : list of co.Locus *of* instance of co.Ontology
                 A list of loci for which to test enrichment. i.e. is there
                 an over-representation of these loci within and the terms in
-                the Ontology.
+                the Ontology. If an ontology is passed, each term in the ontology
+                will be iterated over and tested as if they were a locus_list.
             pval_cutoff : float (default: 0.05)
                 Report terms with a pval lower than this value
             bonferroni_correction : bool (default: True)
@@ -475,23 +476,28 @@ class Ontology(Camoco):
             for term in ontology:
                 e = self.enrichment(
                     term.loci,
-                    label=term.id,
+                    pval_cutoff=pval_cutoff,
+                    max_term_size=max_term_size,
+                    min_term_size=min_term_size,
+                    num_universe=num_universe,
                     return_table=return_table,
+                    label=term.id,
+                    include_genes=include_genes,
+                    bonferroni_correction=bonferroni_correction,
                     min_overlap=min_overlap,
-                    include_genes=include_genes
                 ) 
-                enrich.append((term.id,e))
+                enrich.append(e)
             if return_table:
                 return pd.concat(enrich)
             else:
                 return enrich
         # return a new copy of each 
-        terms = [copy.copy(term) for term in self.terms_containing(
+        terms = self.terms_containing(
             locus_list,
             min_term_size=min_term_size,
             max_term_size=max_term_size
-        )]
-        
+        )
+        terms = [x.copy() for x in terms]
         # Calculate the size of the Universe
         if num_universe is None:
             num_universe = self.num_distinct_loci() 
@@ -500,7 +506,6 @@ class Ontology(Camoco):
                 label,len(terms), num_universe
             )
         )
-        
         significant_terms = []
         for term in terms:
             term_genes = set(term.loci)
@@ -564,15 +569,13 @@ class Ontology(Camoco):
         if return_table == True:
             tbl = []
             for x in significant_terms:
-                try:
-                    x.name = x.name
-                except AttributeError as e:
-                    x.name = ''
                 val = OrderedDict([
-                    ('term', x.name),
+                    ('name', x.name),
                     ('id'  , x.id)
                 ])
                 val.update(x.attrs['hyper'])
+                val.update(x.attrs)
+                del val['hyper']
                 tbl.append(val)
             tbl = DataFrame.from_records(tbl)
             if label != None:

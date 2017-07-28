@@ -415,7 +415,7 @@ class RefGen(Camoco):
         chain=True, window_size=None, include_parent_locus=False,
         include_parent_attrs=False, include_num_intervening=False, 
         include_rank_intervening=False, include_num_siblings=False,
-        include_SNP_distance=False,attrs=None):
+        include_SNP_distance=False,attrs=None,return_table=False):
         '''
             Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -466,6 +466,8 @@ class RefGen(Camoco):
             attrs : dict (default: None)
                 An optional dictionary which will be updated to each
                 candidate genes attr value.
+            return_table : bool(default: False)
+                If True, return a Pandas table (DataFrame)
 
             Returns
             -------
@@ -528,6 +530,8 @@ class RefGen(Camoco):
             if attrs is not None:
                 for gene in genes:
                     gene.update(attrs)
+            if return_table == True:
+                genes = pd.DataFrame([x.as_dict() for x in genes])
             return genes
 
         else:
@@ -545,11 +549,15 @@ class RefGen(Camoco):
                     include_rank_intervening=include_rank_intervening,
                     include_num_siblings=include_num_siblings,
                     include_SNP_distance=include_SNP_distance,
+                    return_table=return_table,
                     attrs=attrs
                 ) for locus in iterator
             ]
             if chain:
-                genes = list(set(itertools.chain(*genes)))
+                if return_table:
+                    genes = pd.concat(genes)
+                else:
+                    genes = list(set(itertools.chain(*genes)))
             return genes
 
     def bootstrap_candidate_genes(self, loci, flank_limit=2,
@@ -930,6 +938,9 @@ class RefGen(Camoco):
                     als[id] = [al]
             return als
 
+    def remove_aliases(self):
+        self.db.cursor().execute('DELETE FROM aliases;')
+
     def has_annotations(self):
         cur = self.db.cursor()
         cur.execute('SELECT count(*) FROM func;')
@@ -991,7 +1002,7 @@ class RefGen(Camoco):
             ----------
             filename : str 
                 The file containing the annotations
-            sep : str (default: \t)
+            sep : str (default: \\t)
                 The delimiter for the columns in the annotation file
             gene_col : int (default: 0)
                 The index of the column containing the gene IDs
@@ -1048,7 +1059,7 @@ class RefGen(Camoco):
         self._build_indices()
 
     def remove_annotations(self):
-        self.db.cursor().execute('DROP FROM func;')
+        self.db.cursor().execute('DELETE FROM func;')
 
     @classmethod
     def create(cls,name,description,type):

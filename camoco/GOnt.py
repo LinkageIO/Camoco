@@ -63,6 +63,16 @@ class GOTerm(Term):
         self.is_a = set(is_a) if is_a else set()
         self.alt_id = set(alt_id) if alt_id else set()
 
+    def copy(self,id=None,name='',desc='',**kwargs):
+        is_a = self.is_a.copy() 
+        alt_id = self.alt_id.copy()
+        copy = super().copy(self.id,desc=desc,loci=self.loci,**kwargs)
+        copy.is_a = is_a
+        copy.alt_id = alt_id
+        if name == '':
+            copy.name = self.name
+        return copy
+
     @property
     def namespace(self):
         return self.attrs['namespace']
@@ -92,8 +102,14 @@ class GOnt(Ontology):
     def __init__(self, name, type='GOnt'):
         super().__init__(name, type=type)
 
-    @lru_cache(maxsize=2**17)
     def __getitem__(self, id):
+        if isinstance(id,str):
+            return self.get_term(id)
+        else:
+            return [self.get_term(x) for x in id]
+
+    @lru_cache(maxsize=2**17)
+    def get_term(self,id,attrs=None):
         ''' retrieve a term by id '''
         cur = self.db.cursor()
         # look to see if this is an alt id first
@@ -139,7 +155,7 @@ class GOnt(Ontology):
         ''' 
             Add a single term to the ontology 
         '''
-        self.__getitem__.cache_clear()
+        self.get_term.cache_clear()
         if overwrite:
             self.del_term(term.id)
         if not cursor:
@@ -260,16 +276,27 @@ class GOnt(Ontology):
                 Terms with less than this enrichment overlap will be ignored.
                 See the docstring for Camoco.Ontology.enrichment.
         '''
-        enrich = list(chain(*[
-            self.enrichment(term.loci,label=term.id,return_table=False,min_overlap=min_overlap) \
-            for term in terms
-        ]))
-        # collapse down that silly fucking hyper shit
+        enrich = []
+        for term in terms:
+            enrich.extend(
+                self.enrichment(term.loci,label=term.id,return_table=False,min_overlap=min_overlap) \
+            )
+        # collapse down the hyper attr value that the enrichment returns
+        unique_terms = {}
         for term in enrich:
             if 'hyper' in term.attrs:
                 term.attrs.update(term.attrs['hyper'])
                 del term.attrs['hyper']
-        return self.to_json(terms=enrich,filename=filename)
+            if term.id not in unique_terms:
+                unique_terms[term.id] = term
+            else:
+                #update with new info
+                x = unique_terms[term.id]
+                if 'pval' in x.attrs and  x.attrs['pval'] > term.attrs['pval']:
+                    x.attrs['pval'] = term.attrs['pval']
+                if 'label' in x.attrs:
+                    x.attrs['label'] = '{},{}'.format(x.attrs['label'],term.attrs['label'])
+        return self.to_json(terms=list(unique_terms.values()),filename=filename)
 
     def to_json(self,filename=None,terms=None):
         '''
@@ -296,7 +323,10 @@ class GOnt(Ontology):
             node_data.update(term.attrs)
             if term.id not in seen_nodes:
                 seen_nodes[term.id] = node_data
-            seen_nodes[term.id].update(node_data)
+            else:
+
+                seen_nodes[term.id].update(node_data)
+            #seen_nodes[term.id].update(node_data)
             for parent in term.is_a:
                 if (term.id,parent) not in seen_edges:
                     net['edges'].append({
@@ -489,8 +519,8 @@ class GOnt(Ontology):
             except ValueError as e:
                 pass
         self.log(
-            'The following terms were referenced during import '
-            'but were not found in the Ontology: \n' +
+            'The following terms were referenced in the obo file '
+            'but were not found in the gene-term mapping: \n' +
             '\n'.join(sorted(missing_terms)) + '\n'
         ) 
         self.add_terms(terms.values(), overwrite=False)
