@@ -95,7 +95,17 @@ class GWAS(Ontology):
             DELETE FROM loci_attr WHERE term = ?
         ''',(id,))
 
-
+    def set_strongest(self,attr=None,higher=None):
+        if not(attr is None):
+            self._global('strongest_attr',attr)
+        if not(higher is None):
+            self._global('strongest_higher',higher)
+    
+    def get_strongest_attr(self):
+        return self._global('strongest_attr')
+    
+    def get_strongest_higher(self):
+        return self._global('strongest_higher')
         
 
     ''' -----------------------------------------------------------------------
@@ -169,7 +179,8 @@ class GWAS(Ontology):
     @classmethod
     def from_DataFrame(cls, df, name, description, refgen,
             term_col='Term', chr_col='CHR', pos_col=None,
-            start_col=None, end_col=None, id_col=None
+            start_col=None, end_col=None, id_col=None, 
+            strongest_attr='pval', strongest_higher=True
             ):
         '''
             Import an GWAS dataset from a pandas dataframe.
@@ -236,4 +247,5 @@ class GWAS(Ontology):
                     term.loci.add(snp)
             self.log("Importing {}", term)
             self.add_term(term)
+        self.set_strongest(attr=strongest_attr,higher=strongest_higher)
         return self

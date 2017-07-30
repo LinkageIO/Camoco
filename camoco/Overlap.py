@@ -154,17 +154,21 @@ class Overlap(Camoco):
             self.log("Output for {} exists! Skipping!",self.args.out)
             return
 
-    def snp2gene(self,term):
+    def snp2gene(self,term,ont):
         if 'effective' in self.args.snp2gene:
             # Map to effective
             return term.effective_loci(
                 window_size=self.args.candidate_window_size
             )
         elif 'strongest' in self.args.snp2gene:
+            if not(self.args.strongest_attr == 'pval'):
+                ont.set_strongest(attr=self.args.strongest_attr)
+            if not(self.args.strongest_higher == True):
+                ont.set_strongest(higher=self.args.strongest_higher)
             return term.strongest_loci(
                 window_size=self.args.candidate_window_size,
-                attr=self.args.strongest_attr,
-                lowest=self.args.strongest_higher
+                attr=ont.get_strongest_attr(),
+                lowest=ont.get_strongest_higher()
             )
 
     def generate_bootstraps(self,loci,overlap):
@@ -619,7 +623,7 @@ class Overlap(Camoco):
             if term.id in self.args.skip_terms:
                 self.cob.log('Skipping {} since it was in --skip-terms',term.id)
             # Generate SNP2Gene Loci
-            loci = self.snp2gene(term)
+            loci = self.snp2gene(term,self.ont)
             if len(loci) < 2 or len(loci) < args.min_term_size:
                 self.cob.log('Not enough genes to perform overlap')
                 continue
@@ -693,11 +697,14 @@ class Overlap(Camoco):
             overlap['SNP2Gene'] = self.args.snp2gene
             results.append(overlap.reset_index())
         if not args.dry_run:
+            # Consolidate results and output to files
             self.results = pd.concat(results)
             self.results.to_csv(self.args.out,sep='\t',index=None)
-            overlap_object = cls.create(self.ont)
-            overlap_object.results = results
-            self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
             
+            # Make an actual results object if not exists
+            overlap_object = cls.create(self.ont)
+            
+            # Save the results to the SQLite table
+            self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
 
 
