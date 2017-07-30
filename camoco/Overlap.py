@@ -127,10 +127,6 @@ class Overlap(Camoco):
             query = query.rstrip(' WHERE')
         query += ';'
         
-        # Run the query
-        #cur = self.db.cursor()
-        #cur.execute(query)
-        
         # Throw the results into a DataFrame for conviniece
         self.log('Executing: {}'.format(query))
         return pd.read_sql(query, sqlite3.connect(self.db.filename)).set_index('gene')
@@ -138,12 +134,13 @@ class Overlap(Camoco):
     def generate_output_name(self):
         # Handle the different output schemes
         if self.args.out is None:
-            self.args.out = '{}_{}_{}_{}_{}_{}.tsv'.format(
+            self.args.out = '{}_{}_{}_{}_{}_{}_{}.tsv'.format(
                 self.cob.name,
                 self.ont.name,
                 self.args.candidate_window_size,
                 self.args.candidate_flank_limit,
                 self.args.method,
+                self.args.snp2gene,
                 ':'.join(self.args.terms)
             )
         if not self.args.out.endswith('.overlap.tsv'):
