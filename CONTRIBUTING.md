@@ -1,15 +1,14 @@
 Contributing to Camoco is simple!
 -------------------------------------
-
 Development for Camoco is discussed using github issues. 
-If you are interesting in hacking and don't know where to start, check out the
+If you are interesting in hacking and dont know where to start, check out the
 [issues](https://github.com/schae234/Camoco/issues) page for current bugs
 and open feature requests. Feel free to comment one already opened issues for
 clarification or to open an issue yourself! 
 
 Development Cycle
 -----------------
-Code will be incorportated into the Camoco base after:
+Code will be incorportated into the Camoco dev branch after:
 - A reference to a specific issue has been made
 - Upstream code does not break current test code
 - Additional test code specific to added feature has been added
