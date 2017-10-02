@@ -33,7 +33,6 @@ from .RefGenDist import *
 from .PCCUP import *
 from .Ontology import Ontology,Term
 from .GWAS import GWAS
-from .HapMap import HapMap
 from .Locus import Locus
 from .Tools import available_datasets,del_dataset
 from .Tools import mv_dataset,redescribe_dataset
