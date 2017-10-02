@@ -79,7 +79,7 @@ def snp2gene(args):
                 genes['RefGen'] = refgen.name
                 if from_cob != False:
                     genes['COB'] = from_cob
-            data = pd.concat([data,genes])
+                data = pd.concat([data,genes])
 
     # Add data from gene info files
     original_number_genes = len(data)
