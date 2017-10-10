@@ -69,6 +69,7 @@ class Overlap(Camoco):
                   "TermLoci" INTEGER,
                   "TermPValue" REAL,
                   "WindowSize" INTEGER,
+                  "SNP2Gene" TEXT,
                   "bs_mean" REAL,
                   "bs_std" REAL,
                   "fdr" REAL,
@@ -79,7 +80,8 @@ class Overlap(Camoco):
                   "num_random" REAL,
                   "num_real" REAL,
                   "score" REAL,
-                  "zscore" REAL
+                  "zscore" REAL,
+                  UNIQUE (COB, Ontology, Term, gene, WindowSize, FlankLimit, SNP2Gene, Method) ON CONFLICT REPLACE
                 );
         ''')
 
@@ -91,7 +93,7 @@ class Overlap(Camoco):
         Methods
     '''
     def get_data(self, gene=None, cob=None, term=None,
-        windowSize=None, flankLimit=None):
+        windowSize=None, flankLimit=None, snp2gene=None, method=None):
         '''
             Function to get data using any of the parameters it is normaly queried by
         '''
@@ -100,8 +102,14 @@ class Overlap(Camoco):
         
         # Throw arguments into a dictionary for effective looping
         args = {
-            'gene':gene, 'COB':cob, 'Term':term,
-            'WindowSize':windowSize, 'FlankLimit':flankLimit}
+            'gene':gene,
+            'COB':cob,
+            'Term':term,
+            'WindowSize':windowSize,
+            'FlankLimit':flankLimit,
+            'SNP2Gene':snp2gene,
+            'Method':method,
+            }
         
         # For each argument, add a clase to the SQL query
         for k,v in args.items():
@@ -119,24 +127,20 @@ class Overlap(Camoco):
             query = query.rstrip(' WHERE')
         query += ';'
         
-        # Run the query
-        cur = self.db.cursor()
-        print('Executing: {}'.format(query))
-        cur.execute(query)
-        
         # Throw the results into a DataFrame for conviniece
-        return pd.read_sql(query,sqlite3.connect(self.db.filename)).set_index('gene')
-
+        self.log('Executing: {}'.format(query))
+        return pd.read_sql(query, sqlite3.connect(self.db.filename)).set_index('gene')
 
     def generate_output_name(self):
         # Handle the different output schemes
         if self.args.out is None:
-            self.args.out = '{}_{}_{}_{}_{}_{}.tsv'.format(
+            self.args.out = '{}_{}_{}_{}_{}_{}_{}.tsv'.format(
                 self.cob.name,
                 self.ont.name,
                 self.args.candidate_window_size,
                 self.args.candidate_flank_limit,
                 self.args.method,
+                self.args.snp2gene,
                 ':'.join(self.args.terms)
             )
         if not self.args.out.endswith('.overlap.tsv'):
@@ -144,24 +148,24 @@ class Overlap(Camoco):
         if os.path.dirname(self.args.out) != '':
             os.makedirs(os.path.dirname(self.args.out),exist_ok=True)
         if os.path.exists(self.args.out) and self.args.force != True:
-            print(
-                "Output for {} exists! Skipping!".format(
-                    self.args.out
-                ),file=sys.stderr
-            )
+            self.log("Output for {} exists! Skipping!",self.args.out)
             return
 
-    def snp2gene(self,term):
+    def snp2gene(self,term,ont):
         if 'effective' in self.args.snp2gene:
             # Map to effective
             return term.effective_loci(
                 window_size=self.args.candidate_window_size
             )
         elif 'strongest' in self.args.snp2gene:
+            if not(self.args.strongest_attr == 'pval'):
+                ont.set_strongest(attr=self.args.strongest_attr)
+            if not(self.args.strongest_higher == True):
+                ont.set_strongest(higher=self.args.strongest_higher)
             return term.strongest_loci(
                 window_size=self.args.candidate_window_size,
-                attr=self.args.strongest_attr,
-                lowest=self.args.strongest_higher
+                attr=ont.get_strongest_attr(),
+                lowest=ont.get_strongest_higher()
             )
 
     def generate_bootstraps(self,loci,overlap):
@@ -178,7 +182,7 @@ class Overlap(Camoco):
         bs = []
         if self.args.num_bootstraps == 'auto':
             # Create a bullshit generator... err bootstraps
-            bs_generator = (self.overlap(loci,bootstrap=True,iter_name=x) \
+            bs_generator = (co.Overlap.overlap(self,loci,bootstrap=True,iter_name=x) \
                 for x in range(max_bs)
             )
             while num_bs <= 50 and len(bs) < 1000: 
@@ -192,11 +196,10 @@ class Overlap(Camoco):
                 )
         else:
             # Be a lil broke back noodle and explicitly bootstrap
-            bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
+            bs = [co.Overlap.overlap(self, loci,bootstrap=True,iter_name=x) \
                 for x in range(int(self.args.num_bootstraps))
             ]
         return pd.concat(bs)
-
 
     def overlap(self,loci,bootstrap=False,iter_name=None):
         '''
@@ -222,7 +225,6 @@ class Overlap(Camoco):
                 iter_name=iter_name,
                 include_regression=True,
             ).rename(columns={'resid':'score'})
-
 
     def num_below_fdr(self,fdr_cutoff=0.3):
         return pd.pivot_table(
@@ -584,8 +586,7 @@ class Overlap(Camoco):
         self = cls.create(gwas)
         self.results = results
         # Add the results to the sqlite table
-        #self._bcolz('overlap',df=self.results)
-        self.results.to_sql('overlap',sqlite3.connect(self.db.filename),if_exists='replace') 
+        self.results.to_sql('overlap',sqlite3.connect(self.db.filename),if_exists='append',index=False) 
         return self
 
     @classmethod
@@ -619,7 +620,7 @@ class Overlap(Camoco):
             if term.id in self.args.skip_terms:
                 self.cob.log('Skipping {} since it was in --skip-terms',term.id)
             # Generate SNP2Gene Loci
-            loci = self.snp2gene(term)
+            loci = self.snp2gene(term,self.ont)
             if len(loci) < 2 or len(loci) < args.min_term_size:
                 self.cob.log('Not enough genes to perform overlap')
                 continue
@@ -690,9 +691,17 @@ class Overlap(Camoco):
             overlap['TermPValue'] = overlap_pval
             overlap['NumBootstraps'] = len(bootstraps.iter.unique())
             overlap['Method'] = self.args.method
+            overlap['SNP2Gene'] = self.args.snp2gene
             results.append(overlap.reset_index())
         if not args.dry_run:
+            # Consolidate results and output to files
             self.results = pd.concat(results)
             self.results.to_csv(self.args.out,sep='\t',index=None)
+            
+            # Make an actual results object if not exists
+            overlap_object = cls.create(self.ont)
+            
+            # Save the results to the SQLite table
+            self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
 
 

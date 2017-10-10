@@ -1036,7 +1036,8 @@ class RefGen(Camoco):
         cur = self.db.cursor()
         cur.execute('SELECT id FROM genes;')
         rm = set(tbl.index.values) - set([id[0] for id in cur.fetchall()])
-        tbl.drop(rm,axis=0,inplace=True)
+        if rm:
+            tbl.drop(rm,axis=0,inplace=True)
         del rm, cur
         
         # One Annotation per row, drop the nulls and duplicates
