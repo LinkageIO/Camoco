@@ -96,7 +96,6 @@ class GWAS(Ontology):
         ''',(id,))
 
 
-       
         
 
     ''' -----------------------------------------------------------------------
@@ -121,7 +120,7 @@ class GWAS(Ontology):
                 -- Relationship here is b/w term and locus-id
                 PRIMARY KEY(term,id)
             );
-            -- Keep track of 
+            -- Keep track of loci attributes
             CREATE TABLE IF NOT EXISTS loci_attr (
                 -- Some loci may be associated with multiple terms, so term
                 -- key is necessary

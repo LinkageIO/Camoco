@@ -11,7 +11,46 @@ that the input to Camoco is simply a gene-by-sample expression matrix, there is
 not reason that the analysis couldn't include things like protein abundance or
 metabolites. Hence the name: co-analysis of molecular components. Very breifly,
 Camoco creates co-expression networks using table formatted expression data and
-and a few common genome data files:
+and a few common genome data files.
+
+Installation
+------------
+#### Virtual Environment
+The easiest way to install Camoco is to use the included installation script.
+This script creates an anaconda based virtual environment which takes care of
+all required python packages as well as several of the external binaries and 
+programs used by Camoco. Installation should be as easy as:
+
+```
+# Download and run install script
+git clone https://github.com/schae234/Camoco.git
+cd Camoco
+# Follow instructions on screen
+./install.sh
+# Activate the virtual environment
+source activate camoco
+# Use CLI or run script
+camoco --help
+# deactivate virtual environment
+source deactivate
+```
+
+You will need to add a few lines to your .bashrc in order for the conda
+environment to be available from your shell.
+
+e.g.:
+```
+# Assuming your installed camoco to ~/.camoco
+export LD_LIBRARY_PATH=~/.camoco/lib/:$LD_LIBRARY_PATH
+export PATH=$BASE/bin:~/.camoco/conda/bin/:$PATH
+```
+
+The installation script accepts simple arguments: `-b (default: ~/.camoco)`:
+the base directory to install camoco including storage for databases
+
+Tagged releases are available on PyPi: `pip install camoco`.
+
+
 
 Required Files:
 + FPKM (or equivalent) CSV/TSV file
@@ -41,68 +80,6 @@ help(co.COB)
 ```
 Object classes are well documented for inputs and outputs.
 
-Installation
-------------
-#### Docker
-The easiest way to install Camoco is to use the included DockerFile. Download and
-install [Docker](https://www.docker.com) on Linux, windows or Mac OS X. Using
-docker will ensure that Camoco is run in an environment closest to what it was
-developed in. After you have installed and tested docker, you should be able to
-build and run camoco:
-
-
-```
-# Download the repo
-git clone https://github.com/schae234/Camoco.git
-# Build the docker file (grab some coffee)
-cd Camoco
-docker build -t camoco .
-# Run the docker image interactively
-docker run -it camoco
-# Inside docker image
-souce activate camoco
-camoco --help
-source deactivate
-# Exit the docker image
-exit
-``` 
-
-#### Virtual Environment
-Alternatively, you can install Camoco using the included installation script.
-This script creates an anaconda based virtual environment which takes care of
-all required python packages as well as several of the external binaries and 
-programs used by Camoco. Installation should be as easy as:
-
-```
-# Download and run install script
-git clone https://github.com/schae234/Camoco.git
-cd Camoco
-# Follow instructions on screen
-./install.sh
-# Activate the virtual environment
-source activate camoco
-# Use CLI or run script
-camoco --help
-# deactivate virtual environment
-source deactivate
-```
-
-You will need to add a few lines to your .bashrc in order for the conda
-environment to be available from your shell.
-
-
-e.g.:
-```
-# Assuming your installed camoco to ~/.camoco
-export LD_LIBRARY_PATH=~/.camoco/lib/:$LD_LIBRARY_PATH
-export PATH=$BASE/bin:~/.camoco/conda/bin/:$PATH
-```
-
-The installation script accepts simple arguments: `-b (default: ~/.camoco)`:
-the base directory to install camoco including storage for databases
-
-Tagged releases are available on PyPi: `pip install camoco`.
-
 CLI
 ---
 Once installed, the `camoco` command will be available through the terminal.
@@ -122,12 +99,12 @@ cd tests
 py.test
 ```
 
-Documentation
--------------
-We acknowledge a lack of formal manual. We are writing this. However, the
-function definitions themselves are well commented throughout the code base.
-Questions and concerns about usage issued through github will be addressed!
-Contact us!
+Code Of Conduct
+---------------
+We expect users to be excellent to each other as well as to provide supportive
+and engaging conversations regardless of each others backgrounds or identities.
+If you'd like to know specifics, Camoco shares the same code of conduct as the
+[Mozilla Science Lab](https://science.mozilla.org/code-of-conduct). Follow the 
+link to learn more.
 
-CacheMoneyCorn
---------------
+**CacheMoneyCorn**

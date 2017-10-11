@@ -588,13 +588,18 @@ if __name__ == '__main__':
         'gwas', 
         help='The camoco GWAS to use.'
     )
-
-    # keyword args
     overlapCLI.add_argument(
         'method',
         default='density',
         choices=['density','locality'],
         help='The metric used to evaulate overlap between Loci and the Network'
+    )
+    # keyword args
+    overlapCLI.add_argument(
+        '--go',
+        action='store_true',
+        default=False,
+        help='If true, build terms from GO instead of GWAS'
     )
     overlapCLI.add_argument(
         '--terms',
@@ -646,6 +651,20 @@ if __name__ == '__main__':
         )
     )
     overlapCLI.add_argument(
+        '--min-term-size',
+        default=2,
+        type=int,
+        metavar='2',
+        help='The minimum number of gene in a term to calculate overlap.'
+    )
+    overlapCLI.add_argument(
+        '--max-term-size',
+        default=None,
+        type=int,
+        metavar='None',
+        help='The maximum number of genes in a term to calculate overlap.'
+    )
+    overlapCLI.add_argument(
         '--snp2gene', 
         type=str, 
         default='effective',
@@ -686,12 +705,12 @@ if __name__ == '__main__':
         default=None,
         help='OutputFile Name (default: Standard Out)'
     )
-    overlapCLI.set_defaults(func=Overlap.from_CLI)
     overlapCLI.add_argument(
         '--dry-run',
         action='store_true',
         help='Do not perform the expensive computations'
     )
+    overlapCLI.set_defaults(func=Overlap.from_CLI)
 
 
     ''' --------------------------
@@ -963,21 +982,23 @@ if __name__ == '__main__':
     snp2gene_cmd.add_argument(
         '--candidate-window-size',
         type=int,
-        default=10000, 
-        metavar=10000,
+        nargs='*',
+        default=[50000], 
+        metavar=50000,
         help=(
             'The window size, in bp, for mapping effective SNPs to genes. '
-            '(default: 10000)'
+            '(default: 50000)'
         )
     )
     snp2gene_cmd.add_argument(
         '--candidate-flank-limit',
         type=int,
-        default=1, 
+        nargs='*',
+        default=[1], 
         metavar=1,
         help=(
             'The number of flanking genes included in SNP to gene mapping. '
-            'on each side of the locus. (default: 2)' 
+            'on each side of the locus. (default: 1)' 
         )
     )
     snp2gene_cmd.add_argument(
