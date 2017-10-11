@@ -415,7 +415,7 @@ class RefGen(Camoco):
         chain=True, window_size=None, include_parent_locus=False,
         include_parent_attrs=False, include_num_intervening=False, 
         include_rank_intervening=False, include_num_siblings=False,
-        include_SNP_distance=False,attrs=None):
+        include_SNP_distance=False,attrs=None,return_table=False):
         '''
             Locus to Gene mapping.
             Return Genes between locus start and stop, plus additional
@@ -466,6 +466,8 @@ class RefGen(Camoco):
             attrs : dict (default: None)
                 An optional dictionary which will be updated to each
                 candidate genes attr value.
+            return_table : bool(default: False)
+                If True, return a Pandas table (DataFrame)
 
             Returns
             -------
@@ -487,7 +489,7 @@ class RefGen(Camoco):
             genes = sorted(itertools.chain(up_genes,genes_within,down_genes))
             #include the number of effective loci
             if include_rank_intervening == True:
-                ranks = sp.stats.rankdata([locus-x for x in genes])
+                ranks = sp.stats.rankdata([abs(x.center_distance(locus)) for x in genes])
             # Iterate through candidate genes and propagate the 
             # parental info
             for i,gene in enumerate(genes):
@@ -508,14 +510,15 @@ class RefGen(Camoco):
                 num_down = 0
                 num_up = 0
                 # Sort the genes by their distance from the locus
-                genes = sorted(genes,key=lambda x: x-locus)
-                for gene in genes:
-                    if locus in gene:
+                genes_with_distances = [(gene,abs(gene.center_distance(locus))) for gene in genes]
+                genes_with_distances = sorted(genes_with_distances,key=lambda x: x[1])
+                for gene,distance in genes_with_distances:
+                    if locus.within(gene):
                         gene.update({'num_intervening':-1})
-                    elif gene > locus:
+                    elif gene.center >= locus.center:
                         gene.update({'num_intervening':num_down})
                         num_down += 1
-                    elif gene < locus:
+                    elif gene.center <= locus.center:
                         gene.update({'num_intervening':num_up})
                         num_up += 1
             if include_num_siblings == True:
@@ -523,11 +526,13 @@ class RefGen(Camoco):
                     gene.update({'num_siblings':len(genes)})
             if include_SNP_distance == True:
                 for gene in genes:
-                    distance = abs(gene - locus)
+                    distance = abs(gene.center_distance(locus))
                     gene.update({'SNP_distance':distance})
             if attrs is not None:
                 for gene in genes:
                     gene.update(attrs)
+            if return_table == True:
+                genes = pd.DataFrame([x.as_dict() for x in genes])
             return genes
 
         else:
@@ -545,11 +550,15 @@ class RefGen(Camoco):
                     include_rank_intervening=include_rank_intervening,
                     include_num_siblings=include_num_siblings,
                     include_SNP_distance=include_SNP_distance,
+                    return_table=return_table,
                     attrs=attrs
                 ) for locus in iterator
             ]
             if chain:
-                genes = list(set(itertools.chain(*genes)))
+                if return_table:
+                    genes = pd.concat(genes)
+                else:
+                    genes = list(set(itertools.chain(*genes)))
             return genes
 
     def bootstrap_candidate_genes(self, loci, flank_limit=2,
@@ -704,6 +713,8 @@ class RefGen(Camoco):
         chroms = set([x.chrom for x in loci])
         # Create a figure with a subplot for each chromosome 
         f, axes = plt.subplots(len(chroms),figsize=(10,4*len(chroms)))
+        if len(chroms) == 1:
+            axes = [axes]
         # Split loci by chromosome
         chromloci = defaultdict(list)
         for locus in sorted(loci):
@@ -727,24 +738,26 @@ class RefGen(Camoco):
             cax.get_yaxis().set_ticks([])
             #cax.get_xaxis().set_ticks([])
             # shortcut for current axis
-            cax.hold(True)
+            #cax.hold(True)
             # place marker for start window
             cax.scatter(hoffset,voffset,marker='>')
             # place marker for start snp
             cax.scatter(hoffset+locus.window,voffset,marker='.',color='blue')
+            # Place a marker for middle 
+            cax.scatter(hoffset+locus.window+len(locus)/2,voffset,marker='|',color='blue')
             # place marker for stop snp
             cax.scatter(hoffset+locus.window+len(locus),voffset,marker='.',color='blue')
             # place marker for stop snp
             cax.scatter(hoffset+locus.window+len(locus)+locus.window,voffset,marker='<')
 
-            # place markers for sub snps
-            #for subsnp in locus.sub_loci:
-            #    cax.scatter(
-            #        hoffset + subsnp.start - locus.start + locus.window,
-            #        voffset,
-            #        marker='.',
-            #        color='blue'
-            #    )
+            #place markers for sub snps
+            for subsnp in locus.sub_loci:
+                cax.scatter(
+                    hoffset + subsnp.start - locus.start + locus.window,
+                    voffset,
+                    marker='.',
+                    color='blue'
+                )
 
             # place a block for interlocal distance
             cax.barh(
@@ -1023,7 +1036,8 @@ class RefGen(Camoco):
         cur = self.db.cursor()
         cur.execute('SELECT id FROM genes;')
         rm = set(tbl.index.values) - set([id[0] for id in cur.fetchall()])
-        tbl.drop(rm,axis=0,inplace=True)
+        if rm:
+            tbl.drop(rm,axis=0,inplace=True)
         del rm, cur
         
         # One Annotation per row, drop the nulls and duplicates

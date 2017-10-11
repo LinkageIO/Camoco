@@ -12,6 +12,7 @@ from functools import lru_cache
 from collections import OrderedDict
 
 import sys
+import copy
 import numpy
 import camoco as co
 import pandas as pd

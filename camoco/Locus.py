@@ -50,7 +50,6 @@ class Locus(object):
         self.attr.update(dict)
         return self
 
-
     def as_record(self):
         return (self.chrom,self.start,self.end,self.name,self.window,self.id)
 
@@ -64,6 +63,7 @@ class Locus(object):
     def __getitem__(self,key):
         return self.attr[key]
 
+
     def default_getitem(self,key,default=None):
         ''' 
             Return a default value if the attr[key] value is None
@@ -72,6 +72,12 @@ class Locus(object):
             return default
         else:
             return self[key]
+
+    def center_distance(self,locus):
+        if self.chrom == locus.chrom:
+            return self.center - locus.center
+        else:
+            return np.inf
 
     @property
     def start(self):
@@ -84,6 +90,10 @@ class Locus(object):
         if self._end is None:
             return None
         return int(self._end)
+
+    @property
+    def center(self):
+        return (self.start + self.end)/2
 
     @property
     def coor(self):
@@ -132,12 +142,35 @@ class Locus(object):
         else:
             return False
 
+    def within(self,locus):
+        '''
+            >>> x.within(y)
+            Returns True if the coordinates of x are completely within
+            the coordinates of y.
+        '''
+        if (locus.chrom == self.chrom
+           and self.upstream >= locus.upstream 
+           and self.downstream <= locus.downstream):
+            return True
+        else:
+            return False 
+
+    def encloses(self,locus):
+        if (locus.chrom == self.chrom
+           and locus.upstream >= self.upstream 
+           and locus.downstream <= self.downstream):
+            return True
+        else:
+            return False 
+
     def __contains__(self,locus):
         if (locus.chrom == self.chrom and
                # The locus has as 'start' position within the Locus window
                (( locus.upstream >= self.upstream and locus.upstream <= self.downstream)
                # The locus has an 'end' position within the Locus window
                or(locus.downstream <= self.downstream and locus.downstream >= self.upstream)
+               or(locus.upstream <= self.upstream and locus.downstream >= self.downstream)
+               or(locus.upstream >= self.upstream and locus.downstream <= self.downstream)
             )):
             return True
         else:
@@ -165,11 +198,24 @@ class Locus(object):
         else:
             return self.chrom < locus.chrom
 
+    def __le__(self,locus):
+        if self.chrom == locus.chrom:
+            return self.start <= locus.start
+        else:
+            return self.chrom <= locus.chrom
+
     def __gt__(self,locus):
         if self.chrom == locus.chrom:
             return self.start > locus.start
         else:
             return self.chrom > locus.chrom
+
+    def __ge__(self,locus):
+        if self.chrom == locus.chrom:
+            return self.start >= locus.start
+        else:
+            return self.chrom >= locus.chrom
+
 
     def __sub__(self,other):
         if self.chrom != other.chrom:
@@ -179,7 +225,10 @@ class Locus(object):
         else:
             # sort them
             a,b = sorted([self,other])
-            return b.start - a.end - 1
+            # calculate the distance
+            distance = b.start - a.end - 1
+            return distance
+
 
     def __str__(self):
         return '''<{}>{}:{}-{}+{}({})'''.format(
