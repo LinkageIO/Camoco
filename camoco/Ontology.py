@@ -12,6 +12,7 @@ from functools import lru_cache
 from collections import OrderedDict
 
 import sys
+import copy
 import numpy
 import camoco as co
 import pandas as pd
@@ -491,12 +492,14 @@ class Ontology(Camoco):
             else:
                 return enrich
         # return a new copy of each 
-        terms = self.terms_containing(
+
+        terms = [copy.copy(term) for term in self.terms_containing(
             locus_list,
             min_term_size=min_term_size,
             max_term_size=max_term_size
-        )
-        terms = [x.copy() for x in terms]
+        )]
+        
+
         # Calculate the size of the Universe
         if num_universe is None:
             num_universe = self.num_distinct_loci() 
