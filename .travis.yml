@@ -2,15 +2,12 @@ language: python
 matrix:
     include:
         - os: linux
-          sudo: required
           python: 3.4
           env: TOXENV=py34
         - os: linux
-          sudo: required
           python: 3.5
           env: TOXENV=py35
         - os: linux
-          sudo: required
           python: 3.6
           env: TOXENV=py36
         - os: osx
@@ -28,7 +25,6 @@ matrix:
 env:
   - LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
 install:
-  - ./.travis/install.sh
   - ./install.sh
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
