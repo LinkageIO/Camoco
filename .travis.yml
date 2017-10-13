@@ -25,6 +25,7 @@ matrix:
 env:
   - LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
 install:
+  - ./.travis/install.sh
   - ./install.sh
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
