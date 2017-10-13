@@ -3,7 +3,7 @@
 set -e
 set -x
 
-if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+if [[ "$(uname -s)" == 'Darwin' ]]; then
 
     # Install some custom requirements on OS X
     # e.g. brew install pyenv-virtualenv
@@ -33,6 +33,4 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
             ;;
     esac
     pyenv rehash
-else
-    # Install some custom requirements on Linux
 fi
