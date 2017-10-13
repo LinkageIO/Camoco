@@ -21,12 +21,12 @@ install: |
       brew update;
       brew install python3;
   fi
-    - ./install.sh
-    - hash -r
-    - conda config --set always_yes yes --set changeps1 no
-    - conda update -q conda
-    - conda info -a
-    - conda install pytest-cov
+    ./install.sh
+    hash -r
+    conda config --set always_yes yes --set changeps1 no
+    conda update -q conda
+    conda info -a
+    conda install pytest-cov
 # command to run tests, e.g. python setup.py test
 script:
   - source $HOME/.camoco/conda/bin/activate camoco
