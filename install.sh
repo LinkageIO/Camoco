@@ -100,6 +100,89 @@ else
 fi
 
 #===================================================
+#----------------Install git lfs--------------------
+#===================================================
+# if ! hash git-lfs 2>/dev/null ; then
+#     echo "Installing git-lfs for the large files in the repo"
+#     cd $BASE
+#     wget https://github.com/github/git-lfs/releases/download/v1.1.0/git-lfs-linux-amd64-1.1.0.tar.gz
+#     tar xzf git-lfs-linux-amd64-1.1.0.tar.gz
+#     rm -rf git-lfs-linux-amd64-1.1.0.tar.gz
+#     cd git-lfs-1.1.0/
+#     rm -rf $BASE/bin/git-lfs*
+#     mv git-lfs $BASE/bin/
+#     cd $BASE
+#     rm -rf git-lfs*
+#     git lfs install
+#     git lfs uninstall
+# else
+#     green "Git-lfs already installed"
+# fi
+
+===================================================
+------------------Install mcl----------------------
+===================================================
+if [ ! -e $BASE/bin/mcl ]
+then
+    echo "Installing mcl locally"
+    cd $BASE
+    wget http://micans.org/mcl/src/mcl-latest.tar.gz
+    echo "Extracting the taball"
+    tar xzf mcl-latest.tar.gz
+    rm -rf mcl-latest.tar.gz
+    cd $(find . -name 'mcl-*' -type d | head -n 1)
+    ./configure --prefix=$BASE
+    make
+    make install
+    cd $BASE
+    rm -rf $(find . -name 'mcl-*' -type d | head -n 1)
+else
+    green 'mcl already installed'
+fi
+
+#===================================================
+#-----Install libraries to Ensure Smoothness--------
+#===================================================
+# if [[ "$PLATFORM" != 'Darwin' ]]
+# then
+#   if [ ! -e $BASE/bin/icu-config ]
+#   then
+#       echo "Installing a local version of the icu library"
+#       cd $BASE
+#       wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/icu_4.8.1.1.orig.tar.gz
+#       echo "Extracting the tarball"
+#       tar xzf icu_4.8.1.1.orig.tar.gz
+#       rm -rf icu_4.8.1.1.orig.tar.gz
+#       cd icu/source
+#       ./configure --prefix=$BASE
+#       make
+#       make install
+#       cd $BASE
+#       rm -rf icu/
+#   else
+#       green "icu already installed"
+#   fi
+# fi
+# if [ ! -e $BASE/lib/libqhull.so ]
+# then
+#     echo "Installing a local version of the qhull library"
+#     cd $BASE
+#     wget http://www.qhull.org/download/qhull-2012.1-src.tgz
+#     echo "Extracting the tarball"
+#     tar xzf qhull-2012.1-src.tgz
+#     rm -rf qhull-2012.1-src.tgz
+#     cd qhull-2012.1
+#     make
+#     mv bin/* $BASE/bin/
+#     mv lib/* $BASE/lib/
+#     ln -s $BASE/lib/libqhull.so $BASE/lib/libqhull.so.5
+#     cd $BASE
+#     rm -rf qhull-2012.1/
+# else
+#     green 'qhull already installed'
+# fi
+
+#===================================================
 #----------Build the Conda Environment--------------
 #===================================================
 if [ ! -d $BASE/conda/envs/camoco ]
@@ -112,7 +195,7 @@ then
     conda create -y -n $NAME python=3 setuptools pip cython numpy scipy pandas \
         matplotlib blaze nose six pyyaml yaml pyparsing python-dateutil \
         pytz numexpr patsy statsmodels networkx mpmath termcolor scikit-learn \
-        ipython ipdb pytest-cov flask gunicorn apsw bcolz
+        ipython ipdb pytest-cov flask gunicorn apsw
 else
     green 'conda already installed'
 fi
@@ -124,6 +207,63 @@ green "activating $NAME"
 source $BASE/conda/bin/activate $NAME
 green 'checking python'
 which python
+
+# if [[ "$PLATFORM" == 'Darwin' ]]
+# then
+#   conda install -c ccordoba12 icu=54.1 -y
+#   conda install ipython jupyter notebook
+#   python -m ipykernel install --user
+#   easy_install pyicu
+# fi
+
+# ==================================================
+# ----------Take care of some pip packages ---------
+# ==================================================
+# python -c 'import powerlaw'
+# if [ $? -eq 1  ]
+# then
+#     pip install powerlaw
+# else
+#     green "powerlaw Installed"
+# fi
+#
+# python -c 'import bcolz'
+# if [ $? -eq 1  ]
+# then
+#     pip install bcolz
+# else
+#     green "bcolz Installed"
+# fi
+#
+# python -c 'import GeneWordSearch'
+# if [ $? -eq 1  ]
+# then
+#     pip install GeneWordSearch
+# else
+#     green "GeneWordSearch Installed"
+# fi
+
+#===================================================
+#-----------------Install apsw----------------------
+#===================================================
+# python -c 'import apsw'
+# if [ $? -eq 1 ]
+# then
+#     echo "Installing apsw into the conda environment"
+#     #cd $BASE
+#     #rm -rf apsw
+#     #git clone https://github.com/rogerbinns/apsw.git
+#     #cd apsw
+#     #python setup.py fetch --version=3.15.2 --missing-checksum-ok --all build --enable-all-extensions install
+#     #cd $BASE
+#     #rm -rf apsw
+#     pip install --user https://github.com/rogerbinns/apsw/releases/download/3.15.2-r1/apsw-3.15.2-r1.zip \
+#         --global-option=fetch --global-option=--version --global-option=3.15.2 --global-option=--all \
+#         --global-option=build --global-option=--enable-all-extensions
+# else
+#     green "apsw installed"
+# fi
+
 
 #==================================================
 #---------------Update Setuptools------------------
