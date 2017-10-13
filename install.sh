@@ -208,24 +208,16 @@ source $BASE/conda/bin/activate $NAME
 green 'checking python'
 which python
 
-# if [[ "$PLATFORM" == 'Darwin' ]]
-# then
-#   conda install -c ccordoba12 icu=54.1 -y
-#   conda install ipython jupyter notebook
-#   python -m ipykernel install --user
-#   easy_install pyicu
-# fi
-
 # ==================================================
 # ----------Take care of some pip packages ---------
 # ==================================================
-# python -c 'import powerlaw'
-# if [ $? -eq 1  ]
-# then
-#     pip install powerlaw
-# else
-#     green "powerlaw Installed"
-# fi
+python -c 'import powerlaw'
+if [ $? -eq 1  ]
+then
+    pip install powerlaw
+else
+    green "powerlaw Installed"
+fi
 
 python -c 'import bcolz'
 if [ $? -eq 1  ]
