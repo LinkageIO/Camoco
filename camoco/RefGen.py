@@ -1149,7 +1149,6 @@ class RefGen(Camoco):
         genes = list()
         chroms = dict()
         if filename.endswith('.gz'):
-            print(filename)
             IN = gzip.open(filename,'rt')
         else:
             IN = open(filename,'r')
