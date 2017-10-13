@@ -16,17 +16,17 @@ env:
   global:
     - CI=true
   - LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
-install: |
-  if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+install:
+  - if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
       brew update;
       brew install python3;
-  fi
-    ./install.sh
-    hash -r
-    conda config --set always_yes yes --set changeps1 no
-    conda update -q conda
-    conda info -a
-    conda install pytest-cov
+    fi
+  - ./install.sh
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  - conda install pytest-cov
 # command to run tests, e.g. python setup.py test
 script:
   - source $HOME/.camoco/conda/bin/activate camoco
