@@ -235,13 +235,13 @@ else
     green "bcolz Installed"
 fi
 
-# python -c 'import GeneWordSearch'
-# if [ $? -eq 1  ]
-# then
-#     pip install GeneWordSearch
-# else
-#     green "GeneWordSearch Installed"
-# fi
+python -c 'import GeneWordSearch'
+if [ $? -eq 1  ]
+then
+    pip install GeneWordSearch
+else
+    green "GeneWordSearch Installed"
+fi
 
 #===================================================
 #-----------------Install apsw----------------------
