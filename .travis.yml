@@ -1,4 +1,7 @@
 language: python
+os:
+  - linux
+  - osx
 python:
   - "3.4"
   - "3.5"
@@ -16,7 +19,7 @@ install:
   - conda info -a
   - conda install pytest-cov
 # command to run tests, e.g. python setup.py test
-script:  
+script:
   - source $HOME/.camoco/conda/bin/activate camoco
   - export PATH=/home/travis/.camoco/bin/:$PATH
   - which py.test
@@ -24,4 +27,3 @@ script:
 
 after_success:
   - coveralls
- 
