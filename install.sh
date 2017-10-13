@@ -226,15 +226,15 @@ which python
 # else
 #     green "powerlaw Installed"
 # fi
-#
-# python -c 'import bcolz'
-# if [ $? -eq 1  ]
-# then
-#     pip install bcolz
-# else
-#     green "bcolz Installed"
-# fi
-#
+
+python -c 'import bcolz'
+if [ $? -eq 1  ]
+then
+    pip install bcolz
+else
+    green "bcolz Installed"
+fi
+
 # python -c 'import GeneWordSearch'
 # if [ $? -eq 1  ]
 # then
