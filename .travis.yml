@@ -15,8 +15,10 @@ install:
   - conda update -q conda
   - conda info -a
   - conda install pytest-cov
+  - conda install coveralls
+
 # command to run tests, e.g. python setup.py test
-script:  
+script:
   - source $HOME/.camoco/conda/bin/activate camoco
   - export PATH=/home/travis/.camoco/bin/:$PATH
   - which py.test
@@ -24,4 +26,3 @@ script:
 
 after_success:
   - coveralls
- 
