@@ -498,8 +498,6 @@ class Ontology(Camoco):
             min_term_size=min_term_size,
             max_term_size=max_term_size
         )]
-        
-
         # Calculate the size of the Universe
         if num_universe is None:
             num_universe = self.num_distinct_loci() 
