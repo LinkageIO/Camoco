@@ -606,9 +606,9 @@ class Overlap(Camoco):
         # Save strongest description arguments if applicable
         if 'strongest' in self.args.snp2gene:
             if not(self.ont._global('strongest_attr') == args.strongest_attr):
-                self.ont._global('strongest_attr', args.strongest_attr)
+                self.ont.set_strongest(attr=args.strongest_attr)
             if not(bool(int(self.ont._global('strongest_higher'))) == bool(args.strongest_higher)):
-                self.ont._global('strongest_higher', args.strongest_higher)
+                self.ont.set_strongest(higher=args.strongest_higher)
         
         # Generate a terms iterable
         if 'all' in self.args.terms:
