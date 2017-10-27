@@ -86,7 +86,7 @@ class RefGen(Camoco):
             **kwargs
         )
 
-    def interection(self,gene_list):
+    def intersection(self,gene_list): 
         '''
             Return the subset of genes that are in the refgen.
 
@@ -132,7 +132,7 @@ class RefGen(Camoco):
             SELECT id,length FROM chromosomes
         '''))
 
-    def iter_genes(self):
+    def iter_genes(self): 
         '''
             Iterates over genes in RefGen.
 
@@ -171,7 +171,7 @@ class RefGen(Camoco):
         info = cur.execute('SELECT chromosome,start,end,id FROM genes WHERE id = ?', [gene_id]).fetchone()
         return self.Gene(*info,build=self.build,organism=self.organism)
 
-    def from_ids(self, gene_ids, check_shape=False):
+    def from_ids(self, gene_ids, check_shape=False): 
         '''
             Returns a list of gene object from an iterable of id strings
             OR from a single gene id string.
@@ -191,7 +191,7 @@ class RefGen(Camoco):
             otherwise a single gene
 
         '''
-        if isinstance(gene_ids,str):
+        if isinstance(gene_ids,str): #pragma: no cover
             import warnings
             warnings.warn(
                 'Passing singe values into RefGen.from_ids is deprecated. Use RefGen.from_id() '
@@ -202,7 +202,7 @@ class RefGen(Camoco):
         for id in gene_ids:
             try:
                 genes.append(self.from_id(id))
-            except ValueError as e:
+            except ValueError as e: 
                 if check_shape == False:
                     continue
                 else:
@@ -231,6 +231,7 @@ class RefGen(Camoco):
             )
         except Exception as e:
             self.log("No chromosome where id = {}. Error: {}",id,e)
+            raise ValueError(e)
 
     def encompassing_genes(self,loci,chain=True):
         '''
@@ -252,7 +253,7 @@ class RefGen(Camoco):
                 a single list will be returned, if False, a result for
                 each locus passed in will be returned.
         '''
-        if isinstance(loci,Locus):
+        if isinstance(loci,Locus): 
             return [
                 self.Gene(*x,build=self.build,organism=self.organism) \
                 for x in self.db.cursor().execute('''
@@ -291,8 +292,8 @@ class RefGen(Camoco):
                     ''',
                     (loci.chrom,loci.start,loci.end))
             ]
-        else:
-            iterator = iter(loci)
+        else: 
+            iterator = iter(loci) 
             genes = [self.genes_within(locus,chain=chain) for locus in iterator]
             if chain:
                 genes = list(itertools.chain(*genes))
@@ -316,7 +317,7 @@ class RefGen(Camoco):
                 -----------------------------x****************x--
                    ^_________________________| Window (upstream)
         '''
-        if locus.window == 0 and window_size is None:
+        if locus.window == 0 and window_size is None: #C
             raise CamocoZeroWindowError(
                 'Asking for upstream genes for {}',
                 locus.id
@@ -354,7 +355,7 @@ class RefGen(Camoco):
               ---x****************x--------------------------------
                                   |_______________________^ Window (downstream)
         '''
-        if locus.window == 0 and window_size is None:
+        if locus.window == 0 and window_size is None: 
             raise CamocoZeroWindowError(
                 'Asking for upstream genes for {} with no window size',
                 locus.id
@@ -401,7 +402,7 @@ class RefGen(Camoco):
             if chain:
                 return list(itertools.chain(up_genes,down_genes))
             return (up_genes,down_genes)
-        else:
+        else: 
             iterator = iter(loci)
             genes = [
                 self.flanking_genes(locus,flank_limit=flank_limit,window_size=window_size)\
@@ -488,7 +489,7 @@ class RefGen(Camoco):
             # use the specific methods
             genes = sorted(itertools.chain(up_genes,genes_within,down_genes))
             #include the number of effective loci
-            if include_rank_intervening == True:
+            if include_rank_intervening == True: 
                 ranks = sp.stats.rankdata([abs(x.center_distance(locus)) for x in genes])
             # Iterate through candidate genes and propagate the
             # parental info
@@ -496,17 +497,17 @@ class RefGen(Camoco):
                 #gene.update({'num_effective_loci':len(locus.sub_loci)})
                 # include parent locus id if thats specified
                 if include_parent_locus == True:
-                    gene.update({'parent_locus':locus.id})
+                    gene.update({'parent_locus':locus.id}) 
                 if include_rank_intervening == True:
-                    gene.update({'intervening_rank':ranks[i]})
+                    gene.update({'intervening_rank':ranks[i]}) 
                 # update all the parent_attrs
-                if include_parent_attrs and len(include_parent_attrs) > 0:
+                if include_parent_attrs and len(include_parent_attrs) > 0: 
                     if 'all' in include_parent_attrs:
                         include_parent_attrs = locus.attr.keys()
                     for attr in include_parent_attrs:
                         attr_name = 'parent_{}'.format(attr)
                         gene.update({attr_name: locus[attr]})
-            if include_num_intervening == True:
+            if include_num_intervening == True: 
                 num_down = 0
                 num_up = 0
                 # Sort the genes by their distance from the locus
@@ -521,24 +522,24 @@ class RefGen(Camoco):
                     elif gene.center <= locus.center:
                         gene.update({'num_intervening':num_up})
                         num_up += 1
-            if include_num_siblings == True:
+            if include_num_siblings == True: 
                 for gene in genes:
                     gene.update({'num_siblings':len(genes)})
-            if include_SNP_distance == True:
+            if include_SNP_distance == True: 
                 for gene in genes:
                     distance = abs(gene.center_distance(locus))
                     gene.update({'SNP_distance':distance})
-            if attrs is not None:
+            if attrs is not None: 
                 for gene in genes:
                     gene.update(attrs)
-            if return_table == True:
+            if return_table == True: 
                 genes = pd.DataFrame([x.as_dict() for x in genes])
             return genes
 
         else:
             iterator = iter(sorted(loci))
             genes = [
-                # This is becoming a pain in the ass
+                # This is becoming a pain
                 self.candidate_genes(
                     locus,
                     flank_limit=flank_limit,
@@ -554,7 +555,7 @@ class RefGen(Camoco):
                     attrs=attrs
                 ) for locus in iterator
             ]
-            if chain:
+            if chain: #C
                 if return_table:
                     genes = pd.concat(genes)
                 else:
@@ -606,13 +607,13 @@ class RefGen(Camoco):
                 gene_limit=num_candidates,
                 window_size=10e100
             )
-            if len(random_candidates) != num_candidates:
+            if len(random_candidates) != num_candidates: #C
                 # somehow we hit the end of a chromosome
                 # or something, just recurse
                 random_candidates = self.bootstrap_candidate_genes(
                     locus,flank_limit=flank_limit,chain=True
                 )
-            if include_parent_locus == True:
+            if include_parent_locus == True: #C
                 for gene in random_candidates:
                     gene.update({'parent_locus':random_gene.id})
             return random_candidates
@@ -636,7 +637,7 @@ class RefGen(Camoco):
                     include_parent_locus=include_parent_locus
                 )
                 # If genes randomly overlap, resample
-                while len(seen.intersection(candidates)) > 0:
+                while len(seen.intersection(candidates)) > 0: #C
                     candidates = self.bootstrap_candidate_genes(
                         locus, flank_limit=flank_limit,
                         window_size=window_size, chain=True,
@@ -645,19 +646,19 @@ class RefGen(Camoco):
                 # Add all new bootstrapped genes to the seen list
                 seen |= set(candidates)
                 bootstraps.append(candidates)
-            if chain:
+            if chain: #C
                 bootstraps = list(seen)
             #self.log("Found {} bootstraps",len(bootstraps))
             return bootstraps
 
 
-    def pairwise_distance(self, gene_list=None):
+    def pairwise_distance(self, gene_list=None): #pragma: no cover
         '''
             returns a vector containing the pairwise distances between genes
             in gene_list in vector form. See np.squareform for matrix
             conversion.
         '''
-        if gene_list is None:
+        if gene_list is None: #C
             gene_list = list(self.iter_genes())
         query = '''
                 SELECT genes.id, chrom.rowid, start, end FROM genes
@@ -685,7 +686,7 @@ class RefGen(Camoco):
         )
         return distances
 
-    def summary(self):
+    def summary(self): #C
         print ("\n".join([
             'Reference Genome: {} - {} - {}',
             '{} genes',
@@ -697,7 +698,7 @@ class RefGen(Camoco):
             )
         )
 
-    def plot_loci(self,loci,filename,flank_limit=2):
+    def plot_loci(self,loci,filename,flank_limit=2): #pragma: no cover
         '''
             Plots the loci, windows and candidate genes
 
@@ -789,9 +790,9 @@ class RefGen(Camoco):
     def __len__(self):
         return self.num_genes()
 
-    def __contains__(self,obj):
+    def __contains__(self,obj): 
         ''' flexible on what you pass into the 'in' function '''
-        if isinstance(obj,Locus):
+        if isinstance(obj,Locus): #C
             # you can pass in a gene object (this expression
             # should ALWAYS be true if you
             # created gene object from this RefGen)
@@ -809,7 +810,7 @@ class RefGen(Camoco):
                 return True
             else:
                 return False
-        else:
+        else: #C
             raise TypeError('Cannot test for containment for {}'.format(obj))
 
     def _build_indices(self):
@@ -833,7 +834,7 @@ class RefGen(Camoco):
         ''')
 
     def add_gene(self,gene,refgen=None):
-        if isinstance(gene,Locus):
+        if isinstance(gene,Locus): #C
             self.db.cursor().execute('''
             INSERT OR REPLACE INTO genes VALUES (?,?,?,?)
             ''',(gene.name,gene.chrom,gene.start,gene.end))
@@ -892,7 +893,7 @@ class RefGen(Camoco):
             header : bool (default: True)
                 A switch stating if there is a header row to ignore or not
         '''
-        with rawFile(alias_file) as IN:
+        with rawFile(alias_file) as IN: #C
             if headers:
                 garb = IN.readline()
 
@@ -912,7 +913,7 @@ class RefGen(Camoco):
             aliases
         )
         cur.execute('END TRANSACTION')
-    def num_aliases(self):
+    def num_aliases(self): #C
         '''
             Returns the number of aliases currently in the database
         '''
@@ -920,7 +921,7 @@ class RefGen(Camoco):
             .execute('SELECT COUNT(*) FROM aliases') \
             .fetchone()[0]
 
-    def aliases(self, gene_id):
+    def aliases(self, gene_id): #C
         if isinstance(gene_id,str):
             return [alias[0] for alias in self.db.cursor().execute('''
                     SELECT alias FROM aliases
@@ -936,22 +937,22 @@ class RefGen(Camoco):
                 [(id,) for id in gene_id]
             )
             als = dict()
-            for al,id in al_list:
+            for al,id in al_list: #C
                 if id in als:
                     als[id].append(al)
                 else:
                     als[id] = [al]
             return als
 
-    def remove_aliases(self):
+    def remove_aliases(self): #C
         self.db.cursor().execute('DELETE FROM aliases;')
 
-    def has_annotations(self):
+    def has_annotations(self): #C
         cur = self.db.cursor()
         cur.execute('SELECT count(*) FROM func;')
         return (int(cur.fetchone()[0]) > 0)
 
-    def get_annotations(self,item):
+    def get_annotations(self,item): #C
         # Build the query from all the genes provided
         if isinstance(item,(set,list)):
             ls = "{}".format("','".join([str(x) for x in item]))
@@ -982,7 +983,7 @@ class RefGen(Camoco):
                 res.append(desc)
         return res
 
-    def export_annotations(self, filename=None, sep="\t"):
+    def export_annotations(self, filename=None, sep="\t"): #C
         '''
             Make a table of all functional annotations.
         '''
@@ -998,7 +999,7 @@ class RefGen(Camoco):
         df = pd.DataFrame(cur.fetchall(),columns=['gene','desc']).set_index('gene')
         df.to_csv(filename,sep=sep)
 
-    def add_annotations(self, filename, sep="\t", gene_col=0, skip_cols=None):
+    def add_annotations(self, filename, sep="\t", gene_col=0, skip_cols=None): #C
         '''
             Imports Annotation relationships from a csv file. By default will
             assume gene names are first column
@@ -1063,7 +1064,7 @@ class RefGen(Camoco):
         # Make sure the indices are built
         self._build_indices()
 
-    def remove_annotations(self):
+    def remove_annotations(self): #C
         self.db.cursor().execute('DELETE FROM func;')
 
     @classmethod
@@ -1082,7 +1083,7 @@ class RefGen(Camoco):
         return self
 
 
-    @classmethod
+    @classmethod #C
     def from_DataFrame(cls,df,name,description,build,organism,
             chrom_col='chrom',start_col='start',stop_col='stop',
             id_col='ID'):
@@ -1150,7 +1151,7 @@ class RefGen(Camoco):
         chroms = dict()
         if filename.endswith('.gz'):
             IN = gzip.open(filename,'rt')
-        else:
+        else: 
             IN = open(filename,'r')
         for line in IN:
             #skip comment lines
@@ -1184,7 +1185,7 @@ class RefGen(Camoco):
         self._build_indices()
         return self
 
-    def copy(self,name,description):
+    def copy(self,name,description): #C
         '''
             Creates a copy of a refgen with a new name and description.
 
