@@ -303,6 +303,42 @@ class Ontology(Camoco):
             self.del_term(term, cursor=cur)
         cur.execute('END TRANSACTION')
 
+    def set_strongest(self,attr=None,higher=None):
+        '''
+            Convinience function that allows you to set default values for
+            strongest SNP2Gene mapping tasks.
+
+            Parameters
+            ----------
+            attr:     The locus attr used to determine which locus is the 
+                      strongest locus.
+            
+            higher:   Flag indicating whether the value in --strongest-attr
+                      is stronger if it is higher. Default behavior is to
+                      treatlower values as stronger (i.e. p-vals)
+        '''
+        if not(attr is None):
+            self._global('strongest_attr',attr)
+        if not(higher is None):
+            self._global('strongest_higher',higher)
+
+    def get_strongest_attr(self):
+        '''
+            Convinience function that allows you to get the default value for
+            the locus attr used to determine which locus is the strongest locus
+            strongest SNP2Gene mapping.
+        '''
+        return self._global('strongest_attr')
+    
+    def get_strongest_higher(self):
+        '''
+            Convinience function that allows you to get default values for
+            the flag indicating whether the value in `strongest-attr` is
+            is stronger if higher for strongest SNP2Gene mapping tasks.
+        '''
+        return self._global('strongest_higher')
+
+
     @classmethod
     def create(cls, name, description, refgen, type='Ontology'):
         '''

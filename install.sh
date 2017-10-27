@@ -194,7 +194,7 @@ then
     conda config --append channels blaze
     conda create -y -n $NAME python=3 setuptools pip cython numpy scipy pandas \
         matplotlib blaze nose six pyyaml yaml pyparsing python-dateutil \
-        pytz numexpr patsy statsmodels networkx mpmath termcolor scikit-learn \
+        pytz numexpr patsy statsmodels networkx=1.11 mpmath termcolor scikit-learn \
         ipython ipdb pytest-cov flask gunicorn apsw
 else
     green 'conda already installed'
