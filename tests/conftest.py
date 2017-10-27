@@ -44,7 +44,7 @@ def Zm5bFGS():
         )
         # This is stupid and necessary because pytables wont let me open
         # more than one table
-        tools.RefGen.from_gff(
+        co.RefGen.from_gff(
             gff, 'Zm5bFGS', 'Maize 5b Filtered Gene Set', '5b', 'Zea Mays'
         )
     return co.RefGen('Zm5bFGS')
