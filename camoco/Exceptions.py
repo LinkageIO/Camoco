@@ -1,8 +1,8 @@
 # Exception abstract class
-class CamocoError(Exception):
+class CamocoError(Exception): # pragma: no cover
     pass
 
-class CamocoExistsError(CamocoError):
+class CamocoExistsError(CamocoError): # pragma: no cover
     '''
         You tried to create a camoco object which already exists
         under the same name,type combination.
@@ -14,7 +14,7 @@ class CamocoExistsError(CamocoError):
             'That already exists' + message.format(*args)
         )
 
-class CamocoGeneNameError(CamocoError):
+class CamocoGeneNameError(CamocoError): # pragma: no cover
     '''
         Gene names must be beautiful snowflakes.
     '''
@@ -22,7 +22,7 @@ class CamocoGeneNameError(CamocoError):
         self.expr = expr
         self.message = 'Gene names must be unique:' + message.format(args)
 
-class CamocoGeneAbsentError(CamocoError):
+class CamocoGeneAbsentError(CamocoError): # pragma: no cover
     '''
         Gene is missing from dataset
     '''
@@ -32,7 +32,7 @@ class CamocoGeneAbsentError(CamocoError):
             'This gene is not in the dataset:' + message.format(args)
         )
 
-class CamocoAccessionNameError(CamocoError):
+class CamocoAccessionNameError(CamocoError): # pragma: no cover
     '''
         Accession names must be Unique.
     '''
@@ -42,7 +42,7 @@ class CamocoAccessionNameError(CamocoError):
             'Accession names must be unique:' + message.format(args)
         )
 
-class CamocoZeroWindowError(CamocoError):
+class CamocoZeroWindowError(CamocoError): # pragma: no cover
     def __init__(self,expr,message,*args):
         self.expr = expr
         self.message = (
@@ -50,7 +50,7 @@ class CamocoZeroWindowError(CamocoError):
             message.format(args)
         )
 
-class CamocoInteractive(CamocoError):
+class CamocoInteractive(CamocoError): # pragma: no cover
     def __init__(self,expr=None,message='',*args):
         self.expr = expr
         self.message = 'Camoco interactive ipython session.'

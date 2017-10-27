@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import numpy as np
 
-class Genome(object):   
+class Genome(object):  # pragma: no cover 
     def __init__(self,id,chroms=list()):
         self.id = id
         self.chroms = chroms 
