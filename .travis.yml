@@ -38,6 +38,6 @@ script:
   - export PATH=/home/travis/.camoco/bin/:$PATH
   - which py.test
   - cd tests
-  - py.test -v --cov=camoco
+  - py.test -v --cov=camoco --cov-config coveragerc
 after_success:
-    - coveralls --rcfile=coveragerc
+    - coveralls
