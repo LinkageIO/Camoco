@@ -10,7 +10,7 @@ Camoco is a python library for building and analyzing co-expression networks.
 Currently, networks are generally built from gene expression data, but given
 that the input to Camoco is simply a gene-by-sample expression matrix, there is
 not reason that the analysis couldn't include things like protein abundance or
-metabolites. Hence the name: co-analysis of molecular components. Very breifly,
+metabolites. Hence the name: co-analysis of molecular components. Very briefly,
 Camoco creates co-expression networks using table formatted expression data and
 and a few common genome data files.
 
