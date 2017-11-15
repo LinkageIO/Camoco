@@ -1,7 +1,7 @@
-'''
+''' 
     COB Tests
 '''
-import camoco as co
+import camoco as co 
 from camoco import cf
 
 import random
@@ -9,6 +9,7 @@ import itertools
 from collections import Counter
 
 import pytest
+import pandas as pd
 import numpy as np
 from scipy.misc import comb
 
@@ -86,6 +87,10 @@ def test_num_neighbors_equals_degree(testCOB):
     random_gene = testCOB.refgen.random_gene()
     assert len(testCOB.neighbors(random_gene)) \
         == testCOB.global_degree(random_gene)
+    assert len(testCOB.neighbors(random_gene,return_gene_set=True)) \
+        == testCOB.global_degree(random_gene)
+    assert len(testCOB.neighbors(random_gene,names_as_index=False)) \
+        == testCOB.global_degree(random_gene)
 
 def test_subnetwork_contains_only_input_genes(testCOB):
     random_genes = set(testCOB.refgen.random_genes(n=cf.test.num))
@@ -133,3 +138,12 @@ def test_zero_degree_genes_return_empty_dataframe(testCOB):
     gene_id = testCOB.degree.ix[testCOB.degree.Degree==0].sample(1).index[0]
     gene = testCOB.refgen[gene_id]
     assert len(testCOB.neighbors(gene)) == 0
+
+def test_repr(testCOB):
+    assert repr(testCOB).startswith('<COB:')
+
+def test_str(testCOB):
+    assert str(testCOB).startswith('<COB:')
+
+def test_qc_gene(testCOB):
+    assert isinstance(testCOB.qc_gene(),pd.DataFrame)

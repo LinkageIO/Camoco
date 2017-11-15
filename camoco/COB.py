@@ -47,7 +47,7 @@ class COB(Expr):
     '''
         A COB object represents an easily browsable Co-expression network. (COB-> co-expression browser)
     '''
-    def __init__(self, name):
+    def __init__(self, name): # pragma: no cover
         super().__init__(name=name)
         self.log('Loading Coex table')
         self.coex = self._bcolz('coex',blaze=True)
@@ -78,7 +78,7 @@ class COB(Expr):
     def __str__(self):
         return self.__repr__()
 
-    def summary(self,file=sys.stdout):
+    def summary(self,file=sys.stdout): # pragma: no cover
         '''
         '''
         print( '''
@@ -142,14 +142,25 @@ class COB(Expr):
 
     def qc_gene(self):
         '''
+            Returns qc statistics broken down by chromosome
+
+            Paramaters
+            ----------
+            None
+
+            Returns
+            -------
+            A dataframe containing QC info
         '''
         qc_gene = self._bcolz('qc_gene')
-        qc_gene['chrom'] = [self.refgen[x].chrom for x in qc_gene.index]
+        # generate the parent refegen
+        rg = self._parent_refgen
+        qc_gene['chrom'] = [rg[x].chrom if x in rg else 'None' for x in qc_gene.index]
         return qc_gene.groupby('chrom').aggregate(sum, axis=0)
 
     @property
     @memoize
-    def edge_FDR(self):
+    def edge_FDR(self): #C
         '''
         '''
         # get the percent of significant edges

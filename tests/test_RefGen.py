@@ -3,6 +3,8 @@ import camoco as co
 from camoco import cf
 
 from camoco import Locus
+import camoco.Tools as tools
+from camoco.Exceptions import CamocoZeroWindowError
 
 '''
     Unit tests
@@ -38,6 +40,17 @@ def test_genes_within(testRefGen):
     )
     genes = testRefGen.genes_within(bigger_locus)
     assert random_gene in genes
+    
+def test_genes_within_iterable(testRefGen):
+    random_gene = testRefGen.random_gene()
+    bigger_locus = Locus(
+        random_gene.chrom,
+        start=random_gene.start-100,
+        end=random_gene.end+100
+    )
+    genes = testRefGen.genes_within([bigger_locus,bigger_locus],chain=True)
+    assert random_gene in genes
+
 
 def test_locus_not_in_upstream_downstream(testRefGen):
     '''
@@ -61,6 +74,10 @@ def test_upstream_downstream_genes(testRefGen):
     # Grab downstream genes of random genes
     random_gene = testRefGen.random_gene()
     # Grab 10 downstream genes
+    try:
+        testRefGen.downstream_genes(random_gene,window_size=0)
+    except CamocoZeroWindowError as e:
+        pass
     downstream_genes = testRefGen.downstream_genes(
         random_gene,gene_limit=11,window_size=50e10
     )
@@ -68,10 +85,23 @@ def test_upstream_downstream_genes(testRefGen):
     # grab last gene
     last_gene = downstream_genes.pop(-1)
     # Grab upstream genes
+    try:
+        testRefGen.upstream_genes(random_gene,window_size=0)
+    except CamocoZeroWindowError as e:
+        pass
     upstream_genes = testRefGen.upstream_genes(
         last_gene,gene_limit=10,window_size=50e10
     )
     assert sorted(downstream_genes) == sorted(upstream_genes)
+
+def test_bad_flanking_genes(testRefGen):
+    random_gene = testRefGen.random_gene()
+
+    try:
+        testRefGen.flanking_genes(random_gene,window_size=0)
+    except CamocoZeroWindowError as e:
+        pass
+    assert True
 
 def test_flanking_genes(testRefGen):
     random_gene = testRefGen.random_gene()
@@ -107,9 +137,24 @@ def test_candidate_genes_from_SNP(testRefGen):
         window=50e6
     )
     candidates = testRefGen.candidate_genes(
-        test_snp,flank_limit=5,chain=False
+        test_snp,flank_limit=5,chain=False,
+        include_rank_intervening=True,
+        include_parent_locus=True,
+        include_parent_attrs='all',
+        include_num_intervening=True,
+        include_num_siblings=True,
+        include_SNP_distance=True
     )
     assert len(candidates) == 12 
+
+def test_chandidate_chained(testRefGen):
+    candidates = testRefGen.candidate_genes(
+            [testRefGen.random_gene()],
+            flank_limit=5,
+            window_size=50e6,
+            chain=True
+    )
+    assert len(candidates) <= 11
 
 def test_candidate_genes_from_gene_includes_gene(testRefGen):
     random_gene = testRefGen.random_gene()
@@ -174,7 +219,7 @@ def test_refgen_length(testRefGen):
     assert from_sql == len(testRefGen)
 
 def test_filtered_refgen(testRefGen):
-    co.del_dataset('RefGen','test_filtered_refgen',force=True) 
+    tools.del_dataset('RefGen','test_filtered_refgen',force=True) 
     random_genes = set(testRefGen.random_genes(n=500))
     test_filtered_refgen = testRefGen.filtered_refgen(
         'test_filtered_refgen',
@@ -185,7 +230,7 @@ def test_filtered_refgen(testRefGen):
     assert len(test_filtered_refgen) == len(random_genes)
     for x in random_genes:
         assert x in test_filtered_refgen
-    co.del_dataset('RefGen','test_filtered_refgen',force=True) 
+    tools.del_dataset('RefGen','test_filtered_refgen',force=True) 
 
 def test_rowid_equals_1_after_refgen_rebuild(Zm5bFGS_duplicate):
     '''
@@ -198,6 +243,45 @@ def test_rowid_equals_1_after_refgen_rebuild(Zm5bFGS_duplicate):
             "SELECT MIN(rowid) from genes"
         ).fetchone()[0] == 1
 
-
 def test_random_genes_returns_correct_n(testRefGen):
     assert len(testRefGen.random_genes(n=cf.test.num)) == cf.test.num
+
+def test_get_genome(testRefGen):
+    assert isinstance(testRefGen.genome,co.Genome.Genome)
+
+def test_intersection(testRefGen):
+    assert len(testRefGen.intersection(testRefGen.random_genes(10))) == 10
+
+def test_iter_genes(testRefGen):
+    assert len(list(testRefGen.iter_genes())) == 39656
+
+def test_from_id_not_in_there(testRefGen):
+    try:
+        x=testRefGen['ABC123']
+    except ValueError as e:
+        return True
+
+def test_from_ids_with_invalid_ids(testRefGen):
+    random_genes = sorted([x.id for x in testRefGen.random_genes(n=10)]) + ['ABC123']
+    try:
+        from_ids = sorted(testRefGen.from_ids(random_genes,check_shape=True))
+    except ValueError as e:
+        pass
+    from_ids = sorted(testRefGen.from_ids(random_genes,check_shape=False))
+    assert len(random_genes) == len(from_ids) + 1
+
+def test_encompassing_genes(testRefGen):
+    rg = testRefGen.random_gene()
+    middle = int((rg.start+rg.end)/2)
+    assert rg in testRefGen.encompassing_genes(Locus(rg.chrom,middle))
+
+def test_get_chromosome(testRefGen):
+    rg = testRefGen.random_gene()
+    chrom = testRefGen.chromosome(rg.chrom)
+    try:
+        testRefGen.chromosome('abc')
+    except ValueError as e:
+        pass
+    assert True
+
+

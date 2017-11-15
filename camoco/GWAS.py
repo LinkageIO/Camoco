@@ -95,18 +95,6 @@ class GWAS(Ontology):
             DELETE FROM loci_attr WHERE term = ?
         ''',(id,))
 
-    def set_strongest(self,attr=None,higher=None):
-        if not(attr is None):
-            self._global('strongest_attr',attr)
-        if not(higher is None):
-            self._global('strongest_higher',higher)
-    
-    def get_strongest_attr(self):
-        return self._global('strongest_attr')
-    
-    def get_strongest_higher(self):
-        return self._global('strongest_higher')
-        
 
     ''' -----------------------------------------------------------------------
             Internal Methods -- Factory Methods

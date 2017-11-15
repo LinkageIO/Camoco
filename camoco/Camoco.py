@@ -143,7 +143,7 @@ class Camoco(object):
         )
 
     def _global(self, key, val=None):
-        # set the global for the dataset
+        # Set the global for the dataset
         try:
             if val is not None:
                 self.db.cursor().execute('''

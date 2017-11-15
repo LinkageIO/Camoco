@@ -24,7 +24,7 @@ import statsmodels.api as sm
 import gzip
 import bz2
 
-def mean_confidence_interval(data):
+def mean_confidence_interval(data): # pragma no cover
     '''
         Convenience function to return both the mean as well as the 
         confidence interval on data. Good for chaining so inline data
@@ -33,7 +33,7 @@ def mean_confidence_interval(data):
     '''
     return np.mean(data), confidence_interval(data)
 
-def confidence_interval(data, confidence=0.95):
+def confidence_interval(data, confidence=0.95): # pragma no cover
     '''
         Returns the confidence (default 95%) for data.
     '''
@@ -43,19 +43,19 @@ def confidence_interval(data, confidence=0.95):
     h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
     return 1.96*se
 
-class NearestDict(OrderedDict):
+class NearestDict(OrderedDict): # pragma no cover
     '''
         This extension overrides the get item method 
         of dict where if a key does not exist, it returns
         the nearst key which does exist.
     '''
-    def __getitem__(self,key):
+    def __getitem__(self,key): # pragma no cover
         'Returns the nearest key which exists'
         return dict.__getitem__(self,min(self.keys(),key=lambda x: abs(x-key)))
 
 
 
-def available_datasets(type='%', name='%'):
+def available_datasets(type='%', name='%'): # pragma no cover
     try:
         cur = co.Camoco("Camoco", type='Camoco').db.cursor()
         datasets = cur.execute('''
@@ -82,18 +82,18 @@ def available_datasets(type='%', name='%'):
         raise e
         
 
-def available(type=None,name=None):
+def available(type=None,name=None): # pragma no cover
     # Laaaaaaaaazy
     return available_datasets(type=type,name=name)
 
-def del_dataset(type, name, force=False):
+def del_dataset(type, name, force=False): # pragma no cover
     try:
         c = co.Camoco("Camoco")
     except CantOpenError:
         return True
     if force == False:
         c.log("Are you sure you want to delete:\n {}.{}", type, name)
-        if input("[Y/n] (Notice CAPS):") != 'Y':
+        if input("[Y/n] (Notice CAPS): # pragma no cover") != 'Y':
             c.log("Nothing Deleted")
             return
     c.log("Deleting {}", name)
@@ -127,7 +127,7 @@ def del_dataset(type, name, force=False):
         del_dataset('Ontology', name+'MCL', force=force)
     return True
 
-def mv_dataset(type,name,new_name):
+def mv_dataset(type,name,new_name): # pragma no cover
     c = co.Camoco("Camoco")
     c.db.cursor().execute('''
         UPDATE datasets SET name = ? 
@@ -139,22 +139,22 @@ def mv_dataset(type,name,new_name):
         c._resource('databases',".".join([type,new_name])+".db")
     )
 
-class rawFile(object):
-    def __init__(self,filename):
+class rawFile(object): # pragma no cover
+    def __init__(self,filename): # pragma no cover
         self.filename = filename
-        if filename.endswith('.gz'):
+        if filename.endswith('.gz'): # pragma no cover
             self.handle = gzip.open(filename,'rt')
-        elif filename.endswith('bz2'):
+        elif filename.endswith('bz2'): # pragma no cover
             self.handle = bz2.open(filename,'rt')
         else:
             self.handle = open(filename,'r')
-    def __enter__(self):
+    def __enter__(self): # pragma no cover
         return self.handle
-    def __exit__(self,type,value,traceback):
+    def __exit__(self,type,value,traceback): # pragma no cover
         self.handle.close()
 
 
-def redescribe_dataset(type,name,new_desc):
+def redescribe_dataset(type,name,new_desc): # pragma no cover
     c = co.Camoco("Camoco")
     c.db.cursor().execute('''
         UPDATE datasets SET description = ? 
@@ -162,10 +162,10 @@ def redescribe_dataset(type,name,new_desc):
         (new_desc,name,type)
     )
 
-def memoize(obj):
+def memoize(obj): # pragma no cover
     cache = obj.cache = {}
     @functools.wraps(obj)
-    def memoizer(*args, **kwargs):
+    def memoizer(*args, **kwargs): # pragma no cover
         # Give us a way to clear the cache
         if 'clear_cache' in kwargs:
             cache.clear()
@@ -177,8 +177,8 @@ def memoize(obj):
     return memoizer
 
 
-class log(object):
-    def __init__(self, msg=None, *args, color='green'):
+class log(object): # pragma no cover
+    def __init__(self, msg=None, *args, color='green'): # pragma no cover
         if msg is not None and cf.logging.log_level == 'verbose':
             print(
                 colored(
@@ -188,10 +188,10 @@ class log(object):
             )
 
     @classmethod
-    def warn(cls, msg, *args):
+    def warn(cls, msg, *args): # pragma no cover
         cls(msg, *args, color='red')
 
-    def __call__(self, msg, *args, color='green'):
+    def __call__(self, msg, *args, color='green'): # pragma no cover
         if cf.logging.log_level == 'verbose':
             print(
                 colored(
@@ -202,7 +202,7 @@ class log(object):
         )
 
 
-def plot_flanking_vs_inter(cob):
+def plot_flanking_vs_inter(cob): # pragma no cover
     import numpy as np
     from scipy import stats
     import statsmodels.api as sm
@@ -240,7 +240,7 @@ def plot_flanking_vs_inter(cob):
     fig.savefig("{}_flank_inter.png".format(cob.name))
 
 
-def plot_local_global_degree(term, filename=None, bootstraps=1):
+def plot_local_global_degree(term, filename=None, bootstraps=1): # pragma no cover
     ROOT = co.COB("ROOT")
     RZM = ROOT.refgen # use root specific for bootstraps
     hood = ROOT.neighborhood(term.flanking_genes(RZM))
@@ -255,10 +255,10 @@ def plot_local_global_degree(term, filename=None, bootstraps=1):
         filename = "{}_locality.png".format(term.id)
     pylab.savefig(filename)
 
-def plot_local_vs_cc(term, filename=None, bootstraps=1):
+def plot_local_vs_cc(term, filename=None, bootstraps=1): # pragma no cover
     RZM = co.COB('ROOT').refgen # use root specific for bootstraps
     pylab.clf()
-    for _ in range(0, bootstraps):
+    for _ in range(0, bootstraps): # pragma no cover
         graph = co.COB('ROOT').graph(term.bootstrap_flanking_genes(RZM))
         degree = np.array(graph.degree())
         cc = np.array(graph.transitivity_local_undirected(weights='weight'))
@@ -276,9 +276,9 @@ def plot_local_vs_cc(term, filename=None, bootstraps=1):
         filename = "{}_cc.png".format(term.id)
     pylab.savefig(filename)
 
-def read_density(path):
+def read_density(path): # pragma no cover
     dfs = []
-    for x in glob.glob(path):
+    for x in glob.glob(path): # pragma no cover
         df = pd.read_table(x,sep=',')
         dfs.append(df)
     df = pd.concat(dfs)
@@ -288,9 +288,9 @@ def read_density(path):
     df.loc[[x.startswith('Trans') for x in df.Term],'TraitType'] = 'Trans'
     return df.set_index(['Ontology','COB','Term','WindowSize','FlankLimit'])
 
-def read_FDR(glob_path,sep=','):
+def read_FDR(glob_path,sep=','): # pragma no cover
     dfs = []
-    for x in glob.glob(glob_path):
+    for x in glob.glob(glob_path): # pragma no cover
         df = pd.read_table(x,sep=sep)
         dfs.append(df)
     df = pd.concat(dfs)
@@ -301,20 +301,20 @@ def read_FDR(glob_path,sep=','):
     df.loc[[x.startswith('Trans') for x in df.Term],'TraitType'] = 'Trans'
     return df.set_index(['Ontology','COB','Term','WindowSize','FlankLimit'])
 
-def zmax(a):
+def zmax(a): # pragma no cover
     if len(a) == 0:
         return 0
     else:
         return np.max(a)
 
-def zmin(a):
+def zmin(a): # pragma no cover
     if len(a) == 0:
         return 0
     else:
         return np.min(a)
 
-def groupedFDR(df):
-    def grouped_agg(x):
+def groupedFDR(df): # pragma no cover
+    def grouped_agg(x): # pragma no cover
         return pd.Series(
             {
                 'Tot':  sum(x.numReal),
@@ -330,11 +330,11 @@ def groupedFDR(df):
     return df.reset_index().groupby(groups).apply(grouped_agg)
 
 
-class DummyRefGen(object):
+class DummyRefGen(object): # pragma no cover
     '''
         This is a dummy refgen that will always return True
     '''
-    def __init__(self):
+    def __init__(self): # pragma no cover
         self.name = 'DummyRefGen'
-    def __contains__(self,x):
+    def __contains__(self,x): # pragma no cover
         return True

@@ -24,6 +24,9 @@ def testTerm():
     return Term('test',desc='hello',loci=loci,attr1=True,attr2=False)
 
 
+def test_init():
+    x = Term('testTerm',desc='for testing',loci=[Locus(1,2),Locus(1,3)],foo='bar')
+
 def test_term_init(testTerm):
     assert testTerm.id == 'test'
     assert testTerm.desc == 'hello'
@@ -52,3 +55,17 @@ def test_strongest_loci(testTerm):
     assert list(
         map(lambda x:x.start, testTerm.strongest_loci('score',lowest=False))
     ) == [400,300,100,300,400]
+
+def test_flanking_loci(testTerm):
+    assert len(testTerm.flanking_loci(Locus(4,250),window_size=100)) == 2
+    assert len(testTerm.flanking_loci(Locus(4,250),window_size=400)) == 4
+
+def test_copy(testTerm):
+    copy = testTerm.copy()
+    assert len(copy) == len(testTerm)
+
+def test_str(testTerm):
+    assert isinstance(str(testTerm),str)
+
+def test_repr(testTerm):
+    assert isinstance(repr(testTerm),str)

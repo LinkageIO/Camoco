@@ -31,7 +31,7 @@ class Term(object):
             self.attrs[key] = val
 
     @property
-    def locus_list(self):
+    def locus_list(self): #pragma: no cover
         raise Exception('This is deprecated')
 
     def __len__(self):

@@ -158,14 +158,10 @@ class Overlap(Camoco):
                 window_size=self.args.candidate_window_size
             )
         elif 'strongest' in self.args.snp2gene:
-            if not(self.args.strongest_attr == 'pval'):
-                ont.set_strongest(attr=self.args.strongest_attr)
-            if not(self.args.strongest_higher == True):
-                ont.set_strongest(higher=self.args.strongest_higher)
             return term.strongest_loci(
                 window_size=self.args.candidate_window_size,
-                attr=ont.get_strongest_attr(),
-                lowest=ont.get_strongest_higher()
+                attr=self.args.strongest_attr,
+                lowest=self.args.strongest_higher
             )
 
     def generate_bootstraps(self,loci,overlap):
@@ -606,15 +602,22 @@ class Overlap(Camoco):
         else:
             self.ont = co.GWAS(args.gwas)
         self.generate_output_name()
-
+        
+        # Save strongest description arguments if applicable
+        if 'strongest' in self.args.snp2gene:
+            if not(self.ont._global('strongest_attr') == args.strongest_attr):
+                self.ont.set_strongest(attr=args.strongest_attr)
+            if not(bool(int(self.ont._global('strongest_higher'))) == bool(args.strongest_higher)):
+                self.ont.set_strongest(higher=args.strongest_higher)
+        
         # Generate a terms iterable
         if 'all' in self.args.terms:
             terms = self.ont.iter_terms()
         else:
             terms = [self.ont[term] for term in self.args.terms]
         all_results = list()
-
         results = []
+        
         # Iterate through terms and calculate
         for term in terms:
             if term.id in self.args.skip_terms:
@@ -627,6 +630,7 @@ class Overlap(Camoco):
             if args.max_term_size != None and len(loci) > args.max_term_size:
                 self.cob.log('Too many genes to perform overlap')
                 continue
+            
             # Send some output to the terminal
             self.cob.log(
                 "Calculating Overlap for {} of {} in {} with window:{} and flank:{} ({} Loci)",

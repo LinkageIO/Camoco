@@ -3,6 +3,7 @@
 import pytest
 import pandas as pd
 import camoco as co
+import camoco.Tools as tools
 
 def test_init(testGWAS):
     assert len(testGWAS) == 2
@@ -27,7 +28,7 @@ def test_fromDataFrame(testRefGen):
     '''
         Test GWAS creation from DataFrame
     '''
-    co.del_dataset('GWAS','testGWAS',force=True)
+    tools.del_dataset('GWAS','testGWAS',force=True)
     df = pd.DataFrame({
         'Trait' : ['a','a','b','b'],
         'CHR' : ['chr1','chr2','chr3','chr4'],
