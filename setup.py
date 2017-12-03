@@ -23,6 +23,32 @@ def find_version(*file_paths):
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
+class PostDevelopCommand(develop):
+    """
+        Post-installation for development mode.
+    """
+    def run(self):
+        print('Running post-installation for apsw')
+        check_call('pip install -r requirements.txt'.split())
+        check_call('''\
+	pip install --user https://github.com/rogerbinns/apsw/releases/download/3.19.3-r1/apsw-3.19.3-r1.zip \
+	--global-option=fetch --global-option=--version --global-option=3.19.3 --global-option=--all \
+	--global-option=build --global-option=--enable-all-extensions'''.split())
+        develop.run(self)
+
+class PostInstallCommand(install):
+    """
+        Post-installation for installation mode.
+    """
+    def run(self):
+        check_call('pip install -r requirements.txt'.split())
+        check_call('''\
+	pip install --user https://github.com/rogerbinns/apsw/releases/download/3.19.3-r1/apsw-3.19.3-r1.zip \
+	--global-option=fetch --global-option=--version --global-option=3.19.3 --global-option=--all \
+	--global-option=build --global-option=--enable-all-extensions'''.split())
+        install.run(self)
+
+
 pccup = Extension(
     'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
@@ -44,7 +70,11 @@ setup(
         'camoco/cli/camoco'
     ],
     ext_modules = [pccup,refgendist],
-    cmdclass = {'build_ext': build_ext},
+    cmdclass = {
+        'build_ext': build_ext,
+        'develop': PostDevelopCommand,
+        'install': PostInstallCommand,
+    },
 
     package_data = {
         '':['*.cyx']    
@@ -62,8 +92,8 @@ setup(
     include_package_data=True,
 
     author = 'Rob Schaefer',
-    author_email = 'schae234@gmail.com',
+    author_email = 'rob@linkgae.io',
     description = 'Library for Co-Analysis of Molecular Componenets.',
-    license = "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License",
+    license = "Copyright Linkage Analytics 2017, Available under the MIT License",
     url = 'https://github.com/schae234/camoco'
 )
