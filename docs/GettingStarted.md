@@ -12,7 +12,7 @@ $ camoco
 ```
 
 You should see:
-```
+```shell
 usage: camoco [-h] [--debug] [--interactive] [--force] Available Commands ...
 
       ___           ___           ___           ___           ___           ___      
@@ -20,14 +20,14 @@ usage: camoco [-h] [--debug] [--interactive] [--force] Available Commands ...
     /  /:/        /  /::\       |  |::\       /  /::\       /  /:/        /  /::\    
    /  /:/        /  /:/\:\      |  |:|:\     /  /:/\:\     /  /:/        /  /:/\:\   
   /  /:/  ___   /  /:/~/::\   __|__|:|\:\   /  /:/  \:\   /  /:/  ___   /  /:/  \:\  
- /__/:/  /  /\ /__/:/ /:/\:\ /__/::::| \:\ /__/:/ \__\:\ /__/:/  /  /\ /__/:/ \__\:\ 
- \  \:\ /  /:/ \  \:\/:/__\/ \  \:\~~\__\/ \  \:\ /  /:/ \  \:\ /  /:/ \  \:\ /  /:/ 
+ /__/:/  /  /\ /__/:/ /:/\:\ /__/::::| \:\ /__/:/ \__\:\ /__/:/  /  /\ /__/:/ \__\:\
+ \  \:\ /  /:/ \  \:\/:/__\/ \  \:\~~\__\/ \  \:\ /  /:/ \  \:\ /  /:/ \  \:\ /  /:/
   \  \:\  /:/   \  \::/       \  \:\        \  \:\  /:/   \  \:\  /:/   \  \:\  /:/  
    \  \:\/:/     \  \:\        \  \:\        \  \:\/:/     \  \:\/:/     \  \:\/:/   
     \  \::/       \  \:\        \  \:\        \  \::/       \  \::/       \  \::/    
-     \__\/         \__\/         \__\/         \__\/         \__\/         \__\/ 
+     \__\/         \__\/         \__\/         \__\/         \__\/         \__\/
 
-Camoco (Co-analysis of Molecular Components) inter-relates and co-analyzes different 
+Camoco (Co-analysis of Molecular Components) inter-relates and co-analyzes different
 levels of genomic data. Namely it integrates genes present near and around GWAS loci
 using unbiased, functional information derived from co-expression networks.
 
@@ -68,7 +68,7 @@ Cache. Money. Corn.
 ```
 
 Download some data:
-```
+```shell
 # A Gene Reference Genome
 wget https://s3.msi.umn.edu/schae234/LocusPocus/ZmB73_5b_FGS.gff.gz
 
@@ -80,13 +80,13 @@ You could use the CLI to create a reference genome object, but lets do things in
 ```
 $ ipython
 ```
-```{ipython}
+```python
 import camoco as co
 import pandas as pd
 ```
 
 Check out the function signature for importing a GFF file:
-```
+```python
 co.RefGen.from_gff?
 
 Signature: co.RefGen.from_gff(filename, name, description, build, organism, chrom_feature='chromosome', gene_feature='gene', ID_attr='ID', attr_split='=')
@@ -131,13 +131,13 @@ Type:      method
 
 ## Create a ReferenceGenome object
 
-```
+```python
 co.RefGen.from_gff("./ZmB73_5b_FGS.gff.gz","CornGenes",'Test!','ZeaMays')
 ```
 
 Bind the object to a variable:
 
-```
+```python
 Zm5bFGS = co.RefGen("CornGenes")
 # Get a random gene
 Zm5bFGS.random_gene()
@@ -161,12 +161,12 @@ Zm5bFGS.random_genes(n=10)
 ```
 
 ## Create a COB (co-expresssion browser) object
-```
+```python
 co.COB.from_table("./MaizeRNASeqTissue.tsv.bz2",name='MaizeTissue',description='Test!',refgen=Zm5bFGS,rawtype='RNASEQ')
 ```
 
 Bind the object to a variable
-```
+```pythonpython
 co.COB.from_table("./MaizeRNASeqTissue.tsv.bz2",name='MaizeTissue',description='Test!',refgen=Zm5bFGS,rawtype='RNASEQ')
 
 [LOG] Tue Dec  5 10:55:23 2017 - Loading Expr table
@@ -307,7 +307,7 @@ Out[25]: <COB: MaizeTissue>
 ## Object work together!
 Get the expression among 10 random genes
 
-```
+```python
 MaizeTissue = co.COB('MaizeTissue')
 
 MaizeTissue.expr(Zm5bFGS.random_genes(n=10))
