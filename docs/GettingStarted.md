@@ -6,7 +6,7 @@
 Follow the installation instructions. Make sure that Camoco is installed by activating the virtual env
 then running the camoco CLI command:
 
-```
+```shell
 $ source activate camoco
 $ camoco
 ```
