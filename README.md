@@ -50,9 +50,6 @@ export PATH=$BASE/bin:~/.camoco/conda/bin/:$PATH
 The installation script accepts simple arguments: `-b (default: ~/.camoco)`:
 the base directory to install camoco including storage for databases
 
-Tagged releases are available on PyPi: `pip install camoco`.
-
-
 
 Required Files:
 + FPKM (or equivalent) CSV/TSV file
