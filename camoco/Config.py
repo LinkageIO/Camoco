@@ -28,8 +28,9 @@ test:
     ontology: ZmIonome
     term:     Fe57
     gene:     GRMZM2G000014
-    
-'''.format(**{'user':getpass.getuser()})
+'''
+
+#'''.format(**{'user':getpass.getuser()})
 
 class Level(dict):
     '''
