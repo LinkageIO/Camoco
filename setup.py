@@ -2,8 +2,12 @@
 
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
-import os
+from setuptools.command.develop import develop
+from setuptools.command.install import install
 
+from subprocess import check_call
+
+import os
 import io
 import re
 import numpy
