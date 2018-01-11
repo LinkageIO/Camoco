@@ -10,7 +10,7 @@ global cf
 default_config = '''--- # YAML Camoco Configuration File
 options:
     basedir: ~/.camoco/
-    testdir: ~/build/{user}/Camoco/tests/
+    testdir: ~/build/LinkageIO/Camoco/tests/
     alpha:   0.0001
     debug:   False
 
