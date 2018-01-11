@@ -7,6 +7,8 @@ import matplotlib
 # Force matplotlib to not use any Xwindows backend.
 matplotlib.use('Agg')
 
+
+
 import camoco as co
 
 import sys
@@ -16,6 +18,7 @@ import glob
 import argparse
 
 from camoco.Tools import log 
+
 
 import pandas as pd
 pd.set_option('display.width',300)

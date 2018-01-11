@@ -45,6 +45,8 @@ pyximport.install(setup_args={
 
 import matplotlib
 matplotlib.use('Agg')
+
+
 from .Config import cf
 from .Camoco import Camoco
 from .Expr import Expr
@@ -62,4 +64,4 @@ from .GOnt import GOnt
 #from .Overlap import Overlap
 
 # Create yourself
-Camoco.create('Camoco','Mother Database')
+#Camoco.create('Camoco','Mother Database')

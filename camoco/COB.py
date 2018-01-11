@@ -45,9 +45,23 @@ from scipy.stats import pearsonr
 
 class COB(Expr):
     '''
-        A COB object represents an easily browsable Co-expression network. (COB-> co-expression browser)
+        A COB object represents an easily browsable Co-expression network.
+        (COB-> co-expression browser)
     '''
     def __init__(self, name): # pragma: no cover
+        '''
+        Initialize a built co-expression network
+
+        Parameters
+        ----------
+        name : str
+            The name of the co-expression network (from when it was built)
+
+        Returns
+        -------
+        cob : COB
+            A COB object
+        '''
         super().__init__(name=name)
         self.log('Loading Coex table')
         self.coex = self._bcolz('coex',blaze=True)
@@ -80,6 +94,16 @@ class COB(Expr):
 
     def summary(self,file=sys.stdout): # pragma: no cover
         '''
+        Returns a nice summary of what is in the network.
+
+        Parameters
+        ----------
+        file : str,default=stdout,optional
+
+        Returns
+        -------
+        None
+            The summary is printed either to stdout or a provided file.
         '''
         print( '''
             COB Dataset: {}
@@ -150,7 +174,8 @@ class COB(Expr):
 
             Returns
             -------
-            A dataframe containing QC info
+            DataFrame
+                A dataframe containing QC info
         '''
         qc_gene = self._bcolz('qc_gene')
         # generate the parent refegen
@@ -162,6 +187,21 @@ class COB(Expr):
     @memoize
     def edge_FDR(self): #C
         '''
+        Returns a calculated false discovery rate of the Edges. This is 
+        calculated from the number of expected edges from the standard normal
+        distribution, which a network will follow if the gene expression matrix
+        is simply random data. This function looks at the number of expected 
+        'significant' edges and divides that by the number of observed edges in 
+        the network.
+
+        Parameters
+        -----------
+        None
+
+        Returns
+        -------
+        FDR : float
+            The ratio of expected edges / observed edges
         '''
         # get the percent of significant edges
         num_sig = self.coex.significant.coerce(to='int32').sum()/len(self.coex)
@@ -172,13 +212,18 @@ class COB(Expr):
 
     def set_sig_edge_zscore(self,zscore):
         '''
-            Sets the 'significance' threshold for the coex network. This will
-            affect thresholded network metrics that use degree (e.g. locality)
-            It will not affect unthresholded metrics like Density. 
+        Sets the 'significance' threshold for the coex network. This will
+        affect thresholded network metrics that use degree (e.g. locality)
+        It will not affect unthresholded metrics like Density. 
 
-            Parameters
-            ----------
-            zscore : the new significance threshold
+        Parameters
+        ----------
+        zscore : float
+            the new significance threshold
+
+        Returns
+        -------
+        None
         '''
         # Don't do anything if there isn't a coex table
         if self.coex is None:
@@ -206,6 +251,7 @@ class COB(Expr):
         if new_sig or self.sigs is None:
             self.sigs = np.array([ind for ind in self.coex.data['significant'].wheretrue()])
             self.sigs.sort()
+        return None
     
     def _coex_DataFrame(self,ids=None,sig_only=True):
         '''

@@ -1,4 +1,5 @@
 import camoco as co
+from camoco.Tools import *
 
 def list_command(args):
     if args.type != None and args.name != None:
@@ -10,11 +11,11 @@ def list_command(args):
                 gont = co.GOnt(args.name)
                 print('\n'.join([x.id for x in gont.iter_terms()]))
         else:
-            print(co.available_datasets(args.type,args.name))
+            print(available_datasets(args.type,args.name))
     elif args.type != None and args.name == None:
         args.name = '%'
-        print(co.available_datasets(args.type,args.name).to_string())
+        print(available_datasets(args.type,args.name).to_string())
     else:
         args.type = '%'
         args.name = '%'
-        print(co.available_datasets(args.type,args.name).to_string())
+        print(available_datasets(args.type,args.name).to_string())
