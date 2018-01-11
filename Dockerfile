@@ -21,6 +21,8 @@ RUN mkdir -p /src/ && \
 
 WORKDIR /root
 
+#ADD /home/rob/.camoco/databases /.camoco/databases
+
 ENV LD_LIBRARY_PATH=/root/.camoco/lib:$LD_LIBRARY_PATH \ 
     PATH=/root/.camoco/bin:/root/.camoco/conda/envs/camoco/bin:$PATH
 
@@ -28,3 +30,4 @@ ENV LD_LIBRARY_PATH=/root/.camoco/lib:$LD_LIBRARY_PATH \
 RUN [ "/bin/bash", "-c", "source activate camoco" ]
 
 ENTRYPOINT [ "/root/.camoco/conda/envs/camoco/bin/camoco" ]
+#ENTRYPOINT [ "/bin/bash" ]
