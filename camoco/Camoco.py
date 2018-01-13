@@ -10,6 +10,7 @@ import bcolz as bcz
 import warnings
 from flask.exthook import ExtDeprecationWarning
 warnings.simplefilter('ignore',ExtDeprecationWarning)
+warnings.simplefilter('ignore',FutureWarning)
 import blaze as blz
 
 from .Tools import log
