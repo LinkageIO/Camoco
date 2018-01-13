@@ -64,4 +64,4 @@ from .GOnt import GOnt
 #from .Overlap import Overlap
 
 # Create yourself
-#Camoco.create('Camoco','Mother Database')
+Camoco.create('Camoco','Mother Database')
