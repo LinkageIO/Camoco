@@ -54,6 +54,7 @@ from .COB import COB
 from .RefGen import RefGen
 #from .RefGenDist import *
 #from .PCCUP import *
+
 from .Ontology import Ontology,Term
 from .GWAS import GWAS
 from .Locus import Locus

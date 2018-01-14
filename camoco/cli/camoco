@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 
+# supress python warnings
+import warnings
+from flask.exthook import ExtDeprecationWarning
+warnings.simplefilter('ignore',ExtDeprecationWarning)
+warnings.simplefilter('ignore',FutureWarning)
+warnings.simplefilter('ignore',RuntimeWarning)
+
 # Make sure that the camoco install is always frist
 import sys
 import os
@@ -490,90 +497,90 @@ if __name__ == '__main__':
     --------------------------'''
     removeCLI = subparsers.add_parser(
         'rm',
-        help='remove camoco dataset.'
+        help='Remove camoco dataset.'
     )
     removeCLI.add_argument('type',default=None)
     removeCLI.add_argument('name',default=None)
     removeCLI.add_argument('-f','--force',action='store_false',default=True)
     removeCLI.set_defaults(func=remove)
 
-    ''' --------------------------
-        plotGWAS 
-    --------------------------'''
-    plotgwas = subparsers.add_parser(
-        'plotGWAS',
-        help='Plot a GWAS dataset'
-    )
-    # Data Set Arguments
-    plotgwas.add_argument(
-        'cob',
-        help='The camoco network to use.'
-    )
-    plotgwas.add_argument(
-        'gwas', 
-        help='The camoco GWAS to use.'
-    )
-    plotgwas.add_argument(
-        '--terms',
-        nargs='*', 
-        default=['all'],
-        help='The term within the GWAS ontology to use. default: all'
-    )
-    plotgwas.add_argument(
-        '--candidate-window-size',
-        default=50000,
-        type=int,
-        help=(
-            'The window size (in bp) for mapping effective SNPs to genes. '
-            'default: 50000'
-        )
-    )
-    plotgwas.add_argument(
-        '--candidate-flank-limit',
-        type=int,
-        default=2,
-        help=(
-           'The number of flanking genes included in SNP to gene mapping. '
-           'default: 2' 
-        )
-    )
-    plotgwas.add_argument(
-        '--snp2gene', 
-        type=str,
-        default='strongest',
-        metavar='strongest',
-        help=(
-            'The SNP to gene mapping to use. Specifying multiple mappings '
-            ' will result in multiple results. Must be one of: '
-            "['effective','strongest'] "
-            "default:'strongest' "
-        )
-    )
-    plotgwas.add_argument(
-        '--strongest-attr', 
-        default='pval', 
-        type=str,
-        help=(
-            'The locus attr used to determine which locus is the'
-            'strongest locus. (defualt=pval).'
-        )
-    )
-    plotgwas.add_argument(
-        '--strongest-higher',
-        action='store_false',
-        default=True,
-        help=(
-            'Flag indicating the value in --strongest-attr is '
-            'stronger if higher. Default behavior is to treat '
-            'lower values as stronger (i.e. p-vals)'
-        )
-    )
-    plotgwas.add_argument(
-        '--out', 
-        default=sys.stdout,
-        help='OutputFile Name (default: Standard Out)'
-    )
-    plotgwas.set_defaults(func=plot_gwas) 
+   #''' --------------------------
+   #    plotGWAS 
+   #--------------------------'''
+   #plotgwas = subparsers.add_parser(
+   #    'plotGWAS',
+   #    help='Plot a GWAS dataset'
+   #)
+   ## Data Set Arguments
+   #plotgwas.add_argument(
+   #    'cob',
+   #    help='The camoco network to use.'
+   #)
+   #plotgwas.add_argument(
+   #    'gwas', 
+   #    help='The camoco GWAS to use.'
+   #)
+   #plotgwas.add_argument(
+   #    '--terms',
+   #    nargs='*', 
+   #    default=['all'],
+   #    help='The term within the GWAS ontology to use. default: all'
+   #)
+   #plotgwas.add_argument(
+   #    '--candidate-window-size',
+   #    default=50000,
+   #    type=int,
+   #    help=(
+   #        'The window size (in bp) for mapping effective SNPs to genes. '
+   #        'default: 50000'
+   #    )
+   #)
+   #plotgwas.add_argument(
+   #    '--candidate-flank-limit',
+   #    type=int,
+   #    default=2,
+   #    help=(
+   #       'The number of flanking genes included in SNP to gene mapping. '
+   #       'default: 2' 
+   #    )
+   #)
+   #plotgwas.add_argument(
+   #    '--snp2gene', 
+   #    type=str,
+   #    default='strongest',
+   #    metavar='strongest',
+   #    help=(
+   #        'The SNP to gene mapping to use. Specifying multiple mappings '
+   #        ' will result in multiple results. Must be one of: '
+   #        "['effective','strongest'] "
+   #        "default:'strongest' "
+   #    )
+   #)
+   #plotgwas.add_argument(
+   #    '--strongest-attr', 
+   #    default='pval', 
+   #    type=str,
+   #    help=(
+   #        'The locus attr used to determine which locus is the'
+   #        'strongest locus. (defualt=pval).'
+   #    )
+   #)
+   #plotgwas.add_argument(
+   #    '--strongest-higher',
+   #    action='store_false',
+   #    default=True,
+   #    help=(
+   #        'Flag indicating the value in --strongest-attr is '
+   #        'stronger if higher. Default behavior is to treat '
+   #        'lower values as stronger (i.e. p-vals)'
+   #    )
+   #)
+   #plotgwas.add_argument(
+   #    '--out', 
+   #    default=sys.stdout,
+   #    help='OutputFile Name (default: Standard Out)'
+   #)
+   #plotgwas.set_defaults(func=plot_gwas) 
 
     ''' --------------------------
         Overlap (density/locality) 
@@ -721,7 +728,7 @@ if __name__ == '__main__':
     --------------------------'''
     health = subparsers.add_parser(
         'health',
-        help='Generate COB Health Stats'
+        help='Generate network health statistics'
     )
     health.add_argument(
         'cob',
@@ -778,175 +785,175 @@ if __name__ == '__main__':
     health.set_defaults(func=cob_health)
 
 
-    '''----------------------------------
-        Cross Reference
-    -------------------------------------'''
-    crossref = subparsers.add_parser(
-        'crossref',
-        help=(
-            'cross reference a set of networks'
-            ' based on edge strength and go term density'
-        )
-    )
-    crossref.add_argument(
-        'cobs',
-        default=None,
-        nargs='*',
-        help='A list of COBs which to cross reference'
-    )
-    crossref.add_argument(
-        '--out',
-        default=None,
-        help='Output file name.'
-    )
-    crossref.set_defaults(func=crossref)
+   #'''----------------------------------
+   #    Cross Reference
+   #-------------------------------------'''
+   #crossref = subparsers.add_parser(
+   #    'crossref',
+   #    help=(
+   #        'cross reference a set of networks'
+   #        ' based on edge strength and go term density'
+   #    )
+   #)
+   #crossref.add_argument(
+   #    'cobs',
+   #    default=None,
+   #    nargs='*',
+   #    help='A list of COBs which to cross reference'
+   #)
+   #crossref.add_argument(
+   #    '--out',
+   #    default=None,
+   #    help='Output file name.'
+   #)
+   #crossref.set_defaults(func=crossref)
 
-    '''----------------------------------
-        Simulate GWAS
-    -------------------------------------'''
-    simulateGWASCLI = subparsers.add_parser(
-        'simulateGWAS',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        help='Evaluate co-expression in simulated GWAS datasets',
-        description=(
-            'Simulate a GWAS dataset by adding candidate windows and \n'
-            'flanking limits to terms within an Ontology. The ideal \n'
-            'GWAS experiment is simulated by defining SNPs to having a 1:1 \n'
-            'mapping to gene in a GO term. i.e. SNPs are directly generated \n'
-            'using starting position of genes in GO term \n'
-            'Noise is intruduced to the experiment \n'
-            'using various sources of noise outlined below.\n'
-            'Optional arguments below are applied in the following order: \n\n'
-            '+ GO terms between min and max term size are extracted \n'
-            '+ `--percent-SNPs-missed` of "SNPs" in GO term are removed. (False Negative SNPs) \n'
-            '+ `--percent-fcr` of "SNPs" are replaced with random "SNPs" (False Positive SNPs) \n'
-            '+ `--candidate-flank-limit` and `--candidate-window-size` introduce noise in \n'
-            '   SNP to gene mapping.'
-        )
-    )
-    simulateGWASCLI.add_argument(
-        'cob',
-        help='The Coexpression network you want to use.'
-    )
-    simulateGWASCLI.add_argument(
-        'GOnt',
-        help='The name of the GO Ontology you want to analyze.'
-    )
-    simulateGWASCLI.add_argument(
-        '--terms',
-        type=str,
-        metavar='all',
-        default = ['all'],
-        nargs='*',
-        help=("Ontology term to simulate. If 'all', which is the default, "
-            "all terms will be tested."    
-        )
-    )
-    simulateGWASCLI.add_argument(
-        '--method',
-        default='density',
-        choices=['density','locality'],
-        help='The metric used to evaluate overlap between the loci and the network'
-    )
-    simulateGWASCLI.add_argument(
-        '--max-term-size',
-        type=int,
-        default=100,
-        help='Maximum number of genes allowed in a GO term'
-    )
-    simulateGWASCLI.add_argument(
-        '--min-term-size',
-        type=int,
-        default=50,
-        help='Minimum number of genes allowed in a GO term'
-    )
-    simulateGWASCLI.add_argument(
-        '--candidate-window-size',
-        type=int,
-        default=1, 
-        metavar=1,
-        help=(
-            'The window size, in bp, for mapping effective SNPs to genes. '
-        )
-    )
-    simulateGWASCLI.add_argument(
-        '--candidate-flank-limit',
-        type=int,
-        default=0, 
-        metavar=0,
-        help=(
-            'The number of flanking genes included in SNP to gene mapping. '
-            'on each side of the locus.' 
-        )
-    )
-    simulateGWASCLI.add_argument(
-        '--num-bootstraps', 
-        default='auto',
-        metavar=100,
-        help=(
-            'The number of bootstraps to perform in order '
-            'to estimate a null distribution.'
-        )
-    )
-    simulateGWASCLI.add_argument(                                                  
-        '--percent-fcr',                                                        
-        type=int,                                                             
-        default=0,                                                           
-        metavar=0,                                                            
-        help=(                                                                  
-            '(FCR) False Cadidate Rate: '
-            'The percentage of the term loci to be replaced with '              
-            'random loci, simulating noise or false positives '                 
-            'within the term. (Default: 0)'                                                   
-        )                                                                       
-    )  
-    simulateGWASCLI.add_argument(
-        '--percent-mcr',
-        metavar=0,
-        type=int,
-        default=0,
-        help=(
-            '(MCR) Missing Candidate Rate: '
-            'Percentage of input SNPs that were missed by '
-            'simulated GWAS. e.g. if GWAS term SNPs ideally '
-            'tag 10 GO genes and --percent-mcr=50 half '
-            'of the genes in the GO term will be removed resulting '
-            'in an input network of 5 genes. (Default=0)'
-        )
-    )
-    simulateGWASCLI.add_argument(
-        '--out', 
-        default=None,
-        help='OutputFile Name'
-    )
-    simulateGWASCLI.set_defaults(func=simulateGWAS.from_CLI)
+   #'''----------------------------------
+   #    Simulate GWAS
+   #-------------------------------------'''
+   #simulateGWASCLI = subparsers.add_parser(
+   #    'simulateGWAS',
+   #    formatter_class=argparse.RawDescriptionHelpFormatter,
+   #    help='Evaluate co-expression in simulated GWAS datasets',
+   #    description=(
+   #        'Simulate a GWAS dataset by adding candidate windows and \n'
+   #        'flanking limits to terms within an Ontology. The ideal \n'
+   #        'GWAS experiment is simulated by defining SNPs to having a 1:1 \n'
+   #        'mapping to gene in a GO term. i.e. SNPs are directly generated \n'
+   #        'using starting position of genes in GO term \n'
+   #        'Noise is intruduced to the experiment \n'
+   #        'using various sources of noise outlined below.\n'
+   #        'Optional arguments below are applied in the following order: \n\n'
+   #        '+ GO terms between min and max term size are extracted \n'
+   #        '+ `--percent-SNPs-missed` of "SNPs" in GO term are removed. (False Negative SNPs) \n'
+   #        '+ `--percent-fcr` of "SNPs" are replaced with random "SNPs" (False Positive SNPs) \n'
+   #        '+ `--candidate-flank-limit` and `--candidate-window-size` introduce noise in \n'
+   #        '   SNP to gene mapping.'
+   #    )
+   #)
+   #simulateGWASCLI.add_argument(
+   #    'cob',
+   #    help='The Coexpression network you want to use.'
+   #)
+   #simulateGWASCLI.add_argument(
+   #    'GOnt',
+   #    help='The name of the GO Ontology you want to analyze.'
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--terms',
+   #    type=str,
+   #    metavar='all',
+   #    default = ['all'],
+   #    nargs='*',
+   #    help=("Ontology term to simulate. If 'all', which is the default, "
+   #        "all terms will be tested."    
+   #    )
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--method',
+   #    default='density',
+   #    choices=['density','locality'],
+   #    help='The metric used to evaluate overlap between the loci and the network'
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--max-term-size',
+   #    type=int,
+   #    default=100,
+   #    help='Maximum number of genes allowed in a GO term'
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--min-term-size',
+   #    type=int,
+   #    default=50,
+   #    help='Minimum number of genes allowed in a GO term'
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--candidate-window-size',
+   #    type=int,
+   #    default=1, 
+   #    metavar=1,
+   #    help=(
+   #        'The window size, in bp, for mapping effective SNPs to genes. '
+   #    )
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--candidate-flank-limit',
+   #    type=int,
+   #    default=0, 
+   #    metavar=0,
+   #    help=(
+   #        'The number of flanking genes included in SNP to gene mapping. '
+   #        'on each side of the locus.' 
+   #    )
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--num-bootstraps', 
+   #    default='auto',
+   #    metavar=100,
+   #    help=(
+   #        'The number of bootstraps to perform in order '
+   #        'to estimate a null distribution.'
+   #    )
+   #)
+   #simulateGWASCLI.add_argument(                                                  
+   #    '--percent-fcr',                                                        
+   #    type=int,                                                             
+   #    default=0,                                                           
+   #    metavar=0,                                                            
+   #    help=(                                                                  
+   #        '(FCR) False Cadidate Rate: '
+   #        'The percentage of the term loci to be replaced with '              
+   #        'random loci, simulating noise or false positives '                 
+   #        'within the term. (Default: 0)'                                                   
+   #    )                                                                       
+   #)  
+   #simulateGWASCLI.add_argument(
+   #    '--percent-mcr',
+   #    metavar=0,
+   #    type=int,
+   #    default=0,
+   #    help=(
+   #        '(MCR) Missing Candidate Rate: '
+   #        'Percentage of input SNPs that were missed by '
+   #        'simulated GWAS. e.g. if GWAS term SNPs ideally '
+   #        'tag 10 GO genes and --percent-mcr=50 half '
+   #        'of the genes in the GO term will be removed resulting '
+   #        'in an input network of 5 genes. (Default=0)'
+   #    )
+   #)
+   #simulateGWASCLI.add_argument(
+   #    '--out', 
+   #    default=None,
+   #    help='OutputFile Name'
+   #)
+   #simulateGWASCLI.set_defaults(func=simulateGWAS.from_CLI)
 
-    '''----------------------------------
-        CisTrans
-    -------------------------------------'''
-    cis_trans = subparsers.add_parser(
-        'cistrans',
-        help=(
-            'compare the density of interactions between cis interactions'
-            'to trans interactions'
-        )
-    )
-    cis_trans.add_argument(
-        'cob',
-        default=None
-    )
-    cis_trans.add_argument(
-        '--cis-distance',
-        default=50000,
-        type=int,
-        help='Distance used to determine if two genes are in cis. (default: 50 kb)'
-    )
-    cis_trans.add_argument(
-        '--out',
-        default=None,
-        help='Output file prefix'
-    )
-    cis_trans.set_defaults(func=cistrans)
+   #'''----------------------------------
+   #    CisTrans
+   #-------------------------------------'''
+   #cis_trans = subparsers.add_parser(
+   #    'cistrans',
+   #    help=(
+   #        'compare the density of interactions between cis interactions'
+   #        'to trans interactions'
+   #    )
+   #)
+   #cis_trans.add_argument(
+   #    'cob',
+   #    default=None
+   #)
+   #cis_trans.add_argument(
+   #    '--cis-distance',
+   #    default=50000,
+   #    type=int,
+   #    help='Distance used to determine if two genes are in cis. (default: 50 kb)'
+   #)
+   #cis_trans.add_argument(
+   #    '--out',
+   #    default=None,
+   #    help='Output file prefix'
+   #)
+   #cis_trans.set_defaults(func=cistrans)
 
     '''----------------------------------
         snp2gene
@@ -1071,7 +1078,7 @@ if __name__ == '__main__':
     geneneighbors_cmd = subparsers.add_parser(
         'neighbors',
         help=(
-            'Generate significant gene neighbors'
+            'Generate significant gene neighbors '
             'from largest to smallest Z-score'    
         )
     )

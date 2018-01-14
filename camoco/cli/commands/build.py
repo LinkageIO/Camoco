@@ -1,6 +1,6 @@
 import camoco as co
 import pandas as pd
-from camoco.Tools import DummyRefGen,log
+from camoco.Tools import DummyRefGen,log,available_datasets
 from camoco.Locus import Gene
 
 def build_cob(args):
@@ -26,7 +26,7 @@ def build_cob(args):
     normalize = False if args.skip_normalization else True
 
     # Check to see if this dataset is already built
-    if co.available_datasets('Expr',args.name):
+    if available_datasets('Expr',args.name):
         print('Warning! This dataset has already been built.')
         co.del_dataset('Expr',args.name,safe=args.force)
         
@@ -73,7 +73,7 @@ def build_refgen(args):
 def build_gont(args):
     refgen = co.RefGen(args.refgen)
     # Check to see if this dataset is already built
-    if co.available_datasets('GOnt',args.name):
+    if available_datasets('GOnt',args.name):
         print('Warning! This dataset has already been built.')
         co.del_dataset('GOnt',args.name,force=args.force)
  
