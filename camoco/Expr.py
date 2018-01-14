@@ -47,7 +47,7 @@ class Expr(Camoco):
             self.log('Loading RefGen')
             self.refgen = RefGen(self.refgen)
         except TypeError as e:
-            self.log.warn('RefGen for {} not set!', self.name)
+            self.log('RefGen for {} not set!', self.name)
         except NameError as e:
             self.log.warn('Refgen for {} not available, must be reset!', self.name)
 
