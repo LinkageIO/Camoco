@@ -178,7 +178,7 @@ class Overlap(Camoco):
         bs = []
         if self.args.num_bootstraps == 'auto':
             # Create a bullshit generator... err bootstraps
-            bs_generator = (co.Overlap.overlap(self,loci,bootstrap=True,iter_name=x) \
+            bs_generator = (self.overlap(loci,bootstrap=True,iter_name=x) \
                 for x in range(max_bs)
             )
             while num_bs <= 50 and len(bs) < 1000: 
@@ -192,7 +192,7 @@ class Overlap(Camoco):
                 )
         else:
             # Be a lil broke back noodle and explicitly bootstrap
-            bs = [co.Overlap.overlap(self, loci,bootstrap=True,iter_name=x) \
+            bs = [self.overlap(loci,bootstrap=True,iter_name=x) \
                 for x in range(int(self.args.num_bootstraps))
             ]
         return pd.concat(bs)
