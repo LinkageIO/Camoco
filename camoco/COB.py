@@ -17,9 +17,10 @@ from itertools import chain
 from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
 from scipy.misc import comb
-from scipy.stats import norm
+from scipy.stats import norm,pearsonr
 from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
+from io import UnsupportedOperation
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -28,8 +29,8 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import itertools
+
 from odo import odo
-from scipy.misc import comb 
 
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
@@ -41,7 +42,6 @@ import pdb
 import json
 import gc
 
-from scipy.stats import pearsonr
 
 class COB(Expr):
     '''
