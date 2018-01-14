@@ -6,13 +6,6 @@ import numpy as np
 import pandas as pd
 import bcolz as bcz
 
-# Suppress the warning until the next wersion
-import warnings
-from flask.exthook import ExtDeprecationWarning
-warnings.simplefilter('ignore',ExtDeprecationWarning)
-warnings.simplefilter('ignore',FutureWarning)
-import blaze as blz
-
 from .Tools import log
 from .Config import cf
 from .Exceptions import CamocoExistsError
@@ -65,6 +58,13 @@ class Camoco(object):
         )
 
     def _bcolz(self, tblname, dbname=None, type=None, df=None, blaze=False):
+    # Suppress the warning until the next wersion
+        import warnings
+        from flask.exthook import ExtDeprecationWarning
+        warnings.simplefilter('ignore',ExtDeprecationWarning)
+        warnings.simplefilter('ignore',FutureWarning)
+        import blaze as blz
+
         if type is None:
             type = self.type
         if dbname is None:
