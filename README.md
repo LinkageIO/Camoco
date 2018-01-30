@@ -50,7 +50,6 @@ export PATH=$BASE/bin:~/.camoco/conda/bin/:$PATH
 The installation script accepts simple arguments: `-b (default: ~/.camoco)`:
 the base directory to install camoco including storage for databases
 
-
 Required Files:
 + FPKM (or equivalent) CSV/TSV file
 + GFF File
