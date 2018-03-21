@@ -1,4 +1,9 @@
-Copyright (c) 2017 Robert Schaefer
+© Regents of the University of Minnesota
+
+Author: Robert Schaefer
+
+
+This software is available under the terms of the MIT License:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
