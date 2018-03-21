@@ -8,11 +8,7 @@ docs/_build
 dist/
 *.pyc
 *.py.swp
-*.swn
-*.swo
-*.swm
-*.swp
-*.swl
+*.sw*
 interfaces/static/js/lib/*
 interfaces/static/images/*
 .DS_Store
