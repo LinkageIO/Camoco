@@ -32,11 +32,17 @@ ENV IRODS_PORT=1247
 ENV IRODS_USER_NAME=anonymous
 ENV IRODS_ZONE_NAME=iplant
 
+RUN mkdir -p /root/.irods/
+RUN echo '{"irods_zone_name": "iplant","irods_user_name": "anonymous","irods_host": "data.iplantcollaborative.org","irods_port": 1247}' | tee /root/.irods/irods_environment.json
+
 #RUN apt-get update ; apt-get upgrade -y ; apt-get install -y wget libcurl4-gnutls-dev
 #RUN wget ftp://ftp.renci.org/pub/irods/releases/4.1.3/ubuntu14/irods-icommands-4.1.3-ubuntu14-x86_64.deb -O /tmp/icommands.deb
 #RUN DEBIAN_FRONTEND=noninteractive apt-get install -y `dpkg -I /tmp/icommands.deb | sed -n 's/^ Depends: //p' | sed 's/,//g'`
 #RUN dpkg -i /tmp/icommands.deb
      
+#RUN cd /src && \
+#    git clone https://github.com/irods/irods_client_fuse && \
+    
 
 WORKDIR /root
 
