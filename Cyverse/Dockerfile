@@ -3,15 +3,15 @@ MAINTAINER Rob<rob@linkage.io>
 LABEL Description "Camoco is a fully-fledged software package for building co-expression networks and analyzing the overlap interactions among genes."
 
 RUN apt-get -y update && apt-get install -y \
-        curl \
+    curl \
 	lsb-release \ 
-        wget \
-        git \
-        gcc \
-        build-essential \
-        libqt5gui5 \
+    wget \
+    git \
+    gcc \
+    build-essential \
+    libqt5gui5 \
 	apt-transport-https \
-        python3
+    python3
 
 RUN mkdir -p /src/ && \
     mkdir -p /data/ && \
@@ -39,19 +39,48 @@ RUN echo '{"irods_zone_name": "iplant","irods_user_name": "anonymous","irods_hos
 #RUN wget ftp://ftp.renci.org/pub/irods/releases/4.1.3/ubuntu14/irods-icommands-4.1.3-ubuntu14-x86_64.deb -O /tmp/icommands.deb
 #RUN DEBIAN_FRONTEND=noninteractive apt-get install -y `dpkg -I /tmp/icommands.deb | sed -n 's/^ Depends: //p' | sed 's/,//g'`
 #RUN dpkg -i /tmp/icommands.deb
-     
-#RUN cd /src && \
-#    git clone https://github.com/irods/irods_client_fuse && \
     
+RUN apt-get install -y \
+    irods-dev \
+    irods-runtime \
+    irods-externals-clang3.8-0 \
+    irods-externals-cppzmq4.1-0 \
+    irods-externals-cmake3.5.2-0 \
+    pkg-config \
+    libfuse-dev \
+    libc++1 \
+    libc++abi1 
 
+ENV PATH=/opt/irods-externals/cmake3.5.2-0/bin:$PATH
+
+RUN ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so
+ 
+RUN cd /src && \
+    git clone https://github.com/irods/irods_client_fuse && \
+    cd irods_client_fuse && \
+    mkdir build && \
+    cd build && \
+    cmake ../ && \
+    make
+    
 WORKDIR /root
 
-#ADD /home/rob/.camoco/databases /root/.camoco/databases
 
 ENV LD_LIBRARY_PATH=/root/.camoco/lib:$LD_LIBRARY_PATH \ 
     PATH=/root/.camoco/bin:/root/.camoco/conda/envs/camoco/bin:$PATH
 
-#RUN [ "/bin/bash", "-c", "source activate camoco" ]
+# Take out the database directory and replace it with the FUSE mounted one
+RUN cd /root
+RUN /src/irods_client_fuse/build/irodsFs \
+    -oallow_other \
+    -oconnreuse \
+    -ometadatacachetimeout 3600 \
+    -opreloadblocks 5 \
+    -w /iplant/home/shared/iplantcollaborative/example_data/Camoco \
+    $HOME/fuse_mount
+RUN mkdir fuse_mount
+RUN rm -fr /root/.camoco/databases
+RUN ln -s /root/fuse_mount/databases /root/.camoco/databases
 
 ENTRYPOINT [ "/bin/bash" ]
 #ENTRYPOINT [ "/root/.camoco/conda/envs/camoco/bin/camoco" ]
