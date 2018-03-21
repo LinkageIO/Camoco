@@ -71,6 +71,7 @@ ENV LD_LIBRARY_PATH=/root/.camoco/lib:$LD_LIBRARY_PATH \
 
 # Take out the database directory and replace it with the FUSE mounted one
 RUN cd /root
+RUN mkdir fuse_mount
 RUN /src/irods_client_fuse/build/irodsFs \
     -oallow_other \
     -oconnreuse \
@@ -78,7 +79,6 @@ RUN /src/irods_client_fuse/build/irodsFs \
     -opreloadblocks 5 \
     -w /iplant/home/shared/iplantcollaborative/example_data/Camoco \
     $HOME/fuse_mount
-RUN mkdir fuse_mount
 RUN rm -fr /root/.camoco/databases
 RUN ln -s /root/fuse_mount/databases /root/.camoco/databases
 
