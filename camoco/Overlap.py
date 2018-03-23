@@ -30,6 +30,7 @@ pd.set_option('display.width',300)
 import glob as glob
 
 from .Camoco import Camoco
+from .Term import Term
 from .Tools import log
 
 class Overlap(Camoco):
@@ -38,11 +39,11 @@ class Overlap(Camoco):
         among a set of loci. 
 
     '''
-    def __init__(self,gwas):
-        if not isinstance(gwas, str):
-            gwas = gwas.name
-        super().__init__(gwas,type='Overlap')
-        self._global('gwas',gwas)
+    def __init__(self,name):
+        if not isinstance(name, str):
+            name = name.name
+        super().__init__(name,type='Overlap')
+        self._global('name',name)
         self._create_tables()
         # Read the overlap results in from the database
         # It is unfortunate that we need to use the sqlite3 package here
@@ -591,12 +592,28 @@ class Overlap(Camoco):
             Implements an interface for the CLI to perform overlap
             Analysis
         '''
-        self = cls.create(args.gwas,description='CLI Overlap')
-        # Build base camoco objects
+        if args.genes != ['None']:
+            source = 'genes'
+        elif args.go:
+            source = 'go'
+        elif args.gwas:
+            source = 'gwas'
+        self = cls.create(source,description='CLI Overlap')
+        self.source = source
         self.args = args
+        # Build base camoco objects
         self.cob = co.COB(args.cob)
-        if args.go:
-            self.ont = co.GOnt(args.gwas)
+
+        # Generate the ontology of terms that we are going to look
+        # at the overlap of
+        if args.genes != [None]:
+            # Deal with this later
+            self.ont = pd.DataFrame()
+            self.ont.name = 'GeneList'
+            args.candidate_window_size = 1
+            args.candidate_flank_limit = 0
+        elif args.go:
+            self.ont = co.GOnt(args.go)
             args.candidate_window_size = 1
             args.candidate_flank_limit = 0
         else:
@@ -611,10 +628,18 @@ class Overlap(Camoco):
                 self.ont.set_strongest(higher=args.strongest_higher)
         
         # Generate a terms iterable
-        if 'all' in self.args.terms:
-            terms = self.ont.iter_terms()
+        if self.source == 'genes':
+            # make a single term
+            loci = self.cob.refgen.from_ids(self.args.genes)
+            if len(loci) < len(self.args.genes):
+                self.cob.log('Some input genes not in network')
+            terms = [Term('CustomTerm',desc='Custom from CLI',loci=loci)]
         else:
-            terms = [self.ont[term] for term in self.args.terms]
+            # Generate terms from the ontology
+            if 'all' in self.args.terms:
+                terms = self.ont.iter_terms()
+            else:
+                terms = [self.ont[term] for term in self.args.terms]
         all_results = list()
         results = []
         
@@ -622,8 +647,15 @@ class Overlap(Camoco):
         for term in terms:
             if term.id in self.args.skip_terms:
                 self.cob.log('Skipping {} since it was in --skip-terms',term.id)
-            # Generate SNP2Gene Loci
-            loci = self.snp2gene(term,self.ont)
+            # If appropriate, generate SNP2Gene Loci
+            if self.args.candidate_flank_limit > 0:
+                loci = self.snp2gene(term,self.ont)
+            else:
+                loci = list(term.loci)
+                for x in loci:
+                    x.window = 1
+                
+            # Filter out terms with insufficient or too many genes
             if len(loci) < 2 or len(loci) < args.min_term_size:
                 self.cob.log('Not enough genes to perform overlap')
                 continue
@@ -707,5 +739,6 @@ class Overlap(Camoco):
             
             # Save the results to the SQLite table
             self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
+            import ipdb; ipdb.set_trace()
 
 

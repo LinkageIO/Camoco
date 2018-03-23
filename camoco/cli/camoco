@@ -595,10 +595,6 @@ if __name__ == '__main__':
         help='The camoco network to use.'
     )
     overlapCLI.add_argument(
-        'gwas', 
-        help='The camoco GWAS to use.'
-    )
-    overlapCLI.add_argument(
         'method',
         default='density',
         choices=['density','locality'],
@@ -606,11 +602,26 @@ if __name__ == '__main__':
     )
     # keyword args
     overlapCLI.add_argument(
-        '--go',
-        action='store_true',
-        default=False,
-        help='If true, build terms from GO instead of GWAS'
+        '--genes',
+        nargs='*',
+        default=[None],
+        help=(
+            'Provide a list of input genes.'    
+        )
     )
+    # Or get genes from terms
+    overlapCLI.add_argument(
+        '--gwas', 
+        default=['all'],
+        help='Calculate overlap on a Camoco GWAS dataset.'
+    )
+
+    overlapCLI.add_argument(
+        '--go',
+        default=['all'],
+        help='Caluclate overlap among GO terms'
+    )
+    # supplementary args
     overlapCLI.add_argument(
         '--terms',
         nargs='*', 
@@ -630,37 +641,6 @@ if __name__ == '__main__':
         )
     )
     overlapCLI.add_argument(
-        '--num-bootstraps', 
-        default='auto',
-        metavar='auto',
-        help=(
-            'The number of bootstraps to perform in order '
-            'to estimate a null distribution. If auto the algorithm '
-            'will bootstrap *until* the term is not significant at n=1000 '
-            '*or* 1000 bootstraps have been performed. (default: auto)'
-        )
-    )
-    overlapCLI.add_argument(
-        '--candidate-window-size',
-        type=int,
-        default=10000, 
-        metavar=10000,
-        help=(
-            'The window size, in bp, for mapping effective SNPs to genes. '
-            '(default: 10000)'
-        )
-    )
-    overlapCLI.add_argument(
-        '--candidate-flank-limit',
-        type=int,
-        default=1, 
-        metavar=1,
-        help=(
-            'The number of flanking genes included in SNP to gene mapping. '
-            'on each side of the locus. (default: 2)' 
-        )
-    )
-    overlapCLI.add_argument(
         '--min-term-size',
         default=2,
         type=int,
@@ -674,6 +654,7 @@ if __name__ == '__main__':
         metavar='None',
         help='The maximum number of genes in a term to calculate overlap.'
     )
+    # SNP to gene mapping
     overlapCLI.add_argument(
         '--snp2gene', 
         type=str, 
@@ -710,6 +691,40 @@ if __name__ == '__main__':
             'lower values as stronger (i.e. p-vals)'
         )
     )
+    overlapCLI.add_argument(
+        '--candidate-window-size',
+        type=int,
+        default=1, 
+        metavar=1,
+        help=(
+            'The window size, in bp, for mapping effective SNPs to genes. '
+            '(default: 1)'
+        )
+    )
+    overlapCLI.add_argument(
+        '--candidate-flank-limit',
+        type=int,
+        default=0, 
+        metavar=0,
+        help=(
+            'The number of flanking genes included in SNP to gene mapping. '
+            'on each side of the locus. (default: 1)' 
+        )
+    )
+    # Statistical Significance
+    overlapCLI.add_argument(
+        '--num-bootstraps', 
+        default='auto',
+        metavar='auto',
+        help=(
+            'The number of bootstraps to perform in order '
+            'to estimate a null distribution. If auto the algorithm '
+            'will bootstrap *until* the term is not significant at n=1000 '
+            '*or* 1000 bootstraps have been performed. (default: auto)'
+        )
+    )
+
+    # Output options 
     overlapCLI.add_argument(
         '--out', 
         default=None,
