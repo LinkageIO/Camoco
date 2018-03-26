@@ -82,6 +82,7 @@ class Overlap(Camoco):
                   "num_real" REAL,
                   "score" REAL,
                   "zscore" REAL,
+                  "num_trans_edges" INTEGER,
                   UNIQUE (COB, Ontology, Term, gene, WindowSize, FlankLimit, SNP2Gene, Method) ON CONFLICT REPLACE
                 );
         ''')
@@ -729,6 +730,13 @@ class Overlap(Camoco):
             overlap['Method'] = self.args.method
             overlap['SNP2Gene'] = self.args.snp2gene
             results.append(overlap.reset_index())
+            # Summarize results
+            overlap_score = np.nanmean(overlap.score)/(1/np.sqrt(overlap.num_trans_edges.mean()))
+            self.cob.log('Overlap Score ({}): {} (p<{})'.format(
+                self.args.method,
+                overlap_score,
+                overlap_pval
+            ))
         if not args.dry_run:
             # Consolidate results and output to files
             self.results = pd.concat(results)
@@ -739,6 +747,5 @@ class Overlap(Camoco):
             
             # Save the results to the SQLite table
             self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
-            import ipdb; ipdb.set_trace()
 
 
