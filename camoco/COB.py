@@ -649,6 +649,7 @@ class COB(Expr):
             if iter_name is not None:
                 gene_split['iter'] = iter_name
             gene_split.index.name = 'gene'
+            gene_split['num_trans_edges'] = len(edges)
             return gene_split
         else:
             if return_mean:
