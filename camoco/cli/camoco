@@ -606,7 +606,7 @@ if __name__ == '__main__':
         nargs='*',
         default=[None],
         help=(
-            'Provide a list of input genes.'    
+            'Provide a [comma, space, semicolon] separated list of input genes.'    
         )
     )
     # Or get genes from terms
