@@ -607,8 +607,10 @@ class Overlap(Camoco):
 
         # Generate the ontology of terms that we are going to look
         # at the overlap of
-        if args.genes != [None]:
-            # Deal with this later
+        if args.genes != None:
+            # Be smart about this
+            import re
+            args.genes = list(chain(*[re.split('[,; ]',x) for x in args.genes]))
             self.ont = pd.DataFrame()
             self.ont.name = 'GeneList'
             args.candidate_window_size = 1
