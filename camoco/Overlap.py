@@ -593,11 +593,11 @@ class Overlap(Camoco):
             Implements an interface for the CLI to perform overlap
             Analysis
         '''
-        if args.genes != ['None']:
+        if args.genes != [None]:
             source = 'genes'
-        elif args.go:
+        elif args.go is not None:
             source = 'go'
-        elif args.gwas:
+        elif args.gwas is not None:
             source = 'gwas'
         self = cls.create(source,description='CLI Overlap')
         self.source = source
@@ -607,7 +607,7 @@ class Overlap(Camoco):
 
         # Generate the ontology of terms that we are going to look
         # at the overlap of
-        if args.genes != None:
+        if source == 'genes':
             # Be smart about this
             import re
             args.genes = list(chain(*[re.split('[,; ]',x) for x in args.genes]))
@@ -615,12 +615,14 @@ class Overlap(Camoco):
             self.ont.name = 'GeneList'
             args.candidate_window_size = 1
             args.candidate_flank_limit = 0
-        elif args.go:
+        elif source == 'go':
             self.ont = co.GOnt(args.go)
             args.candidate_window_size = 1
             args.candidate_flank_limit = 0
-        else:
+        elif source == 'gwas':
             self.ont = co.GWAS(args.gwas)
+        else:
+            raise ValueError('Please provide a valid overlap source (--genes, --go or --gwas)')
         self.generate_output_name()
         
         # Save strongest description arguments if applicable

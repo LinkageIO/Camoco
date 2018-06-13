@@ -612,13 +612,13 @@ if __name__ == '__main__':
     # Or get genes from terms
     overlapCLI.add_argument(
         '--gwas', 
-        default=['all'],
+        default=None,
         help='Calculate overlap on a Camoco GWAS dataset.'
     )
 
     overlapCLI.add_argument(
         '--go',
-        default=['all'],
+        default=None,
         help='Caluclate overlap among GO terms'
     )
     # supplementary args
