@@ -5,7 +5,11 @@ from scipy.misc import comb
 cimport cython
 
 from libc.math cimport sqrt
-from libc.math cimport isnan
+#from libc.math cimport isnan
+cdef extern from "numpy/npy_math.h" nogil:
+    long double NAN "NPY_NAN"
+    bint isnan "npy_isnan"(long double)
+
 
 #cdef extern from "math.h":
 #    bint isnan(double x)
