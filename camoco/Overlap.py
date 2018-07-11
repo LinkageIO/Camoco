@@ -151,7 +151,7 @@ class Overlap(Camoco):
             os.makedirs(os.path.dirname(self.args.out),exist_ok=True)
         if os.path.exists(self.args.out) and self.args.force != True:
             self.log("Output for {} exists! Skipping!",self.args.out)
-            return
+            raise ValueError()
 
     def snp2gene(self,term,ont):
         if 'effective' in self.args.snp2gene:
@@ -623,7 +623,10 @@ class Overlap(Camoco):
             self.ont = co.GWAS(args.gwas)
         else:
             raise ValueError('Please provide a valid overlap source (--genes, --go or --gwas)')
-        self.generate_output_name()
+        try:
+            self.generate_output_name()
+        except ValueError as e:
+            return
         
         # Save strongest description arguments if applicable
         if 'strongest' in self.args.snp2gene:
@@ -642,16 +645,19 @@ class Overlap(Camoco):
         else:
             # Generate terms from the ontology
             if 'all' in self.args.terms:
-                terms = self.ont.iter_terms()
+                terms = list(self.ont.iter_terms())
             else:
                 terms = [self.ont[term] for term in self.args.terms]
         all_results = list()
         results = []
-        
+
+        num_total_terms = len(terms)
         # Iterate through terms and calculate
-        for term in terms:
+        for i,term in enumerate(terms):
+            self.cob.log(' ---------- Calculating overlap for {} of {} Terms',i,num_total_terms)
             if term.id in self.args.skip_terms:
                 self.cob.log('Skipping {} since it was in --skip-terms',term.id)
+            self.cob.log('Generating SNP-to-gene mapping')
             # If appropriate, generate SNP2Gene Loci
             if self.args.candidate_flank_limit > 0:
                 loci = self.snp2gene(term,self.ont)
@@ -685,10 +691,12 @@ class Overlap(Camoco):
                 overlap = self.overlap(loci)
             except DataError as e:
                 continue
+            self.cob.log('Generating bootstraps')
             bootstraps = self.generate_bootstraps(loci,overlap)
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
             # Calculate z scores for density
+            self.cob.log('Calculating Z-Scores')
             if bs_std != 0:
                 overlap['zscore'] = (overlap.score-bs_mean)/bs_std
                 bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
@@ -696,6 +704,7 @@ class Overlap(Camoco):
                 # If there is no variation, make all Z-scores 0
                 overlap['zscore'] = bootstraps['zscore'] = 0
             # Calculate FDR
+            self.cob.log('Calculating FDR')
             overlap['fdr'] = np.nan
             max_zscore = int(overlap.zscore.max()) + 1
             for zscore in np.arange(0, max_zscore,0.25):
