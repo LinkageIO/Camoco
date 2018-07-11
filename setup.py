@@ -67,6 +67,7 @@ setup(
         'termcolor==1.1.0',
         'scikit-learn==0.19.1',
         'powerlaw==1.3.5',
+        'networkx==1.11', 
         'statsmodels==0.9.0'
     ],
     include_package_data=True,
