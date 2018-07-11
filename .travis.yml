@@ -17,7 +17,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - conda install pytest-cov numpy cython
+  - conda install pytest-cov numpy Cython
   - pip install .
 
 # command to run tests, e.g. python setup.py test
