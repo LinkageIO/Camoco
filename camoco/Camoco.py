@@ -60,8 +60,8 @@ class Camoco(object):
     def _bcolz(self, tblname, dbname=None, type=None, df=None, blaze=False):
     # Suppress the warning until the next wersion
         import warnings
-        from flask.exthook import ExtDeprecationWarning
-        warnings.simplefilter('ignore',ExtDeprecationWarning)
+        #from flask.exthook import ExtDeprecationWarning
+        #warnings.simplefilter('ignore',ExtDeprecationWarning)
         warnings.simplefilter('ignore',FutureWarning)
         import blaze as blz
 
