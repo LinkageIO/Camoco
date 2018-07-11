@@ -8,6 +8,7 @@ matrix:
 # Install packages
 install:
   - pip install pytest-cov numpy Cython
+  - pip install minus80
   - python setup.py install
 
 # command to run tests, e.g. python setup.py test
