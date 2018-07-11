@@ -56,7 +56,7 @@ setup(
         '':['*.cyx']    
     },
     install_requires = [		
-        'minus80==0.1.2',
+        'minus80==0.1.3',
         'cython==0.16',    		
         'igraph==0.1.5',		
         'matplotlib==2.2.2',		
