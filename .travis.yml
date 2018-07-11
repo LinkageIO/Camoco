@@ -1,21 +1,9 @@
 language: python
 matrix:
     include:
-#       - os: linux
-#         python: 3.4
-#         env: TOXENV=py34 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
-#       - os: linux
-#         python: 3.5
-#         env: TOXENV=py35 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
         - os: linux
           python: 3.6
           env: TOXENV=py36 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
-#       - os: osx
-#         language: generic
-#         env: TOXENV=py34 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
-#       - os: osx
-#         language: generic
-#         env: TOXENV=py35 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
         - os: osx
           language: generic
           env: TOXENV=py36 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
@@ -29,8 +17,8 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - conda install pytest-cov
-  - conda install coveralls
+  - conda install pytest-cov numpy cython
+  - pip install .
 
 # command to run tests, e.g. python setup.py test
 script:
