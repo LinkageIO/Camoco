@@ -28,7 +28,7 @@ def build_cob(args):
     # Check to see if this dataset is already built
     if available_datasets('Expr',args.name):
         print('Warning! This dataset has already been built.')
-        co.del_dataset('Expr',args.name,safe=args.force)
+        co.Tools.del_dataset('Expr',args.name,safe=args.force)
         
     # Basically just pass all the CLI arguments to the COB class method  
     cob = co.COB.from_table(
@@ -75,7 +75,7 @@ def build_gont(args):
     # Check to see if this dataset is already built
     if available_datasets('GOnt',args.name):
         print('Warning! This dataset has already been built.')
-        co.del_dataset('GOnt',args.name,force=args.force)
+        co.Tools.del_dataset('GOnt',args.name,force=args.force)
  
     go = co.GOnt.from_obo(
         args.obo_filename,
