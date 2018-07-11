@@ -27,32 +27,6 @@ def find_version(*file_paths):
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
-class PostDevelopCommand(develop):
-    """
-        Post-installation for development mode.
-    """
-    def run(self):
-        print('Running post-installation for apsw')
-        check_call('pip install -r requirements.txt'.split())
-        check_call('''\
-	pip install --user https://github.com/rogerbinns/apsw/releases/download/3.19.3-r1/apsw-3.19.3-r1.zip \
-	--global-option=fetch --global-option=--version --global-option=3.19.3 --global-option=--all \
-	--global-option=build --global-option=--enable-all-extensions'''.split())
-        develop.run(self)
-
-class PostInstallCommand(install):
-    """
-        Post-installation for installation mode.
-    """
-    def run(self):
-        check_call('pip install -r requirements.txt'.split())
-        check_call('''\
-	pip install --user https://github.com/rogerbinns/apsw/releases/download/3.19.3-r1/apsw-3.19.3-r1.zip \
-	--global-option=fetch --global-option=--version --global-option=3.19.3 --global-option=--all \
-	--global-option=build --global-option=--enable-all-extensions'''.split())
-        install.run(self)
-
-
 pccup = Extension(
     'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
@@ -76,22 +50,24 @@ setup(
     ext_modules = [pccup,refgendist],
     cmdclass = {
         'build_ext': build_ext,
-        'develop': PostDevelopCommand,
-        'install': PostInstallCommand,
     },
 
     package_data = {
         '':['*.cyx']    
     },
     install_requires = [		
-        'cython>=0.16',    		
-        'igraph>=0.1.5',		
-        'matplotlib>=1.4.3',		
-        'numpy>=1.9.1',		
-        'pandas>=0.16',		
-        'scipy>=0.15',		
-        'termcolor>=1.1.0',
-        'powerlaw==1.3.5'
+        'minus80==0.1.3',
+        'flask==0.12.2',
+        'cython==0.16',    		
+        'igraph==0.1.5',		
+        'matplotlib==2.2.2',		
+        'numpy==1.14.5',		
+        'pandas==0.22.0',		
+        'scipy==1.1.0',		
+        'termcolor==1.1.0',
+        'scikit-learn==0.19.1',
+        'powerlaw==1.3.5',
+        'statsmodels==0.9.0'
     ],
     include_package_data=True,
 

@@ -147,7 +147,7 @@ class RefGen(Camoco):
 
 
     @lru_cache(maxsize=131072)
-    def from_id(self, gene_id):
+    def from_id(self, gene_id, **kwargs):
         '''
             Returns a gene object from a string
 
@@ -169,9 +169,9 @@ class RefGen(Camoco):
             gene_id = result[0]
         gene_id = gene_id.upper()
         info = cur.execute('SELECT chromosome,start,end,id FROM genes WHERE id = ?', [gene_id]).fetchone()
-        return self.Gene(*info,build=self.build,organism=self.organism)
+        return self.Gene(*info,build=self.build,organism=self.organism,**kwargs)
 
-    def from_ids(self, gene_ids, check_shape=False): 
+    def from_ids(self, gene_ids, check_shape=False, **kwargs): 
         '''
             Returns a list of gene object from an iterable of id strings
             OR from a single gene id string.
@@ -184,6 +184,9 @@ class RefGen(Camoco):
                 Check if you get back the same number of ids you
                 pass in. If false (default), just give back what
                 you find, ignoring erronous ids.
+            **kwargs : keyword arguments
+                Pass additional keyword arguments which will be 
+                assigned to genes. (e.g. window=1)
 
             Returns
             -------
@@ -197,11 +200,11 @@ class RefGen(Camoco):
                 'Passing singe values into RefGen.from_ids is deprecated. Use RefGen.from_id() '
                 'or slicing syntax instead.'
             )
-            return self.from_id(gene_ids)
+            return self.from_id(gene_ids,**kwargs)
         genes = []
         for id in gene_ids:
             try:
-                genes.append(self.from_id(id))
+                genes.append(self.from_id(id,**kwargs))
             except ValueError as e: 
                 if check_shape == False:
                     continue

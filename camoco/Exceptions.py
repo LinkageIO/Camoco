@@ -46,8 +46,7 @@ class CamocoZeroWindowError(CamocoError): # pragma: no cover
     def __init__(self,expr,message,*args):
         self.expr = expr
         self.message = (
-            'Operation requiring window, but window is 0:' + \
-            message.format(args)
+            'Operation requiring window, but window is 0:'
         )
 
 class CamocoInteractive(CamocoError): # pragma: no cover

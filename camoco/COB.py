@@ -649,6 +649,7 @@ class COB(Expr):
             if iter_name is not None:
                 gene_split['iter'] = iter_name
             gene_split.index.name = 'gene'
+            gene_split['num_trans_edges'] = len(edges)
             return gene_split
         else:
             if return_mean:
@@ -726,7 +727,7 @@ class COB(Expr):
 
     def density(self, gene_list, min_distance=None, by_gene=False):
         '''
-            Calculates the denisty of the non-thresholded network edges
+            Calculates the density of the non-thresholded network edges
             amongst genes within gene_list. Includes parameters to perform
             measurements for genes within a certain distance of each other.
             This corrects for cis regulatory elements increasing noise
