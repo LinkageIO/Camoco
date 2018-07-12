@@ -744,7 +744,10 @@ class Overlap(Camoco):
             overlap['SNP2Gene'] = self.args.snp2gene
             results.append(overlap.reset_index())
             # Summarize results
-            overlap_score = np.nanmean(overlap.score)/(1/np.sqrt(overlap.num_trans_edges.mean()))
+            if self.args.method == 'density':
+                overlap_score = np.nanmean(overlap.score)/(1/np.sqrt(overlap.num_trans_edges.mean()))
+            elif self.args.method == 'locality':
+                overlap_score = np.nanmean(overlap.score)
             self.cob.log('Overlap Score ({}): {} (p<{})'.format(
                 self.args.method,
                 overlap_score,
@@ -760,5 +763,3 @@ class Overlap(Camoco):
             
             # Save the results to the SQLite table
             self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
-
-
