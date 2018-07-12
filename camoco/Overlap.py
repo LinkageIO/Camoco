@@ -229,6 +229,7 @@ class Overlap(Camoco):
             self.results,
             index=['Method','COB','WindowSize','FlankLimit'],
             columns='Term',
+            fill_value=np.nan,
             values='fdr',
             aggfunc=lambda x: sum(x<=fdr_cutoff)
         )
@@ -544,13 +545,15 @@ class Overlap(Camoco):
         candidates = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
         candidates['fdr'] = fdr_cutoff
         # Calculate Totals
-        total = pd.DataFrame(pd.pivot_table(
+        total = pd.pivot_table(
             candidates,
-            columns=['fdr','Method','COB'],
+            index=['fdr','Method','COB'],
             values='gene',
             dropna=dropna,
             aggfunc=lambda x: len(set(x))
-        ).fillna(0).astype(int),columns=['Total']).T
+        ).fillna(0).astype(int)
+        total.columns = ['Total']
+        total = total.T
         # Pivot and aggregate
         by_term =  pd.pivot_table(
             candidates,
