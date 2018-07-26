@@ -287,7 +287,7 @@ class Overlap(Camoco):
         )
         results = snps.join(loci).join(genes)
         #ionome_eff_loci = [len()]
-        return results.astype(int)
+        return results
      
     def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05,
                           collapse_snp2gene=False,figsize=(15,10),
@@ -487,7 +487,8 @@ class Overlap(Camoco):
                         all_candidates.extend([x.as_dict() for x in candidates])
         return pd.DataFrame(all_candidates)
 
-    def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3,return_genes=False):
+    def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3,return_genes=False,
+                 second_overlap=None):
         '''
             Return a matrix showing the number of shared HPO genes by Term.
             The diagonal of the matrix is the number of genes discoverd by that 
@@ -502,41 +503,61 @@ class Overlap(Camoco):
                 The FDR cutoff the be considered HPO
             return_genes : bool (default: False)
                 Return the candidate gene list instead of the overlap table
+            second_overlap : Overlap Object (default: None)
+                If specified, overlap between terms will be calculated 
+                between this overlaps HPO genes and the second overlaps
+                HPO genes resulting in a adjacency matrix where the 
+                x-axis is overlap 1's terms and the y-axis is overlap
+                2's terms and the values are the number of shared genes
+                per term.
         '''
-        df = self.high_priority_candidates(
+        hpo1 = self.high_priority_candidates(
                 fdr_cutoff=fdr_cutoff,
                 min_snp2gene_obs=min_snp2gene_obs,
                 original_COB_only=True)
+
+        if second_overlap is None:
+            second_overlap = self
+        hpo2 = second_overlap.high_priority_candidates(
+            fdr_cutoff=fdr_cutoff,
+            min_snp2gene_obs=min_snp2gene_obs,
+            original_COB_only=True
+        )
         # 
-        x={df[0]:set(df[1].gene) for df in df.groupby('Term')}                     
+        x={df[0]:set(df[1].gene) for df in hpo1.groupby('Term')}                     
+        y={df[0]:set(df[1].gene) for df in hpo2.groupby('Term')}                     
         adj = []                                                                        
         #num_universe = len(set(chain(*x.values())))
-        num_universe = len(self.results.gene.unique())
+        num_universe = len(set(self.results.gene.unique()).union(set(second_overlap.results.gene.unique())))
         for i,a in enumerate(x.keys()):                                                              
-            for j,b in enumerate(x.keys()):  
+            for j,b in enumerate(y.keys()):  
+                num_a = len(x[a])
+                num_b = len(y[b])
                 if j < i:
                     continue
-                common = set(x[a]).intersection(x[b])
-                num_common = len(set(x[a]).intersection(x[b]))
+                common = set(x[a]).intersection(y[b])
+                num_common = len(set(x[a]).intersection(y[b]))
                 if a != b:
-                    pval = hypergeom.sf(num_common-1,num_universe,len(x[a]),len(x[b]))
+                    pval = hypergeom.sf(num_common-1,num_universe,len(x[a]),len(y[b]))
                 else:
                     # This will make the diagonal of the matrix be the number HPO genes
                     # for the element
                     pval = len(x[a])
-                adj.append((a,b,num_common,pval,','.join(common))) 
+                adj.append((a,b,num_a,num_b,num_common,pval,','.join(common))) 
         adj = pd.DataFrame(adj)                                                         
-        adj.columns = ['Term1','Term2','num_common','pval','common']
+        adj.columns = ['Term1','Term2','num_term1','num_term2','num_common','pval','common']
         # Stop early if we just want to return the lists 
         if return_genes == True:
             adj = adj[adj.num_common>0] 
             adj = adj[np.logical_not(adj.Term1==adj.Term2)]
+            adj = adj.drop_duplicates()
+            adj['bonferoni'] = adj.pval <= (0.05 / (len(x)*len(y)) 
             return adj.drop_duplicates()
         else:
             overlap = pd.pivot_table(adj,index='Term1',columns='Term2',values='num_common')
             # Mask out the lower diagonal on the overalp matrix
             overlap.values[tril_indices(len(overlap))] = 0
-            pvals = pd.pivot_table(adj,index='Term2',columns='Term1',values='pval')
+            pvals = pd.pivot_table(adj,index='Term1',columns='Term2',values='pval')
             # Mask out the upper tringular on the pvals matrix
             pvals.values[triu_indices(len(pvals),1)] = 0
             return (overlap+pvals).astype(float)
@@ -577,13 +598,16 @@ class Overlap(Camoco):
         return self
  
     @classmethod
-    def from_csv(cls,dir='./',sep='\t'):
+    def from_csv(cls,dir='./',sep='\t',name=None):
         # Read in Gene specific data
         results = pd.concat(
             [pd.read_table(x,sep=sep) \
                 for x in glob.glob(dir+"/*.overlap.tsv") ]
         )
-        gwas = results.Ontology.unique()[0]
+        if name is None:
+            gwas = results.Ontology.unique()[0]
+        else:
+            gwas = name
         self = cls.create(gwas)
         self.results = results
         # Add the results to the sqlite table
