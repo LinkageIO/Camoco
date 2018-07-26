@@ -251,6 +251,7 @@ class COB(Expr):
         if new_sig or self.sigs is None:
             self.sigs = np.array([ind for ind in self.coex.data['significant'].wheretrue()])
             self.sigs.sort()
+        self._calculate_degree(update_db=False)
         return None
     
     def _coex_DataFrame(self,ids=None,sig_only=True):
@@ -1530,7 +1531,7 @@ class COB(Expr):
         self.log("Done")
         return self
 
-    def _calculate_degree(self):
+    def _calculate_degree(self,update_db=True):
         '''
             Calculates degrees of genes within network. 
         '''
@@ -1548,7 +1549,9 @@ class COB(Expr):
             # Translate the expr indexes to the gene names
             for i,degree in sigs:
                 self.degree.ix[names[i]] = degree
-        self._bcolz('degree', df=self.degree)
+        # Update the database
+        if update_db:
+            self._bcolz('degree', df=self.degree)
         # Cleanup
         del sigs 
         del names
@@ -1674,7 +1677,7 @@ class COB(Expr):
         return self
 
     @classmethod
-    def from_Expr(cls, expr):
+    def from_Expr(cls, expr, zscore_cutoff=3, **kwargs):
         '''
             Create a COB instance from an camoco.Expr (Expression) instance.
             A COB inherits all the methods of a Expr instance and implements
@@ -1685,6 +1688,10 @@ class COB(Expr):
             Parameters
             ----------
             expr : camoco.Expr
+                The camoco expression object used to build the 
+                co-expression network.
+            zscore_cutoff : int (defualt: 3)
+                The zscore cutoff for the network.
 
             Returns
             -------
@@ -1701,7 +1708,8 @@ class COB(Expr):
 
     @classmethod
     def from_DataFrame(cls, df, name, description,
-                       refgen, rawtype=None, **kwargs):
+                       refgen, rawtype=None, 
+                       zscore_cutoff=3, **kwargs):
         '''
             The method will read the table in (as a pandas dataframe),
             build the Expr object passing all keyword arguments in ``**``kwargs
@@ -1727,6 +1735,8 @@ class COB(Expr):
                 This is noted here to reinforce the impotance of the rawtype
                 passed to camoco.Expr.from_DataFrame. See docs there
                 for more information.
+            zscore_cutoff : int (defualt: 3)
+                The zscore cutoff for the network.
             \*\*kwargs : key,value pairs
                 additional parameters passed to subsequent methods.
                 (see Expr.from_DataFrame)
@@ -1734,13 +1744,15 @@ class COB(Expr):
         '''
         # Create a new Expr object from a data frame
         expr = super().from_DataFrame(
-            df, name, description, refgen, rawtype, **kwargs
+            df, name, description, refgen, rawtype, 
+            zscore_cutoff=zscore_cutoff, **kwargs
         )
         return cls.from_Expr(expr)
 
     @classmethod
     def from_table(cls, filename, name, description,
-                   refgen, rawtype=None, sep='\t', index_col=None, **kwargs):
+                   refgen, rawtype=None, sep='\t', index_col=None, 
+                   zscore_cutoff=3, **kwargs):
         '''
             Build a COB Object from an FPKM or Micrarray CSV. This is a
             convenience method which handles reading in of tables.
@@ -1773,6 +1785,8 @@ class COB(Expr):
                 If not None, this column will be set as the gene index
                 column. Useful if there is a column name in the text file
                 for gene names.
+            zscore_cutoff : int (defualt: 3)
+                The zscore cutoff for the network.
             **kwargs : key value pairs
                 additional parameters passed to subsequent methods.
 
@@ -1788,7 +1802,9 @@ class COB(Expr):
         )
         return cls.from_DataFrame(
             df, name, description, refgen,
-            rawtype=rawtype,**kwargs
+            rawtype=rawtype,
+            zscore_cutoff=zscore_cutoff,
+            **kwargs
         )
 
 
