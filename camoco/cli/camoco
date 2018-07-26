@@ -450,6 +450,18 @@ if __name__ == '__main__':
         )
     )
     bldcob.add_argument(
+        '--zscore_cutoff',
+        default=3,
+        metavar='(default: 3.0)',
+        type=float,
+        help=(
+            "The zscore threshold used for edges in the network. Edges with "
+            "z-scores under this value will not be used for thresholded "
+            "calculations such as locality. Un-thresholded calculations, "
+            "such as density will not be affected by this cutoff."
+        )
+    )
+    bldcob.add_argument(
         '--dry-run',
         action='store_true',
         help='Dry run will only process the first 5000 genes'
@@ -789,6 +801,13 @@ if __name__ == '__main__':
         default=None,
         type=int,
         help='If specified, limits the number of total GO terms tested (i.e. Subsampling)'
+    )
+    health.add_argument(
+        '--edge-zscore-cutoff',
+        default=None,
+        type=int,
+        metavar=3.0,
+        help='Significance zscore cutoff for edges'
     )
     health.add_argument(
         '--num-bootstraps',
