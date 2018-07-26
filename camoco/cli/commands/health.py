@@ -22,6 +22,10 @@ def cob_health(args):
     if args.out is None:
         args.out = '{}_Health'.format(cob.name)
 
+    if args.edge_zscore_cutoff is not None:
+        log("Changing Z-Score cutoff to {}",args.edge_zscore_cutoff)
+        cob.set_sig_edge_zscore(args.edge_zscore_cutoff)
+
     log('Plotting Scores ----------------------------------------------------') 
     if not path.exists('{}_CoexPCC_raw.png'.format(args.out)):
         cob.plot_scores(
@@ -114,9 +118,9 @@ def cob_health(args):
         p2e = fit.distribution_compare('power_law','exponential')
         # Plot!
         emp = fit.plot_ccdf(ax=ax,color='r',linewidth=3, label='Empirical Data')
-        pwr = fit.power_law.plot_ccdf(ax=ax, color='b', linestyle='--', label='Power law')
-        tpw = fit.truncated_power_law.plot_ccdf(ax=ax, color='k', linestyle='--', label='Truncated Power')
-        exp = fit.exponential.plot_ccdf(ax=ax, color='g', linestyle='--', label='Exponential')
+        pwr = fit.power_law.plot_ccdf(ax=ax,linewidth=2, color='b', linestyle=':', label='Power law')
+        tpw = fit.truncated_power_law.plot_ccdf(ax=ax,linewidth=2, color='k', linestyle='-.', label='Truncated Power')
+        exp = fit.exponential.plot_ccdf(ax=ax,linewidth=2, color='g', linestyle='--', label='Exponential')
         ####
         ax.set_ylabel("p(Degree≥x)")
         ax.set_xlabel("Degree Frequency")
@@ -241,35 +245,43 @@ def cob_health(args):
                 go_enrichment.loc[np.logical_not(np.isfinite(go_enrichment['locality_pval'])),'locality_pval'] = max_locality + 1
             plt.clf()
             figure,axes = plt.subplots(3,2,figsize=(12,12))
+            # Calculate alpha based on one- or two-tails
+            if args.two_tailed_GO == True:
+                alpha = 0.05 / 2
+            else:
+                alpha = 0.05
             # -----------
             # Density
             # ----------
             axes[0,0].scatter(
                 go_enrichment['density'],
                 go_enrichment['density_pval'],
-                alpha=0.05
+                alpha=0.05,
+                color='blue'
             )
             axes[0,0].set_xlabel('Empirical Density (Z-Score)')
             axes[0,0].set_ylabel('Bootstraped -log10(p-value)')
-            fold = sum(np.array(go_enrichment['density_pval'])>1.3)/(0.05 * len(go_enrichment))
+            fold = sum(np.array(go_enrichment['density_pval'])>np.log10(alpha))/(alpha * len(go_enrichment))
             axes[0,0].axhline(y=-1*np.log10(0.05),color='red')
             axes[0,0].text(
-                min(axes[0,0].get_xlim()),-1*np.log10(0.05),
+                min(axes[0,0].get_xlim()),-1*np.log10(alpha),
                 '{:.3g} Fold Enrichement'.format(fold),
                 color='red'
             )
             axes[1,0].scatter(
                 go_enrichment['size'],
                 go_enrichment['density_pval'],
-                alpha=0.05
+                alpha=0.05,
+                color='blue'
             )
             axes[1,0].set_ylabel('Bootstrapped -log10(p-value)')
             axes[1,0].set_xlabel('Term Size')
-            axes[1,0].axhline(y=-1*np.log10(0.05),color='red')
+            axes[1,0].axhline(y=-1*np.log10(alpha),color='red')
             axes[2,0].scatter(
                 go_enrichment['size'],
                 go_enrichment['density'],
-                alpha=0.05
+                alpha=0.05,
+                color='blue'
             )
             axes[2,0].scatter(
                 go_enrichment.query('density_pval>1.3')['size'],
@@ -285,7 +297,8 @@ def cob_health(args):
             axes[0,1].scatter(
                 go_enrichment['locality'],
                 go_enrichment['locality_pval'],
-                alpha=0.05
+                alpha=0.05,
+                color='blue'
             )
             axes[0,1].set_xlabel('Empirical Locality (Residual)')
             axes[0,1].set_ylabel('Bootstraped -log10(p-value)')
@@ -299,7 +312,8 @@ def cob_health(args):
             axes[1,1].scatter(
                 go_enrichment['size'],
                 go_enrichment['locality_pval'],
-                alpha=0.05
+                alpha=0.05,
+                color='blue'
             )
             axes[1,1].set_xlabel('Term Size')
             axes[1,1].set_ylabel('Bootstrapped -log10(p-value)')
@@ -307,7 +321,8 @@ def cob_health(args):
             axes[2,1].scatter(
                 go_enrichment['size'],
                 go_enrichment['locality'],
-                alpha=0.05
+                alpha=0.05,
+                color='blue' 
             )
             axes[2,1].scatter(
                 go_enrichment.query('locality_pval>1.3')['size'],
@@ -315,7 +330,7 @@ def cob_health(args):
                 alpha=0.05,
                 color='r'
             )
-            axes[2,1].set_ylabel('Density')
+            axes[2,1].set_ylabel('Locality')
             axes[2,1].set_xlabel('Term Size')
             # Save Figure
             plt.tight_layout()

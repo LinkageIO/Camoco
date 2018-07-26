@@ -50,6 +50,7 @@ def build_cob(args):
         min_expr=args.min_expr,
         max_val=args.max_val,
         dry_run=args.dry_run,
+        zscore_cutoff=args.zscore_cutoff,
         index_col=args.index_col
     )
     print("Build successful!")
