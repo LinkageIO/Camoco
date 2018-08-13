@@ -56,7 +56,7 @@ setup(
     ],
     include_dirs=['camoco/include'],
     install_requires = [		
-        'minus80==0.1.3',
+        #'minus80==0.1.3',
         'flask==0.12.2',
         'cython==0.16',    		
         'igraph==0.1.5',		
@@ -68,7 +68,11 @@ setup(
         'scikit-learn==0.19.1',
         'powerlaw==1.3.5',
         'networkx==1.11', 
-        'statsmodels==0.9.0'
+        'statsmodels==0.9.0',
+        'apsw'
+    ],
+    dependency_links = [
+        'git+https://github.com/rogerbinns/apsw' 
     ],
     include_package_data=True,
 
