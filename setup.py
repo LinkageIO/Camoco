@@ -5,6 +5,7 @@ from setuptools import setup, find_packages, Extension
 import os
 import io
 import re
+#import numpy
 
 def read(*names, **kwargs):
     with io.open(
@@ -51,7 +52,7 @@ setup(
     setup_requires = [
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=18.0',
-        'numpy==1.14.5',
+        #'numpy==1.14.5',
         'cython',
     ],
     include_dirs=['camoco/include'],
@@ -69,7 +70,7 @@ setup(
         'powerlaw==1.3.5',
         'networkx==1.11', 
         'statsmodels==0.8.0',
-        'bcolz==1.2.1',
+        'bcolz',
         'pyyaml==3.12',
         'apsw'
     ],
