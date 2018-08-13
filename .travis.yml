@@ -7,12 +7,11 @@ matrix:
 
 # Install packages
 install:
-  - pip install pytest-cov numpy Cython
-  - pip install git+git://github.com/LinkageIO/Minus80.git
-  - python setup.py install
+  - pip install .
 
 # command to run tests, e.g. python setup.py test
 script:
+  - pip install pytest-cov
   - which py.test
   - cd tests
   - py.test -v --cov=camoco --cov-config coveragerc
