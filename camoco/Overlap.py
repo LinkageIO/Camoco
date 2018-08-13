@@ -551,7 +551,7 @@ class Overlap(Camoco):
             adj = adj[adj.num_common>0] 
             adj = adj[np.logical_not(adj.Term1==adj.Term2)]
             adj = adj.drop_duplicates()
-            adj['bonferoni'] = adj.pval <= (0.05 / (len(x)*len(y)) 
+            adj['bonferoni'] = adj.pval <= (0.05 / (len(x)*len(y))) 
             return adj.drop_duplicates()
         else:
             overlap = pd.pivot_table(adj,index='Term1',columns='Term2',values='num_common')
