@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages, Extension
-from Cython.Distutils import build_ext
-from setuptools.command.develop import develop
-from setuptools.command.install import install
-
-from subprocess import check_call
 
 import os
 import io
 import re
-import numpy
 
 def read(*names, **kwargs):
     with io.open(
@@ -30,14 +24,14 @@ def find_version(*file_paths):
 pccup = Extension(
     'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
-#    extra_compile_args=['-ffast-math'],
-    include_dirs=[numpy.get_include()]
+#   extra_compile_args=['-ffast-math'],
+#   include_dirs=[numpy.get_include()]
 )
 refgendist = Extension(
     'camoco.RefGenDist',
     sources=['camoco/RefGenDist.pyx'],
-#    extra_compile_args=['-ffast-math'],
-    include_dirs=[numpy.get_include()]
+#   extra_compile_args=['-ffast-math'],
+#   include_dirs=[numpy.get_include()]
 )
 
 setup(
@@ -49,12 +43,18 @@ setup(
     ],
     ext_modules = [pccup,refgendist],
     cmdclass = {
-        'build_ext': build_ext,
     },
 
     package_data = {
         '':['*.cyx']    
     },
+    setup_requires = [
+        # Setuptools 18.0 properly handles Cython extensions.
+        'setuptools>=18.0',
+        'numpy==1.14.5',
+        'cython',
+    ],
+    include_dirs=['camoco/include'],
     install_requires = [		
         'minus80==0.1.3',
         'flask==0.12.2',
@@ -62,7 +62,7 @@ setup(
         'igraph==0.1.5',		
         'matplotlib==2.2.2',		
         'numpy==1.14.5',		
-        'pandas==0.22.0',		
+        'pandas==0.19.2',		
         'scipy==1.1.0',		
         'termcolor==1.1.0',
         'scikit-learn==0.19.1',
