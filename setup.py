@@ -5,7 +5,7 @@ from setuptools import setup, find_packages, Extension
 import os
 import io
 import re
-#import numpy
+import numpy
 
 def read(*names, **kwargs):
     with io.open(
@@ -26,13 +26,13 @@ pccup = Extension(
     'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
 #   extra_compile_args=['-ffast-math'],
-#   include_dirs=[numpy.get_include()]
+    include_dirs=[numpy.get_include()]
 )
 refgendist = Extension(
     'camoco.RefGenDist',
     sources=['camoco/RefGenDist.pyx'],
 #   extra_compile_args=['-ffast-math'],
-#   include_dirs=[numpy.get_include()]
+    include_dirs=[numpy.get_include()]
 )
 
 setup(
@@ -55,27 +55,27 @@ setup(
         #'numpy==1.14.5',
         'cython',
     ],
-    include_dirs=['camoco/include'],
+#   include_dirs=['camoco/include'],
     install_requires = [		
-        #'minus80==0.1.3',
-        'flask==0.12.2',
-        'cython==0.16',    		
-        'igraph==0.1.11',		
-        'matplotlib==2.0.0',		
-        'numpy==1.12.0',		
-        'pandas==0.19.2',		
-        'scipy==1.1.0',		
-        'termcolor==1.1.0',
-        'scikit-learn==0.18.1',
-        'powerlaw==1.3.5',
-        'networkx==1.11', 
-        'statsmodels==0.8.0',
-        'bcolz',
-        'pyyaml==3.12',
-        'apsw'
+        #'minus80>=0.1.3',
+        'cython>=0.16',    		
+        'igraph>=0.1.11',		
+        'pyyaml>=3.12',
+        'matplotlib>=2.0.0',		
+        'numpy>=1.12.0',		
+        'scipy>=1.1.0',		
+        'pandas>=0.19.2',		
+        'scikit-learn>=0.18.1',
+        'statsmodels>=0.8.0',
+        'termcolor>=1.1.0',
+        'powerlaw>=1.3.5',
+        'flask>=0.12.2',
+        #'apsw',
+        'minus80',
     ],
     dependency_links = [
-        'git+https://github.com/rogerbinns/apsw' 
+        'git+https://github.com/LinkageIO/Minus80'
+        #'git+https://github.com/rogerbinns/apsw' 
     ],
     include_package_data=True,
 
