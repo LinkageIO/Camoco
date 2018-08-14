@@ -93,7 +93,7 @@ def del_dataset(type, name, force=False): # pragma no cover
         return True
     if force == False:
         c.log("Are you sure you want to delete:\n {}.{}", type, name)
-        if input("[Y/n]".upper()) != 'Y':
+        if input("[Y/n]").upper() != 'Y':
             c.log("Nothing Deleted")
             return
     c.log("Deleting {}", name)
