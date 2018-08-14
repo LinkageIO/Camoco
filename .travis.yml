@@ -11,7 +11,7 @@ install:
   - wget http://micans.org/mcl/src/mcl-latest.tar.gz
   - tar xzf mcl-latest.tar.gz
   - cd $(find . -name 'mcl-*' -type d | head -n 1)
-  - ./configure
+  - ./configure --prefix=$HOME/.camoco/
   - make
   - make install 
   - cd ..
