@@ -23,7 +23,7 @@ from itertools import chain
 
 import camoco as co
 import pandas as pd
-from pandas.core.groupby import DataError
+from pandas.core.groupby.groupby import DataError
 
 
 pd.set_option('display.width',300)
