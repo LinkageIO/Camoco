@@ -57,7 +57,7 @@ setup(
     ],
 #   include_dirs=['camoco/include'],
     install_requires = [		
-        #'minus80>=0.1.3',
+        'minus80>=0.1.5',
         'cython>=0.16',    		
         'igraph>=0.1.11',		
         'pyyaml>=3.12',
@@ -71,10 +71,10 @@ setup(
         'powerlaw>=1.3.5',
         'flask>=0.12.2',
         #'apsw',
-        'minus80',
+        #'minus80',
     ],
     dependency_links = [
-        'git+https://github.com/LinkageIO/Minus80'
+        #'git+https://github.com/LinkageIO/Minus80'
         #'git+https://github.com/rogerbinns/apsw' 
     ],
     include_package_data=True,
