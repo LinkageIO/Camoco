@@ -1036,7 +1036,10 @@ class COB(Expr):
                     )
                 )
             else:
-                raise ValueError( "MCL failed: return code: {}".format(p.returncode))
+                if p.returncode == 127:
+                    raise FileNotFoundError()
+                else:
+                    raise ValueError( "MCL failed: return code: {}".format(p.returncode))
         except FileNotFoundError as e:
             self.log('Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".')
 
