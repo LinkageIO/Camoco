@@ -3,27 +3,24 @@ matrix:
     include:
         - os: linux
           python: 3.6
-          env: TOXENV=py36 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
-        - os: osx
-          language: generic
-          env: TOXENV=py36 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
-# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+          env: TOXENV=py36 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH PIP_USER=FALSE
 
 # Install packages
 install:
-  - ./.travis/install.sh
-  - ./install.sh
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  - conda info -a
-  - conda install pytest-cov numpy cython
+  # Install MCL
+  - wget http://micans.org/mcl/src/mcl-latest.tar.gz
+  - tar xzf mcl-latest.tar.gz
+  - cd $(find . -name 'mcl-*' -type d | head -n 1)
+  - ./configure --prefix=$HOME/.camoco/
+  - make
+  - make install 
+  - cd ..
+  # Install Camoco
   - pip install .
 
 # command to run tests, e.g. python setup.py test
 script:
-  - source $HOME/.camoco/conda/bin/activate camoco
-  - export PATH=/home/travis/.camoco/bin/:$PATH
+  - pip install pytest-cov
   - which py.test
   - cd tests
   - py.test -v --cov=camoco --cov-config coveragerc

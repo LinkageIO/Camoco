@@ -23,7 +23,7 @@ from itertools import chain
 
 import camoco as co
 import pandas as pd
-from pandas.core.groupby import DataError
+from pandas.core.groupby.groupby import DataError
 
 
 pd.set_option('display.width',300)
@@ -151,7 +151,7 @@ class Overlap(Camoco):
             os.makedirs(os.path.dirname(self.args.out),exist_ok=True)
         if os.path.exists(self.args.out) and self.args.force != True:
             self.log("Output for {} exists! Skipping!",self.args.out)
-            return
+            raise ValueError()
 
     def snp2gene(self,term,ont):
         if 'effective' in self.args.snp2gene:
@@ -229,6 +229,7 @@ class Overlap(Camoco):
             self.results,
             index=['Method','COB','WindowSize','FlankLimit'],
             columns='Term',
+            fill_value=np.nan,
             values='fdr',
             aggfunc=lambda x: sum(x<=fdr_cutoff)
         )
@@ -286,7 +287,7 @@ class Overlap(Camoco):
         )
         results = snps.join(loci).join(genes)
         #ionome_eff_loci = [len()]
-        return results.astype(int)
+        return results
      
     def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05,
                           collapse_snp2gene=False,figsize=(15,10),
@@ -486,7 +487,8 @@ class Overlap(Camoco):
                         all_candidates.extend([x.as_dict() for x in candidates])
         return pd.DataFrame(all_candidates)
 
-    def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3,return_genes=False):
+    def adjacency(self, min_snp2gene_obs=2,fdr_cutoff=0.3,return_genes=False,
+                 second_overlap=None):
         '''
             Return a matrix showing the number of shared HPO genes by Term.
             The diagonal of the matrix is the number of genes discoverd by that 
@@ -501,41 +503,61 @@ class Overlap(Camoco):
                 The FDR cutoff the be considered HPO
             return_genes : bool (default: False)
                 Return the candidate gene list instead of the overlap table
+            second_overlap : Overlap Object (default: None)
+                If specified, overlap between terms will be calculated 
+                between this overlaps HPO genes and the second overlaps
+                HPO genes resulting in a adjacency matrix where the 
+                x-axis is overlap 1's terms and the y-axis is overlap
+                2's terms and the values are the number of shared genes
+                per term.
         '''
-        df = self.high_priority_candidates(
+        hpo1 = self.high_priority_candidates(
                 fdr_cutoff=fdr_cutoff,
                 min_snp2gene_obs=min_snp2gene_obs,
                 original_COB_only=True)
+
+        if second_overlap is None:
+            second_overlap = self
+        hpo2 = second_overlap.high_priority_candidates(
+            fdr_cutoff=fdr_cutoff,
+            min_snp2gene_obs=min_snp2gene_obs,
+            original_COB_only=True
+        )
         # 
-        x={df[0]:set(df[1].gene) for df in df.groupby('Term')}                     
+        x={df[0]:set(df[1].gene) for df in hpo1.groupby('Term')}                     
+        y={df[0]:set(df[1].gene) for df in hpo2.groupby('Term')}                     
         adj = []                                                                        
         #num_universe = len(set(chain(*x.values())))
-        num_universe = len(self.results.gene.unique())
+        num_universe = len(set(self.results.gene.unique()).union(set(second_overlap.results.gene.unique())))
         for i,a in enumerate(x.keys()):                                                              
-            for j,b in enumerate(x.keys()):  
+            for j,b in enumerate(y.keys()):  
+                num_a = len(x[a])
+                num_b = len(y[b])
                 if j < i:
                     continue
-                common = set(x[a]).intersection(x[b])
-                num_common = len(set(x[a]).intersection(x[b]))
+                common = set(x[a]).intersection(y[b])
+                num_common = len(set(x[a]).intersection(y[b]))
                 if a != b:
-                    pval = hypergeom.sf(num_common-1,num_universe,len(x[a]),len(x[b]))
+                    pval = hypergeom.sf(num_common-1,num_universe,len(x[a]),len(y[b]))
                 else:
                     # This will make the diagonal of the matrix be the number HPO genes
                     # for the element
                     pval = len(x[a])
-                adj.append((a,b,num_common,pval,','.join(common))) 
+                adj.append((a,b,num_a,num_b,num_common,pval,','.join(common))) 
         adj = pd.DataFrame(adj)                                                         
-        adj.columns = ['Term1','Term2','num_common','pval','common']
+        adj.columns = ['Term1','Term2','num_term1','num_term2','num_common','pval','common']
         # Stop early if we just want to return the lists 
         if return_genes == True:
             adj = adj[adj.num_common>0] 
             adj = adj[np.logical_not(adj.Term1==adj.Term2)]
+            adj = adj.drop_duplicates()
+            adj['bonferoni'] = adj.pval <= (0.05 / (len(x)*len(y))) 
             return adj.drop_duplicates()
         else:
             overlap = pd.pivot_table(adj,index='Term1',columns='Term2',values='num_common')
             # Mask out the lower diagonal on the overalp matrix
             overlap.values[tril_indices(len(overlap))] = 0
-            pvals = pd.pivot_table(adj,index='Term2',columns='Term1',values='pval')
+            pvals = pd.pivot_table(adj,index='Term1',columns='Term2',values='pval')
             # Mask out the upper tringular on the pvals matrix
             pvals.values[triu_indices(len(pvals),1)] = 0
             return (overlap+pvals).astype(float)
@@ -544,13 +566,15 @@ class Overlap(Camoco):
         candidates = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
         candidates['fdr'] = fdr_cutoff
         # Calculate Totals
-        total = pd.DataFrame(pd.pivot_table(
+        total = pd.pivot_table(
             candidates,
-            columns=['fdr','Method','COB'],
+            index=['fdr','Method','COB'],
             values='gene',
             dropna=dropna,
             aggfunc=lambda x: len(set(x))
-        ).fillna(0).astype(int),columns=['Total']).T
+        ).fillna(0).astype(int)
+        total.columns = ['Total']
+        total = total.T
         # Pivot and aggregate
         by_term =  pd.pivot_table(
             candidates,
@@ -574,13 +598,16 @@ class Overlap(Camoco):
         return self
  
     @classmethod
-    def from_csv(cls,dir='./',sep='\t'):
+    def from_csv(cls,dir='./',sep='\t',name=None):
         # Read in Gene specific data
         results = pd.concat(
             [pd.read_table(x,sep=sep) \
                 for x in glob.glob(dir+"/*.overlap.tsv") ]
         )
-        gwas = results.Ontology.unique()[0]
+        if name is None:
+            gwas = results.Ontology.unique()[0]
+        else:
+            gwas = name
         self = cls.create(gwas)
         self.results = results
         # Add the results to the sqlite table
@@ -623,7 +650,10 @@ class Overlap(Camoco):
             self.ont = co.GWAS(args.gwas)
         else:
             raise ValueError('Please provide a valid overlap source (--genes, --go or --gwas)')
-        self.generate_output_name()
+        try:
+            self.generate_output_name()
+        except ValueError as e:
+            return
         
         # Save strongest description arguments if applicable
         if 'strongest' in self.args.snp2gene:
@@ -642,16 +672,19 @@ class Overlap(Camoco):
         else:
             # Generate terms from the ontology
             if 'all' in self.args.terms:
-                terms = self.ont.iter_terms()
+                terms = list(self.ont.iter_terms())
             else:
                 terms = [self.ont[term] for term in self.args.terms]
         all_results = list()
         results = []
-        
+
+        num_total_terms = len(terms)
         # Iterate through terms and calculate
-        for term in terms:
+        for i,term in enumerate(terms):
+            self.cob.log(' ---------- Calculating overlap for {} of {} Terms',i,num_total_terms)
             if term.id in self.args.skip_terms:
                 self.cob.log('Skipping {} since it was in --skip-terms',term.id)
+            self.cob.log('Generating SNP-to-gene mapping')
             # If appropriate, generate SNP2Gene Loci
             if self.args.candidate_flank_limit > 0:
                 loci = self.snp2gene(term,self.ont)
@@ -685,10 +718,12 @@ class Overlap(Camoco):
                 overlap = self.overlap(loci)
             except DataError as e:
                 continue
+            self.cob.log('Generating bootstraps')
             bootstraps = self.generate_bootstraps(loci,overlap)
             bs_mean = bootstraps.groupby('iter').score.apply(np.mean).mean()
             bs_std  = bootstraps.groupby('iter').score.apply(np.std).mean()
             # Calculate z scores for density
+            self.cob.log('Calculating Z-Scores')
             if bs_std != 0:
                 overlap['zscore'] = (overlap.score-bs_mean)/bs_std
                 bootstraps['zscore'] = (bootstraps.score-bs_mean)/bs_std
@@ -696,6 +731,7 @@ class Overlap(Camoco):
                 # If there is no variation, make all Z-scores 0
                 overlap['zscore'] = bootstraps['zscore'] = 0
             # Calculate FDR
+            self.cob.log('Calculating FDR')
             overlap['fdr'] = np.nan
             max_zscore = int(overlap.zscore.max()) + 1
             for zscore in np.arange(0, max_zscore,0.25):
@@ -735,7 +771,10 @@ class Overlap(Camoco):
             overlap['SNP2Gene'] = self.args.snp2gene
             results.append(overlap.reset_index())
             # Summarize results
-            overlap_score = np.nanmean(overlap.score)/(1/np.sqrt(overlap.num_trans_edges.mean()))
+            if self.args.method == 'density':
+                overlap_score = np.nanmean(overlap.score)/(1/np.sqrt(overlap.num_trans_edges.mean()))
+            elif self.args.method == 'locality':
+                overlap_score = np.nanmean(overlap.score)
             self.cob.log('Overlap Score ({}): {} (p<{})'.format(
                 self.args.method,
                 overlap_score,
@@ -751,5 +790,3 @@ class Overlap(Camoco):
             
             # Save the results to the SQLite table
             self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
-
-
