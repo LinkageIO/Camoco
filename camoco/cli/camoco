@@ -317,7 +317,7 @@ if __name__ == '__main__':
     )
     bldcob.add_argument(
         '--rawtype',
-        default=None,
+        default='RNASEQ',
         help=(
             "Passing in a rawtype can help determine default parameters for "
             "standard data types such as MICROARRAY and RNASEQ. "
