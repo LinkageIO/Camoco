@@ -1,28 +1,33 @@
 language: python
 matrix:
-    include:
-        - os: linux
-          python: 3.6
-          env: TOXENV=py36 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH PIP_USER=FALSE
-
-# Install packages
+  include:
+  - os: linux
+    python: 3.6
+    env: TOXENV=py36 LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
+      PIP_USER=FALSE
 install:
-  # Install MCL
-  - wget http://micans.org/mcl/src/mcl-latest.tar.gz
-  - tar xzf mcl-latest.tar.gz
-  - cd $(find . -name 'mcl-*' -type d | head -n 1)
-  - ./configure --prefix=$HOME/.camoco/
-  - make
-  - make install 
-  - cd ..
-  # Install Camoco
-  - pip install .
-
-# command to run tests, e.g. python setup.py test
+    #- wget http://micans.org/mcl/src/mcl-latest.tar.gz
+    #- tar xzf mcl-latest.tar.gz
+    #- cd $(find . -name 'mcl-*' -type d | head -n 1)
+    #- "./configure --prefix=$HOME/.camoco/"
+    #- make
+    #- make install
+    #- cd ..
+    - pip install .
 script:
-  - pip install pytest-cov
-  - which py.test
-  - cd tests
-  - py.test -v --cov=camoco --cov-config coveragerc
+    - pip install pytest-cov
+    - which py.test
+    - cd tests
+    - py.test -v --cov=camoco --cov-config coveragerc
 after_success:
     - coveralls
+    - cd ../
+deploy:
+  provider: pypi
+  user: schae234
+  password:
+    secure: BDO56IeGoZw5hq/83MFMufOuIt5I3PuvTJYYC/Eqs+hJxA06+2KEzGpqKVMR/aTpU5Qh6U3NSA8LgYOpAkJS0EKojn7ZwrEMq7hzGeSFfecimx85ECa2OtxwA0WFZ6p6yPRABuoXgS6qYikGar+Q7lxx5exwNFNZDO3CvxNxHpU=
+  on:
+    tags: true
+    distributions: sdist bdist_wheel
+    repo: LinkageIO/Camoco
