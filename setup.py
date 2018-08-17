@@ -70,6 +70,7 @@ setup(
         'termcolor>=1.1.0',
         'powerlaw>=1.3.5',
         'flask>=0.12.2',
+        'markov-clustering>=0.0.3.dev0',
         #'apsw',
         #'minus80',
     ],
