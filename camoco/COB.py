@@ -1,5 +1,8 @@
 #!/usr/bin/python3
 
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 import camoco.PCCUP as PCCUP
 
 from .Camoco import Camoco
@@ -246,12 +249,12 @@ class COB(Expr):
             
             # Keep track of the current threshold
             self._global('current_significance_threshold',zscore)
+            self._calculate_degree(update_db=False)
         
         # Rebuild significant index set
         if new_sig or self.sigs is None:
             self.sigs = np.array([ind for ind in self.coex.data['significant'].wheretrue()])
             self.sigs.sort()
-        self._calculate_degree(update_db=False)
         return None
     
     def _coex_DataFrame(self,ids=None,sig_only=True):
@@ -539,7 +542,7 @@ class COB(Expr):
             else:
                 df.insert(0,'gene_a',[])
                 df.insert(0,'gene_b',[])
-        if names_as_index:
+        if names_as_index and not names_as_cols:
             df = df.set_index(['gene_a','gene_b'])
         if trans_locus_only:
             try:
@@ -779,8 +782,9 @@ class COB(Expr):
             # Get the score table
             self.log('Pulling the scores for the .dat')
             score = self.subnetwork(gene_list, sig_only=sig_only, 
-            min_distance=min_distance, names_as_index=False,
-            names_as_cols=False)
+                min_distance=min_distance, names_as_index=False,
+                names_as_cols=False
+            )
             
             # Drop unecessary columns
             score.drop(['distance','significant'], axis=1, inplace=True)
@@ -977,8 +981,69 @@ class COB(Expr):
             net = json.dumps(net)
             return net
 
-
     def mcl(self, gene_list=None, I=2.0, scheme=7, min_distance=None,
+            min_cluster_size=0, max_cluster_size=10e10):
+        '''
+            Returns clusters (as list) as designated by MCL (Markov Clustering).
+
+            Parameters
+            ----------
+            gene_list : a gene iterable
+                These are the genes which will be clustered
+            I : float (default: 2.0)
+                This is the inflation parameter passed into mcl.
+            min_distance : int (default: None)
+                The minimum distance between genes for which to consider
+                co-expression interactions. This filters out cis edges.
+            min_cluster_size : int (default: 0)
+                The minimum cluster size to return. Filter out clusters smaller
+                than this.
+            max_cluster_size : float (default: 10e10)
+                The maximum cluster size to return. Filter out clusters larger
+                than this.
+
+            Returns
+            -------
+            A list clusters containing a lists of genes within each cluster
+        '''
+        # Inspired by https://github.com/networkx/networkx/blob/master/networkx/convert_matrix.py
+        import markov_clustering as mc
+        from scipy import sparse
+        # first get the subnetwork in pair form
+        sub = self.subnetwork(
+            gene_list=gene_list, min_distance=min_distance,
+            sig_only=True, names_as_cols=True
+        )
+        nlen = self.num_genes()
+        # get the expression matrix indices for all the genes
+        row = [self._expr_index[x] for x in sub.gene_a.values]
+        col = [self._expr_index[x] for x in sub.gene_b.values]
+        data = list(sub.score.values)
+        # Make the values symmetric by doubling everything
+        # Note: by nature we dont have cycles so we dont have to
+        #   worry about the diagonal
+        d = data + data
+        r = row + col
+        c = col + row
+        matrix = sparse.coo_matrix((d,(r,c)), shape=(nlen,nlen),dtype=None)
+        # Run MCL
+        result = mc.run_mcl(matrix)
+        clusters = mc.get_clusters(result)
+        # MCL traditionally returns clusters by size with 0 being the largest
+        clusters = sorted(clusters,key=lambda x: len(x), reverse=True)
+        # Create a dictionary to map ids to gene names
+        gene_id_index = {v:k for k,v in self._expr_index.items()}
+        result = []
+        for c in clusters:
+            if len(c) < min_cluster_size or len(c) > max_cluster_size:
+                continue
+            # convert to loci
+            loci = self.refgen.from_ids([gene_id_index[i] for i in c])
+            result.append(loci)
+        return result     
+        
+
+    def _mcl_legacy(self, gene_list=None, I=2.0, scheme=7, min_distance=None,
             min_cluster_size=0, max_cluster_size=10e10):
         '''
             A *very* thin wrapper to the MCL program. The MCL program must
