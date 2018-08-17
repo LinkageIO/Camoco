@@ -32,7 +32,7 @@ DEALINGS IN THE SOFTWARE.
 
 """
 
-__version__ = '0.5.2'
+__version__ = '0.6.0'
 
 import sys
 import os
