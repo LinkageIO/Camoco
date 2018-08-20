@@ -773,7 +773,7 @@ if __name__ == '__main__':
         help='Perform Gene Ontology Statistics. (default: None)'
     )
     health.add_argument(
-        '--two_tailed_GO',
+        '--two-tailed',
         action='store_true',
         default=False,
         help='Include negative density values for GO statistics (default: False)'
