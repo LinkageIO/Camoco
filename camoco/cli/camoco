@@ -335,7 +335,7 @@ if __name__ == '__main__':
     bldcob.add_argument(
         '--index-col',
         type=str,
-        default=None,
+        default=0,
         help=(
             'If not None, this column will be set as the gene index '
             'column. Useful if there is a column name in the text file '
@@ -489,6 +489,13 @@ if __name__ == '__main__':
         help = (
             'The name of the dataset you want to list. '
             'Also accepts SQLite wildcards.' 
+        )
+    )
+    lstcmd.add_argument(
+        '--names',
+        action='store_true',
+        help=(
+            'If True, will return a list of dataset names'    
         )
     )
     lstcmd.add_argument(

@@ -10,6 +10,8 @@ def list_command(args):
             elif args.type =='GOnt':
                 gont = co.GOnt(args.name)
                 print('\n'.join([x.id for x in gont.iter_terms()]))
+        if args.names:
+            print(' '.join(available_datasets(args.type,args.name).Name))
         else:
             print(available_datasets(args.type,args.name))
     elif args.type != None and args.name == None:
