@@ -97,7 +97,7 @@ class Overlap(Camoco):
     def get_data(self, gene=None, cob=None, term=None,
         windowSize=None, flankLimit=None, snp2gene=None, method=None):
         '''
-            Function to get data using any of the parameters it is normaly queried by
+            Function to get data using any of the parameters it is normaly queried by.
         '''
         # Base section of query
         query = "SELECT * FROM overlap WHERE"
