@@ -981,6 +981,65 @@ class COB(Expr):
             net = json.dumps(net)
             return net
 
+
+    def to_sparse_matrix(self,gene_list=None,min_distance=None,
+            max_edges=None,remove_orphans=False):
+        '''
+            Convert the co-expression interactions to a 
+            scipy sparse matrix.
+
+            Parameters
+            -----
+            gene_list: iter of Loci (default: None)
+                If specified, return only the interactions among
+                loci in the list. If None, use all genes.
+            min_distance : int (default: None)
+                The minimum distance between genes for which to consider
+                co-expression interactions. This filters out cis edges.
+
+            Returns
+            -------
+            A tuple (a,b) where 'a' is a scipy sparse matrix and
+            'b' is a mapping from gene_id to index.
+        '''
+        from scipy import sparse
+        self.log('Getting genes')
+        if gene_list is None:
+            gene_list = self.genes()
+        # first get the subnetwork in pair form
+        self.log('Pulling edges')
+        edges = self.subnetwork(
+            gene_list=gene_list, min_distance=min_distance,
+            sig_only=True, names_as_cols=True
+        )
+        # Option to limit the number of edges 
+        if max_edges is not None:
+            self.log('Filtering edges')
+            edges = edges.sort_values(by='score',ascending=False)[0:max_edges]
+        # Option to restrict gene list to only genes with edges
+        if remove_orphans:
+            self.log('Removing orphans')
+            not_orphans = set(edges.gene_a).union(edges.gene_b)
+            gene_list = [g for g in gene_list if g.id in not_orphans]
+        # Create a gene index
+        self.log('Creating Index')
+        gene_index = {g.id:i for i,g in enumerate(gene_list)}
+        nlen = len(gene_list)
+        # get the expression matrix indices for all the genes
+        row = [gene_index[x] for x in edges.gene_a.values]
+        col = [gene_index[x] for x in edges.gene_b.values]
+        data = list(edges.score.values)
+        # Make the values symmetric by doubling everything
+        # Note: by nature we dont have cycles so we dont have to
+        #   worry about the diagonal
+        self.log('Making matrix symmetric')
+        d = data + data
+        r = row + col
+        c = col + row
+        self.log('Creating matrix')
+        matrix = sparse.coo_matrix((d,(r,c)), shape=(nlen,nlen),dtype=None)
+        return (matrix,gene_index)
+
     def mcl(self, gene_list=None, I=2.0, scheme=7, min_distance=None,
             min_cluster_size=0, max_cluster_size=10e10):
         '''
@@ -1008,31 +1067,14 @@ class COB(Expr):
         '''
         # Inspired by https://github.com/networkx/networkx/blob/master/networkx/convert_matrix.py
         import markov_clustering as mc
-        from scipy import sparse
-        # first get the subnetwork in pair form
-        sub = self.subnetwork(
-            gene_list=gene_list, min_distance=min_distance,
-            sig_only=True, names_as_cols=True
-        )
-        nlen = self.num_genes()
-        # get the expression matrix indices for all the genes
-        row = [self._expr_index[x] for x in sub.gene_a.values]
-        col = [self._expr_index[x] for x in sub.gene_b.values]
-        data = list(sub.score.values)
-        # Make the values symmetric by doubling everything
-        # Note: by nature we dont have cycles so we dont have to
-        #   worry about the diagonal
-        d = data + data
-        r = row + col
-        c = col + row
-        matrix = sparse.coo_matrix((d,(r,c)), shape=(nlen,nlen),dtype=None)
+        matrix,gene_index = self.to_sparse_matrix(gene_list=gene_list)
         # Run MCL
         result = mc.run_mcl(matrix)
         clusters = mc.get_clusters(result)
         # MCL traditionally returns clusters by size with 0 being the largest
         clusters = sorted(clusters,key=lambda x: len(x), reverse=True)
         # Create a dictionary to map ids to gene names
-        gene_id_index = {v:k for k,v in self._expr_index.items()}
+        gene_id_index = {v:k for k,v in gene_index.items()}
         result = []
         for c in clusters:
             if len(c) < min_cluster_size or len(c) > max_cluster_size:
@@ -1941,6 +1983,7 @@ def _sparse_fruchterman_reingold(A, dim=2, k=None, pos=None, fixed=None,
 
     displacement=np.zeros((dim,nnodes))
     for iteration in range(iterations):
+        print(f'On iteration {iteration}')        
         displacement*=0
         # loop over rows
         for i in range(A.shape[0]):
