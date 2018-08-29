@@ -62,7 +62,7 @@ from .Locus import Locus
 #from .Tools import mv_dataset,redescribe_dataset
 #from .GEO import Family
 from .GOnt import GOnt
-#from .Overlap import Overlap
+from .Overlap import Overlap
 
 # Create yourself
 Camoco.create('Camoco','Mother Database')
