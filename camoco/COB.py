@@ -1918,108 +1918,35 @@ class COB(Expr):
         )
 
 
-    def coordinates(self):
+    def coordinates(self,force=False,iterations=50):
         ''' 
             returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene
         '''
-        import scipy.sparse.csgraph as csgraph
-        import networkx
-        A,i = self.to_sparse_matrix(remove_orphans=True,max_edges=100000)
-        num,ccindex = csgraph.connected_components(A,directed=False)
-        self.log(f'The largest CC has {num} nodes')
-        # convert to csc
-        self.log(f'Converting to compressed sparse column')
-        L = A.tocsc()
-        self.log('Extracting largest connected component')
-        L = L[ccindex == 0,:][:,ccindex == 0]
-        self.log('Calculating positions')
-        pos = networkx.layout._sparse_fruchterman_reingold(L,iterations=50)
-        import ipdb; ipdb.set_trace()
+        pos = self._bcolz('coordinates')
+        if pos is None or force == True:
+            import scipy.sparse.csgraph as csgraph
+            import networkx
+            A,i = self.to_sparse_matrix(remove_orphans=True,max_edges=100000)
+            rev_i = {v:k for k,v in i.items()}
+            num,ccindex = csgraph.connected_components(A,directed=False)
+            self.log(f'The largest CC has {num} nodes')
+            # convert to csc
+            self.log(f'Converting to compressed sparse column')
+            L = A.tocsc()
+            self.log('Extracting largest connected component')
+            L = L[ccindex == 0,:][:,ccindex == 0]
+            self.log('Calculating positions')
+            pos = pd.DataFrame(
+                networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
+            )
+            (lcc_indices,) = np.where(ccindex == 0)
+            labels = [rev_i[x] for x in lcc_indices]
+            pos.index = labels
+            pos.columns = ['x','y']
+            self._bcolz('coordinates',df=pos)
         return pos
-
-
-def _sparse_fruchterman_reingold(A, k=None, pos=None, fixed=None,
-                                 iterations=50, threshold=1e-4, dim=2,
-                                seed=None):
-    '''
-        Copyright (C) 2004-2016, NetworkX Developers
-        Aric Hagberg <hagberg@lanl.gov>
-        Dan Schult <dschult@colgate.edu>
-        Pieter Swart <swart@lanl.gov>
-        All rights reserved.
-    '''
-    import numpy as np
-
-    try:
-        nnodes, _ = A.shape
-    except AttributeError:
-        msg = "fruchterman_reingold() takes an adjacency matrix as input"
-        raise nx.NetworkXError(msg)
-    try:
-        from scipy.sparse import spdiags, coo_matrix
-    except ImportError:
-        msg = "_sparse_fruchterman_reingold() scipy numpy: http://scipy.org/ "
-        raise ImportError(msg)
-    # make sure we have a LIst of Lists representation
-    try:
-        A = A.tolil()
-    except:
-        A = (coo_matrix(A)).tolil()
-
-    if pos is None:
-        # random initial positions
-        pos = np.asarray(seed.rand(nnodes, dim), dtype=A.dtype)
-    else:
-        # make sure positions are of same type as matrix
-        pos = pos.astype(A.dtype)
-
-    # no fixed nodes
-    if fixed is None:
-        fixed = []
-
-    # optimal distance between nodes
-    if k is None:
-        k = np.sqrt(1.0 / nnodes)
-    # the initial "temperature"  is about .1 of domain area (=1x1)
-    # this is the largest step allowed in the dynamics.
-    t = max(max(pos.T[0]) - min(pos.T[0]), max(pos.T[1]) - min(pos.T[1])) * 0.1
-    # simple cooling scheme.
-    # linearly step down by dt on each iteration so last iteration is size dt.
-    dt = t / float(iterations + 1)
-
-    displacement = np.zeros((dim, nnodes))
-    for iteration in range(iterations):
-        print(f"On Iteration {iteration}")
-        displacement *= 0
-        # loop over rows
-        for i in range(A.shape[0]):
-            if i in fixed:
-                continue
-            # difference between this row's node position and all others
-            delta = (pos[i] - pos).T
-            # distance between points
-            distance = np.sqrt((delta**2).sum(axis=0))
-            # enforce minimum distance of 0.01
-            distance = np.where(distance < 0.01, 0.01, distance)
-            # the adjacency matrix row
-            Ai = np.asarray(A.getrowview(i).toarray())
-            # displacement "force"
-            displacement[:, i] +=\
-                (delta * (k * k / distance**2 - Ai * distance / k)).sum(axis=1)
-        # update positions
-        length = np.sqrt((displacement**2).sum(axis=0))
-        length = np.where(length < 0.01, 0.1, length)
-        delta_pos = (displacement * t / length).T
-        pos += delta_pos
-        # cool temperature
-        t -= dt
-        err = np.linalg.norm(delta_pos) / nnodes
-        if err < threshold:
-            break
-    return pos
-
 
 def fix_val(val):
     if isinf(val):
