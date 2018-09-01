@@ -91,48 +91,6 @@ class Overlap(Camoco):
         cur = self.db.cursor()
         cur.execute('CREATE INDEX IF NOT EXISTS gene ON overlap(gene)')
 
-    '''
-        Methods
-    '''
-    def get_data(self, gene=None, cob=None, term=None,
-        windowSize=None, flankLimit=None, snp2gene=None, method=None):
-        '''
-            Function to get data using any of the parameters it is normaly queried by.
-        '''
-        # Base section of query
-        query = "SELECT * FROM overlap WHERE"
-        
-        # Throw arguments into a dictionary for effective looping
-        args = {
-            'gene':gene,
-            'COB':cob,
-            'Term':term,
-            'WindowSize':windowSize,
-            'FlankLimit':flankLimit,
-            'SNP2Gene':snp2gene,
-            'Method':method,
-            }
-        
-        # For each argument, add a clase to the SQL query
-        for k,v in args.items():
-            if not(v is None):
-                if isinstance(v,(set,list)):
-                    ls = "{}".format("','".join([str(x) for x in v]))
-                else:
-                    ls = v
-                query += " {} IN ('{}') AND".format(k,ls)
-        
-        # Peel off unneeded things at the end of the query, depending args
-        if query.endswith(' AND'):
-            query = query.rstrip(' AND')
-        if query.endswith(' WHERE'):
-            query = query.rstrip(' WHERE')
-        query += ';'
-        
-        # Throw the results into a DataFrame for conviniece
-        self.log('Executing: {}'.format(query))
-        return pd.read_sql(query, sqlite3.connect(self.db.filename)).set_index('gene')
-
     def generate_output_name(self):
         # Handle the different output schemes
         if self.args.out is None:
@@ -289,109 +247,6 @@ class Overlap(Camoco):
         #ionome_eff_loci = [len()]
         return results
      
-    def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05,
-                          collapse_snp2gene=False,figsize=(15,10),
-                          skip_terms=None):
-        '''
-            Generate a heatmap based on TermPVal
-
-            Parameters
-            ----------
-            filename : str
-                output file name
-            pval_cutoff : float (default:0.05)
-                The term p-value cutoff for shading the heatmap
-            collapse_snp2gene : bool (default: False)
-                If true, candidates will be collapsed around
-                snp to gene mapping parameters
-            figsize : tuple(int,int) (default:(15,10))
-                Control the size of the figure
-            skip_terms : iter (default:None)
-                If provided, terms in the iterable will
-                not be plotted
-        '''
-        methods = sorted(self.results.Method.unique())
-        cobs = sorted(self.results.COB.unique())
-        fig,axes = plt.subplots(len(cobs),len(methods))
-        fig.set_size_inches(figsize)
-        def get_axis(i,j,axes):
-            if len(axes.shape) == 1:
-                return axes[i]
-            else:
-                return axes[i,j]
-        for i,cob in enumerate(cobs):
-            for j,method in enumerate(methods):
-                axis = get_axis(i,j,axes)
-                data = pd.pivot_table(
-                    self.results.ix[(self.results.COB==cob) & (self.results.Method==method)],
-                    index=['WindowSize','FlankLimit'],
-                    columns=['Term'],
-                    values='TermPValue',
-                    aggfunc=np.mean
-                )
-                if collapse_snp2gene:
-                    data = pd.DataFrame(data.apply(min)).T
-                if skip_terms:
-                    for term in skip_terms:
-                        del data[term]
-                #data[data > pval_cutoff] = np.nan
-                #data[data < pval_cutoff] = 0
-                axis.set_frame_on(False)
-                cmap = plt.cm.Greens_r
-                cmap.set_bad('white',1.0)
-                im = axis.pcolormesh(
-                    np.ma.masked_invalid(data),
-                    cmap=cmap,
-                    #linewidth=0.1,
-                    edgecolor='lightgrey',
-                    vmin=0,
-                    vmax=0.05
-                )
-                # Make the layout more natural
-                if j == len(methods) - 1 :
-                    axis.set_ylabel(cob,fontsize=10)
-                    axis.set_yticklabels(data.index.values,rotation='45')
-                    axis.yaxis.set_label_position("right")
-                if j == 0:
-                    axis.set_yticklabels(
-                        axis.get_yticklabels(),size=7
-                    )
-                    axis.set(
-                        yticks=np.arange(len(data.index))+0.5
-                    )
-                else:
-                    axis.set_yticks([])
-                    axis.set_yticklabels([])
-                axis.yaxis.set_ticks_position('left')
-                axis.invert_yaxis()
-                if i == 0:
-                    axis.set_title(method,y=1.1,size=15)
-                    axis.xaxis.tick_top()
-                    axis.set_xticks(np.arange(len(data.columns))+0.5)
-                    axis.set_xticklabels(
-                        [re.sub('\d','',x) for x in data.columns.values], 
-                        rotation='45',
-                        ha='left',
-                        size=7
-                    )
-                else:
-                    axis.set_xticks([])
-                    axis.set_xticklabels([])
-                axis.set_yticklabels(data.index.values)
-        # Create a new axis to append the color bar to
-        #fig.subplots_adjust(right=0.8)
-        #cax = fig.add_axes([.95,0.5,0.01,0.4])
-        #divider = make_axes_locatable(get_axes(0,0,))
-        #cax = divider.append_axes("bottom", size="5%", pad=0.05)
-        #cbar = fig.colorbar(
-        #    im, cax=cax, orientation='vertical', ticks=[0,0.025,0.05]
-        #)
-        #cbar.set_ticklabels(['0','0.025','≥0.05'])
-        #plt.tight_layout(pad=0.4,w_pad=0.5, h_pad=1.0)
-        if filename is not None:
-            plt.savefig(filename,dpi=300)
-            plt.close()
-        return (fig,axes)
 
     def high_priority_candidates(self,fdr_cutoff=0.3,min_snp2gene_obs=2,
                                  original_COB_only=False):
@@ -562,7 +417,11 @@ class Overlap(Camoco):
             pvals.values[triu_indices(len(pvals),1)] = 0
             return (overlap+pvals).astype(float)
 
-    def num_candidate_genes(self,fdr_cutoff=0.3,min_snp2gene_obs=2,dropna=False):
+    def num_hpo(self,fdr_cutoff=0.3,min_snp2gene_obs=2,dropna=False,drop_empty_cols=True):
+        '''
+            Returns a summary table with the number of HPO genes discoverd
+            for different networks
+        '''
         candidates = self.high_priority_candidates(fdr_cutoff=fdr_cutoff,min_snp2gene_obs=min_snp2gene_obs)
         candidates['fdr'] = fdr_cutoff
         # Calculate Totals
@@ -584,7 +443,10 @@ class Overlap(Camoco):
             dropna=dropna,
             aggfunc=lambda x: len(set(x))
         ).fillna(0).astype(int)
-        return by_term.append(total)
+        num_hpo = by_term.append(total)
+        if drop_empty_cols:
+            num_hpo = num_hpo.loc[:,num_hpo.sum()>0]
+        return num_hpo
 
     
     ''' ----------------------------------------------------------------------------------
@@ -790,3 +652,113 @@ class Overlap(Camoco):
             
             # Save the results to the SQLite table
             self.results.to_sql('overlap',sqlite3.connect(overlap_object.db.filename),if_exists='append',index=False)
+
+
+    ''' ----------------------------------------------------------------------------------
+        Deprecated Methods
+    '''
+
+    def plot_pval_heatmap(self,filename=None,pval_cutoff=0.05,
+                          collapse_snp2gene=False,figsize=(15,10),
+                          skip_terms=None):
+        '''
+            Generate a heatmap based on TermPVal
+
+            Parameters
+            ----------
+            filename : str
+                output file name
+            pval_cutoff : float (default:0.05)
+                The term p-value cutoff for shading the heatmap
+            collapse_snp2gene : bool (default: False)
+                If true, candidates will be collapsed around
+                snp to gene mapping parameters
+            figsize : tuple(int,int) (default:(15,10))
+                Control the size of the figure
+            skip_terms : iter (default:None)
+                If provided, terms in the iterable will
+                not be plotted
+        '''
+        methods = sorted(self.results.Method.unique())
+        cobs = sorted(self.results.COB.unique())
+        fig,axes = plt.subplots(len(cobs),len(methods))
+        fig.set_size_inches(figsize)
+        def get_axis(i,j,axes):
+            if len(axes.shape) == 1:
+                return axes[i]
+            else:
+                return axes[i,j]
+        for i,cob in enumerate(cobs):
+            for j,method in enumerate(methods):
+                axis = get_axis(i,j,axes)
+                data = pd.pivot_table(
+                    self.results.ix[(self.results.COB==cob) & (self.results.Method==method)],
+                    index=['WindowSize','FlankLimit'],
+                    columns=['Term'],
+                    values='TermPValue',
+                    aggfunc=np.mean
+                )
+                if collapse_snp2gene:
+                    data = pd.DataFrame(data.apply(min)).T
+                if skip_terms:
+                    for term in skip_terms:
+                        del data[term]
+                #data[data > pval_cutoff] = np.nan
+                #data[data < pval_cutoff] = 0
+                axis.set_frame_on(False)
+                cmap = plt.cm.Greens_r
+                cmap.set_bad('white',1.0)
+                im = axis.pcolormesh(
+                    np.ma.masked_invalid(data),
+                    cmap=cmap,
+                    #linewidth=0.1,
+                    edgecolor='lightgrey',
+                    vmin=0,
+                    vmax=0.05
+                )
+                # Make the layout more natural
+                if j == len(methods) - 1 :
+                    axis.set_ylabel(cob,fontsize=10)
+                    axis.set_yticklabels(data.index.values,rotation='45')
+                    axis.yaxis.set_label_position("right")
+                if j == 0:
+                    axis.set_yticklabels(
+                        axis.get_yticklabels(),size=7
+                    )
+                    axis.set(
+                        yticks=np.arange(len(data.index))+0.5
+                    )
+                else:
+                    axis.set_yticks([])
+                    axis.set_yticklabels([])
+                axis.yaxis.set_ticks_position('left')
+                axis.invert_yaxis()
+                if i == 0:
+                    axis.set_title(method,y=1.1,size=15)
+                    axis.xaxis.tick_top()
+                    axis.set_xticks(np.arange(len(data.columns))+0.5)
+                    axis.set_xticklabels(
+                        [re.sub('\d','',x) for x in data.columns.values], 
+                        rotation='45',
+                        ha='left',
+                        size=7
+                    )
+                else:
+                    axis.set_xticks([])
+                    axis.set_xticklabels([])
+                axis.set_yticklabels(data.index.values)
+        # Create a new axis to append the color bar to
+        #fig.subplots_adjust(right=0.8)
+        #cax = fig.add_axes([.95,0.5,0.01,0.4])
+        #divider = make_axes_locatable(get_axes(0,0,))
+        #cax = divider.append_axes("bottom", size="5%", pad=0.05)
+        #cbar = fig.colorbar(
+        #    im, cax=cax, orientation='vertical', ticks=[0,0.025,0.05]
+        #)
+        #cbar.set_ticklabels(['0','0.025','≥0.05'])
+        #plt.tight_layout(pad=0.4,w_pad=0.5, h_pad=1.0)
+        if filename is not None:
+            plt.savefig(filename,dpi=300)
+            plt.close()
+        return (fig,axes)
+
