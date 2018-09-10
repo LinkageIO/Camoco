@@ -31,6 +31,10 @@ class Term(object):
             self.attrs[key] = val
 
     @property
+    def name(self):
+        return self.id
+
+    @property
     def locus_list(self): #pragma: no cover
         raise Exception('This is deprecated')
 
