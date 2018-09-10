@@ -528,7 +528,7 @@ class Ontology(Camoco):
                     min_term_size=min_term_size,
                     num_universe=num_universe,
                     return_table=return_table,
-                    label=term.id,
+                    label=label+'_'+term.id,
                     include_genes=include_genes,
                     bonferroni_correction=bonferroni_correction,
                     min_overlap=min_overlap,
@@ -556,8 +556,8 @@ class Ontology(Camoco):
         significant_terms = []
         for term in terms:
             term_genes = set(term.loci)
-            if len(term_genes) > max_term_size:
-                continue
+            #if len(term_genes) > max_term_size:
+            #    continue
             num_common = len(term_genes.intersection(locus_list))
             num_in_term = len(term_genes)
             num_sampled = len(locus_list)
@@ -582,23 +582,25 @@ class Ontology(Camoco):
                 # That aint right
                 Out[105]: 0.00025438479046726637
                 In [106]: hypergeom.sf(3-1,100,5,10)
-                # See Dog? You wnat num_common - 1
+                # See? You wnat num_common - 1
                 Out[106]: 0.0066379128971171221
                 # can we go back to drinking coffee now?
             '''
             pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
             if pval <= pval_cutoff and num_common >= min_overlap:
-                if label != None:
-                    term.attrs['label'] = label
                 term.attrs['hyper'] = OrderedDict([
-                    ('pval'        , pval),
-                    ('term_tested' , len(terms)),
-                    ('num_common'  , num_common),
-                    ('num_universe', num_universe),
-                    ('term_size'   , num_in_term),
-                    ('num_terms'   , len(self)),
-                    ('num_sampled' , num_sampled)
+                    ('source'           , self.name),
+                    ('pval'             , pval),
+                    ('terms_tested'     , len(terms)),
+                    ('num_common'       , num_common),
+                    ('num_universe'     , num_universe),
+                    ('source_term_size' , num_in_term),
+                    ('target_term_size' , len(locus_list)),
+                    ('num_terms'        , len(self)),
+                    #('num_sampled'      , num_sampled)
                 ])
+                if label != None:
+                    term.attrs['hyper']['label'] = label
                 if bonferroni_correction == True:
                     # Right now this isn't true bonferroni, its only correcting for
                     # the number of terms that had term genes in it
@@ -625,8 +627,8 @@ class Ontology(Camoco):
                 del val['hyper']
                 tbl.append(val)
             tbl = DataFrame.from_records(tbl)
-            if label != None:
-                tbl['label'] = label
+            #if label != None:
+            #    tbl['label'] = label
             if len(tbl) > 0:
                 tbl = tbl.sort_values(by='pval')
             return tbl
