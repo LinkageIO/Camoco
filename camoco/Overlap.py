@@ -182,11 +182,15 @@ class Overlap(Camoco):
                 include_regression=True,
             ).rename(columns={'resid':'score'})
 
-    def num_below_fdr(self,fdr_cutoff=0.3):
+    def num_below_fdr(self,fdr_cutoff=0.3,method=None):
+        if method is None:
+            tbl = self.results
+        else:
+            tbl = self.results.query(f'Method == @method')
         return pd.pivot_table(
-            self.results,
-            index=['Method','COB','WindowSize','FlankLimit'],
-            columns='Term',
+            tbl,
+            columns=['Method','COB','WindowSize','FlankLimit'],
+            index='Term',
             fill_value=np.nan,
             values='fdr',
             aggfunc=lambda x: sum(x<=fdr_cutoff)
