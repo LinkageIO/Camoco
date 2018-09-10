@@ -513,8 +513,14 @@ class Ontology(Camoco):
         if isinstance(locus_list,co.Ontology):
             ontology = locus_list
             self.log('Calculating enrichment for an  Ontology: {}',ontology.name)
+
             enrich = []
-            for term in ontology:
+            if label is None:
+                label = ontology.name
+            if num_universe is None:
+                num_universe = len(set(self.distinct_loci_ids()).union(ontology.distinct_loci_ids()))
+            for term in ontology.terms(min_term_size=min_term_size,max_term_size=max_term_size):
+                term = copy.copy(term)
                 e = self.enrichment(
                     term.loci,
                     pval_cutoff=pval_cutoff,
