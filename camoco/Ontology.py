@@ -138,6 +138,11 @@ class Ontology(Camoco):
             'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
         ).fetchone()[0]
 
+    def distinct_loci_ids(self):
+        return [x[0] for x in self.db.cursor().execute(
+            'SELECT DISTINCT(id) FROM term_loci'
+        )]
+
     def iter_terms(self,min_term_size=0,max_term_size=10e10):
         '''
             Return a generator that iterates over each term in the ontology.
