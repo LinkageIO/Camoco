@@ -225,9 +225,9 @@ class Expr(Camoco):
         '''
         # update the transformation log
         if len(set(df.columns)) != len(df.columns):
-            raise CamocoGeneNameError('Gene names not Unique.')
+            raise CamocoAccessionNameError('Accession names must be unique')
         if len(set(df.index)) != len(df.index):
-            raise CamocoAccessionNameError('Accession names not Unique')
+            raise CamocoGeneNameError('Gene names must be unique.')
         self._transformation_log(transform_name)
         if raw == True:
             table = 'raw_expr'
