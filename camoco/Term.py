@@ -22,6 +22,7 @@ class Term(object):
     '''
     def __init__(self, id, desc='', loci=None, **kwargs):
         self.id = id
+        self.name = id
         self.desc = desc
         self.attrs = {}
         self.loci = set()
@@ -30,9 +31,9 @@ class Term(object):
         for key, val in kwargs.items():
             self.attrs[key] = val
 
-    @property
-    def name(self):
-        return self.id
+    #@property
+    #def name(self):
+    #    return self.id
 
     @property
     def locus_list(self): #pragma: no cover
