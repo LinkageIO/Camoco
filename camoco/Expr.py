@@ -155,6 +155,7 @@ class Expr(Camoco):
             df = df[accessions]
         if gene_normalize:
             df = df.apply(
+                # Axis: 1 applies to ROWS!
                 lambda row: (row-row.mean())/row.std(), axis=1
             )
         return df
