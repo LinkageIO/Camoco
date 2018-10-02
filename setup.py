@@ -72,6 +72,7 @@ setup(
         'powerlaw>=1.3.5',
         'flask>=0.12.2',
         'markov-clustering>=0.0.3.dev0',
+        'fastcluster>=1.1.25',
         #'apsw',
         #'minus80',
     ],
