@@ -366,8 +366,9 @@ if __name__ == '__main__':
         )
     )  
     bldcob.add_argument(
-        '--quantile',
+        '--skip-quantile',
         action='store_true',
+        default=False,
         help=(
             'Flag specifies whether or not to perform quantile normalization '
             'on expression data.'
@@ -394,12 +395,12 @@ if __name__ == '__main__':
     )
     bldcob.add_argument(
         '--min-expr',
-        default=0,
+        default=0.01,
         type=float,
         help=(
             "Expression values (e.g. FPKM) under this threshold will be set "
             "to NaN and not used during correlation calculations. "
-            "default: 0"
+            "default: 0.01"
         )
     )  
     bldcob.add_argument(
