@@ -25,6 +25,7 @@ def build_cob(args):
 
         quality_control = False if args.skip_quality_control else True
         normalize = False if args.skip_normalization else True
+        quantile = False if args.skip_quantile else True
 
         # Check to see if this dataset is already built
         if available_datasets('Expr',args.name):
@@ -43,7 +44,7 @@ def build_cob(args):
             # Data Processing
             quality_control=quality_control,
             normalization=normalize,
-            quantile=args.quantile,
+            quantile=quantile,
             # Data processing parameters
             max_gene_missing_data=args.max_gene_missing_data,
             max_accession_missing_data=args.max_accession_missing_data,
