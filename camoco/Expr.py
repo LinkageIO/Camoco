@@ -385,7 +385,7 @@ class Expr(Camoco):
 
             Parameters
             ----------
-            min_expr : int (default: 1)
+            min_expr : int (default: 0.01)
                 FPKM (or equivalent) values under this threshold will be set to
                 NaN and not used during correlation calculations.
             max_gene_missing_data : float (default: 0.2)
@@ -446,7 +446,7 @@ class Expr(Camoco):
         # Presence absence variable et
         if presence_absence == True:
            self.log("Allowing for presence absence variation")
-           #find out which values equalt 0
+           #find out which values equal 0
            zero_index = df_flt == 0
         # Filter the min expression genes
         df_flt[df < min_expr] = np.nan
@@ -545,7 +545,7 @@ class Expr(Camoco):
         '''
         self.log('------------ Quantile ')
         if 'quantile' in self._transformation_log():
-            raise ValueError('Quanitle already performed on {}', self.name)
+            raise ValueError('Quantile already performed on {}', self.name)
         # Retrieve current expression DataFrame
         expr = self.expr()
         self.log('Ranking data')
@@ -619,7 +619,7 @@ class Expr(Camoco):
         '''
             Used for the heatmap function. Retruns a matplotlib cmap which is yellow/blue
         '''
-        heatmapdict = {
+        white_middle_heatmapdict = {
             'red': ((0.0, 1.0, 1.0),
                     (0.5, 1.0, 1.0),
                     (1.0, 0.0, 0.0)),
@@ -628,6 +628,17 @@ class Expr(Camoco):
                     (1.0, 0.0, 0.0)),
             'blue': ((0.0, 0.0, 0.0),
                     (0.5, 1.0, 1.0),
+                    (1.0, 1.0, 1.0))
+        }
+        heatmapdict = {
+            'red': ((0.0, 1.0, 1.0),
+                    (0.5, 0.0, 0.0),
+                    (1.0, 0.0, 0.0)),
+            'green':((0.0, 1.0, 1.0),
+                    (0.5, 0.0, 0.0),
+                    (1.0, 0.0, 0.0)),
+            'blue': ((0.0, 0.0, 0.0),
+                    (0.5, 0.0, 0.0),
                     (1.0, 1.0, 1.0))}
         heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', heatmapdict, 256)
         return heatmap_cmap
