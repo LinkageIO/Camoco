@@ -1344,21 +1344,28 @@ class COB(Expr):
         # Get leaves of genes
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
+        import fastcluster
+        dm = dm.fillna(0)
+        expr_linkage = fastcluster.linkage(dm,method='average') 
+        dm = dm.iloc[leaves_list(expr_linkage),:]
+        accession_linkage = fastcluster.linkage(dm.T,method='average')
+        dm = dm.iloc[:,leaves_list(accession_linkage)]
+
         # Get the Gene clustering order
-        if cluster_method == 'leaf':
-            self.log('Ordering rows by leaf')
-            order = self._bcolz('leaves').loc[dm.index].\
-                    fillna(np.inf).sort_values(by='index').index.values
-        elif cluster_method == 'mcl':
-            self.log('Ordering rows by MCL cluster')
-            order = self._bcolz('clusters').loc[dm.index].\
-                    fillna(np.inf).sort_values(by='cluster').index.values
-        else:
-            # No cluster order.
-            self.log('Unknown row ordering: {}, no ordering performed', cluster_method)
-            order = dm.index
+        #if cluster_method == 'leaf':
+        #    self.log('Ordering rows by leaf')
+        #    order = self._bcolz('leaves').loc[dm.index].\
+        #            fillna(np.inf).index.values
+        #elif cluster_method == 'mcl':
+        #    self.log('Ordering rows by MCL cluster')
+        #    order = self._bcolz('clusters').loc[dm.index].\
+        #            fillna(np.inf).sort_values(by='cluster').index.values
+        #else:
+        #    # No cluster order.
+        #    self.log('Unknown row ordering: {}, no ordering performed', cluster_method)
+        #    order = dm.index
         # rearrange expression by leaf order
-        dm = dm.loc[order, :]
+        #dm = dm.loc[order, :]
         # Optional Average by cluster
 #       if avg_by_cluster == True:
 #           # Extract clusters
@@ -1371,7 +1378,7 @@ class COB(Expr):
 #               self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
 #               return None
         # Get leaves of accessions
-        if cluster_accessions:
+#        if cluster_accessions:
             #accession_pccs = (1 - PCCUP.pair_correlation(
             #    np.ascontiguousarray(
             #        # PCCUP expects floats
@@ -1380,10 +1387,10 @@ class COB(Expr):
             #))
 
             #accession_link = linkage(1-accession_pccs, method='single')
-            accession_link = linkage(dm.fillna(0).T, method='single')
-            accession_dists = leaves_list(accession_link)
+#            accession_link = linkage(dm.fillna(0).T, method='single')
+#            accession_dists = leaves_list(accession_link)
             # Order by accession distance
-            dm = dm.loc[:,dm.columns[accession_dists]]
+#            dm = dm.loc[:,dm.columns[accession_dists]]
         # Save plot if provided filename
         if plot_dendrogram == False:
             fig = plt.figure(
@@ -1412,6 +1419,7 @@ class COB(Expr):
         vmin = vmax*-1
         im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
         ax.grid(False) 
+
         # Intelligently add labels
         if (include_accession_labels is None and len(dm.columns) < 30) \
             or include_accession_labels == True:
@@ -1683,7 +1691,7 @@ class COB(Expr):
         '''
         import fastcluster
         # We need to recreate the original PCCs
-        self.log('Calculating Leaves using {}'.format(method))
+        self.log('Calculating hierarchical clustering using {}'.format(method))
         if len(self.coex) == 0:
             raise ValueError('Cannot calculate leaves without coex')
         pcc_mean = float(self._global('pcc_mean'))
