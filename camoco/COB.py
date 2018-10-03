@@ -1293,7 +1293,7 @@ class COB(Expr):
 
     def plot(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
-             cluster_method='mcl', include_accession_labels=None,
+             cluster_method='leaf', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
              min_cluster_size=10, cluster_accessions=True,
              plot_dendrogram=False):
@@ -1344,6 +1344,7 @@ class COB(Expr):
         # Get leaves of genes
         dm = self.expr(genes=genes,accessions=accessions,
                 raw=raw,gene_normalize=gene_normalize)
+        # Get the Gene clustering order
         if cluster_method == 'leaf':
             self.log('Ordering rows by leaf')
             order = self._bcolz('leaves').loc[dm.index].\
@@ -1359,25 +1360,27 @@ class COB(Expr):
         # rearrange expression by leaf order
         dm = dm.loc[order, :]
         # Optional Average by cluster
-        if avg_by_cluster == True:
-            # Extract clusters
-            dm = self.clusters.groupby('cluster').\
-                    filter(lambda x: len(x) >= min_cluster_size).\
-                    groupby('cluster').\
-                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
-                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
-            if len(dm) == 0:
-                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
-                return None
+#       if avg_by_cluster == True:
+#           # Extract clusters
+#           dm = self.clusters.groupby('cluster').\
+#                   filter(lambda x: len(x) >= min_cluster_size).\
+#                   groupby('cluster').\
+#                   apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
+#                   apply(lambda x: (x-x.mean())/x.std() ,axis=1)
+#           if len(dm) == 0:
+#               self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
+#               return None
         # Get leaves of accessions
         if cluster_accessions:
-            accession_pccs = (1 - PCCUP.pair_correlation(
-                np.ascontiguousarray(
-                    # PCCUP expects floats
-                    self._expr.as_matrix().T.astype('float')
-                )
-            ))
-            accession_link = linkage(1-accession_pccs, method='single')
+            #accession_pccs = (1 - PCCUP.pair_correlation(
+            #    np.ascontiguousarray(
+            #        # PCCUP expects floats
+            #        self._expr.as_matrix().T.astype('float')
+            #    )
+            #))
+
+            #accession_link = linkage(1-accession_pccs, method='single')
+            accession_link = linkage(dm.fillna(0).T, method='single')
             accession_dists = leaves_list(accession_link)
             # Order by accession distance
             dm = dm.loc[:,dm.columns[accession_dists]]
@@ -1397,7 +1400,7 @@ class COB(Expr):
             )
             ax = plt.subplot(gs[0])
             # make the axes for the dendrograms
-            right_ax   = plt.subplot(gs[1])
+            right_ax = plt.subplot(gs[1])
             right_ax.set_xticks([])
             right_ax.set_yticks([])
             bottom_ax = plt.subplot(gs[2])
@@ -1408,6 +1411,7 @@ class COB(Expr):
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
         im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        ax.grid(False) 
         # Intelligently add labels
         if (include_accession_labels is None and len(dm.columns) < 30) \
             or include_accession_labels == True:
@@ -1677,6 +1681,7 @@ class COB(Expr):
             -----
             This is kind of expenive.
         '''
+        import fastcluster
         # We need to recreate the original PCCs
         self.log('Calculating Leaves using {}'.format(method))
         if len(self.coex) == 0:
@@ -1693,7 +1698,7 @@ class COB(Expr):
         dists[np.isnan(dists)] = 0
         gc.collect()
         # Find the leaves from hierarchical clustering
-        gene_link = linkage(dists, method=method)
+        gene_link = fastcluster.linkage(dists, method=method)
         return gene_link
 
     def _calculate_leaves(self,method='single'):
@@ -1918,7 +1923,7 @@ class COB(Expr):
         )
 
 
-    def coordinates(self,force=False,iterations=50):
+    def coordinates(self,iterations=50,force=False):
         ''' 
             returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
