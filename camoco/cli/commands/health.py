@@ -43,7 +43,7 @@ def cob_health(args):
     else:
         log('Skipped Norm.')
 
-   #log('Plotting Expression ------------------------------------------------')
+    log('Plotting Expression ------------------------------------------------')
    #if not path.exists('{}_Expr_raw.png'.format(args.out)):
    #    cob.plot(
    #        '{}_Expr_raw.png'.format(args.out),
@@ -53,16 +53,16 @@ def cob_health(args):
    #    )
    #else:
    #    log('Skipped raw.')
-   #if not path.exists('{}_Expr_norm.png'.format(args.out)):
-   #    cob.plot(
-   #        '{}_Expr_norm.png'.format(args.out),
-   #        include_accession_labels=True,
-   #        raw=False,
-   #        cluster_method='leaf',
-   #        cluster_accessions=True
-   #    )
-   #else:
-   #    log('Skipped norm.')
+    if not path.exists('{}_Expr_norm.png'.format(args.out)):
+        cob.plot(
+            '{}_Expr_norm.png'.format(args.out),
+            include_accession_labels=True,
+            raw=False,
+            cluster_method='ward',
+            cluster_accessions=True
+        )
+    else:
+        log('Skipped norm.')
    #log('Plotting Cluster Expression-----------------------------------------')
    #if not path.exists('{}_Expr_cluster.png'.format(args.out)):
    #    cob.plot(
