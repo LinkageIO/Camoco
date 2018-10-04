@@ -17,6 +17,7 @@ from math import isinf
 from numpy import matrix, arcsinh, tanh
 from collections import defaultdict, Counter
 from itertools import chain
+from matplotlib.collections import LineCollection
 from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
 from scipy.misc import comb
@@ -32,6 +33,7 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import itertools
+import fastcluster
 
 from odo import odo
 
@@ -1291,9 +1293,9 @@ class COB(Expr):
         Plotting Methods
     '''
 
-    def plot(self, filename=None, genes=None,accessions=None,
+    def plot_heatmap(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
-             cluster_method='leaf', include_accession_labels=None,
+             cluster_method='single', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
              min_cluster_size=10, cluster_accessions=True,
              plot_dendrogram=False):
@@ -1314,11 +1316,13 @@ class COB(Expr):
             raw : bool (default: False)
                 If true, raw expression data will be used. Default is to use
                 the normailzed, QC'd data.
-            cluster_method : str (default: mcl)
+            cluster_method : str (default: 'single')
                 Specifies how to organize the gene axis in the heatmap. If
-                'mcl', genes will be organized by MCL cluster. If 'leaf', 
-                genes will be organized based on hierarchical clustering,
-                any other value will result in genes to be in sorted order.
+                'mcl', genes will be organized by MCL cluster. Otherwise
+                the value must be one of the linkage methods defined by 
+                the scipy.cluster.hierarchy.linkage function: [single,
+                complete, average, weighted, centroid, median, ward].
+                https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.linkage.html
             include_accession_labels : bool (default: None)
                 Force the rendering of accession labels. If None, accession 
                 lables will be included as long as there are less than 30.
@@ -1326,7 +1330,7 @@ class COB(Expr):
                 Force rendering of gene labels in heatmap. If None, gene
                 labels will be rendered as long as there are less than 100.
             avg_by_cluster : bool (default: False)
-                If True, gene expression values will be averaged by cluster
+                If True, gene expression values will be averaged by MCL cluster
                 showing a single row per cluster.
             min_cluster_size : int ( default: 10)
                 If avg_by_cluster, only cluster sizes larger than min_cluster_size
@@ -1341,56 +1345,50 @@ class COB(Expr):
             a populated matplotlib figure object
 
         '''
-        # Get leaves of genes
-        dm = self.expr(genes=genes,accessions=accessions,
-                raw=raw,gene_normalize=gene_normalize)
-        import fastcluster
-        dm = dm.fillna(0)
-        expr_linkage = fastcluster.linkage(dm,method='average') 
-        dm = dm.iloc[leaves_list(expr_linkage),:]
-        accession_linkage = fastcluster.linkage(dm.T,method='average')
-        dm = dm.iloc[:,leaves_list(accession_linkage)]
+        # Get the Expressiom Matrix
+        if avg_by_cluster == True:
+            # Extract clusters
+            dm = self.clusters.groupby('cluster').\
+                    filter(lambda x: len(x) >= min_cluster_size).\
+                    groupby('cluster').\
+                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
+                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
+            if len(dm) == 0:
+                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
+                return None
+        else:
+            # Fetch the Expr Matrix
+            dm = self.expr(
+                genes=genes, accessions=accessions,
+                raw=raw, gene_normalize=gene_normalize
+            )
+        dm = dm.fillna(0) # linkage does not allow nas
 
         # Get the Gene clustering order
-        #if cluster_method == 'leaf':
-        #    self.log('Ordering rows by leaf')
-        #    order = self._bcolz('leaves').loc[dm.index].\
-        #            fillna(np.inf).index.values
-        #elif cluster_method == 'mcl':
-        #    self.log('Ordering rows by MCL cluster')
-        #    order = self._bcolz('clusters').loc[dm.index].\
-        #            fillna(np.inf).sort_values(by='cluster').index.values
-        #else:
-        #    # No cluster order.
-        #    self.log('Unknown row ordering: {}, no ordering performed', cluster_method)
-        #    order = dm.index
-        # rearrange expression by leaf order
-        #dm = dm.loc[order, :]
-        # Optional Average by cluster
-#       if avg_by_cluster == True:
-#           # Extract clusters
-#           dm = self.clusters.groupby('cluster').\
-#                   filter(lambda x: len(x) >= min_cluster_size).\
-#                   groupby('cluster').\
-#                   apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
-#                   apply(lambda x: (x-x.mean())/x.std() ,axis=1)
-#           if len(dm) == 0:
-#               self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
-#               return None
-        # Get leaves of accessions
-#        if cluster_accessions:
-            #accession_pccs = (1 - PCCUP.pair_correlation(
-            #    np.ascontiguousarray(
-            #        # PCCUP expects floats
-            #        self._expr.as_matrix().T.astype('float')
-            #    )
-            #))
+        if cluster_method in ['single','complete','average','weighted','centroid','median','ward']:
+            self.log('Ordering rows by leaf')
+            expr_linkage = fastcluster.linkage(dm,method=cluster_method) 
+            order = leaves_list(expr_linkage)
+            dm = dm.iloc[order, :]
+        elif cluster_method == 'mcl':
+            self.log('Ordering rows by MCL cluster')
+            order = self.clusters.loc[dm.index].\
+                    fillna(np.inf).sort_values(by='cluster').index.values
+            dm = dm.loc[order, :]
+        else:
+            # No cluster order.
+            self.log('Unknown gene ordering: {}, no ordering performed', cluster_method)
 
-            #accession_link = linkage(1-accession_pccs, method='single')
-#            accession_link = linkage(dm.fillna(0).T, method='single')
-#            accession_dists = leaves_list(accession_link)
-            # Order by accession distance
-#            dm = dm.loc[:,dm.columns[accession_dists]]
+        # Get leaves of accessions
+        if cluster_accessions:
+            if cluster_method == 'mcl':
+                acc_clus_method = 'average'
+            else:
+                acc_clus_method = cluster_method
+            accession_linkage = fastcluster.linkage(dm.T,method=acc_clus_method)
+            # Re-order the matrix based on tree
+            order = leaves_list(accession_linkage)
+            dm = dm.iloc[:,order]
         # Save plot if provided filename
         if plot_dendrogram == False:
             fig = plt.figure(
@@ -1407,10 +1405,10 @@ class COB(Expr):
             )
             ax = plt.subplot(gs[0])
             # make the axes for the dendrograms
-            right_ax = plt.subplot(gs[1])
-            right_ax.set_xticks([])
-            right_ax.set_yticks([])
-            bottom_ax = plt.subplot(gs[2])
+            gene_ax = plt.subplot(gs[1])
+            gene_ax.set_xticks([])
+            gene_ax.set_yticks([])
+            accession_ax = plt.subplot(gs[2])
         # Plot the Expression matrix 
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
         cmap = self._cmap
@@ -1419,34 +1417,45 @@ class COB(Expr):
         vmin = vmax*-1
         im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
         ax.grid(False) 
-
+        ax.tick_params(labelsize=4)
+        ax.tick_params('x',labelrotation=45)
+        ax.set(
+            xticklabels=dm.columns.values,
+            yticklabels=dm.index.values,
+        )
         # Intelligently add labels
-        if (include_accession_labels is None and len(dm.columns) < 30) \
+        if (include_accession_labels is None and len(dm.columns) < 60) \
             or include_accession_labels == True:
                 ax.set(
                     xticks=np.arange(len(dm.columns)),
-                    xticklabels=dm.columns.values
                 )
-                ax.set_xticklabels(dm.columns, rotation=90)
         if (include_gene_labels is None and len(dm.index) < 100) \
             or include_gene_labels == True:
                 ax.set(
                     yticks=np.arange(len(dm.index)),
-                    yticklabels=dm.index.values
                 )
         #ax.figure.colorbar(im)
-        if plot_dendrogram == True:
-            # Plot the accession dendrogram
-            dendrogram(accession_link,ax=bottom_ax,orientation='bottom')
-            bottom_ax.set_xticks([])
-            bottom_ax.set_yticks([])
-            # Plot the gene dendrogram
-            import sys
-            sys.setrecursionlimit(100000)
-            gene_link = self._calculate_gene_hierarchy()
-            dendrogram(gene_link,ax=right_ax,orientation='right')
-            right_ax.set_xticks([])
-            right_ax.set_yticks([])
+        if plot_dendrogram == True:   
+            with plt.rc_context({'lines.linewidth': 0.5}):
+                from scipy.cluster import hierarchy
+                hierarchy.set_link_color_palette(['k'])
+    
+                # Plot the accession dendrogram
+                import sys
+                sys.setrecursionlimit(10000)
+                dendrogram(
+                    accession_linkage,ax=accession_ax,color_threshold=np.inf,
+                    orientation='bottom'
+                )
+                accession_ax.set_facecolor('w')
+                accession_ax.set_xticks([])
+                accession_ax.set_yticks([])
+                # Plot the gene dendrogram
+                if cluster_method != 'mcl':
+                    dendrogram(expr_linkage,ax=gene_ax,orientation='right',color_threshold=np.inf)
+                    gene_ax.set_xticks([])
+                    gene_ax.set_yticks([])
+                    gene_ax.set_facecolor('w')
         # Save if you wish
         if filename is not None:
             plt.savefig(filename,dpi=300,figsize=(20,20))
