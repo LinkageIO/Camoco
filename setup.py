@@ -63,7 +63,7 @@ setup(
         'igraph>=0.1.11',		
         'pyyaml>=3.12',
         'matplotlib>=2.0.0',		
-        'numpy>=1.12.0',		
+        'numpy>=1.15.0',		
         'scipy>=1.1.0',		
         'pandas>=0.19.2',		
         'scikit-learn>=0.18.1',
