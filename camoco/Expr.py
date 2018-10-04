@@ -551,7 +551,7 @@ class Expr(Camoco):
         self.log('Ranking data')
         for accession_name,values in expr.iteritems():
             rank_ties = max(Counter(values).values())
-            if rank_ties > len(values) * 0.10:
+            if rank_ties > len(values) * 0.20:
                 raise ValueError(
                     '{}:{} has {} ({}%) rank ties'.format(
                         self.name, accession_name,
