@@ -553,10 +553,8 @@ class Expr(Camoco):
             rank_ties = max(Counter(values).values())
             if rank_ties > len(values) * 0.20:
                 raise ValueError(
-                    '{}:{} has {} ({}%) rank ties'.format(
-                        self.name, accession_name,
-                        rank_ties, rank_ties/len(values)
-                    )
+                    f'{self.name}:{accession_name} has {rank_ties} '
+                    f'({rank_times/len(values)}%) rank ties'
                 )
         # assign ranks by accession (column)
         expr_ranks = expr.rank(axis=0, method='first', na_option='keep')

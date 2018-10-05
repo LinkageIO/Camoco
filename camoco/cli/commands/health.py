@@ -2,6 +2,7 @@ import pandas as pd
 import camoco as co
 import numpy as np
 import powerlaw
+import os
 
 from os import path
 
@@ -13,18 +14,30 @@ import matplotlib.pylab as plt
 
 def cob_health(args):
     log = coblog()
-    log('\n'
-        '-----------------------\n'
-        '   Network Health      \n'
-        '-----------------------\n'
+    log(f'\n'
+        f'-----------------------------\n'
+        f'   Network Health:{args.cob} \n'
+        f'-----------------------------\n'
     )
+    log(f"\nCreating reports in {os.getcwd()}\n\n")
+
     cob = co.COB(args.cob)
     if args.out is None:
         args.out = '{}_Health'.format(cob.name)
+    log(f'Output prefix: {args.out}')
+
 
     if args.edge_zscore_cutoff is not None:
         log("Changing Z-Score cutoff to {}",args.edge_zscore_cutoff)
         cob.set_sig_edge_zscore(args.edge_zscore_cutoff)
+
+    log('Printing Summary ---------------------------------------------------')
+    if not path.exists('{}.summary.txt'.format(args.out)):
+        with open('{}.summary.txt'.format(args.out),'w') as OUT:
+            # Print out the network summary
+            cob.summary(file=OUT)
+    else:
+        log('Skipped summary.')
 
     log('Plotting Scores ----------------------------------------------------') 
     if not path.exists('{}_CoexPCC_raw.png'.format(args.out)):
@@ -54,7 +67,7 @@ def cob_health(args):
    #else:
    #    log('Skipped raw.')
     if not path.exists('{}_Expr_norm.png'.format(args.out)):
-        cob.plot(
+        cob.plot_heatmap(
             '{}_Expr_norm.png'.format(args.out),
             include_accession_labels=True,
             raw=False,
@@ -74,14 +87,6 @@ def cob_health(args):
    #    )
    #else:
    #    log('Skipped norm.')
-
-    log('Printing Summary ---------------------------------------------------')
-    if not path.exists('{}.summary.txt'.format(args.out)):
-        with open('{}.summary.txt'.format(args.out),'w') as OUT:
-            # Print out the network summary
-            cob.summary(file=OUT)
-    else:
-        log('Skipped summary.')
 
     log('Printing QC Statistics ---------------------------------------------')
     if args.refgen is not None:
@@ -135,8 +140,8 @@ def cob_health(args):
     else:
         log('Skipping Degree Dist.')
 
-    log('Plotting GO --------------------------------------------------------')
     if args.go is not None:
+        log('Plotting GO --------------------------------------------------------')
         # Set the alpha based on the tails
         if args.two_tailed == True:
             alpha = 0.05 /2
