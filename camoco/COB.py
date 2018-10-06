@@ -1967,22 +1967,24 @@ class COB(Expr):
         if pos is None or force == True:
             import scipy.sparse.csgraph as csgraph
             import networkx
-            A,i = self.to_sparse_matrix(remove_orphans=True,max_edges=max_edges)
+            A,i = self.to_sparse_matrix(remove_orphans=False,max_edges=max_edges)
+            # generate a reverse lookup for index to label
             rev_i = {v:k for k,v in i.items()}
             num,ccindex = csgraph.connected_components(A,directed=False)
-            self.log(f'The largest CC has {num} nodes')
             # convert to csc
             self.log(f'Converting to compressed sparse column')
             L = A.tocsc()
             self.log('Extracting largest connected component')
-            L = L[ccindex == 0,:][:,ccindex == 0]
+            lcc_index,num = Counter(ccindex).most_common(1)[0]
+            L = L[ccindex == lcc_index,:][:,ccindex == lcc_index]
+            self.log(f'The largest CC has {num} nodes')
             self.log('Calculating positions')
             #coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
             coordinates = positions = forceatlas2.forceatlas2(L,pos=None,iterations=iterations)
             pos = pd.DataFrame(
                 coordinates
             )
-            (lcc_indices,) = np.where(ccindex == 0)
+            (lcc_indices,) = np.where(ccindex == lcc_index)
             labels = [rev_i[x] for x in lcc_indices]
             pos.index = labels
             pos.columns = ['x','y']
