@@ -44,7 +44,7 @@ pyximport.install(setup_args={
 })
 
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 
 from .Config import cf
