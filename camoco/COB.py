@@ -1970,6 +1970,32 @@ class COB(Expr):
             self._bcolz('coordinates',df=pos)
         return pos
 
+
+    def cluster_ellipse(self, cluster_number, nstd=2):
+        # Get the coordinates of the MCL cluster
+        coor = self.coordinates()
+        points = coor.loc[self.clusters.iloc[self.clusters.cluster.values == cluster_number].index.values]
+        points = points.iloc[np.logical_not(np.isnan(points.x)).values,:]
+        # Calculate stats for eigenvalues
+        pos = points.mean(axis=0)
+        cov = np.cov(points, rowvar=False)
+        def eigsorted(cov):
+            vals, vecs = np.linalg.eigh(cov)
+            order = vals.argsort()[::-1]
+            return vals[order], vecs[:,order]
+        vals, vecs = eigsorted(cov)
+        theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
+        width, height = 2 * nstd * np.sqrt(vals)
+        return {
+            'xy': pos,
+            'width': width,
+            'height': height,
+            'angle' : theta
+        }
+
+
+
+
 def fix_val(val):
     if isinf(val):
         return -1
