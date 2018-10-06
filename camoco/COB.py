@@ -1940,17 +1940,32 @@ class COB(Expr):
         )
 
 
-    def coordinates(self,iterations=50,force=False):
+    def coordinates(self,iterations=50,force=False,max_edges=100000):
         ''' 
             returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
             does not have coordinates, returns (0, 0) for each mystery gene
         '''
+        from fa2 import ForceAtlas2
+        forceatlas2 = ForceAtlas2(
+            outboundAttractionDistribution=False,
+            linLogMode=False,
+            adjustSizes=False,
+            edgeWeightInfluence=1.0,
+            jitterTolerance=1.0,
+            barnesHutOptimize=True,
+            barnesHutTheta=1.2,
+            multiThreaded=False,
+            scalingRatio=2.0,
+            strongGravityMode=False,
+            gravity=1.0,
+            verbose=True
+        )
         pos = self._bcolz('coordinates')
         if pos is None or force == True:
             import scipy.sparse.csgraph as csgraph
             import networkx
-            A,i = self.to_sparse_matrix(remove_orphans=True,max_edges=100000)
+            A,i = self.to_sparse_matrix(remove_orphans=True,max_edges=max_edges)
             rev_i = {v:k for k,v in i.items()}
             num,ccindex = csgraph.connected_components(A,directed=False)
             self.log(f'The largest CC has {num} nodes')
@@ -1960,8 +1975,10 @@ class COB(Expr):
             self.log('Extracting largest connected component')
             L = L[ccindex == 0,:][:,ccindex == 0]
             self.log('Calculating positions')
+            #coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
+            coordinates = positions = forceatlas2.forceatlas2(L,pos=None,iterations=iterations)
             pos = pd.DataFrame(
-                networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
+                coordinates
             )
             (lcc_indices,) = np.where(ccindex == 0)
             labels = [rev_i[x] for x in lcc_indices]
