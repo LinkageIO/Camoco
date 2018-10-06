@@ -1006,13 +1006,11 @@ class COB(Expr):
         '''
         from scipy import sparse
         self.log('Getting genes')
-        if gene_list is None:
-            gene_list = self.genes()
         # first get the subnetwork in pair form
         self.log('Pulling edges')
         edges = self.subnetwork(
             gene_list=gene_list, min_distance=min_distance,
-            sig_only=True, names_as_cols=True
+            sig_only=True, names_as_cols=True, names_as_index=False
         )
         # Option to limit the number of edges 
         if max_edges is not None:
@@ -1025,6 +1023,10 @@ class COB(Expr):
             gene_list = [g for g in gene_list if g.id in not_orphans]
         # Create a gene index
         self.log('Creating Index')
+        if gene_list == None:
+            gene_list = list(self.refgen.iter_genes())
+        else:
+            gene_list = set(gene_list)
         gene_index = {g.id:i for i,g in enumerate(gene_list)}
         nlen = len(gene_list)
         # get the expression matrix indices for all the genes
