@@ -103,6 +103,8 @@ def build_GWAS(args):
     # Add the trait if its missing
     if args.add_trait is not None:
         df[args.trait_col] = args.add_trait
+    if args.query is not None:
+        df = df.query(args.query)
     print('Loading {}'.format(args.refgen))
     refgen = co.RefGen(args.refgen)
     # Filter out traits that are in args.skip_trait

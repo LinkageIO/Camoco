@@ -173,6 +173,20 @@ if __name__ == '__main__':
             'Skip these traits. Can provide as many traits as you like'
         )
     )
+    bldgwas.add_argument(
+        '--query',
+        default=None,
+        help=(
+            'Before importing the traits from the dataframe, '
+            'filter the columns via DataFrame.query() '
+            'e.g. --query "pval < 0.05" would execute '
+            'df.query("pval < 0.05") assuming the pval '
+            'column exists. Useful for filtering data '
+            'before importing the traits. '
+            'See https://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.query.html '
+            'for more info.'
+        )
+    )
     bldgwas.set_defaults(func=build_GWAS)
 
 
