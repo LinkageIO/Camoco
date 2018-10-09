@@ -1,3 +1,5 @@
+.cache
+.coverage
 .pytest_cache
 .eggs
 camoco/*.c
