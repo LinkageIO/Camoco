@@ -1993,6 +1993,8 @@ class COB(Expr):
 
 
     def cluster_ellipse(self, cluster_number, nstd=2):
+        # Solution inspired by: 
+        # https://stackoverflow.com/questions/12301071/multidimensional-confidence-intervals
         # Get the coordinates of the MCL cluster
         coor = self.coordinates()
         points = coor.loc[self.clusters.iloc[self.clusters.cluster.values == cluster_number].index.values]

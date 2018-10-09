@@ -108,9 +108,9 @@ def cob_health(args):
     log('Plotting Degree Distribution ---------------------------------------')
     if not path.exists('{}_DegreeDist.png'.format(args.out)):
         degree = cob.degree['Degree'].values
-        #Using powerlaw makes run-time warning the first time you use it.
-        #This is still an open issue on the creators github.
-        #The creator recommends removing this warning as long as there is a fit.
+        # Using powerlaw makes run-time warning the first time you use it.
+        # This is still an open issue on the creators github.
+        # The creator recommends removing this warning as long as there is a fit.
         np.seterr(divide='ignore', invalid='ignore')
         fit = powerlaw.Fit(degree,discrete=True,xmin=1)
         # get an axis
