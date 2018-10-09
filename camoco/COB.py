@@ -1297,10 +1297,10 @@ class COB(Expr):
 
     def plot_heatmap(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
-             cluster_method='single', include_accession_labels=None,
+             cluster_method='ward', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
              min_cluster_size=10, cluster_accessions=True,
-             plot_dendrogram=False):
+             plot_dendrogram=True):
         '''
             Plots a heatmap of genes x expression.
 
@@ -1384,7 +1384,7 @@ class COB(Expr):
         # Get leaves of accessions
         if cluster_accessions:
             if cluster_method == 'mcl':
-                acc_clus_method = 'average'
+                acc_clus_method = 'ward'
             else:
                 acc_clus_method = cluster_method
             accession_linkage = fastcluster.linkage(dm.T,method=acc_clus_method)
@@ -1399,11 +1399,12 @@ class COB(Expr):
             )
             ax = fig.add_subplot(111)
         else:
-            gs = gridspec.GridSpec(
+            fig = plt.figure(facecolor='white',figsize=(20,20))
+            gs = fig.add_gridspec(
                 2, 2, 
                 height_ratios=[3,1], 
                 width_ratios=[3,1],
-                hspace=0, wspace=0
+                hspace=0, wspace=0,
             )
             ax = plt.subplot(gs[0])
             # make the axes for the dendrograms
