@@ -128,10 +128,18 @@ if __name__ == '__main__':
         help='Name of camoco RefGen dataset.'
     )
     bldgwas.add_argument(
+        '--add-trait',
+        default=None,
+        help='Add a trait as a column to the CSV. This is '
+        'useful if the file is only 1 trait and it is not '
+        'present as a column.'
+    )
+    bldgwas.add_argument(
         '--trait-col',
         metavar='Trait',
         default='Trait',
-        help='The name of the column in the table containing the trait name. '
+        help='The name of the column in the table containing '
+             'the trait name. '
     )
     bldgwas.add_argument(
         '--chrom-col',

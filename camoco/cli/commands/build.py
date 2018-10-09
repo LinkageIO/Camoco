@@ -100,6 +100,9 @@ def build_GWAS(args):
     df = pd.DataFrame.from_csv(args.filename,sep=args.sep).reset_index()
     if len(df.columns) == 1:
         raise ValueError("Only 1 column found, check --sep, see --help")
+    # Add the trait if its missing
+    if args.add_trait is not None:
+        df[args.trait_col] = args.add_trait
     print('Loading {}'.format(args.refgen))
     refgen = co.RefGen(args.refgen)
     # Filter out traits that are in args.skip_trait
