@@ -285,7 +285,7 @@ def cob_health(args):
                 '{:.3g} Fold Enrichement'.format(fold),
                 color='red'
             )
-            axes[0,0].set_title('Density')
+            axes[0,0].set_title('Density Health')
             # Plot pvalue by term size
             axes[1,0].scatter(
                 go_enrichment['size'],
@@ -330,7 +330,7 @@ def cob_health(args):
                 '{:.3g} Fold Enrichement'.format(fold),
                 color='red'
             )
-            axes[0,0].set_title('Locality')
+            axes[0,1].set_title('Locality Health')
             axes[1,1].scatter(
                 go_enrichment['size'],
                 go_enrichment['locality_pval'],

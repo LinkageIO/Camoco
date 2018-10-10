@@ -55,7 +55,6 @@ def build_cob(args):
             zscore_cutoff=args.zscore_cutoff,
             index_col=args.index_col
         )
-        print("Build successful!")
         print(cob.summary())
     except Exception as e:
         print("Build failed. Rolling back: removing corrupted files...")
