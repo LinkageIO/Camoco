@@ -1300,7 +1300,7 @@ class COB(Expr):
              cluster_method='single', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
              min_cluster_size=10, cluster_accessions=True,
-             plot_dendrogram=False):
+             plot_dendrogram=True):
         '''
             Plots a heatmap of genes x expression.
 
