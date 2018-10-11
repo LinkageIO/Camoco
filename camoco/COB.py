@@ -560,38 +560,6 @@ class COB(Expr):
             ]
         return df
 
-    def cluster_coefficient(self, locus_list, flank_limit,
-        trans_locus=True, bootstrap=False, by_gene=True, iter_name=None):
-        '''
-            Calculates the clustering coefficient for genes which span loci.
-
-            Parameters
-            ----------
-            locus_list : iter of Loci
-                an iterable of loci
-            flank_limit : int
-                The number of flanking genes passed to be pulled out
-                for each locus (passed onto the refgen.candidate_genes method)
-            return_mean : bool (default: True)
-                If false, raw edges will be returned
-            bootstrap : bool (default: False)
-                If true, candidate genes will be bootstrapped from the COB
-                reference genome
-            by_gene : bool (default: False)
-                Return a per-gene breakdown of density within the subnetwork.
-            iter_name : str (default: None)
-                Optional string which will be added as a column. Useful for
-                keeping track of bootstraps in an aggregated data frame.
-
-            Returns
-            -------
-            Clustering coefficient of interactions if return_mean is True
-            otherwise a dataframe of trans edges
-
-        '''
-        raise NotImplementedError()
-
-
     def trans_locus_density(self, locus_list,flank_limit,
         return_mean=True, bootstrap=False, by_gene=False,
         iter_name=None):
