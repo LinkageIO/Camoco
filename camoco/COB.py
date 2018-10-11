@@ -1851,6 +1851,50 @@ class COB(Expr):
         return self
 
     @classmethod
+    def from_COBs(cls, cobs, name, description,
+                  refgen, rawtype=None, 
+                  zscore_cutoff=3, **kwargs):
+        '''
+            This method will combine the expression tables from
+            an iterable to COBs in order to create a new co-expression
+            network.
+
+            Parameters
+            ----------
+            cobs : iterable to camoco.COB objects
+                The co-expression networks to combine
+                expression data from
+            name : str
+                The name of the resultant COB
+            description : str
+                A short description of the COB
+            refgen : camoco.RefGen
+                A Camoco refgen object which describes the reference
+                genome referred to by the genes in the dataset. This
+                is cross references during import so we can pull information
+                about genes we are interested in during analysis.
+            rawtype : str (default: None)
+                This is noted here to reinforce the impotance of the rawtype
+                passed to camoco.Expr.from_DataFrame. See docs there
+                for more information.
+            zscore_cutoff : int (defualt: 3)
+                The zscore cutoff for the network.
+            \*\*kwargs : key,value pairs
+                additional parameters passed to subsequent methods.
+                (see Expr.from_DataFrame)
+
+        '''
+        dfs = [c.expr(raw=True) for c in cobs]
+        for cob,df in zip(cobs,dfs):
+            net.columns = [f'{acc}_{cob.name}' for acc in df.columns]
+        all_expr = pd.concat(dfs,axis=1,sort=False)
+        # Call the internal from_dataframe method 
+        return self.from_DataFrame(
+            all_expr, name, description, refgen, rawtype,
+            zscore_cutoff=zscore_cutoff, **kwargs
+        )
+
+    @classmethod
     def from_DataFrame(cls, df, name, description,
                        refgen, rawtype=None, 
                        zscore_cutoff=3, **kwargs):
