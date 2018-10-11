@@ -1263,6 +1263,48 @@ class COB(Expr):
         Plotting Methods
     '''
 
+    def plot_network(self,genes=None,lcc_only=True,
+            force=False,plot_clusters=True,
+            min_cluster_size=100):
+        '''
+
+        '''
+        from matplotlib.patches import Ellipse
+        coor = self.coordinates(lcc_only=lcc_only,force=force)
+        fig = plt.figure(
+            facecolor='white',
+            figsize=(20,20)
+        )
+        ax = fig.add_subplot(111)
+        # Plot the background genes
+        ax.set_facecolor('white')
+        ax.grid(False) 
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.scatter(coor.x,coor.y,alpha=1)
+        # Plot the genes
+        if genes is not None:
+            ids = coor.loc[[x.id for x in genes if x.id in coor.index]] 
+            ax.scatter(ids.x,ids.y,color='g')
+        # Plot clusters
+        big_clusters = [
+            k for k,v in Counter(self.clusters.cluster).items()\
+            if v > min_cluster_size
+        ]
+        for clus in big_clusters:
+            ids = [x.id for x in self.cluster_genes(clus) if x.id in coor.index]
+            ccoor = coor.loc[ids]
+            ax.scatter(ccoor.x,ccoor.y)
+            c = self.cluster_coordinates(clus)
+            c.update({'edgecolor':'black','fill':False,'linestyle':'--'})
+            e = Ellipse(**c)
+            ax.add_artist(e)
+        return fig
+
+    def cluster_genes(self,cluster_id):
+        ids = self.clusters.query(f'cluster == {cluster_id}').index.values
+        return self.refgen[ids]
+
     def plot_heatmap(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
              cluster_method='single', include_accession_labels=None,
