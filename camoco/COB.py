@@ -983,7 +983,7 @@ class COB(Expr):
         # Option to limit the number of edges 
         if max_edges is not None:
             self.log('Filtering edges')
-            edges = edges.sort_values(by='score',ascending=False)[0:max_edges]
+            edges = edges.sort_values(by='score',ascending=False)[0:min(max_edges,len(edges))]
         # Option to restrict gene list to only genes with edges
         if remove_orphans:
             self.log('Removing orphans')
