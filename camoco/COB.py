@@ -1996,7 +1996,7 @@ class COB(Expr):
         )
 
 
-    def coordinates(self,iterations=50,force=False,max_edges=100000):
+    def coordinates(self,iterations=50,force=False,max_edges=100000,lcc_only=True):
         ''' 
             returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
@@ -2028,30 +2028,44 @@ class COB(Expr):
             # convert to csc
             self.log(f'Converting to compressed sparse column')
             L = A.tocsc()
-            self.log('Extracting largest connected component')
-            lcc_index,num = Counter(ccindex).most_common(1)[0]
-            L = L[ccindex == lcc_index,:][:,ccindex == lcc_index]
-            self.log(f'The largest CC has {num} nodes')
+            if lcc_only:
+                self.log('Extracting largest connected component')
+                lcc_index,num = Counter(ccindex).most_common(1)[0]
+                L = L[ccindex == lcc_index,:][:,ccindex == lcc_index]
+                self.log(f'The largest CC has {num} nodes')
+                # get labels based on index in L
+                (lcc_indices,) = np.where(ccindex == lcc_index)
+                labels = [rev_i[x] for x in lcc_indices]
+            else:
+                labels = [rev_i[x] for x in range(L.shape[0])]
             self.log('Calculating positions')
             #coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
             coordinates = positions = forceatlas2.forceatlas2(L,pos=None,iterations=iterations)
             pos = pd.DataFrame(
                 coordinates
             )
-            (lcc_indices,) = np.where(ccindex == lcc_index)
-            labels = [rev_i[x] for x in lcc_indices]
             pos.index = labels
             pos.columns = ['x','y']
             self._bcolz('coordinates',df=pos)
         return pos
 
+    def cluster_coordinates(self, cluster_number, nstd=1.5):
+        '''
+            Calculate the rough coordinates around an MCL 
+            cluster.
 
-    def cluster_ellipse(self, cluster_number, nstd=2):
+            Returns parameters that can be used to draw an ellipse.
+            e.g. for cluster #5
+            >>> from matplotlib.patches import Ellipse
+            >>> e = Ellipse(**self.cluster_coordinates(5))
+
+        '''
         # Solution inspired by: 
         # https://stackoverflow.com/questions/12301071/multidimensional-confidence-intervals
         # Get the coordinates of the MCL cluster
         coor = self.coordinates()
-        points = coor.loc[self.clusters.iloc[self.clusters.cluster.values == cluster_number].index.values]
+        gene_ids = [x.id for x in self.cluster_genes(cluster_number)]
+        points = coor.loc[gene_ids]
         points = points.iloc[np.logical_not(np.isnan(points.x)).values,:]
         # Calculate stats for eigenvalues
         pos = points.mean(axis=0)
