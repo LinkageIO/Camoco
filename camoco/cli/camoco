@@ -364,17 +364,6 @@ if __name__ == '__main__':
             'for gene names.'
         )
     )  
-    #bldcob.add_argument(
-    #    '--norm_method',
-    #    help=(
-    #        'The normalization method to use. This can be inferred '
-    #        'from the raw data type. By default RNASEQ uses np.arcsinh and '
-    #        'MICROARRAY data uses np.log2. A different normalization function '
-    #        'can be passed directly in. '
-    #        'Default: None (inferred from Expr.rawtype)'
-    #
-    #    )
-    #)
     bldcob.add_argument(
         '--max-val',
         type=float,
