@@ -1,5 +1,4 @@
 #! /usr/bin/python3
-
 from .Camoco import Camoco
 from .RefGen import RefGen
 from .Tools import memoize
@@ -500,7 +499,7 @@ class Expr(Camoco):
         qc_accession['PASS_ALL'] = qc_accession.apply(
             lambda row: np.all(row), axis=1
         )
-        df = df.loc[:, qc_accession['PASS_ALL'].index.values]
+        df = df.loc[:, qc_accession['PASS_ALL']]
         # Update the database
         self._bcolz('qc_accession', df=qc_accession)
         self._bcolz('qc_gene', df=qc_gene)
