@@ -1310,7 +1310,7 @@ class COB(Expr):
              cluster_method='ward', include_accession_labels=None,
              include_gene_labels=None, avg_by_cluster=False,
              min_cluster_size=10, cluster_accessions=True,
-             plot_dendrogram=True):
+             plot_dendrogram=True,nan_color='black'):
         '''
             Plots a heatmap of genes x expression.
 
@@ -1351,6 +1351,11 @@ class COB(Expr):
                 If true, accessions will be clustered
             plot_dendrogram : bool (default: True)
                 If true, dendrograms will be plotted
+            nan_color : str (default: 'black')
+                Specifies the color of nans in the heatmap. Changing this
+                to a high contrast color can help identify problem areas.
+                Otherwise, black represents 'background' level of expression
+                and is otherwise innocuous.
 
             Returns
             -------
@@ -1374,12 +1379,12 @@ class COB(Expr):
                 genes=genes, accessions=accessions,
                 raw=raw, gene_normalize=gene_normalize
             )
-        dm = dm.fillna(0) # linkage does not allow nas
+        #dm = dm.fillna(0) # linkage does not allow nas
 
         # Get the Gene clustering order
         if cluster_method in ['single','complete','average','weighted','centroid','median','ward']:
             self.log('Ordering rows by leaf')
-            expr_linkage = fastcluster.linkage(dm,method=cluster_method) 
+            expr_linkage = fastcluster.linkage(dm.fillna(0),method=cluster_method) 
             order = leaves_list(expr_linkage)
             dm = dm.iloc[order, :]
         elif cluster_method == 'mcl':
@@ -1397,7 +1402,7 @@ class COB(Expr):
                 acc_clus_method = 'ward'
             else:
                 acc_clus_method = cluster_method
-            accession_linkage = fastcluster.linkage(dm.T,method=acc_clus_method)
+            accession_linkage = fastcluster.linkage(dm.fillna(0).T,method=acc_clus_method)
             # Re-order the matrix based on tree
             order = leaves_list(accession_linkage)
             dm = dm.iloc[:,order]
@@ -1425,10 +1430,10 @@ class COB(Expr):
         # Plot the Expression matrix 
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
         cmap = self._cmap
-        cmap.set_bad('grey', 1.0)
+        cmap.set_bad(nan_color, 1.0)
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
-        im = ax.matshow(dm, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
+        im = ax.matshow(nan_mask, aspect='auto', cmap=cmap, vmax=vmax, vmin=vmin)
         ax.grid(False) 
         ax.tick_params(labelsize=4)
         ax.tick_params('x',labelrotation=45)
@@ -1447,6 +1452,7 @@ class COB(Expr):
                 ax.set(
                     yticks=np.arange(len(dm.index)),
                 )
+        fig.align_labels()
         #ax.figure.colorbar(im)
         if plot_dendrogram == True:   
             with plt.rc_context({'lines.linewidth': 0.5}):
