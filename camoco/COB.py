@@ -1295,7 +1295,10 @@ class COB(Expr):
             ids = [x.id for x in self.cluster_genes(clus) if x.id in coor.index]
             ccoor = coor.loc[ids]
             ax.scatter(ccoor.x,ccoor.y)
-            c = self.cluster_coordinates(clus)
+            try:
+                c = self.cluster_coordinates(clus)
+            except KeyError as e:
+                continue
             c.update({'edgecolor':'black','fill':False,'linestyle':'--'})
             e = Ellipse(**c)
             ax.add_artist(e)
