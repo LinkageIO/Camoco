@@ -381,7 +381,19 @@ class GOnt(Ontology):
         ax.grid(False)
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.scatter(coor.x,coor.y,alpha=1)
+        # plot the edges
+        edges = []
+        import matplotlib.lines as lines
+        for term in self.iter_terms():
+            for parent in term.is_a:
+                tcor = coor.loc[term.id]
+                pcor = coor.loc[parent]
+                #edges.append(
+                ax.plot([tcor.x,pcor.x],[tcor.y,pcor.y])#,transform=fig.transFigure,figure=fig)
+                #)
+        #fig.lines.extend(edges)
+        # plot the genes
+        ax.scatter(coor.x,coor.y,alpha=0.1)
         return fig
 
     def to_json(self,filename=None,terms=None):
