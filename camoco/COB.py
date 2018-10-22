@@ -1263,7 +1263,7 @@ class COB(Expr):
         Plotting Methods
     '''
 
-    def plot_network(self,genes=None,lcc_only=True,
+    def plot_network(self,filename=None,genes=None,lcc_only=True,
             force=False,plot_clusters=True,
             min_cluster_size=100):
         '''
@@ -1299,6 +1299,8 @@ class COB(Expr):
             c.update({'edgecolor':'black','fill':False,'linestyle':'--'})
             e = Ellipse(**c)
             ax.add_artist(e)
+        if filename is not None:
+            plt.savefig(filename)
         return fig
 
     def cluster_genes(self,cluster_id):
