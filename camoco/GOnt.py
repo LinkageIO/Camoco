@@ -10,6 +10,7 @@ from .Tools import log,rawFile
 from collections import defaultdict
 from itertools import chain
 from functools import lru_cache
+from matplotlib import pylab as plt
 
 import pandas as pd
 import apsw as lite
@@ -298,6 +299,91 @@ class GOnt(Ontology):
                     x.attrs['label'] = '{},{}'.format(x.attrs['label'],term.attrs['label'])
         return self.to_json(terms=list(unique_terms.values()),filename=filename)
 
+    def to_sparse_matrix(self):
+        '''
+            Create a sparse matrix view of term interactions
+        '''
+        from scipy import sparse
+        terms = list(self.iter_terms())
+        term_index = {t.id:i for i,t in enumerate(terms)}
+        nlen = len(terms)
+        row = []
+        col = []
+        data = []
+        for term in terms:
+            for parent in term.is_a:
+                row.append(term_index[term.id])
+                col.append(term_index[parent])
+                data.append(1)   
+        # make the matrix symmetric
+        d = data + data
+        r = row + col
+        c = col + row
+        matrix = sparse.coo_matrix((d,(r,c)), shape=(nlen,nlen),dtype=None)
+        return (matrix,term_index)
+
+    def _coordinates(self,iterations=100,force=False,lcc_only=False):
+        from fa2 import ForceAtlas2
+        forceatlas2 = ForceAtlas2(
+            outboundAttractionDistribution=False,
+            linLogMode=False,
+            adjustSizes=False,
+            edgeWeightInfluence=1.0,
+            jitterTolerance=1.0,
+            barnesHutOptimize=True,
+            barnesHutTheta=1.2,
+            multiThreaded=False,
+            scalingRatio=2.0,
+            strongGravityMode=False,
+            gravity=1.0,
+            verbose=True
+        )
+        pos = self._bcolz('coordinates')
+        if pos is None or force == True:
+            import scipy.sparse.csgraph as csgraph
+            import networkx
+            A,i = self.to_sparse_matrix()
+            # generate a reverse lookup for index to label
+            rev_i = {v:k for k,v in i.items()}
+            num,ccindex = csgraph.connected_components(A,directed=False)
+            # convert to csc
+            self.log(f'Converting to compressed sparse column')
+            L = A.tocsc()
+            #if lcc_only:
+            #    self.log('Extracting largest connected component')
+            #    lcc_index,num = Counter(ccindex).most_common(1)[0]
+            #    L = L[ccindex == lcc_index,:][:,ccindex == lcc_index]
+            #    self.log(f'The largest CC has {num} nodes')
+            #    # get labels based on index in L
+            #    (lcc_indices,) = np.where(ccindex == lcc_index)
+            #    labels = [rev_i[x] for x in lcc_indices]
+            #else:
+            labels = [rev_i[x] for x in range(L.shape[0])]
+            self.log('Calculating positions')
+            #coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
+            coordinates = positions = forceatlas2.forceatlas2(L,pos=None,iterations=iterations)
+            pos = pd.DataFrame(
+                coordinates
+            )
+            pos.index = labels
+            pos.columns = ['x','y']
+            self._bcolz('coordinates',df=pos)
+        return pos
+
+    def plot_network(self):
+        coor = self._coordinates()
+        fig = plt.figure(
+            facecolor='white',
+            figsize=(20,20)
+        )
+        ax = fig.add_subplot(111)
+        ax.set_facecolor('white')
+        ax.grid(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.scatter(coor.x,coor.y,alpha=1)
+        return fig
+
     def to_json(self,filename=None,terms=None):
         '''
             Create a JSON representation of a Gene Ontology
@@ -324,7 +410,6 @@ class GOnt(Ontology):
             if term.id not in seen_nodes:
                 seen_nodes[term.id] = node_data
             else:
-
                 seen_nodes[term.id].update(node_data)
             #seen_nodes[term.id].update(node_data)
             for parent in term.is_a:
