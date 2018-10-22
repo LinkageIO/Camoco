@@ -1898,10 +1898,10 @@ class COB(Expr):
         '''
         dfs = [c.expr(raw=True) for c in cobs]
         for cob,df in zip(cobs,dfs):
-            net.columns = [f'{acc}_{cob.name}' for acc in df.columns]
+            df.columns = [f'{acc}_{cob.name}' for acc in df.columns]
         all_expr = pd.concat(dfs,axis=1,sort=False)
         # Call the internal from_dataframe method 
-        return self.from_DataFrame(
+        return cls.from_DataFrame(
             all_expr, name, description, refgen, rawtype,
             zscore_cutoff=zscore_cutoff, **kwargs
         )
