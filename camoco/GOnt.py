@@ -392,16 +392,15 @@ class GOnt(Ontology):
         else:
             highlighted_terms = set()
         # plot the edges
-        edges = []
-        import matplotlib.lines as lines
         for term in self.iter_terms():
+            if remove_orphans and len(term.is_a) == 0 and self.num_children(term) == 0:
+                    continue
+            else:
+                background_terms.add(term)
             for parent in term.is_a:
                 tcor = coor.loc[term.id]
                 pcor = coor.loc[parent]
-                #edges.append(
-                ax.plot([tcor.x,pcor.x],[tcor.y,pcor.y])#,transform=fig.transFigure,figure=fig)
-                #)
-        #fig.lines.extend(edges)
+                ax.plot([tcor.x,pcor.x],[tcor.y,pcor.y],'gray',alpha=0.7)
         # plot the genes
         background_terms = coor.loc[[x.id for x in background_terms],:]
         ax.scatter(background_terms.x,background_terms.y,alpha=1)
