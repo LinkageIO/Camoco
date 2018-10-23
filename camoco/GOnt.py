@@ -566,7 +566,16 @@ class GOnt(Ontology):
         self.log('Your gene ontology is built.')
         return self
 
-         
+        
+    def num_children(self, term):
+        '''
+            Returns the number of children terms a term has
+        '''
+        term = self[term]
+        return self.db.cursor().execute(
+            'SELECT COUNT(child)  FROM rels WHERE parent = ?',
+            (term.id,)
+        ).fetchone()[0]
 
     @classmethod
     def from_obo(cls, obo_file, gene_map_file ,name, description, 
