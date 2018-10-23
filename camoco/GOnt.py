@@ -106,6 +106,8 @@ class GOnt(Ontology):
     def __getitem__(self, id):
         if isinstance(id,str):
             return self.get_term(id)
+        elif isinstance(id,GOTerm):
+            return self.get_term(id.id)
         else:
             return [self.get_term(x) for x in id]
 
@@ -370,7 +372,9 @@ class GOnt(Ontology):
             self._bcolz('coordinates',df=pos)
         return pos
 
-    def plot_network(self):
+    def plot_network(self,terms=None,remove_orphans=True):
+        '''
+        '''
         coor = self._coordinates()
         fig = plt.figure(
             facecolor='white',
@@ -381,6 +385,12 @@ class GOnt(Ontology):
         ax.grid(False)
         ax.set_xticks([])
         ax.set_yticks([])
+        # Keep track of genes to plot
+        background_terms = set()
+        if terms is not None:
+            highlighted_terms = set(terms)
+        else:
+            highlighted_terms = set()
         # plot the edges
         edges = []
         import matplotlib.lines as lines
@@ -393,7 +403,11 @@ class GOnt(Ontology):
                 #)
         #fig.lines.extend(edges)
         # plot the genes
-        ax.scatter(coor.x,coor.y,alpha=0.1)
+        background_terms = coor.loc[[x.id for x in background_terms],:]
+        ax.scatter(background_terms.x,background_terms.y,alpha=1)
+        # plot the highlighted terms
+        highlighted_terms = coor.loc[[x.id for x in highlighted_terms],:]
+        ax.scatter(highlighted_terms.x,highlighted_terms.y,alpha=1)
         return fig
 
     def to_json(self,filename=None,terms=None):
