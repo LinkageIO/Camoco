@@ -1731,7 +1731,7 @@ class COB(Expr):
 
         # Find the stats beteween the two sets,
         # and the genes with the biggest differences
-        delta.sort(ascending=False)
+        delta.sort_values(ascending=False,inplace=True)
         highest = sorted(
             list(dict(delta[:diff_genes]).items()),
             key=lambda x: x[1], reverse=True
@@ -1747,7 +1747,6 @@ class COB(Expr):
             ('bigger_in_'+self.name):highest,
             ('bigger_in_'+obj.name):lowest
         }
-
         return ans
 
 
