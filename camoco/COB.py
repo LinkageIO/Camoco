@@ -1502,27 +1502,21 @@ class COB(Expr):
             a populated matplotlib figure object
 
         '''
+        # These are valid hierarchical clustering methods
+        hier_cluster_methods = [
+            'single','complete','average','weighted','centroid','median','ward'
+        ]
         # Get the Expressiom Matrix
         if avg_by_cluster == True:
-            # Extract clusters
-            dm = self.clusters.groupby('cluster').\
-                    filter(lambda x: len(x) >= min_cluster_size).\
-                    groupby('cluster').\
-                    apply(lambda x: self.expr(genes=self.refgen[x.index]).mean()).\
-                    apply(lambda x: (x-x.mean())/x.std() ,axis=1)
-            if len(dm) == 0:
-                self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
-                return None
+            dm = self.cluster_expression(min_cluster_size=min_cluster_size,normalize=True)
         else:
             # Fetch the Expr Matrix
             dm = self.expr(
                 genes=genes, accessions=accessions,
                 raw=raw, gene_normalize=gene_normalize
             )
-        #dm = dm.fillna(0) # linkage does not allow nas
-
         # Get the Gene clustering order
-        if cluster_method in ['single','complete','average','weighted','centroid','median','ward']:
+        if cluster_method in hier_cluster_methods: 
             self.log('Ordering rows by leaf')
             expr_linkage = fastcluster.linkage(dm.fillna(0),method=cluster_method) 
             order = leaves_list(expr_linkage)
