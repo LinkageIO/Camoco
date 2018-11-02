@@ -1256,8 +1256,147 @@ class COB(Expr):
         if iter_name is not None:
             degree['iter_name'] = iter_name
         return degree
+    
+    ''' ----------------------------------------------------------------------
+        Cluster Methods
+    '''
+    def cluster_genes(self,cluster_id):
+        '''
+            Return the genes that are in a cluster
+
+            Parameters
+            ----------
+            cluster_id: str / int
+                The ID of the cluster for which to get the gene IDs.
+                Technically a string, but MCL clusters are assigned
+                numbers. This is automatically converted so '0' == 0.
+
+            Returns
+            -------
+            A list of Loci (genes) that are in the cluster
+        '''
+        ids = self.clusters.query(f'cluster == {cluster_id}').index.values
+        return self.refgen[ids]
+
+    def cluster_coordinates(self, cluster_number, nstd=1.5):
+        '''
+            Calculate the rough coordinates around an MCL 
+            cluster.
+
+            Returns parameters that can be used to draw an ellipse.
+            e.g. for cluster #5
+            >>> from matplotlib.patches import Ellipse
+            >>> e = Ellipse(**self.cluster_coordinates(5))
+
+        '''
+        # Solution inspired by: 
+        # https://stackoverflow.com/questions/12301071/multidimensional-confidence-intervals
+        # Get the coordinates of the MCL cluster
+        coor = self.coordinates()
+        gene_ids = [x.id for x in self.cluster_genes(cluster_number)]
+        points = coor.loc[gene_ids]
+        points = points.iloc[np.logical_not(np.isnan(points.x)).values,:]
+        # Calculate stats for eigenvalues
+        pos = points.mean(axis=0)
+        cov = np.cov(points, rowvar=False)
+        def eigsorted(cov):
+            vals, vecs = np.linalg.eigh(cov)
+            order = vals.argsort()[::-1]
+            return vals[order], vecs[:,order]
+        vals, vecs = eigsorted(cov)
+        theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
+        width, height = 2 * nstd * np.sqrt(vals)
+        return {
+            'xy': pos,
+            'width': width,
+            'height': height,
+            'angle' : theta
+        }
+
+    def cluster_expression(self,min_cluster_size=10,normalize=True):
+        '''
+            Get a matrix of cluster x accession gene expression.
+            Each row represents the average gene expression in each accession
+            for the genes in the cluster.
+
+            Parameters
+            ----------
+            min_cluster_size : int (default:10)
+                Clusters smaller than this will not be included in the
+                expression matrix.
+            normalize : bool (default:True)
+                If true, each row will be standard normalized meaning that
+                0 will represent the average (mean) across all accessions
+                and the resultant values in the row will represent the number 
+                of standard deviations from the mean.
+
+            Returns
+            -------
+            A DataFrame containing gene expression values. Each row represents
+            a cluster and each column represents an accession. The values of
+            the matrix are the average gene expression (of genes in the cluster)
+            for each accession.
+
+        '''
+        # Extract clusters
+        dm = self.clusters.groupby('cluster').\
+                filter(lambda x: len(x) >= min_cluster_size).\
+                groupby('cluster').\
+                apply(lambda x: self.expr(genes=self.refgen[x.index]).mean())
+        if normalize:
+            dm = dm.apply(lambda x: (x-x.mean())/x.std() ,axis=1)
+        if len(dm) == 0:
+            self.log.warn('No clusters larger than {} ... skipping',min_cluster_size)
+            return None
+        return dm
 
 
+    def coordinates(self,iterations=50,force=False,max_edges=100000,lcc_only=True):
+        ''' 
+            returns the static layout, you can change the stored layout by
+            passing in a new layout object. If no layout has been stored or a gene
+            does not have coordinates, returns (0, 0) for each mystery gene
+        '''
+        from fa2 import ForceAtlas2
+        forceatlas2 = ForceAtlas2(
+            outboundAttractionDistribution=False, linLogMode=False,
+            adjustSizes=False, edgeWeightInfluence=1.0,
+            jitterTolerance=1.0, barnesHutOptimize=True,
+            barnesHutTheta=1.2, multiThreaded=False,
+            scalingRatio=2.0, strongGravityMode=False,
+            gravity=1.0, verbose=True
+        )
+        pos = self._bcolz('coordinates')
+        if pos is None or force == True:
+            import scipy.sparse.csgraph as csgraph
+            import networkx
+            A,i = self.to_sparse_matrix(remove_orphans=False,max_edges=max_edges)
+            # generate a reverse lookup for index to label
+            rev_i = {v:k for k,v in i.items()}
+            num,ccindex = csgraph.connected_components(A,directed=False)
+            # convert to csc
+            self.log(f'Converting to compressed sparse column')
+            L = A.tocsc()
+            if lcc_only:
+                self.log('Extracting largest connected component')
+                lcc_index,num = Counter(ccindex).most_common(1)[0]
+                L = L[ccindex == lcc_index,:][:,ccindex == lcc_index]
+                self.log(f'The largest CC has {num} nodes')
+                # get labels based on index in L
+                (lcc_indices,) = np.where(ccindex == lcc_index)
+                labels = [rev_i[x] for x in lcc_indices]
+            else:
+                labels = [rev_i[x] for x in range(L.shape[0])]
+            self.log('Calculating positions')
+            #coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
+            coordinates = positions = forceatlas2.forceatlas2(L,pos=None,iterations=iterations)
+            pos = pd.DataFrame(
+                coordinates
+            )
+            pos.index = labels
+            pos.columns = ['x','y']
+            self._bcolz('coordinates',df=pos)
+        return pos
 
     ''' ----------------------------------------------------------------------
         Plotting Methods
@@ -1305,10 +1444,6 @@ class COB(Expr):
         if filename is not None:
             plt.savefig(filename)
         return fig
-
-    def cluster_genes(self,cluster_id):
-        ids = self.clusters.query(f'cluster == {cluster_id}').index.values
-        return self.refgen[ids]
 
     def plot_heatmap(self, filename=None, genes=None,accessions=None,
              gene_normalize=True, raw=False,
@@ -2006,98 +2141,6 @@ class COB(Expr):
             zscore_cutoff=zscore_cutoff,
             **kwargs
         )
-
-
-    def coordinates(self,iterations=50,force=False,max_edges=100000,lcc_only=True):
-        ''' 
-            returns the static layout, you can change the stored layout by
-            passing in a new layout object. If no layout has been stored or a gene
-            does not have coordinates, returns (0, 0) for each mystery gene
-        '''
-        from fa2 import ForceAtlas2
-        forceatlas2 = ForceAtlas2(
-            outboundAttractionDistribution=False,
-            linLogMode=False,
-            adjustSizes=False,
-            edgeWeightInfluence=1.0,
-            jitterTolerance=1.0,
-            barnesHutOptimize=True,
-            barnesHutTheta=1.2,
-            multiThreaded=False,
-            scalingRatio=2.0,
-            strongGravityMode=False,
-            gravity=1.0,
-            verbose=True
-        )
-        pos = self._bcolz('coordinates')
-        if pos is None or force == True:
-            import scipy.sparse.csgraph as csgraph
-            import networkx
-            A,i = self.to_sparse_matrix(remove_orphans=False,max_edges=max_edges)
-            # generate a reverse lookup for index to label
-            rev_i = {v:k for k,v in i.items()}
-            num,ccindex = csgraph.connected_components(A,directed=False)
-            # convert to csc
-            self.log(f'Converting to compressed sparse column')
-            L = A.tocsc()
-            if lcc_only:
-                self.log('Extracting largest connected component')
-                lcc_index,num = Counter(ccindex).most_common(1)[0]
-                L = L[ccindex == lcc_index,:][:,ccindex == lcc_index]
-                self.log(f'The largest CC has {num} nodes')
-                # get labels based on index in L
-                (lcc_indices,) = np.where(ccindex == lcc_index)
-                labels = [rev_i[x] for x in lcc_indices]
-            else:
-                labels = [rev_i[x] for x in range(L.shape[0])]
-            self.log('Calculating positions')
-            #coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
-            coordinates = positions = forceatlas2.forceatlas2(L,pos=None,iterations=iterations)
-            pos = pd.DataFrame(
-                coordinates
-            )
-            pos.index = labels
-            pos.columns = ['x','y']
-            self._bcolz('coordinates',df=pos)
-        return pos
-
-    def cluster_coordinates(self, cluster_number, nstd=1.5):
-        '''
-            Calculate the rough coordinates around an MCL 
-            cluster.
-
-            Returns parameters that can be used to draw an ellipse.
-            e.g. for cluster #5
-            >>> from matplotlib.patches import Ellipse
-            >>> e = Ellipse(**self.cluster_coordinates(5))
-
-        '''
-        # Solution inspired by: 
-        # https://stackoverflow.com/questions/12301071/multidimensional-confidence-intervals
-        # Get the coordinates of the MCL cluster
-        coor = self.coordinates()
-        gene_ids = [x.id for x in self.cluster_genes(cluster_number)]
-        points = coor.loc[gene_ids]
-        points = points.iloc[np.logical_not(np.isnan(points.x)).values,:]
-        # Calculate stats for eigenvalues
-        pos = points.mean(axis=0)
-        cov = np.cov(points, rowvar=False)
-        def eigsorted(cov):
-            vals, vecs = np.linalg.eigh(cov)
-            order = vals.argsort()[::-1]
-            return vals[order], vecs[:,order]
-        vals, vecs = eigsorted(cov)
-        theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
-        width, height = 2 * nstd * np.sqrt(vals)
-        return {
-            'xy': pos,
-            'width': width,
-            'height': height,
-            'angle' : theta
-        }
-
-
-
 
 def fix_val(val):
     if isinf(val):
