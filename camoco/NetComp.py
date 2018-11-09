@@ -52,6 +52,28 @@ class NetComp(Freezable):
         for n in networks:
             self.add_network(n)
 
+    def _initialize_tables(self):
+        cur = self._db.cursor()
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS networks (
+                name TEXT
+            )
+        ''')
+
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS net_comp (
+                source TEXT,
+                target TEXT,
+                source_cluster TEXT,
+                n_genes INT,
+                comp_method TEXT,
+                source_coex FLOAT,
+                target_coex FLOAT,
+                target_coex_pval FLOAT
+            ) 
+        ''')
+
+    @accepts_iterable
     def add_network(self,net):
         '''
             Add a network (COB) to the 
