@@ -83,4 +83,53 @@ class NetComp(Freezable):
             net = COB(net)
         if not isinstance(net,COB):
             raise ValueError(f'a valid network must be provided')
-        self.networks.add(net)
+        # check if name is already in networks
+        if net.name not in [x.name for x in self.networks]:
+            self.networks.add(net)
+        self._db.cursor().execute('''
+            INSERT INTO networks(name) VALUES (?)
+        ''',(net.name,))
+
+
+    @contextmanager 
+    def _net_comp_buffer(self):
+        '''
+            Add a comparison record to the internal database
+        '''
+        cur = self._db.cursor()
+        record_buffer = []
+        yield record_buffer
+        cur.executemany('''
+            INSERT INTO net_comp VALUES (?,?,?,?,?,?,?,?)
+        ''',record_buffer)
+
+    def compare_cluster_coex(self,min_cluster_size=10,max_cluster_size=300,num_bootstrap=100):
+        '''
+            Compare the co-expression of genes within clusters between networks.
+            This will compute the strength of coexpression of genes from clusters
+            in network A in network B. This comparison tests that clusters in network
+            A are *also* clustered in network B.
+        '''
+        with self._net_comp_buffer() as results:
+            for source,target in permutations(self.networks,2):
+                print(f'comparing {source.name} to {target.name}')
+                if source.name == target.name:
+                    continue 
+                common_genes = set(source.genes()).intersection(target.genes())
+                for cid in source.clusters.cluster.unique():
+                    cluster_genes = source.cluster_genes(cid)
+                    cluster_genes = common_genes.intersection(cluster_genes)
+                    if (len(cluster_genes) >= max_cluster_size \
+                    or len(cluster_genes) <= min_cluster_size):
+                        continue
+                    source_density = source.density(cluster_genes)
+                    target_density = target.density(cluster_genes)
+                    target_pval = sum(
+                        [target.density(random.sample(common_genes,len(cluster_genes))) >= target_density \
+                        for _ in range(num_bootstrap)]
+                    ) / num_bootstrap
+                    results.append((
+                        source.name, target.name,cid,len(cluster_genes),
+                        'density', source_density, target_density, target_pval
+                    ))
+
