@@ -31,10 +31,24 @@ def accepts_iterable(fn):
             fn(self,arg,*args,**kwargs)
     return wrapped
 
-    def __init__(self,name,networks):
-        self.networks = set()
 
-        # Add all the networks
+class NetComp(Freezable):
+
+    def __init__(self,name,networks=None):
+        # init core objects
+        super().__init__(name=name)
+        self._initialize_tables()
+        self.log = logging.getLogger(f'NetComp.{name}')
+        self.networks = set()
+        # Retrieve stored networks
+        net_names = [x[0] for x in self._db.cursor().execute('''
+            SELECT name FROM networks
+        ''')]
+        for name in net_names:
+            self.networks.add(COB(name))
+        # Handle args
+        if networks is None:
+            networks = []
         for n in networks:
             self.add_network(n)
 
