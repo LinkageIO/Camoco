@@ -333,7 +333,9 @@ class GOnt(Ontology):
         matrix = sparse.coo_matrix((d,(r,c)), shape=(nlen,nlen),dtype=None)
         return (matrix,term_index)
 
-    def _coordinates(self,iterations=100,force=False,lcc_only=False):
+
+
+    def _coordinates(self,iterations=100,force=False,ignore_orphans=True):
         from fa2 import ForceAtlas2
         forceatlas2 = ForceAtlas2(
             outboundAttractionDistribution=False,
@@ -360,24 +362,26 @@ class GOnt(Ontology):
             # convert to csc
             self.log(f'Converting to compressed sparse column')
             L = A.tocsc()
-            #if lcc_only:
-            #    self.log('Extracting largest connected component')
-            #    lcc_index,num = Counter(ccindex).most_common(1)[0]
-            #    L = L[ccindex == lcc_index,:][:,ccindex == lcc_index]
-            #    self.log(f'The largest CC has {num} nodes')
-            #    # get labels based on index in L
-            #    (lcc_indices,) = np.where(ccindex == lcc_index)
-            #    labels = [rev_i[x] for x in lcc_indices]
-            #else:
-            labels = [rev_i[x] for x in range(L.shape[0])]
-            self.log('Calculating positions')
-            #coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
-            coordinates = positions = forceatlas2.forceatlas2(L,pos=None,iterations=iterations)
-            pos = pd.DataFrame(
-                coordinates
-            )
-            pos.index = labels
-            pos.columns = ['x','y']
+            connected_components = Counter(ccindex)
+            component_coordinates = []
+            offset = None
+            for index,csize in sorted(connected_components.items(),key=lambda x: x[1],reverse=True): 
+                if csize == 1 and ignore_orphans:
+                    continue
+                C = L[ccindex == index,:][:,ccindex == index]
+                (c_indices,) = np.where(ccindex == index)
+                labels = [rev_i[x] for x in c_indices]
+                self.log(f'Calculating positions for component {index} (n={csize})')
+                coordinates = positions = forceatlas2.forceatlas2(C,pos=None,iterations=iterations)
+                coordinates = pd.DataFrame(
+                    coordinates, index=labels, columns = ['x','y']        
+                )
+                if offset is not None:
+                    # shift the x coordinates to 0
+                    coordinates.x = coordinates.x + abs(coordinates.x.min()) + offset
+                offset = coordinates.x.max()
+                component_coordinates.append(coordinates)
+            pos = pd.concat(component_coordinates)
             self._bcolz('coordinates',df=pos)
         return pos
 
@@ -409,13 +413,13 @@ class GOnt(Ontology):
             for parent in term.is_a:
                 tcor = coor.loc[term.id]
                 pcor = coor.loc[parent]
-                ax.plot([tcor.x,pcor.x],[tcor.y,pcor.y],'gray',alpha=0.7)
+                ax.plot([tcor.x,pcor.x],[tcor.y,pcor.y],'gray',alpha=0.7,zorder=1)
         # plot the genes
         background_terms = coor.loc[[x.id for x in background_terms],:]
-        ax.scatter(background_terms.x,background_terms.y,alpha=1)
+        ax.scatter(background_terms.x,background_terms.y,alpha=1,zorder=2)
         # plot the highlighted terms
         highlighted_terms = coor.loc[[x.id for x in highlighted_terms],:]
-        ax.scatter(highlighted_terms.x,highlighted_terms.y,alpha=1)
+        ax.scatter(highlighted_terms.x,highlighted_terms.y,alpha=1,zorder=3)
         return fig
 
     def to_json(self,filename=None,terms=None):
