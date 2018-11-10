@@ -7,7 +7,7 @@ from .RefGen import RefGen
 from .Locus import Locus
 from .Tools import log,rawFile
 
-from collections import defaultdict
+from collections import defaultdict,Counter
 from itertools import chain
 from functools import lru_cache
 from matplotlib import pylab as plt
@@ -55,8 +55,6 @@ class GOTerm(Term):
         is_a=None, loci=None, **kwargs):
         '''
             Initialize a GOTerm
-
-            Parameters
         '''
         super().__init__(id, desc=desc, loci=loci, **kwargs)
         self.name = name
@@ -243,6 +241,17 @@ class GOnt(Ontology):
             yield self[parent_term]
             for grand_parent in self.parents(self[parent_term]):
                 yield grand_parent
+
+    def children(self,term):
+        '''
+            Returns an iterable containing the children of a term.
+            Children are determined via the is_a property of the term.
+        '''
+        term = self[term]
+        children_ids = [x[0] for x in self.db.cursor().execute(
+            'SELECT child FROM rels WHERE parent = ?',(term.id,)
+        )]
+        return [self[x] for x in children_ids]
 
     def graph(self, terms=None):
         '''
