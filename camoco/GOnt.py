@@ -666,8 +666,19 @@ class GOnt(Ontology):
             cur.execute('ALTER TABLE terms ADD COLUMN name TEXT;')
         except lite.SQLError:
             pass
-        cur.execute('CREATE TABLE IF NOT EXISTS rels (parent TEXT, child TEXT);')
-        cur.execute('CREATE TABLE IF NOT EXISTS alts (alt TEXT UNIQUE, main TEXT);')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS rels (
+                parent TEXT, 
+                child TEXT,
+                PRIMARY KEY(parent, child)
+            );
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS alts (
+                alt TEXT UNIQUE, 
+                main TEXT
+            );
+        ''')
 
     def _clear_tables(self):
         super()._clear_tables()
