@@ -36,6 +36,10 @@ CLI
 Once installed, the `camoco` command will be available through the terminal.
 See `camoco --help` for options!
 
+Documentation
+-------------
+Documentation, tutorials, and walkthroughts are currently being updated and will be released 11/16/18.
+
 
 Code Of Conduct
 ---------------
