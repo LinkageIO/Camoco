@@ -54,7 +54,7 @@ RefGen objects are created once and are stored in a database. From these RefGen 
 of genes can be generated very quickly. 
 
 
-Other Data Types include:
+Camoco Data Types include:
 
 Locus
   The most fundamental element that Camoco uses is a :class:`Locus` object. A Locus is general purpose
@@ -69,8 +69,26 @@ RefGen
   used by other Camoco objects to generate genes either by ID or by genome location.
 
 Term
-  A :class:`Term` 
+  A :class:`Term` object is collection of Loci objects with a common form or function. This is 
+  commonly used as a contianer for loci in a :class:`Ontology` or :class:`GWAS`.
 
+Ontology
+  This is a object containing a set of Terms and their hierarchical relationships. This is used 
+  to store data related to things like `Gene Onotologies (GO) <http://www.geneontology.org/>`__ 
+  or `MapMan <https://mapman.gabipd.org/>`__ pathways.
+ 
+GWAS
+  Similar to an Ontology, the terms in a GWAS are SNPs. A GWAS object handles SNP to gene mapping
+  by referencing a RefGen object.
+
+COB
+  This is the co-expression browser object. A COB is the network object in Camoco and used to
+  perform all the network analysis components.
+
+
+
+Building Camoco Data Set
+========================
 
 During the build process, there
 are several options for  performing quality control including: filtering
