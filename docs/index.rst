@@ -54,8 +54,11 @@ Table Of Contents
 =================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+    :maxdepth: 2
+    :caption: Contents:
+  
+    Camoco Documentation <index> 
+    Overview <overview>
 
 
 
@@ -63,15 +66,5 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 
-Camoco
-======
-
-.. automodule:: camoco
-
-COB
-===
-.. autoclass:: COB
-    :members:
