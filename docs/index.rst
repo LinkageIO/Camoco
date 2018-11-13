@@ -3,18 +3,20 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-********************
-Camoco Documentation
-********************
+.. _overview:
+.. currentmodule:: camoco
 
-Camoco is a python library for building and analyzing co-expression networks. 
-Currently, networks are generally built from gene expression data, but given 
-that the input to Camoco is simply a gene-by-sample expression matrix, there 
-is not reason that the analysis couldn't include things like protein abundance 
-or metabolites. Hence the name: co-analysis of molecular components. Very 
-breifly, Camoco creates co-expression networks using table formatted expression 
-data and and a few common genome data files:
+####################################################
+Camoco - gene co-expression network analysis toolkit 
+####################################################
 
+**Camoco** is a python library for building and analyzing gene co-expression
+networks.  Networks are built from tables of gene expression data typically derived 
+from RNA-seq or micro-array experiments. Once networks are built, there are several 
+tools available to validate or check the *health* of the co-expression network using 
+annotated ontologies such as the `Gene Ontology <http://www.geneontology.org/>`__.
+Co-expression can then be calculated among sets of genes using several different
+metrics.
 
 
 .. toctree::
