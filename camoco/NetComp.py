@@ -103,6 +103,7 @@ class NetComp(Freezable):
             INSERT INTO net_comp VALUES (?,?,?,?,?,?,?,?)
         ''',record_buffer)
 
+
     def compare_cluster_coex(self,min_cluster_size=10,max_cluster_size=300,num_bootstrap=100):
         '''
             Compare the co-expression of genes within clusters between networks.
@@ -129,7 +130,7 @@ class NetComp(Freezable):
                         for _ in range(num_bootstrap)]
                     ) / num_bootstrap
                     results.append((
-                        source.name, target.name,cid,len(cluster_genes),
+                        source.name,target.name,str(cid),len(cluster_genes),
                         'density', source_density, target_density, target_pval
                     ))
 
