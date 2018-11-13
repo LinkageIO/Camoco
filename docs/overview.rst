@@ -63,7 +63,7 @@ Locus
   other genome coordinate objects such as SNPs and genes, which are just Loci with additional
   information.
 
-RefGen
+RefGen*
   This object contains a reference set of Locus object, such as those that are defined in a `GFF
   File <https://uswest.ensembl.org/info/website/upload/gff.html>`__. Typically, RefGen objects are
   used by other Camoco objects to generate genes either by ID or by genome location.
@@ -72,27 +72,47 @@ Term
   A :class:`Term` object is collection of Loci objects with a common form or function. This is 
   commonly used as a contianer for loci in a :class:`Ontology` or :class:`GWAS`.
 
-Ontology
+Ontology*
   This is a object containing a set of Terms and their hierarchical relationships. This is used 
   to store data related to things like `Gene Onotologies (GO) <http://www.geneontology.org/>`__ 
   or `MapMan <https://mapman.gabipd.org/>`__ pathways.
  
-GWAS
+GWAS*
   Similar to an Ontology, the terms in a GWAS are SNPs. A GWAS object handles SNP to gene mapping
   by referencing a RefGen object.
 
-COB
+COB*
   This is the co-expression browser object. A COB is the network object in Camoco and used to
   perform all the network analysis components.
 
 
+* Designates a persistent data type
 
-Building Camoco Data Set
-========================
+Building data sets
+==================
 
-During the build process, there
-are several options for  performing quality control including: filtering
-missing data in genes/accession, setting minimum threshold for gene expression,
-and specifying a minimal level of variance in gene expression. 
+Datasets can be built in two main ways, the first is from raw data and the second is from
+existing camoco data sets. For example, a RefGen object is typically built from a GFF file.
+From a RefGen object, Loci objects can be created. Similarly Ontologies and GWAS are built
+from raw data files while Terms are created from Ontologies and GWAS objects. 
 
+COB objects are built from raw gene expression datasets, however, they also require that 
+a valid RefGen object is built. During this process, a filtered RefGen object is automatically
+created containing only the genes in the expression data.
+
+When a persistant Camoco object is built, a user specified name is required. This name is used
+in analyses where specific datasets need to be referenced. For example, in maize, there are 
+two gene references: a full gene set as well as a filtered gene set containing only high 
+confidence genes. Perhaps you might be interested in what a co-expression network might look
+like if it was built using genes in the full vs filtered gene set. First, you'd build the two
+RefGen objects from the raw datasets. This requires naming the dataset as they need to be 
+referenced when the networks are built later. If we named these datasets 'ZmFull' and 'ZmFiltered', 
+we could build two networks, one from each RefGen dataset.
+
+Another case where naming datasets can come in handy is when there are quality control steps in
+the build process. Building a network requires several parameters that control quality control
+including:filtering missing data in genes/accession, setting minimum threshold for gene expression,
+and specifying a minimal level of variance in gene expression. While the parameters used to build
+the datasets are stored internally in the Camoco dataset and are retrievable, it might be useful
+to name your datasets to reflect how they were created. For instance: 'ZmStrict' and 'ZmLenient' 
 
