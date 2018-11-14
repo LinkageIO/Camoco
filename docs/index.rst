@@ -45,6 +45,9 @@ Camoco offers several key features for network analysis:
 * Customizable **network plotting** methods
 * On the fly GWAS **SNP-to-gene mapping**
 
+
+Citation
+========
 Camoco and its applications have been published in The Plant Cell. If you make
 use of Camoco in your work, please cite the following:
 
