@@ -6,9 +6,13 @@
 .. _overview:
 .. currentmodule:: camoco
 
-####################################################
-Camoco - gene co-expression network analysis toolkit 
-####################################################
+Introduction
+############
+
+.. image:: _static/CamocoLogo.png
+    :scale: 50%
+    :alt: Camoco Logo
+
 
 **Camoco** is a python library for building and analyzing gene co-expression
 networks.  Networks are built from tables of gene expression data typically derived 
