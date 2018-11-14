@@ -66,7 +66,7 @@ Table Of Contents
     Introduction <index> 
     Overview <overview>
     Installation <installation>
-    10 Min. Tutorial <ten-minute>
+    Tutorial <ten-minute>
 
 
 
