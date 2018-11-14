@@ -62,10 +62,11 @@ Table Of Contents
 
 .. toctree::
     :maxdepth: 2
-    :caption: Contents:
   
-    Camoco Documentation <index> 
+    Introduction <index> 
     Overview <overview>
+    Installation <installation>
+    10 Min. Tutorial <ten-minute>
 
 
 
