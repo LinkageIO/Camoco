@@ -19,6 +19,10 @@ install successfully.
   Code blocks starting with $ designate shell commands.
 
 
+Operating System Compatibilty
+=============================
+Camoco was built on and tested using Linux (Ubuntu 18.04).
+
 Python Version Requirement
 ==========================
 Camoco requires python version 3.6+. If this differs from your system version of python,
