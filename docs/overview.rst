@@ -86,7 +86,7 @@ COB*
   perform all the network analysis components.
 
 
-* Designates a persistent data type
+/* Designates a persistent data type
 
 Building data sets
 ==================
