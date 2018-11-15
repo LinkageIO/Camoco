@@ -21,7 +21,8 @@ install successfully.
 
 Operating System Compatibilty
 =============================
-Camoco was built on and tested using Linux (Ubuntu 18.04).
+Camoco was built on and tested using Linux (Ubuntu 18.04). It is also suggested that you
+have a machine with at least 8Gb of usable RAM.
 
 Python Version Requirement
 ==========================
@@ -33,14 +34,13 @@ Once miniconda is installed, create a virtual environment: ::
 
   $ conda create -n camoco_env python=3.6
 
-Activate the python virtual environment: ::
+Follow the prompts on the screen. Next, activate the python virtual environment: ::
   
   $ source activate camoco_env
 
-Python should now be 3.6: ::
+Python should now be 3.6:
 
-  $ python --version
-  Python 3.6.7 :: Anaconda, Inc.
+.. command-output:: python --version
 
 Install Camoco as described above: ::
   
