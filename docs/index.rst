@@ -12,6 +12,7 @@ Introduction
 .. image:: _static/CamocoLogo.png
     :scale: 50%
     :alt: Camoco Logo
+    :align: right
 
 
 **Camoco** is a python library for building and analyzing gene co-expression
@@ -22,7 +23,7 @@ annotated ontologies such as the `Gene Ontology <http://www.geneontology.org/>`_
 Co-expression can then be calculated among sets of genes using several different
 metrics.
 
-In addition to building and validating co-expression networks, camoco can also
+In addition to building and validating co-expression networks, Camoco can also
 be used to directly integrate data from `Genome-Wide Association Studies
 (GWAS) <https://en.wikipedia.org/wiki/Genome-wide_association_study>`__. Using a
 window based method, markers (SNPs) from GWAS are mapped to candidate genes and
@@ -66,7 +67,7 @@ Table Of Contents
     Introduction <index> 
     Overview <overview>
     Installation <installation>
-    Tutorial <ten-minute>
+    Tutorial: Pt I: CLI <tutorial>
 
 
 
