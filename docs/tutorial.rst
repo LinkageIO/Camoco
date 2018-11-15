@@ -1,8 +1,9 @@
 
-.. _ten-minute: 
+.. _tutorial: 
 
-Tutorial
-########
+Tutorial Part I. - Building Objects with the CLI
+################################################
+
 This is a whirlwind tutorial to get you started with Camoco. This tutorial assumes that 
 you've successfully completed the :ref:`installation steps <installation>`. In this 
 tutorial we will be recreating the datasets used in `this publication 
@@ -154,7 +155,7 @@ You should see the following output: ::
 Building Camoco Objects
 =======================
 
-The first camoco object we are going to build is the RefGen object. This is needed because 
+The first Camoco object we are going to build is the RefGen object. This is needed because 
 most of the other objects need a reference in order to properly interpret gene IDs. For example,
 if you look at the first few lines of the file go gene mapping, you'll see `GRMZM2G061764_P01`
 which corresponds to a maize gene. Without the RefGen object, Camoco has not information about
@@ -179,7 +180,7 @@ information contained in other objects. Lets start with the RefGen object.
 
 Building a RefGen Object
 ------------------------
-Looking at the camoco help command above (`camoco --help`), we can see there is a 
+Looking at the Camoco help command above (`camoco --help`), we can see there is a 
 command to build a RefGen object. We can find more information about the command 
 by looking at its help message
 
@@ -217,7 +218,7 @@ by looking at its help message
                              column. default: "="
    
 
-The command takes 5 required arguments (called positional arugment): `filename`, `name`, `description`,
+The command takes 5 required arguments (called positional argument): `filename`, `name`, `description`,
 `build`, and `organism`, as well as 5 optional arguments. Our build command will look something like:
 
 .. code::
@@ -225,7 +226,7 @@ The command takes 5 required arguments (called positional arugment): `filename`,
   $ camoco build-refgen ZmB73_5b_FGS.gff "Zm5bFGS" "Maize 5b Filtered Gene Set" 5b "Zea mays"
 
 The `filename` corresponds to the raw file we downloaded. The `name` is a short name supplied by you, 
-that references the dataset. Correspondinly, `description` is used to supply a little more information.
+that references the dataset. Correspondingly, `description` is used to supply a little more information.
 Then we have `build` and `organism` which are used internally to differentiate between different genome
 builds (gene positions change between versions) as well as genes that might have the same name but come
 from different species/sub-species.
@@ -368,7 +369,7 @@ We can get an idea of what data we need to build the network by running the `--h
 This command has lots of options, many of which are for specific cases and are not of 
 major concern here. There are 4 required arguments to the command: `filename`, `name`,
 `description`, and `refgen`. Many of these are familiar from the `build-refgen` command,
-the only new one is the `refgen` argument. This argument is the `name` of the refgen that
+the only new one is the `refgen` argument. This argument is the `name` of the RefGen that
 we build above: `Zm5bFGS`. You can see that it would be very easy to swap out the `refgen`
 name to build networks from different reference genomes. Lets start with the first expression
 dataset: `Schaefer2018_ROOTFPKM.tsv`. 
@@ -488,7 +489,7 @@ Camoco is now performing quality control on the input data. The first thing it d
 any genes that are not present in the RefGen object. In this case 0 genes were not in the RefGen.
 Next, Camoco sets gene expression values lower than 0.1 to NaN. Values of NaN will be ignored when
 calculating co-expression and this is to control for missing genes versus lowly expressed genes.
-Next, Camoco filters out genes with over 20% missing data as well as genes that dont have at least 
+Next, Camoco filters out genes with over 20% missing data as well as genes that don't have at least 
 one accession with an FPKM above 5. This removes genes that have very little variance in their 
 gene expression profiles and are not informative given the accession provided (i.e low variance).
 Finally, Camoco finds that 0 accessions have over 30% missing data so it keeps all the samples in 
@@ -574,14 +575,14 @@ Next, Camoco is ready to calculate gene co-expression:
 
     [...]
 
-Here, Camoco calculated the pearson correlation coefficient for all pairwise combinations
+Here, Camoco calculated the Pearson correlation coefficient for all pairwise combinations
 of genes that passed QC. In this case there are 22,909 genes which means there are 262,399,686
 interactions that must be calculated which takes about 2 minutes of compute time. Camoco
 stores all unthresholded interactions as well as which interactions have a z-score
 of 3 or above for thresholded analyses. This threshold can be changed at anytime,
 even after the network is built.
 
-Similar to coexpression, Camoco calculates pairwise gene distance for all pairs of genes. 
+Similar to co-expression, Camoco calculates pairwise gene distance for all pairs of genes. 
 
 After that, several clustering functions are run on the network data and
 :class:`Ontology` objects are build and stored for these groups of genes. As
@@ -639,7 +640,7 @@ Building Ontology Datasets
 Currently, the only Ontology that is supported from the command line is GO.
 
 As you've likely gotten the hang of the procedure to look at the help message
-for building camoco commands, building an Ontology object containing GO data 
+for building Camoco commands, building an Ontology object containing GO data 
 should be straight forward. 
 
 Examine what is required to build the dataset from the CLI help message
@@ -851,6 +852,301 @@ Build the following datasets:
 * ZmSAM COB Object from `Stelpflug2018_B73_Tissue_Atlas.txt`
 * ZmWallace GWAS Object from `Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt`
 
+\*solutions can be found at the bottom of this page
 
+
+
+Calculating co-expression with the CLI
+======================================
+Once all the necessary Camoco objects are built, co-expression can be calculated among
+genes represented by the Camoco datasets. Throught the CLI, this is performed using the
+`overlap` command. 
+
+Lets look at the help message for the `overlap` command:
+
+.. code::
+
+    $ camoco overlap --help
+    usage: camoco overlap [-h] [--genes [GENES [GENES ...]]] [--gwas GWAS]
+                          [--go GO] [--terms [TERMS [TERMS ...]]]
+                          [--skip-terms [SKIP_TERMS [SKIP_TERMS ...]]]
+                          [--min-term-size 2] [--max-term-size None]
+                          [--snp2gene effective] [--strongest-attr pval]
+                          [--strongest-higher] [--candidate-window-size 1]
+                          [--candidate-flank-limit 0] [--num-bootstraps auto]
+                          [--out OUT] [--dry-run]
+                          cob {density,locality}
+
+    positional arguments:
+      cob                   The camoco network to use.
+      {density,locality}    The metric used to evaulate overlap between Loci and
+                            the Network
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --genes [GENES [GENES ...]]
+                            Provide a [comma, space, semicolon] separated list of
+                            input genes.
+      --gwas GWAS           Calculate overlap on a Camoco GWAS dataset.
+      --go GO               Caluclate overlap among GO terms
+      --terms [TERMS [TERMS ...]]
+                            The term within the ontology to use. If all, terms in
+                            gwas will be iteratively analyzed. (default: all)
+      --skip-terms [SKIP_TERMS [SKIP_TERMS ...]]
+                            Terms specified here will be skipped.
+      --min-term-size 2     The minimum number of gene in a term to calculate
+                            overlap.
+      --max-term-size None  The maximum number of genes in a term to calculate
+                            overlap.
+      --snp2gene effective  The SNP to gene mapping to use. If *effective*, SNPs
+                            with overlappingn windows will be collapsed into
+                            genomic intervals resulting in all genes within the
+                            intervals to be used. If *strongest* is specified,
+                            SNPs with lower values designated from --strongest-
+                            attr (e.g. pvals) will be dropped when SNPs have
+                            overlapping windows. Value must be in
+                            ["effective","strongest"]. (default: effective)
+      --strongest-attr pval
+                            The locus attr used to determine which locus is
+                            thestrongest locus. (defualt=pval).
+      --strongest-higher    Flag indicating the value in --strongest-attr
+                            isstronger if higher. Default behavior is to
+                            treatlower values as stronger (i.e. p-vals)
+      --candidate-window-size 1
+                            The window size, in bp, for mapping effective SNPs to
+                            genes. (default: 1)
+      --candidate-flank-limit 0
+                            The number of flanking genes included in SNP to gene
+                            mapping. on each side of the locus. (default: 1)
+      --num-bootstraps auto
+                            The number of bootstraps to perform in order to
+                            estimate a null distribution. If auto the algorithm
+                            will bootstrap *until* the term is not significant at
+                            n=1000 *or* 1000 bootstraps have been performed.
+                            (default: auto)
+      --out OUT             OutputFile Name (default: Standard Out)
+      --dry-run             Do not perform the expensive computations
+
+
+The first two required arguments are a COB and one of two co-expression scores. These scores
+are defined in depth in the Camoco manuscript, but briefly here, `density` is the *mean, unthresholded
+co-expression among input genes* while `locality` calculates the *mean proportion of thresholded co-exression
+interactions between input genes compared to the number of total interactions they have*. In essence, 
+density measures how co-expressed a set of genes are while locality performs a correction for genes
+that have many interactions (i.e. genes that have lots of interactions are down-weighted).
+
+After our first two positional arguments, we have a whole list of options. Lets start with a basic case.
+Lets calculate the co-expression using both scores on a set of random input genes.
+
+Calculating co-expression of a gene set
+---------------------------------------
+
+22 Random Genes
+  GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,
+  GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,
+  GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,
+  AC194970.5_FG009
+
+.. code::
+
+    camoco overlap ZmRoot density --genes GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,AC194970.5_FG009
+    [LOG] Thu Nov 15 08:20:46 2018 - Loading Expr table
+    [LOG] Thu Nov 15 08:20:46 2018 - Building Expr Index
+    [LOG] Thu Nov 15 08:20:46 2018 - Loading RefGen
+    [LOG] Thu Nov 15 08:20:46 2018 - Building Indices
+    [LOG] Thu Nov 15 08:20:46 2018 - Loading Coex table
+    [LOG] Thu Nov 15 08:20:48 2018 - Loading Global Degree
+    [LOG] Thu Nov 15 08:20:48 2018 - Loading Clusters
+    [LOG] Thu Nov 15 08:20:48 2018 - Building Indices
+    [LOG] Thu Nov 15 08:20:48 2018 -  ---------- Calculating overlap for 0 of 1 Terms
+    [LOG] Thu Nov 15 08:20:48 2018 - Generating SNP-to-gene mapping
+    [LOG] Thu Nov 15 08:20:48 2018 - Calculating Overlap for CustomTerm of GeneList in ZmRoot with window:1 and flank:0 (22 Loci)
+    [LOG] Thu Nov 15 08:20:48 2018 - Generating bootstraps
+    [LOG] Thu Nov 15 08:20:50 2018 - Iteration: 50 -- current pval: 0.58 0.58% complete
+    [LOG] Thu Nov 15 08:20:52 2018 - Iteration: 100 -- current pval: 0.59 1.18% complete
+    [LOG] Thu Nov 15 08:20:52 2018 - Calculating Z-Scores
+    [LOG] Thu Nov 15 08:20:52 2018 - Calculating FDR
+    [LOG] Thu Nov 15 08:20:52 2018 - Overlap Score (density): -0.4020806831780932 (p<0.59)
+
+Lets break down the output. We specified the `ZmRoot` network here, so Camoco fetched the COB from the database.
+While it took several minutes to build the network, but only 2 seconds to load from the database. Nice! 
+Additionally, Camoco loaded all the necessary information to perform this calculation. Notice how we did
+not specify a RefGen. Camoco used the one that was assigned to it when it was built. 
+
+Next, Camoco performed SNP-to-Gene mapping. In this case, it was a no-op meaning that the mapping window size 
+was 1 so only the input genes were included. Next, Camoco calculates the density between the input genes
+as well as to randomized *bootstraps* which are gene sets of the same size as our input. The p-value
+stabilzes after around 100 bootstraps then the score is reported. This input set of genes has a 
+density of -0.40 and 60% of the randomized bootstraps had a density that was greater (i.e. more extreme)
+than the input set. Based on this, the co-expression among these random 22 genes seems to indeed be random.
+
+Lets look at the locality.
+
+.. code::
+
+    camoco overlap ZmRoot locality --genes GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,AC194970.5_FG009
+    [LOG] Thu Nov 15 08:29:42 2018 - Loading Expr table
+    [LOG] Thu Nov 15 08:29:42 2018 - Building Expr Index
+    [LOG] Thu Nov 15 08:29:42 2018 - Loading RefGen
+    [LOG] Thu Nov 15 08:29:42 2018 - Building Indices
+    [LOG] Thu Nov 15 08:29:42 2018 - Loading Coex table
+    [LOG] Thu Nov 15 08:29:43 2018 - Loading Global Degree
+    [LOG] Thu Nov 15 08:29:43 2018 - Loading Clusters
+    [LOG] Thu Nov 15 08:29:43 2018 - Building Indices
+    [LOG] Thu Nov 15 08:29:43 2018 -  ---------- Calculating overlap for 0 of 1 Terms
+    [LOG] Thu Nov 15 08:29:43 2018 - Generating SNP-to-gene mapping
+    [LOG] Thu Nov 15 08:29:43 2018 - Calculating Overlap for CustomTerm of GeneList in ZmRoot with window:1 and flank:0 (22 Loci)
+    [LOG] Thu Nov 15 08:29:43 2018 - Generating bootstraps
+    [LOG] Thu Nov 15 08:29:47 2018 - Iteration: 50 -- current pval: 0.98 0.98% complete
+    [LOG] Thu Nov 15 08:29:50 2018 - Iteration: 100 -- current pval: 0.97 1.94% complete
+    [LOG] Thu Nov 15 08:29:50 2018 - Calculating Z-Scores
+    [LOG] Thu Nov 15 08:29:50 2018 - Calculating FDR
+    [LOG] Thu Nov 15 08:29:51 2018 - Overlap Score (locality): -0.05498542488574266 (p<0.97)
+
+About the same results. Random co-expression for random genes. No real surprise here. How does this 
+compare to something that exhibits strong co-expresion? Lets perform the same two commands, but this
+time we will look at a non-random set of genes.
+
+Calculating co-expression on a GO term
+--------------------------------------
+
+GO:0006270, 
+  Name: DNA replication initiation, Desc: "The process in which DNA-dependent DNA replication is started; 
+  this involves the separation of a stretch of the DNA double helix, the recruitment of DNA polymerases 
+  and the initiation of polymerase action." [ISBN:071673706X, ISBN:0815316194], 22 Loci
+  GRMZM2G066101,GRMZM2G021069,GRMZM2G126453,GRMZM2G075584,GRMZM2G162445,GRMZM2G327032,GRMZM2G092778,
+  GRMZM2G062333,GRMZM2G065205,GRMZM2G075978,GRMZM2G082131,GRMZM2G450055,GRMZM2G163658,GRMZM2G130239,
+  GRMZM2G160664,GRMZM2G139894,GRMZM2G104373,GRMZM2G158136,GRMZM2G126860,GRMZM2G157621,GRMZM2G100639,
+  GRMZM2G112074
+
+This information was pulled from the GO maize gene assignments. Its a set of 22 genes that are annotated
+to be involved with the initialization of DNA replication.
+
+Now, we could copy and paste the gene IDs for this GO term into the CLI, but Camoco already knows information
+about this GO term because we built the GO database. We can change our command options to tell Camoco
+where to get this information.
+
+.. code::
+
+    camoco overlap ZmRoot density --go ZmGO --term GO:0006270                           
+    [LOG] Thu Nov 15 08:37:17 2018 - Loading Expr table
+    [LOG] Thu Nov 15 08:37:17 2018 - Building Expr Index
+    [LOG] Thu Nov 15 08:37:17 2018 - Loading RefGen
+    [LOG] Thu Nov 15 08:37:17 2018 - Building Indices
+    [LOG] Thu Nov 15 08:37:17 2018 - Loading Coex table
+    [LOG] Thu Nov 15 08:37:18 2018 - Loading Global Degree
+    [LOG] Thu Nov 15 08:37:18 2018 - Loading Clusters
+    [LOG] Thu Nov 15 08:37:18 2018 - Building Indices
+    [LOG] Thu Nov 15 08:37:18 2018 - Building Indices
+    [LOG] Thu Nov 15 08:37:18 2018 -  ---------- Calculating overlap for 0 of 1 Terms
+    [LOG] Thu Nov 15 08:37:18 2018 - Generating SNP-to-gene mapping
+    [LOG] Thu Nov 15 08:37:18 2018 - Calculating Overlap for GO:0006270 of ZmGO in ZmRoot with window:1 and flank:0 (22 Loci)
+    [LOG] Thu Nov 15 08:37:19 2018 - Generating bootstraps
+    [LOG] Thu Nov 15 08:37:21 2018 - Iteration: 50 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:23 2018 - Iteration: 100 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:25 2018 - Iteration: 150 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:27 2018 - Iteration: 200 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:29 2018 - Iteration: 250 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:31 2018 - Iteration: 300 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:33 2018 - Iteration: 350 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:35 2018 - Iteration: 400 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:37 2018 - Iteration: 450 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:39 2018 - Iteration: 500 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:41 2018 - Iteration: 550 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:44 2018 - Iteration: 600 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:46 2018 - Iteration: 650 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:48 2018 - Iteration: 700 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:50 2018 - Iteration: 750 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:52 2018 - Iteration: 800 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:54 2018 - Iteration: 850 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:57 2018 - Iteration: 900 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:37:59 2018 - Iteration: 950 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:38:01 2018 - Iteration: 1000 -- current pval: 0.0 0.0% complete
+    [LOG] Thu Nov 15 08:38:02 2018 - Calculating Z-Scores
+    [LOG] Thu Nov 15 08:38:02 2018 - Calculating FDR
+    [LOG] Thu Nov 15 08:38:15 2018 - Overlap Score (density): 19.553358790010673 (p<0.0)
+
+We can just specify the name of the GO Ontology object we build, `ZmGO`, as well as the name of the term, `GO:0006270`.
+Again, Camoco will fetch the information and start computing. We can indeed see that with the default gene
+mapping, we pull out the 22 genes we expected. Camoco calculates a density of 19.5 for this gene set, much higher
+than our random set of genes above (-0.40). This time, Camoco performs 1000 randomized bootstraps and we find that
+**none** of the random sets of genes has a density that can beat our GO term.
+
+Checking locality is as easy as swapping out the command
+
+.. code::
+ 
+  camoco overlap ZmRoot locality --go ZmGO --term GO:0006270
+  [.. truncated ...]
+  [LOG] Thu Nov 15 08:48:25 2018 - Overlap Score (locality): 0.1513447281613 (p<0.004)
+
+Here the p-value is still significant, but we see that 4 of the 1000 randomized bootstraps
+showed a locality score greater than 0.15.
+
+Calculating co-expression among all GO terms
+--------------------------------------------
+Modifying the above commands just slightly will instruct Camoco to iterate over all the 
+terms in an Ontology. 
+
+.. note::
+  
+  Calculating co-expression on a full Ontology can result in a **lot** of computation!
+
+If an Ontology is specified with no term, Camoco calculates the co-expression on all the 
+terms in the Ontology that meet the filtering criteria in the command options.
+
+.. code::
+
+  $ camoco overlap ZmRoot locality --go ZmGO
+
+This command will calculate the co-expression of *all* terms in the Ontology! We can refine
+our calculation in several different ways. The first, is we can specify a list of terms 
+instead of a single one.
+
+.. code::
+ 
+  $ camoco overlap ZmRoot density --go ZmGO --terms GO:0006270 GO:0004812 GO:0006481
+
+This will calculate the density of three GO terms. While parsing out the results of one
+or three terms is doable, scrolling back and extracting the information from hundreds or
+even thousands of terms is unmanagable. Using the `--out` flag, Camoco will print an expanded
+results table to an output file.
+
+.. code::
+
+  $ camoco overlap ZmRoot locality --go ZmGO --out ZmGO_overlap_results
+
+The same information will be printed to the screen to allow you to follow along and 
+track progress, but in addition, an output file is created not only with the Term 
+co-expression results, but also a breakdown of each gene's contribution.
+
+.. code::
+
+  $ head ZmGO_overlap_results.overlap.tsv
+  gene    local   global  score   fitted  zscore  fdr     num_real        num_random      bs_mean bs_std [..]
+  GRMZM2G075978   9       242     6.092622797537619       2.907377202462381       43.2248805848083       [..]
+  GRMZM2G327032   10      449     4.605734033447897       5.394265966552103       32.65972351674033      [..]
+  GRMZM2G062333   10      675     1.8905801170987306      8.10941988290127        13.367071448197386     [..]
+  GRMZM2G162445   10      776     0.6771706235090598      9.32282937649094        4.745134019335283      [..]
+  GRMZM2G450055   9       741     0.09765906188171769     8.902340938118282       0.6273877432024378     [..]
+  GRMZM2G163658   0       2       -0.024027910764151908   0.024027910764151908    -0.23726468419577254   [..]
+  [..truncated..]
+
+Similarly, you can control the command using `--min-term-size` and `--max-term-size`. These options allow you
+to filter out the Terms so that overlap is only calculated on terms that are the right size. In the case we'd
+want to limit out analysis to terms with less than 20 and more than 10 genes we'd run:
+
+.. code::
+  
+  $ camoco overlap ZmRoot locality --go ZmGO --min-term-size 10 --max-term-size 20
+
+
+
+
+
+
+
+Exercise Solutions
+==================
 
 
