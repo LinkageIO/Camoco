@@ -80,7 +80,9 @@ setup(
         'docs' : [
             'ipython>=6.5.0',
             'matplotlib>=2.2.3',
-            'numpydoc'
+            'numpydoc',
+            'sphinx_materialdesign_theme',
+            'sphinxcontrib-programoutput'
         ]
     },
     dependency_links = [
