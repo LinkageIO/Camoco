@@ -421,7 +421,7 @@ def ZmWallace(Zm5bFGS):
         csv = os.path.join(
             cf.options.testdir,
             'raw','GWAS','WallacePLoSGenet',
-            'Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.bz2'
+            'Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.gz'
         )
         # Define our reference geneome
         df = pd.DataFrame.from_csv(csv,index_col=None,sep='\t')
@@ -613,11 +613,11 @@ def ZmGO(Zm5bFGS):
     if not tools.available_datasets('GOnt','ZmGO'):
         obo = os.path.join(
             cf.options.testdir,
-            'raw','GOnt','go.obo.bz2'
+            'raw','GOnt','go.obo.gz'
         )
         gene_map_file = os.path.join(
             cf.options.testdir,
-            'raw','GOnt','zm_go.tsv.bz2'
+            'raw','GOnt','zm_go.tsv.gz'
         )
         return co.GOnt.from_obo(
            obo, gene_map_file, 'ZmGO',
