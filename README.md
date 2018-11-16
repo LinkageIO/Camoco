@@ -38,7 +38,7 @@ See `camoco --help` for options!
 
 Documentation
 -------------
-Documentation, tutorials, and walkthroughts are currently being updated and will be released 11/16/18.
+Documentation is available here: https://camoco.readthedocs.io/
 
 
 Code Of Conduct
