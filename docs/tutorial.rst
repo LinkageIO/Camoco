@@ -333,7 +333,7 @@ We can get an idea of what data we need to build the network by running the `--h
       --skip-quality-control
                             A Flag indicating to skip quality control procedure on
                             expression data. Default: False
-      --skip-normalization  Flag indicating that expression normaliztion should be
+      --skip-normalization  Flag indicating that expression normalization should be
                             skipped. Default: False
       --min-expr MIN_EXPR   Expression values (e.g. FPKM) under this threshold
                             will be set to NaN and not used during correlation
@@ -859,7 +859,7 @@ Build the following datasets:
 Calculating co-expression with the CLI
 ======================================
 Once all the necessary Camoco objects are built, co-expression can be calculated among
-genes represented by the Camoco datasets. Throught the CLI, this is performed using the
+genes represented by the Camoco datasets. Through the CLI, this is performed using the
 `overlap` command. 
 
 Lets look at the help message for the `overlap` command:
@@ -976,7 +976,7 @@ not specify a RefGen. Camoco used the one that was assigned to it when it was bu
 Next, Camoco performed SNP-to-Gene mapping. In this case, it was a no-op meaning that the mapping window size 
 was 1 so only the input genes were included. Next, Camoco calculates the density between the input genes
 as well as to randomized *bootstraps* which are gene sets of the same size as our input. The p-value
-stabilzes after around 100 bootstraps then the score is reported. This input set of genes has a 
+stabilizes after around 100 bootstraps then the score is reported. This input set of genes has a 
 density of -0.40 and 60% of the randomized bootstraps had a density that was greater (i.e. more extreme)
 than the input set. Based on this, the co-expression among these random 22 genes seems to indeed be random.
 
@@ -1004,7 +1004,7 @@ Lets look at the locality.
     [LOG] Thu Nov 15 08:29:51 2018 - Overlap Score (locality): -0.05498542488574266 (p<0.97)
 
 About the same results. Random co-expression for random genes. No real surprise here. How does this 
-compare to something that exhibits strong co-expresion? Lets perform the same two commands, but this
+compare to something that exhibits strong co-expression? Lets perform the same two commands, but this
 time we will look at a non-random set of genes.
 
 Calculating co-expression on a GO term
@@ -1109,7 +1109,7 @@ instead of a single one.
 
 This will calculate the density of three GO terms. While parsing out the results of one
 or three terms is doable, scrolling back and extracting the information from hundreds or
-even thousands of terms is unmanagable. Using the `--out` flag, Camoco will print an expanded
+even thousands of terms is unmanageable. Using the `--out` flag, Camoco will print an expanded
 results table to an output file.
 
 .. code::
@@ -1140,13 +1140,75 @@ want to limit out analysis to terms with less than 20 and more than 10 genes we'
   
   $ camoco overlap ZmRoot locality --go ZmGO --min-term-size 10 --max-term-size 20
 
+Calculating co-expression on GWAS traits
+----------------------------------------
+GWAS traits are similar to Ontology terms except that SNPs are mapped to genes. The loci that are stored
+in the GWAS terms are slightly different in that they encode SNPs and not genes. To map them to genes
+a simple window based method is used with additional flanking genes added. For example, if a 50 kb window
+and 1 flanking gene is specified, a 50kb up and 50kb down (100kb total) window is calculated around the SNP
+and an additional 1 flanking gene outside the window is used. The flanking gene allows for nearest genes to
+be utilized if the window does not cover any genes. These options are specified in the `overlap` command.
 
 
 
+.. code::
+
+  $ camoco overlap ZmRoot density --gwas ZmIonome --term Al27 --candidate-window-size 50000 --candidate-flank-limit 1 
+
+Again, to avoid calculating the co-expression for **all** GWAS terms (i.e. traits) we specify a `--term` with the option
+`Al27` to calculate co-expression for the Aluminum GWAS. The output looks like:
+
+.. code::
+
+    [LOG] Thu Nov 15 23:07:14 2018 - Loading Expr table
+    [LOG] Thu Nov 15 23:07:14 2018 - Building Expr Index
+    [LOG] Thu Nov 15 23:07:14 2018 - Loading RefGen
+    [LOG] Thu Nov 15 23:07:14 2018 - Building Indices
+    [LOG] Thu Nov 15 23:07:14 2018 - Loading Coex table
+    [LOG] Thu Nov 15 23:07:15 2018 - Loading Global Degree
+    [LOG] Thu Nov 15 23:07:15 2018 - Loading Clusters
+    [LOG] Thu Nov 15 23:07:15 2018 - Building Indices
+    [LOG] Thu Nov 15 23:07:15 2018 - Building Indices
+    [LOG] Thu Nov 15 23:07:15 2018 -  ---------- Calculating overlap for 0 of 1 Terms
+    [LOG] Thu Nov 15 23:07:15 2018 - Generating SNP-to-gene mapping
+    [LOG] Thu Nov 15 23:07:15 2018 - Al27: Found 176 SNPs -> 149 effective SNPs with window size 50000 bp
+    [LOG] Thu Nov 15 23:07:15 2018 - Calculating Overlap for Al27 of ZmIonome in ZmRoot with window:50000 and flank:1 (149 Loci)
+    [LOG] Thu Nov 15 23:07:16 2018 - Generating bootstraps
+    [LOG] Thu Nov 15 23:07:35 2018 - Iteration: 50 -- current pval: 0.82 0.82% complete
+    [LOG] Thu Nov 15 23:07:54 2018 - Iteration: 100 -- current pval: 0.8 1.6% complete
+    [LOG] Thu Nov 15 23:07:54 2018 - Calculating Z-Scores
+    [LOG] Thu Nov 15 23:07:54 2018 - Calculating FDR
+    [LOG] Thu Nov 15 23:07:54 2018 - Overlap Score (density): -1.1740572539338927 (p<0.8)
+
+In this case the p-value indicates there is not a significant amount of co-expression among the genes
+near the GWAS SNPs.
+
+
+Conclusions
+===========
+
+This was a whirlwind walk-through on some of the computations that can be done with Camoco. Please direct
+any inquiries/comments/suggestions to out `GitHub repository <https://github.com/LinkageIO/Camoco/issues>`_.
 
 
 
 Exercise Solutions
 ==================
+
+To build the ZmSAM network:
+
+.. code::
+
+  $ camoco build-cob Stelpflug2018_B73_Tissue_Atlas.txt ZmSAM "Tissue Devel Atlas" Zm5bFGS --max-val 250
+
+In this case `--max-val` needs to be specified since some of the expression data has a low maximum value.
+It was hand checked that it was valid data.
+
+To build the ZmPAN network:
+
+.. code::
+  $ camoco build-cob Hirsch2014_PANGenomeFPKM.txt ZmPAN "Maize PAN Genome (Hirsch et al.)" Zm5bFGS --sep=',' 
+
+In this case, the data was separated by commas, so a `--sep` option was needed.
 
 
