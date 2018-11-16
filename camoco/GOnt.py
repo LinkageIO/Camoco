@@ -387,7 +387,11 @@ class GOnt(Ontology):
 
     def plot_network(self,terms=None,remove_orphans=True):
         '''
+
         '''
+        # Get term objects
+        terms = [self[x] for x in terms]
+        # get coordinates
         coor = self._coordinates()
         fig = plt.figure(
             facecolor='white',

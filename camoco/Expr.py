@@ -347,11 +347,10 @@ class Expr(Camoco):
             self.log("Dataset already normalized")
             self._transformation_log('DetectedPreNormalized')
         elif any(self.is_normalized(max_val=max_val)):
-            # Something fucked up is happending
             raise TypeError(
                 ('Attempting normalization on already normalized'
-                ' dataset. Consider passing a max_val ({}) '
-                '< {} if Im wrong.').format(max_val, min(self.max_values())))
+                ' dataset. Consider passing a --max_val '
+                '< {} if Im wrong.').format( min(self.max_values())))
         else:
             df = self._expr
             if norm_method is not None:
