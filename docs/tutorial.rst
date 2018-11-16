@@ -1207,6 +1207,7 @@ It was hand checked that it was valid data.
 To build the ZmPAN network:
 
 .. code::
+
   $ camoco build-cob Hirsch2014_PANGenomeFPKM.txt ZmPAN "Maize PAN Genome (Hirsch et al.)" Zm5bFGS --sep=',' 
 
 In this case, the data was separated by commas, so a `--sep` option was needed.
