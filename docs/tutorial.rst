@@ -40,7 +40,7 @@ Network (COB) Data
   using data originally generated from `Hirsch et al. <https://doi.org/10.1105/tpc.113.119982>`_
 
 
-`Stelpflug2018_B73_Tissue_Atlas.txt.gz <https://github.com/LinkageIO/Camoco/raw/master/tests/raw/Expr/RNASEQ/Stelpflug2018_B73_Tissue_Atlas.txt.gz>`_
+`Stelpflug2015_B73_Tissue_Atlas.txt.gz <https://github.com/LinkageIO/Camoco/raw/master/tests/raw/Expr/RNASEQ/Stelpflug2018_B73_Tissue_Atlas.txt.gz>`_
   This is a FPKM tables from 76 different tissues/time-points in the maize accession B73 described in
   `Stelpflug et al. <https://doi.org/10.3835/plantgenome2015.04.0025>`_. This is the basis of the ZmSAM
   network in `Schaefer et al. <https://doi.org/10.1105/tpc.18.00299>`_.
