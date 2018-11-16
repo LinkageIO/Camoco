@@ -104,7 +104,7 @@ class NetComp(Freezable):
         ''',record_buffer)
 
 
-    def compare_cluster_coex(self,min_cluster_size=10,max_cluster_size=300,num_bootstrap=100):
+    def compare_cluster_coex(self,min_cluster_size=10,max_cluster_size=300,num_bootstrap=100,method='density'):
         '''
             Compare the co-expression of genes within clusters between networks.
             This will compute the strength of coexpression of genes from clusters
@@ -123,14 +123,23 @@ class NetComp(Freezable):
                     if (len(cluster_genes) >= max_cluster_size \
                     or len(cluster_genes) <= min_cluster_size):
                         continue
-                    source_density = source.density(cluster_genes)
-                    target_density = target.density(cluster_genes)
-                    target_pval = sum(
-                        [target.density(random.sample(common_genes,len(cluster_genes))) >= target_density \
-                        for _ in range(num_bootstrap)]
-                    ) / num_bootstrap
+                    # Calculate Co-expression
+                    if method == 'density':
+                        source_coex = source.density(cluster_genes)
+                        target_coex = target.density(cluster_genes)
+                        target_coex_pval = sum(
+                            [target.density(random.sample(common_genes,len(cluster_genes))) >= target_coex \
+                            for _ in range(num_bootstrap)]
+                        ) / num_bootstrap
+                    elif method == 'locality':
+                        source_coex = source.locality(cluster_genes)
+                        target_coex = target.locality(cluster_genes,include_regression=True).resid.mean()
+                        target_coex_pval = sum(
+                            [target.locality(random.sample(common_genes,len(cluster_genes))) >= target_coex \
+                            for _ in range(num_bootstrap)]
+                        ) / num_bootstrap
                     results.append((
                         source.name,target.name,str(cid),len(cluster_genes),
-                        'density', source_density, target_density, target_pval
+                        method, source_coex, target_coex, target_coex_pval
                     ))
 
