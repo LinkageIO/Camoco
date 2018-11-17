@@ -135,7 +135,7 @@ class NetComp(Freezable):
                         source_coex = source.locality(cluster_genes)
                         target_coex = target.locality(cluster_genes,include_regression=True).resid.mean()
                         target_coex_pval = sum(
-                            [target.locality(random.sample(common_genes,len(cluster_genes))) >= target_coex \
+                            [target.locality(random.sample(common_genes,len(cluster_genes))).resid.mean() >= target_coex \
                             for _ in range(num_bootstrap)]
                         ) / num_bootstrap
                     results.append((
@@ -143,3 +143,27 @@ class NetComp(Freezable):
                         method, source_coex, target_coex, target_coex_pval
                     ))
 
+    def _percent_shared_mcl(self, pval_cutoff=0,comp_method='density'):
+        results = []
+        sig_clusters = self._query(f'SELECT * FROM net_comp WHERE comp_method = "{comp_method}" and target_coex_pval <= {pval_cutoff}')
+        sig_clusters['cluster'] = sig_clusters.source + '_' + sig_clusters.source_cluster
+        
+        for a,b in permutations(sig_clusters.target.unique(),2):
+            # Get the number that are in both
+
+            # Check each 
+            a_sig = set(sig_clusters.query(f'target == "{a}" and source != "{a}" and source != "{b}"').cluster)
+            b_sig = set(sig_clusters.query(f'target == "{b}" and source != "{b}" and source != "{a}"').cluster)
+            total = len(a_sig.union(b_sig))
+            results.append((a,b,len(a_sig.intersection(b_sig))/total))
+        results = pd.DataFrame(results,columns=['source','target','percent_sig'])
+        return pd.pivot_table(results,index='source',columns='target')
+
+        #return pd.pivot_table(
+        #    a.query('comp_method=="density"')\
+        #            .groupby(['source','target'])\
+        #            .apply(lambda x: sum(x.target_coex_pval<=pval_cutoff)/len(x))\
+        #            .reset_index(),
+        #    index='source',
+        #    columns='target'
+        #)
