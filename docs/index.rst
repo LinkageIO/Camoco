@@ -68,6 +68,7 @@ Table Of Contents
     Overview <overview>
     Installation <installation>
     Tutorial: Pt I: CLI <tutorial>
+    Strengths and Limitations <limitations>
 
 
 
