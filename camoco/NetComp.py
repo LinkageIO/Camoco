@@ -154,16 +154,13 @@ class NetComp(Freezable):
             # Check each 
             a_sig = set(sig_clusters.query(f'target == "{a}" and source != "{a}" and source != "{b}"').cluster)
             b_sig = set(sig_clusters.query(f'target == "{b}" and source != "{b}" and source != "{a}"').cluster)
-            total = len(a_sig.union(b_sig))
-            results.append((a,b,len(a_sig.intersection(b_sig))/total))
+            sig_both = set(
+                sig_clusters.query(f'target == "{b}" and source == "{a}"'))\
+                .union(sig_clusters.query(f'target == "{a}" and source == "{b}"')
+            )
+            total = a_sig.union(b_sig).union(sig_both)
+            numerator = len(a_sig.intersection(b_sig)) + len(sig_both)
+            denominator = len(total)
+            results.append((a,b,numerator/denominator))
         results = pd.DataFrame(results,columns=['source','target','percent_sig'])
         return pd.pivot_table(results,index='source',columns='target')
-
-        #return pd.pivot_table(
-        #    a.query('comp_method=="density"')\
-        #            .groupby(['source','target'])\
-        #            .apply(lambda x: sum(x.target_coex_pval<=pval_cutoff)/len(x))\
-        #            .reset_index(),
-        #    index='source',
-        #    columns='target'
-        #)
