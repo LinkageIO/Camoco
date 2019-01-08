@@ -298,6 +298,7 @@ class COB(Expr):
         # Get the DataFrame
         df = pd.DataFrame.from_items(
             ((key, self.coex.data[key][ids]) for key in self.coex.data.names))
+        #df = odo(self.coex[ids],pd.DataFrame)
         df.set_index(ids,inplace=True)
         return df
     
