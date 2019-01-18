@@ -1,5 +1,6 @@
 import camoco as co
 import pandas as pd
+import sys
 from camoco.Tools import DummyRefGen,log,available_datasets
 from camoco.Locus import Gene
 
@@ -14,7 +15,7 @@ def build_cob(args):
                 "colunms are separated by '{}'?").format(args.filename,args.sep)
             )
             return None
-        elif len(pd.read_table(args.filename,sep=args.sep).columns) < 20:
+        elif len(pd.read_table(args.filename,sep=args.sep).columns) < 20 and args.non_interactive != True:
             print(
                 ("Detected fewer than 20 accessions in the expression matrix. "
                  "Calculating co-expression with this many datapoints is not advised")
