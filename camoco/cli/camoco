@@ -474,6 +474,11 @@ if __name__ == '__main__':
         action='store_true',
         help='Dry run will only process the first 5000 genes'
     )
+    bldcob.add_argument(
+        '--non-interactive',
+        action='store_true',
+        help='If true, all the interactive steps/checks will be answered yes'
+    )
 
     bldcob.set_defaults(func=build_cob)
 
