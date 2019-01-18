@@ -14,6 +14,15 @@ def build_cob(args):
                 "colunms are separated by '{}'?").format(args.filename,args.sep)
             )
             return None
+        elif len(pd.read_table(args.filename,sep=args.sep).columns) < 20:
+            print(
+                ("Detected fewer than 20 accessions in the expression matrix. "
+                 "Calculating co-expression with this many datapoints is not advised")
+            )
+            if input('are you sure you want to continue? [y/n]: ').upper() == 'Y':
+                pass
+            else:
+                sys.exit(1)
         if args.allow_non_membership:
             refgen = refgen.copy(
                 '{}_tmp'.format(refgen.name), 
