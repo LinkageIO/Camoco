@@ -24,12 +24,6 @@ $ cd Camoco
 $ python setup.py install
 ```
 
-CLI
----
-Once installed, the `camoco` command will be available through the terminal.
-See `camoco --help` for options!
-
-
 Code Of Conduct
 ---------------
 We expect users to be excellent to each other as well as to provide supportive
