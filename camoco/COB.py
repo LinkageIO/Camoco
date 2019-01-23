@@ -1763,7 +1763,6 @@ class COB(Expr):
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
         num_bytes_needed = comb(self.shape()[0],2) * 8
-        import ipdb; ipdb.set_trace()
         if num_bytes_needed > psutil.virtual_memory().available:
             raise MemoryError("Not enough RAM to calculate co-expression network")
         pccs = (1 - PCCUP.pair_correlation(
