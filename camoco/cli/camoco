@@ -1182,8 +1182,15 @@ if __name__ == '__main__':
         if args.debug:
             raise e
         sys.exit(e)
+    except MemoryError as e:
+        if args.debug:
+            raise e
+        log.warn(
+            "Your computer ran out of memory! This analysis needs to be done on a machine with more memory (16Gb+ recommended)"        
+        )
+        sys.exit(e)
     except Exception as e:
-        log.warn("A baaaad thing happened.\n\n" + str(e))
+        log.warn("An error occured.\nrun with --debug or --interactive for more information\n\n" + str(e))
         if args.debug:
             raise e
         else:
