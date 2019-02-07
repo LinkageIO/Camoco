@@ -65,7 +65,7 @@ setup(
         'matplotlib>=2.0.0',		
         'numpy>=1.15.0',		
         'scipy>=1.1.0',		
-        'pandas>=0.19.2',		
+        'pandas<=0.23.9',		
         'scikit-learn>=0.18.1',
         'statsmodels>=0.8.0',
         'termcolor>=1.1.0',
