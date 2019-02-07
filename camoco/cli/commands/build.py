@@ -57,7 +57,7 @@ def build_cob(args):
         )
         print(cob.summary())
     except Exception as e:
-        print("Build failed. Rolling back: removing corrupted files...")
+        print(f"Build failed for {args.name}. Rolling back: removing corrupted files...")
         co.Tools.del_dataset('Expr',args.name,force=True)
         raise e
 
@@ -90,7 +90,8 @@ def build_gont(args):
         args.description,
         refgen,
         go_col=args.go_col,
-        id_col=args.id_col
+        id_col=args.id_col,
+        headers=args.gene_term_header
     )
     print("Done: {}".format(go.summary()))
     print('Build Successful')
