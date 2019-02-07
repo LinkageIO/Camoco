@@ -1405,7 +1405,7 @@ class COB(Expr):
 
     def plot_network(self,filename=None,genes=None,lcc_only=True,
             force=False,plot_clusters=True,
-            min_cluster_size=100):
+            min_cluster_size=100, max_clusters=None):
         '''
 
         '''
