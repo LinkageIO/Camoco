@@ -229,6 +229,15 @@ if __name__ == '__main__':
         type=int,
         help='The gene ID column in Gene-term map file (default:0)'
     )
+    bldgo.add_argument(
+        '--gene-term-header',
+        default=False,
+        action='store_true',
+        help=(
+            'Flag specifies if a header line is present in the gene-term map file'
+            'If set, the build-command will skip a single (header) line in the file'
+        )
+    )
     bldgo.set_defaults(func=build_gont)
     
 
@@ -406,22 +415,22 @@ if __name__ == '__main__':
     )
     bldcob.add_argument(
         '--min-expr',
-        default=0.01,
+        default=0.001,
         type=float,
         help=(
             "Expression values (e.g. FPKM) under this threshold will be set "
             "to NaN and not used during correlation calculations. "
-            "default: 0.01"
+            "default: 0.001"
         )
     )  
     bldcob.add_argument(
         '--max-gene-missing-data',
-        default=0.2,
+        default=0.3,
         type=float,
         help=(   
             "Maximum percentage missing data a gene can have. Genes not "
             "meeting this criteria are removed from dataset."
-            "default: 0.2"
+            "default: 0.3"
         )
     )  
     bldcob.add_argument(
@@ -436,13 +445,13 @@ if __name__ == '__main__':
     )  
     bldcob.add_argument(
         '--min-single-sample-expr',
-        default=5,
+        default=0.08,
         type=float,
         help=(
             "Genes that do not have a single accession having an expression "
             "value above this threshold are removed from analysis. These are "
             "likely presence/absence and will not have a strong coexpression "
-            "pattern."
+            "pattern. Default: 0.08"
         )
     )  
     bldcob.add_argument(
