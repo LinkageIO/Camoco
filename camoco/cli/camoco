@@ -483,6 +483,11 @@ if __name__ == '__main__':
         action='store_true',
         help='Dry run will only process the first 5000 genes'
     )
+    bldcob.add_argument(
+        '--non-interactive',
+        action='store_true',
+        help='If true, all the interactive steps/checks will be answered yes'
+    )
 
     bldcob.set_defaults(func=build_cob)
 
@@ -1186,8 +1191,15 @@ if __name__ == '__main__':
         if args.debug:
             raise e
         sys.exit(e)
+    except MemoryError as e:
+        if args.debug:
+            raise e
+        log.warn(
+            "Your computer ran out of memory! This analysis needs to be done on a machine with more memory (16Gb+ recommended)"        
+        )
+        sys.exit(e)
     except Exception as e:
-        log.warn("A baaaad thing happened.\n\n" + str(e))
+        log.warn("An error occured.\nrun with --debug or --interactive for more information\n\n" + str(e))
         if args.debug:
             raise e
         else:

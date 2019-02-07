@@ -4,16 +4,9 @@ Camoco
 [![Coverage Status](https://coveralls.io/repos/github/schae234/Camoco/badge.svg?branch=master)](https://coveralls.io/github/schae234/Camoco?branch=master)
 [![DOI](https://zenodo.org/badge/15055703.svg)](https://zenodo.org/badge/latestdoi/15055703)
 
-Co-Analysis of Molecular Components
------------------------------------
-![Camoco Workflow](https://s3-us-west-2.amazonaws.com/camoco/CamocoWorkflow.png)
-Camoco is a python library for building and analyzing co-expression networks.
-Currently, networks are generally built from gene expression data, but given
-that the input to Camoco is simply a gene-by-sample expression matrix, there is
-not reason that the analysis couldn't include things like protein abundance or
-metabolites. Hence the name: co-analysis of molecular components. Very briefly,
-Camoco creates co-expression networks using table formatted expression data and
-and a few common genome data files.
+Documentation
+-------------
+Documentation is available here: https://camoco.readthedocs.io/
 
 Installation
 ------------
@@ -30,16 +23,6 @@ $ git clone https://github.com/LinkageIO/Camoco.git
 $ cd Camoco
 $ python setup.py install
 ```
-
-CLI
----
-Once installed, the `camoco` command will be available through the terminal.
-See `camoco --help` for options!
-
-Documentation
--------------
-Documentation is available here: https://camoco.readthedocs.io/
-
 
 Code Of Conduct
 ---------------

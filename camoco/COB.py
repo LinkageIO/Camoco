@@ -34,6 +34,7 @@ import pandas as pd
 import numpy as np
 import itertools
 import fastcluster
+import psutil
 
 from odo import odo
 
@@ -1762,6 +1763,9 @@ class COB(Expr):
         '''
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
+        num_bytes_needed = comb(self.shape()[0],2) * 8
+        if num_bytes_needed > psutil.virtual_memory().available:
+            raise MemoryError("Not enough RAM to calculate co-expression network")
         pccs = (1 - PCCUP.pair_correlation(
             np.ascontiguousarray(
                 # PCCUP expects floats
@@ -1774,6 +1778,13 @@ class COB(Expr):
         pccs[pccs <= -1.0] = -0.9999999
         pccs = np.arctanh(pccs)
         gc.collect();
+
+        # Do a PCC check to make sure they are not all NaNs
+        if not any(np.logical_not(np.isnan(pccs))):
+            raise ValueError(
+               "Not enough data is available to reliably calculate co-expression, "
+               "please ensure you have more than 10 accessions to calculate correlation coefficient"
+            )
         
         self.log("Calculating Mean and STD")
         # Sometimes, with certain datasets, the NaN mask overlap
