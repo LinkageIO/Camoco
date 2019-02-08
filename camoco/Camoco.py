@@ -13,6 +13,13 @@ from .Config import cf
 from .Exceptions import CamocoExistsError
 from apsw import ConstraintError
 
+def busyhandler(num_prev_calls):
+    if num_prev_calls >= 10:
+        return False
+    else:
+        print(f'Sleeping for {num_prev_calls+1}')
+        time.sleep(num_prev_calls+1)
+        return True
 
 class Camoco(object):
 
@@ -44,18 +51,12 @@ class Camoco(object):
         except TypeError:
             raise TypeError('{}.{} does not exist'.format(type, name))
 
+
     def _database(self, dbname, type=None):
         # This lets us grab databases for other types
         if type is None:
             type = self.type
         # return a connection if exists
-        def busyhandler(num_prev_calls):
-            if num_prev_calls >= 10:
-                return False
-            else:
-                time.sleep(num_prev_calls)
-                return True
-
         con = lite.Connection(
             os.path.expanduser(
                 os.path.join(
@@ -202,9 +203,11 @@ class Camoco(object):
             raise
         try:
             # Create the base camoco database
-            lite.Connection(
+            con = lite.Connection(
                 os.path.join(basedir, 'databases', 'Camoco.Camoco.db')
-            ).cursor().execute('''
+            )
+            con.setbusyhandler(busyhandler)
+            con.cursor().execute('''
                 CREATE TABLE IF NOT EXISTS datasets (
                     name TEXT NOT NULL,
                     description TEXT,
