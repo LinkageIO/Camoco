@@ -545,6 +545,8 @@ class GOnt(Ontology):
             if headers:
                 garb = INMAP.readline()
             for line in INMAP.readlines():
+                if line.startswith('#') or line.startswith('!'):
+                    continue
                 row = line.strip('\n').split('\t')
                 gene = row[id_col].split('_')[0].strip()
                 cur_term = row[go_col]
