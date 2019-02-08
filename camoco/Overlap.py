@@ -5,7 +5,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import matplotlib.pylab as plt
 matplotlib.style.use('ggplot')
-#matplotlib.use('Agg')
 
 import argparse
 import sys
@@ -25,8 +24,6 @@ import camoco as co
 import pandas as pd
 from pandas.core.groupby.groupby import DataError
 
-
-pd.set_option('display.width',300)
 import glob as glob
 
 from .Camoco import Camoco
@@ -187,13 +184,15 @@ class Overlap(Camoco):
             tbl = self.results
         else:
             tbl = self.results.query(f'Method == @method')
+        tbl = self.results[np.isfinite(self.results.fdr)]
+        #tbl = tbl[tbl.fdr <= fdr_cutoff]
         return pd.pivot_table(
             tbl,
             columns=['Method','COB','WindowSize','FlankLimit'],
-            index='Term',
-            fill_value=np.nan,
+            index=['Term','Ontology'],
+            fill_value=0,
             values='fdr',
-            aggfunc=lambda x: sum(x<=fdr_cutoff)
+            aggfunc= lambda x: sum(x <= fdr_cutoff)
         )
 
     def SNP2Gene_breakdown(self,COB=None):
