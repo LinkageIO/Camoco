@@ -5,6 +5,8 @@ import tempfile
 import numpy as np
 import pandas as pd
 import bcolz as bcz
+import time
+import time
 
 from .Tools import log
 from .Config import cf
@@ -47,7 +49,14 @@ class Camoco(object):
         if type is None:
             type = self.type
         # return a connection if exists
-        return lite.Connection(
+        def busyhandler(num_prev_calls):
+            if num_prev_calls >= 10:
+                return False
+            else:
+                time.sleep(num_prev_calls)
+                return True
+
+        con = lite.Connection(
             os.path.expanduser(
                 os.path.join(
                     cf.options.basedir,
@@ -56,6 +65,8 @@ class Camoco(object):
                 )
             )
         )
+        con.setbusyhandler(busyhandler)
+        return con
 
     def _bcolz(self, tblname, dbname=None, type=None, df=None, blaze=False):
     # Suppress the warning until the next wersion
