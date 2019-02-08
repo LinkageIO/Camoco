@@ -435,12 +435,12 @@ if __name__ == '__main__':
     )  
     bldcob.add_argument(
         '--max-accession-missing-data',
-        default=0.3,
+        default=0.5,
         type=float,
         help=(
             "maximum percentage missing data an accession (experiment) can"
             "have before it is removed."
-            "Default: 0.3"
+            "Default: 0.5"
         )
     )  
     bldcob.add_argument(
