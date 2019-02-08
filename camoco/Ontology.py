@@ -476,7 +476,7 @@ class Ontology(Camoco):
 
             Parameters
             ----------
-            locus_list : list of co.Locus *of* instance of co.Ontology
+            locus_list : list of co.Locus *or* instance of co.Ontology
                 A list of loci for which to test enrichment. i.e. is there
                 an over-representation of these loci within and the terms in
                 the Ontology. If an ontology is passed, each term in the ontology
@@ -582,9 +582,8 @@ class Ontology(Camoco):
                 # That aint right
                 Out[105]: 0.00025438479046726637
                 In [106]: hypergeom.sf(3-1,100,5,10)
-                # See? You wnat num_common - 1
+                # See? You want num_common - 1
                 Out[106]: 0.0066379128971171221
-                # can we go back to drinking coffee now?
             '''
             pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
             if pval <= pval_cutoff and num_common >= min_overlap:
