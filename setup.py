@@ -35,6 +35,11 @@ refgendist = Extension(
     include_dirs=[numpy.get_include()]
 )
 
+# Check if running Windows
+if os.name == 'nt':
+    raise ValueError("Camoco isn't supported for windows! Camoco runs best on Linux!")
+    sys.exit(1)
+
 setup(
     name = 'camoco',
     version = find_version('camoco','__init__.py'),
