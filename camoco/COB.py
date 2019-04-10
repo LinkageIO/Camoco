@@ -1440,7 +1440,12 @@ class COB(Expr):
                 c = self.cluster_coordinates(clus)
             except KeyError as e:
                 continue
-            c.update({'edgecolor':'black','fill':False,'linestyle':'--'})
+            c.update({
+                'edgecolor':'black',
+                'fill':False,
+                'linestyle':':',
+                'linewidth':3
+            })
             e = Ellipse(**c)
             ax.add_artist(e)
         if filename is not None:
