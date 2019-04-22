@@ -1280,7 +1280,7 @@ class COB(Expr):
         ids = self.clusters.query(f'cluster == {cluster_id}').index.values
         return self.refgen[ids]
 
-    def cluster_coordinates(self, cluster_number, nstd=1.5):
+    def cluster_coordinates(self, cluster_number, nstd=2):
         '''
             Calculate the rough coordinates around an MCL 
             cluster.
@@ -1404,14 +1404,23 @@ class COB(Expr):
         Plotting Methods
     '''
 
-    def plot_network(self,filename=None,genes=None,lcc_only=True,
-            force=False,plot_clusters=True,
-            min_cluster_size=100, max_clusters=None):
+    def plot_network(self,
+        filename=None,
+        genes=None,
+        lcc_only=True,
+        force=False,
+        plot_clusters=True,
+        min_cluster_size=100, 
+        max_clusters=None,
+        background_color=None
+    ):
         '''
 
         '''
-        from matplotlib.patches import Ellipse
-        coor = self.coordinates(lcc_only=lcc_only,force=force)
+        coor = self.coordinates(
+            lcc_only=lcc_only,
+            force=force
+        )
         fig = plt.figure(
             facecolor='white',
             figsize=(20,20)
@@ -1422,32 +1431,36 @@ class COB(Expr):
         ax.grid(False) 
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.scatter(coor.x,coor.y,alpha=1)
+        ax.scatter(coor.x,coor.y,alpha=1,color=background_color)
         # Plot the genes
         if genes is not None:
             ids = coor.loc[[x.id for x in genes if x.id in coor.index]] 
             ax.scatter(ids.x,ids.y,color='g')
         # Plot clusters
-        big_clusters = [
-            k for k,v in Counter(self.clusters.cluster).items()\
-            if v > min_cluster_size
-        ]
-        for clus in big_clusters:
-            ids = [x.id for x in self.cluster_genes(clus) if x.id in coor.index]
-            ccoor = coor.loc[ids]
-            ax.scatter(ccoor.x,ccoor.y)
-            try:
-                c = self.cluster_coordinates(clus)
-            except KeyError as e:
-                continue
-            c.update({
-                'edgecolor':'black',
-                'fill':False,
-                'linestyle':':',
-                'linewidth':3
-            })
-            e = Ellipse(**c)
-            ax.add_artist(e)
+        if plot_clusters:
+            from matplotlib.patches import Ellipse
+            big_clusters = [
+                k for k,v in Counter(self.clusters.cluster).items()\
+                if v > min_cluster_size
+            ]
+            for i,clus in enumerate(big_clusters):
+                if max_clusters is not None and i+1 > max_clusters:
+                    break
+                ids = [x.id for x in self.cluster_genes(clus) if x.id in coor.index]
+                ccoor = coor.loc[ids]
+                ax.scatter(ccoor.x,ccoor.y)
+                try:
+                    c = self.cluster_coordinates(clus)
+                except KeyError as e:
+                    continue
+                c.update({
+                    'edgecolor':'black',
+                    'fill':False,
+                    'linestyle':':',
+                    'linewidth':3
+                })
+                e = Ellipse(**c)
+                ax.add_artist(e)
         if filename is not None:
             plt.savefig(filename)
         return fig
