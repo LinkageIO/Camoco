@@ -11,7 +11,7 @@ Documentation is available here: https://camoco.readthedocs.io/
 Installation
 ------------
 Camoco was developed using python >=3.6 and requires numpy to be installed.
-Otherwise install the latest tagged version with pip:
+Install the latest tagged version with pip:
 ```
 $ pip install numpy
 $ pip install camoco
