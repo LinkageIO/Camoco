@@ -63,7 +63,7 @@ setup(
     ],
 #   include_dirs=['camoco/include'],
     install_requires = [		
-        'minus80>=0.3.1',
+        'minus80>=0.3.2',
         'cython>=0.16',    		
         'igraph>=0.1.11',		
         'pyyaml>=3.12',
