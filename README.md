@@ -1,8 +1,9 @@
 Camoco
 ======
 [![Build Status](https://travis-ci.org/LinkageIO/Camoco.svg?branch=master)](https://travis-ci.org/LinkageIO/Camoco)
-[![Coverage Status](https://coveralls.io/repos/github/schae234/Camoco/badge.svg?branch=master)](https://coveralls.io/github/schae234/Camoco?branch=master)
 [![DOI](https://zenodo.org/badge/15055703.svg)](https://zenodo.org/badge/latestdoi/15055703)
+
+<!--- [![Coverage Status](https://coveralls.io/repos/github/schae234/Camoco/badge.svg?branch=master)](https://coveralls.io/github/schae234/Camoco?branch=master) --->
 
 Documentation
 -------------
@@ -11,7 +12,7 @@ Documentation is available here: https://camoco.readthedocs.io/
 Installation
 ------------
 Camoco was developed using python >=3.6 and requires numpy to be installed.
-Otherwise install the latest tagged version with pip:
+Install the latest tagged version with pip:
 ```
 $ pip install numpy
 $ pip install camoco
