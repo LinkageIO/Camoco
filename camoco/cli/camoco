@@ -75,6 +75,12 @@ if __name__ == '__main__':
         ])
     )
     parser.add_argument(
+        '--version',
+        help='print the software version',
+        default=False,
+        action='store_true'
+    )
+    parser.add_argument(
         '--debug',
         action='store_true',
         default=False,
@@ -103,6 +109,9 @@ if __name__ == '__main__':
     # Also allow the help message to be printed using the help command
     helpcmd = subparsers.add_parser('help',help='Prints this help message')
     helpcmd.set_defaults(func=lambda x: parser.print_help())
+
+
+
 
     '''--------------------------
         Build GWAS
@@ -1174,41 +1183,56 @@ if __name__ == '__main__':
     )
     geneneighbors_cmd.set_defaults(func=geneneighbors)
 
+
     ''' -------------------------------------------------------------------
     # DO IT 
     -----------------------------------------------------------------------'''
     args = parser.parse_args()
     # Add debug options
-    if args.debug is True:
-        from IPython.core import ultratb
-        sys.excepthook = ultratb.FormattedTB(
-            mode='Verbose', color_scheme='Linux', call_pdb=1
-        )
-    # Execute the command
-    try:
-        return_value = args.func(args)
-    except AttributeError as e:
-        if args.debug:
-            raise e
-        sys.exit(e)
-    except MemoryError as e:
-        if args.debug:
-            raise e
-        log.warn(
-            "Your computer ran out of memory! This analysis needs to be done on a machine with more memory (16Gb+ recommended)"        
-        )
-        sys.exit(e)
-    except Exception as e:
-        log.warn("An error occured.\nrun with --debug or --interactive for more information\n\n" + str(e))
-        if args.debug:
-            raise e
-        else:
-            sys.exit(1)
-    if args.interactive is True:
-        from IPython.core import ultratb
-        sys.excepthook = ultratb.FormattedTB(
-            mode='Verbose', color_scheme='Linux', call_pdb=1
-        )
-        from camoco.Exceptions import CamocoInteractive
-        raise CamocoInteractive()
+    def main(args):
+        '''
+        returns a system code
+        '''
+        if args.version is True:
+            print(co.__version__)
+            return 0
+        if args.debug is True:
+            from IPython.core import ultratb
+            sys.excepthook = ultratb.FormattedTB(
+                mode='Verbose', color_scheme='Linux', call_pdb=1
+            )
+        # Execute the command
+        try:
+            return_value = args.func(args)
+        except AttributeError as e:
+            if args.debug:
+                raise e
+            sys.exit(e)
+        except MemoryError as e:
+            if args.debug:
+                raise e
+            log.warn(
+                "Your computer ran out of memory! This analysis needs to "
+                "be done on a machine with more memory (16Gb+ recommended)"        
+            )
+            sys.exit(e)
+        except Exception as e:
+            log.warn(
+                "An error occured.\nrun with --debug or "
+                "--interactive for more information\n\n" + str(e)
+            )
+            if args.debug:
+                raise e
+            else:
+                sys.exit(1)
+        if args.interactive is True:
+            from IPython.core import ultratb
+            sys.excepthook = ultratb.FormattedTB(
+                mode='Verbose', color_scheme='Linux', call_pdb=1
+            )
+            from camoco.Exceptions import CamocoInteractive
+            raise CamocoInteractive()
+        # Return 
+        return return_value
+    return_value = main(args)
     sys.exit(return_value)
