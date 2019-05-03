@@ -16,6 +16,40 @@ from camoco import cf
 from scipy.special import comb
 from collections import Counter
 
+def test_consistent_network_degree_dist(testCOB):
+    '''
+        In general, the degree of each node should stay consistent unless 
+        something went wrong during network creation. This test compares
+        the freshly built network (testCOB) gene degree to a csv with
+        degree numbers from past builds
+        The old_degree file was created with:
+
+        >>> testCOB.degree.reset_index().to_csv(
+            os.path.join(
+                co.Config.cf.options.testdir,
+                'raw','StabilityData','ZmRNASeqTissueAtlas_degree.csv'
+            ),index=False
+        )
+    '''
+    old_degree = pd.read_table(
+        os.path.join(
+            co.Config.cf.options.testdir,
+            'raw',
+            'StabilityData',
+            'ZmRNASeqTissueAtlas_degree.csv'
+        ),
+        sep=',',
+        index_col='index'
+    )
+    merded_degree = old_degree.join(
+        testCOB.degree,
+        lsuffix='_old',
+        rsuffix='_new'
+    )
+    r2,pval = scipy.stats.pearsonr(merged_degree.Degree_old,merged_degree.Degree_new)
+    assert r2 > 0.99
+
+
 
 def test_consistent_GO_density(testCOB,testZmGO):
     '''
@@ -49,11 +83,15 @@ def test_consistent_GO_density(testCOB,testZmGO):
         suffixes=['_old','_new'],
         how='inner'
     )
-    # check to see that we have approx the same number of values 
-    # for GO terms in old vs new
-    assert len(merged_densities) > (len(old_densities) - 10)
+    # Get rid of nans
+    not_nan_mask = np.logical_not(
+        np.isnan(merged_densities.density_old) & \
+        np.isnan(merged_densities.density_new)
+    )
+    merged_densities = merged_densities.loc[not_nan_mask]
+
     # Calculate pearson correlation of old vs new
-    pval,r2 = scipy.stats.pearsonr(
+    r2,pval = scipy.stats.pearsonr(
         merged_densities.density_new,
         merged_densities.density_old
     )
