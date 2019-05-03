@@ -1,17 +1,65 @@
 ''' 
     COB Tests
 '''
-import camoco as co 
-from camoco import cf
 
+import os
+import pytest
 import random
 import itertools
-from collections import Counter
+import scipy.stats
 
-import pytest
+import camoco as co 
 import pandas as pd
 import numpy as np
-from scipy.misc import comb
+
+from camoco import cf
+from scipy.special import comb
+from collections import Counter
+
+
+def test_consistent_GO_density(testCOB,testZmGO):
+    '''
+        Denisty of GO terms should be fairly consistent between
+        network builds. This test loads pre-calculated densities
+        for GO terms (10<n<300) and compares against densities
+        calculated from the current built network.
+    '''
+    # Load the prev calculated densities
+    old_densities = pd.read_table(
+        os.path.join(
+            co.Config.cf.options.testdir,
+            'raw',
+            'StabilityData',
+            'ZmRNASeqTissueAtlas_ZmGO_Densities.csv'
+        ),
+        sep=','
+    ) 
+    # caluclate the current densities from GO terms
+    current_densities = pd.DataFrame(
+        [(i.id,testCOB.density(i.loci)) \
+                for i in testZmGO.terms(min_term_size=10,max_term_size=300)\
+        ],
+        columns=['term','density']
+    )
+    # Merge them together to make it easier to match values
+    merged_densities = old_densities.merge(
+        current_densities,
+        left_on='term',
+        right_on='term',
+        suffixes=['_old','_new'],
+        how='inner'
+    )
+    # check to see that we have approx the same number of values 
+    # for GO terms in old vs new
+    assert len(merged_densities) > (len(old_densities) - 10)
+    # Calculate pearson correlation of old vs new
+    pval,r2 = scipy.stats.pearsonr(
+        merged_densities.density_new,
+        merged_densities.density_old
+    )
+    # check for high correlation
+    assert r2 > 0.99
+
 
 def test_coordination_between_expr_and_expr_index(testCOB):
     for i,x in enumerate(testCOB._expr.index):
@@ -108,7 +156,7 @@ def test_degree_index_matches_degree(testCOB):
     # Compare the degree determined from subnetwork aggregation
     # is the same as what is in the data frame
     for k,v in Counter(itertools.chain(*testCOB.subnetwork().index.values)).items():
-        assert testCOB.degree.ix[k].Degree == v
+        assert testCOB.degree.loc[k].Degree == v
 
 
 def test_empty_subnetwork_returns_proper_dataframe(testCOB):
@@ -135,7 +183,7 @@ def test_zero_index_genes_doesnt_get_filtered(testCOB):
 
 def test_zero_degree_genes_return_empty_dataframe(testCOB):
     # get a random zero degree gene
-    gene_id = testCOB.degree.ix[testCOB.degree.Degree==0].sample(1).index[0]
+    gene_id = testCOB.degree.loc[testCOB.degree.Degree==0].sample(1).index[0]
     gene = testCOB.refgen[gene_id]
     assert len(testCOB.neighbors(gene)) == 0
 
