@@ -1,6 +1,6 @@
 import numpy as np
 cimport numpy as np
-from scipy.misc import comb 
+from scipy.special import comb
 
 cimport cython
 
