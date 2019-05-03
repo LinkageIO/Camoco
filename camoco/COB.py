@@ -20,7 +20,7 @@ from itertools import chain
 from matplotlib.collections import LineCollection
 from subprocess import Popen, PIPE
 from scipy.spatial.distance import squareform
-from scipy.misc import comb
+from scipy.special import comb
 from scipy.stats import norm,pearsonr
 from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
@@ -1176,7 +1176,7 @@ class COB(Expr):
             if isinstance(gene_list, Locus):
                 if trans_locus_only:
                     raise ValueError('Cannot calculate cis degree on one gene.')
-                return self.degree.ix[gene_list.id].Degree
+                return self.degree.loc[gene_list.id].Degree
             else:
                 degree = self.degree.ix[[x.id for x in gene_list]].fillna(0)
                 if trans_locus_only:
