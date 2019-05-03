@@ -41,7 +41,7 @@ def test_consistent_network_degree_dist(testCOB):
         sep=',',
         index_col='index'
     )
-    merded_degree = old_degree.join(
+    merged_degree = old_degree.join(
         testCOB.degree,
         lsuffix='_old',
         rsuffix='_new'
