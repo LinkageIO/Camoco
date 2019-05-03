@@ -31,6 +31,7 @@ def test_consistent_network_degree_dist(testCOB):
             ),index=False
         )
     '''
+    # Read in degree for genes from old file
     old_degree = pd.read_table(
         os.path.join(
             co.Config.cf.options.testdir,
@@ -41,11 +42,19 @@ def test_consistent_network_degree_dist(testCOB):
         sep=',',
         index_col='index'
     )
+    # merge together to make easier to match values
     merged_degree = old_degree.join(
         testCOB.degree,
         lsuffix='_old',
         rsuffix='_new'
     )
+    # Get rid of nans
+    not_nan_mask = np.logical_not(
+        np.isnan(merged_degree.Degree_old) & \
+        np.isnan(merged_degree.Degree_new)
+    )
+    merged_degree = merged_degree.loc[not_nan_mask]
+    # calculate PCC and compare old v new
     r2,pval = scipy.stats.pearsonr(merged_degree.Degree_old,merged_degree.Degree_new)
     assert r2 > 0.99
 
