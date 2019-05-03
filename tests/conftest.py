@@ -96,7 +96,7 @@ def ZmRNASeqTissueAtlas(Zm5bFGS):
             min_expr=0.001,
             quantile=False,
             max_val=300,
-            dry_run=True
+            dry_run=False
         )
     else:
         return co.COB('ZmRNASeqTissueAtlas')
@@ -314,7 +314,7 @@ def ZmIonome(Zm5bFGS):
 ----------------------------------------------------------------------------'''
 
 @pytest.fixture(scope='module')
-def TestGO(Zm5bFGS):
+def testGO(Zm5bFGS):
     if cf.test.force.Ontology:
         tools.del_dataset('GOnt','TestGO',force=True)
     if not tools.available_datasets('GOnt','TestGO'):
@@ -331,12 +331,12 @@ def TestGO(Zm5bFGS):
            'Test GO', Zm5bFGS
         )
     else:
-        return co.GOnt('TestGO')
+        return co.GOnt('testGO')
 
 
 
 @pytest.fixture(scope="module")
-def ZmGO(Zm5bFGS):
+def testZmGO(Zm5bFGS):
     if cf.test.force.Ontology:
         tools.del_dataset('GOnt','ZmGO',force=True)
     if not tools.available_datasets('GOnt','ZmGO'):
