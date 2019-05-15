@@ -1,7 +1,4 @@
-© Regents of the University of Minnesota
-
-Author: Robert Schaefer
-
+© Robert Schaefer 2017-2019; Regents of the University of Minnesota 2015-2017;
 
 This software is available under the terms of the MIT License:
 
