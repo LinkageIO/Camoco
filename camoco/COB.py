@@ -1796,7 +1796,7 @@ class COB(Expr):
         pccs[pccs <= -1.0] = -0.9999999
         pccs = np.arctanh(pccs)
         gc.collect();
-
+    
         # Do a PCC check to make sure they are not all NaNs
         if not any(np.logical_not(np.isnan(pccs))):
             raise ValueError(

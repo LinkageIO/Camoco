@@ -1086,14 +1086,14 @@ if __name__ == '__main__':
     snp2gene_cmd.add_argument(
         '--snp2gene', 
         type=str, 
-        default='strongest',
-        choices=['strongest','effective'],
-        metavar='strongest',
+        default='effective',
+        choices=['effective','strongest'],
+        metavar='effective',
         help=(
             'The SNP to gene mapping to use. Specifying multiple mappings '
             ' will result in multiple results. Must be in: '
             '["effective","strongest"] '
-            '(default: strongest)'
+            '(default: effective)'
         )
     )
     snp2gene_cmd.add_argument(
