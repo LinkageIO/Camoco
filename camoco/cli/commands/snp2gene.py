@@ -32,10 +32,10 @@ def snp2gene(args):
     # Set a flag saying this is from a COB refgen
     from_cob = False
     # Create the refgen (option to create it from a COB)
-    if co.available_datasets('Expr',args.refgen):
+    if co.Tools.available_datasets('Expr',args.refgen):
         refgen = co.COB(args.refgen).refgen
         from_cob = args.refgen 
-    elif co.available_datasets('RefGen',args.refgen):
+    elif co.Tools.available_datasets('RefGen',args.refgen):
         refgen = co.RefGen(args.refgen)
     # Create the GWAS object
     ont = co.GWAS(args.gwas)
