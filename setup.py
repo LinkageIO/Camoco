@@ -69,7 +69,7 @@ setup(
         'pyyaml>=3.12',
         'matplotlib>=2.0.0',		
         'numpy>=1.15.0',		
-        'scipy>=1.1.0',		
+        'scipy==1.2.1',		
         'pandas<=0.23.9',		
         'scikit-learn>=0.18.1',
         'statsmodels>=0.8.0',
