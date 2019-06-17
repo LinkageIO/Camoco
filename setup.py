@@ -72,14 +72,12 @@ setup(
         'scipy==1.2.1',		
         'pandas<=0.23.9',		
         'scikit-learn>=0.18.1',
-        'statsmodels>=0.8.0',
+        'statsmodels==0.8.0',
         'termcolor>=1.1.0',
         'powerlaw>=1.3.5',
         'flask>=0.12.2',
         'markov-clustering>=0.0.3.dev0',
         'fastcluster>=1.1.25',
-        #'apsw',
-        #'minus80',
     ],
     extras_require={
         'docs' : [
@@ -87,6 +85,7 @@ setup(
             'matplotlib>=2.2.3',
             'numpydoc',
             'sphinx_materialdesign_theme',
+            'sphinx_rtd_theme',
             'sphinxcontrib-programoutput'
         ]
     },

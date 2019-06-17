@@ -62,7 +62,8 @@ Table Of Contents
 =================
 
 .. toctree::
-    :maxdepth: 2
+    :caption: Table of Contents
+    :maxdepth: 1
   
     Introduction <index> 
     Overview <overview>

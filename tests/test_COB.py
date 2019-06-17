@@ -16,6 +16,13 @@ from camoco import cf
 from scipy.special import comb
 from collections import Counter
 
+def test_consistent_MCL_clusters(testCOB):
+    '''
+        Make sure that between build, that MCL
+        clusters stay consistent.
+    '''
+    pass
+
 def test_consistent_network_degree_dist(testCOB):
     '''
         In general, the degree of each node should stay consistent unless 
