@@ -63,7 +63,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Camoco'
-copyright = '2016, Rob Schaefer'
+copyright = '2019, Rob Schaefer'
 author = 'Rob Schaefer'
 
 # The version info for the project you're documenting, acts as replacement for
