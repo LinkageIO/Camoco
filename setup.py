@@ -54,7 +54,7 @@ setup(
     package_data = {
         '':['*.cyx']    
     },
-    python_requires='>=3.6',
+    python_requires='==3.6',
     setup_requires = [
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=18.0',
@@ -64,21 +64,21 @@ setup(
 #   include_dirs=['camoco/include'],
     install_requires = [		
         'minus80>=0.3.3',
-        'cython==0.29.10',    		
-        'igraph==0.1.11',		
-        'pyyaml==5.1.1',
-        'matplotlib==3.1.0',		
-        'numpy==1.16.4',		
-        'scipy==1.2.1',		
+        'cython>=0.29.10',    		
+        'igraph>=0.1.11',		
+        'pyyaml>=5.1.1',
+        'matplotlib>=3.1.0',		
+        'numpy>=1.16.4',		
+        'scipy>=1.2.1',		
         'pandas==0.23.4',		
 
-        'scikit-learn==0.21.2',
-        'statsmodels==0.8.0',
-        'termcolor==1.1.0',
-        'powerlaw==1.4.6',
-        'flask==1.0.3',
-        'markov-clustering==0.0.6.dev0',
-        'fastcluster==1.1.25'
+        'scikit-learn>=0.21.2',
+        'statsmodels>=0.8.0',
+        'termcolor>=1.1.0',
+        'powerlaw>=1.4.6',
+        'flask>=1.0.3',
+        'markov-clustering>=0.0.6.dev0',
+        'fastcluster>=1.1.25'
     ],
     extras_require={
         'docs' : [
