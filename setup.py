@@ -54,7 +54,7 @@ setup(
     package_data = {
         '':['*.cyx']    
     },
-    python_requires='==3.6',
+    python_requires='>=3.6, <3.7',
     setup_requires = [
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=18.0',
