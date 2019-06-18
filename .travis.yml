@@ -5,6 +5,10 @@ matrix:
     dist: xenial
     sudo: true
     env: LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
+  - python: 3.6
+    dist: xenial
+    sudo: true
+    env: LD_LIBRARY_PATH=$HOME/.camoco/lib:$LD_LIBRARY_PATH PATH=$HOME/.camoco/bin:$HOME/.camoco/conda/bin:$PATH
 install:
     - pip install .
 script:
