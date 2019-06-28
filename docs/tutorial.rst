@@ -671,7 +671,13 @@ file: `go.obo` before our familiar `name`, `description`, and `refgen` arguments
 
 .. code:: 
 
-    $ camoco build-go zm_go.tsv go.obo "ZmGO" "Maize GO" Zm5bFGS
+    $ camoco build-go \
+      zm_go.tsv \
+      go.obo \
+      "ZmGO" \
+      "Maize GO" \
+      Zm5bFGS
+
     [LOG] Wed Nov 14 18:24:34 2018 - Building Indices
     [LOG] Wed Nov 14 18:24:34 2018 - Importing OBO: go.obo
     [LOG] Wed Nov 14 18:24:36 2018 - Building the indices.
@@ -757,6 +763,7 @@ try again with more optional arguments.
     $ camoco build-gwas ZmIonome.allLocs.csv ZmIonome \
       "Maize Ionome GWAS" Zm5bFGS --sep ',' --trait-col el \
       --chrom-col chr --pos-col pos
+
     Loading Zm5bFGS
     [LOG] Wed Nov 14 18:43:33 2018 - Building Indices
     [LOG] Wed Nov 14 18:43:33 2018 - Building Indices
@@ -838,7 +845,12 @@ Lets get that RefGen object re-built
 
 .. code::
 
-  $ camoco build-refgen ZmB73_5b_FGS.gff "Zm5bFGS" "Maize 5b Filtered Gene Set" 5b "Zea mays"
+  $ camoco build-refgen \
+    ZmB73_5b_FGS.gff \
+    "Zm5bFGS" \
+    "Maize 5b Filtered Gene Set" \
+    5b \
+    "Zea mays"
 
 
 
@@ -941,15 +953,21 @@ Lets calculate the co-expression using both scores on a set of random input gene
 Calculating co-expression of a gene set
 ---------------------------------------
 
-22 Random Genes
-  GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,
-  GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,
-  GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,
-  AC194970.5_FG009
+22 Random Genes:
+
+GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,
+GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,
+GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,
+GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,
+GRMZM2G108090,AC194970.5_FG009
 
 .. code::
 
-    camoco overlap ZmRoot density --genes GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,AC194970.5_FG009
+    camoco overlap \
+      ZmRoot \
+      density \
+      --genes GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,AC194970.5_FG009
+
     [LOG] Thu Nov 15 08:20:46 2018 - Loading Expr table
     [LOG] Thu Nov 15 08:20:46 2018 - Building Expr Index
     [LOG] Thu Nov 15 08:20:46 2018 - Loading RefGen
@@ -984,7 +1002,11 @@ Lets look at the locality.
 
 .. code::
 
-    camoco overlap ZmRoot locality --genes GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,AC194970.5_FG009
+    camoco overlap \
+      ZmRoot \
+      locality \
+      --genes GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,GRMZM2G108090,AC194970.5_FG009
+
     [LOG] Thu Nov 15 08:29:42 2018 - Loading Expr table
     [LOG] Thu Nov 15 08:29:42 2018 - Building Expr Index
     [LOG] Thu Nov 15 08:29:42 2018 - Loading RefGen
@@ -1010,14 +1032,16 @@ time we will look at a non-random set of genes.
 Calculating co-expression on a GO term
 --------------------------------------
 
-GO:0006270, 
+GO:0006270 
   Name: DNA replication initiation, Desc: "The process in which DNA-dependent DNA replication is started; 
   this involves the separation of a stretch of the DNA double helix, the recruitment of DNA polymerases 
   and the initiation of polymerase action." [ISBN:071673706X, ISBN:0815316194], 22 Loci
-  GRMZM2G066101,GRMZM2G021069,GRMZM2G126453,GRMZM2G075584,GRMZM2G162445,GRMZM2G327032,GRMZM2G092778,
-  GRMZM2G062333,GRMZM2G065205,GRMZM2G075978,GRMZM2G082131,GRMZM2G450055,GRMZM2G163658,GRMZM2G130239,
-  GRMZM2G160664,GRMZM2G139894,GRMZM2G104373,GRMZM2G158136,GRMZM2G126860,GRMZM2G157621,GRMZM2G100639,
-  GRMZM2G112074
+  GRMZM2G066101,GRMZM2G021069,GRMZM2G126453,GRMZM2G075584,
+  GRMZM2G162445,GRMZM2G327032,GRMZM2G092778,GRMZM2G062333,
+  GRMZM2G065205,GRMZM2G075978,GRMZM2G082131,GRMZM2G450055,
+  GRMZM2G163658,GRMZM2G130239,GRMZM2G160664,GRMZM2G139894,
+  GRMZM2G104373,GRMZM2G158136,GRMZM2G126860,GRMZM2G157621,
+  GRMZM2G100639,GRMZM2G112074
 
 This information was pulled from the GO maize gene assignments. Its a set of 22 genes that are annotated
 to be involved with the initialization of DNA replication.
@@ -1028,7 +1052,10 @@ where to get this information.
 
 .. code::
 
-    camoco overlap ZmRoot density --go ZmGO --term GO:0006270                           
+    camoco overlap \
+      ZmRoot \
+      density \
+      --go ZmGO --term GO:0006270                           
     [LOG] Thu Nov 15 08:37:17 2018 - Loading Expr table
     [LOG] Thu Nov 15 08:37:17 2018 - Building Expr Index
     [LOG] Thu Nov 15 08:37:17 2018 - Loading RefGen
@@ -1076,7 +1103,11 @@ Checking locality is as easy as swapping out the command
 
 .. code::
  
-  camoco overlap ZmRoot locality --go ZmGO --term GO:0006270
+  camoco overlap \
+    ZmRoot \
+    locality \
+    --go ZmGO \
+    --term GO:0006270
   [.. truncated ...]
   [LOG] Thu Nov 15 08:48:25 2018 - Overlap Score (locality): 0.1513447281613 (p<0.004)
 
@@ -1097,7 +1128,10 @@ terms in the Ontology that meet the filtering criteria in the command options.
 
 .. code::
 
-  $ camoco overlap ZmRoot locality --go ZmGO
+  $ camoco overlap \
+  ZmRoot \
+  locality \
+  --go ZmGO
 
 This command will calculate the co-expression of *all* terms in the Ontology! We can refine
 our calculation in several different ways. The first, is we can specify a list of terms 
@@ -1105,7 +1139,11 @@ instead of a single one.
 
 .. code::
  
-  $ camoco overlap ZmRoot density --go ZmGO --terms GO:0006270 GO:0004812 GO:0006481
+  $ camoco overlap \
+    ZmRoot \
+    density \
+    --go ZmGO \
+    --terms GO:0006270 GO:0004812 GO:0006481
 
 This will calculate the density of three GO terms. While parsing out the results of one
 or three terms is doable, scrolling back and extracting the information from hundreds or
@@ -1114,7 +1152,11 @@ results table to an output file.
 
 .. code::
 
-  $ camoco overlap ZmRoot locality --go ZmGO --out ZmGO_overlap_results
+  $ camoco overlap \
+    ZmRoot \
+    locality \
+    --go ZmGO \
+    --out ZmGO_overlap_results
 
 The same information will be printed to the screen to allow you to follow along and 
 track progress, but in addition, an output file is created not only with the Term 
@@ -1138,7 +1180,12 @@ want to limit out analysis to terms with less than 20 and more than 10 genes we'
 
 .. code::
   
-  $ camoco overlap ZmRoot locality --go ZmGO --min-term-size 10 --max-term-size 20
+  $ camoco overlap \
+    ZmRoot \
+    locality \
+    --go ZmGO \
+    --min-term-size 10 \
+    --max-term-size 20
 
 Calculating co-expression on GWAS traits
 ----------------------------------------
@@ -1153,7 +1200,13 @@ be utilized if the window does not cover any genes. These options are specified 
 
 .. code::
 
-  $ camoco overlap ZmRoot density --gwas ZmIonome --term Al27 --candidate-window-size 50000 --candidate-flank-limit 1 
+  $ camoco overlap \
+    ZmRoot \
+    density \
+    --gwas ZmIonome \
+    --term Al27 \
+    --candidate-window-size 50000 \
+    --candidate-flank-limit 1 
 
 Again, to avoid calculating the co-expression for **all** GWAS terms (i.e. traits) we specify a `--term` with the option
 `Al27` to calculate co-expression for the Aluminum GWAS. The output looks like:
@@ -1195,21 +1248,158 @@ any inquiries/comments/suggestions to out `GitHub repository <https://github.com
 Exercise Solutions
 ==================
 
+
+ZmSAM Network
+-------------
+
 To build the ZmSAM network:
 
 .. code::
 
-  $ camoco build-cob Stelpflug2018_B73_Tissue_Atlas.txt ZmSAM "Tissue Devel Atlas" Zm5bFGS --max-val 250
+  $ camoco build-cob \
+    Stelpflug2018_B73_Tissue_Atlas.txt \
+    ZmSAM \
+    "Tissue Devel Atlas" \
+    Zm5bFGS \
+    --max-val 250
 
 In this case `--max-val` needs to be specified since some of the expression data has a low maximum value.
 It was hand checked that it was valid data.
+
+ZmPAN Network
+-------------
 
 To build the ZmPAN network:
 
 .. code::
 
-  $ camoco build-cob Hirsch2014_PANGenomeFPKM.txt ZmPAN "Maize PAN Genome (Hirsch et al.)" Zm5bFGS --sep=',' 
+  $ camoco build-cob \
+    Hirsch2014_PANGenomeFPKM.txt \
+    ZmPAN \
+    "Maize PAN Genome (Hirsch et al.)" \
+    Zm5bFGS \
+    --sep=',' 
 
 In this case, the data was separated by commas, so a `--sep` option was needed.
 
+ZmWallace GWAS Dataset
+----------------------
 
+To build the ZmWallace GWAS dataset specify the filename along with the column names. The head of the file looks like:
+
+.. code::
+
+  $ zcat Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.gz | head
+  trait   chr     pos     allele  rmip    source
+  100 Kernel weight       1       3364007 A/G     1       Hapmap1
+  100 Kernel weight       1       22247033        A/G     3       Hapmap1
+  100 Kernel weight       1       22987420        C/T     1       Hapmap2
+  100 Kernel weight       1       23056483        C/G     1       Hapmap2
+  100 Kernel weight       1       23066099        A/G     1       Hapmap2
+  100 Kernel weight       1       23097979        T/C     60      Hapmap2
+  100 Kernel weight       1       23099013        C/A     1       Hapmap2
+  100 Kernel weight       1       23401419        G/A     1       Hapmap2
+  100 Kernel weight       1       23478001        win2k-  1       CNV_edgeR
+
+  $ zcat Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.gz| wc -l
+  38421
+
+
+
+The file is compressed, so the `zcat` command is needed to pipe the first few lines into the `head` command. The 
+trait is in the `trait` column, the chromosome and position are in columns `chr` and `pos` respectively. Using
+the `wc -l` command, we can see that there are 38,420 SNPS (and 1 header) in the file. In Wallace et al., they
+report that there were ~4,800 significant SNPs in their dataset. Upon closer inspection of the publication, we see that 
+they only considered SNPs with a RMIP of 5 or above, however in this file, SNPs with RMIPs of 1 or above are
+listed. 
+
+.. Note::
+  
+  RMIP is a method for setting a significance threshold. See more `here <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2728864/>`_
+
+We need to do some data wrangling to filter out the SNPs with an RMIP below 5. It's up to the researcher to determine
+the significance threshold cutoff used for the overlap analysis. Camoco can tolerate a certain level of noise, however
+it is assumed that the majority of SNPs used in the analysis are near a causal gene. It's recommended that the input
+SNP list only contains significant SNPs (or an FDR the researcher is comfortable with).
+
+
+The `build-gwas` help command has the following flag that allows for filtering to be done using a 
+`pandas <https://pandas.pydata.org>`_ data frame query.
+
+.. code::
+
+  $ camoco build-gwas --help
+
+  [ ... Truncated ... ]  
+
+  --query QUERY         Before importing the traits from the dataframe, filter
+                        the columns via DataFrame.query() e.g. --query "pval <
+                        0.05" would execute df.query("pval < 0.05") assuming
+                        the pval column exists. Useful for filtering data
+                        before importing the traits. See
+                        https://pandas.pydata.org/pandas-
+                        docs/stable/generated/pandas.DataFrame.query.html for
+                        more info.
+
+We can build the dataset using the following camoco command:
+
+.. code::
+
+ $ camoco build-gwas Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.gz \
+    "ZmWallaceRMIP5" \
+    "Wallace Maize data with RMIP 5" \
+    Zm5bFGS \
+    --trait-col trait \
+    --chrom-col chr \
+    --pos-col pos \
+    --query "rmip >= 5" 
+
+ [LOG] Fri Jun 28 15:08:46 2019 - Building Indices
+ [LOG] Fri Jun 28 15:08:46 2019 - Building Indices
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: 100 Kernel weight, Desc: , 109 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Anthesis-silking interval, Desc: , 128 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Average internode length (above ear), Desc: , 166 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Average internode length (below ear), Desc: , 231 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Average internode length (whole plant), Desc: , 196 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Boxcox-transformed leaf angle, Desc: , 159 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Chlorophyll A, Desc: , 34 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Chlorophyll B, Desc: , 58 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Cob diameter, Desc: , 153 Loci
+ [LOG] Fri Jun 28 15:08:46 2019 - Importing Term: Days to anthesis, Desc: , 189 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Days to silk, Desc: , 178 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Ear height, Desc: , 200 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Ear row number, Desc: , 164 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Fructose, Desc: , 20 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Fumarate, Desc: , 5 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Glucose, Desc: , 42 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Glutamate, Desc: , 29 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Height above ear, Desc: , 162 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Height per day (until flowering), Desc: , 181 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Leaf length, Desc: , 171 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Leaf width, Desc: , 186 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Malate, Desc: , 43 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Nitrate, Desc: , 54 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Nodes above ear, Desc: , 138 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Nodes per plant, Desc: , 188 Loci
+ [LOG] Fri Jun 28 15:08:47 2019 - Importing Term: Nodes to ear, Desc: , 170 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Northern Leaf Blight, Desc: , 135 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: PCA of metabolites: PC1, Desc: , 36 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: PCA of metabolites: PC2, Desc: , 54 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Photoperiod Growing-degree days to silk, Desc: , 80 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Photoperiod growing-degree days to anthesis, Desc: , 95 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Plant height, Desc: , 201 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Protein, Desc: , 27 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Ratio of ear height to total height, Desc: , 184 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Southern leaf blight, Desc: , 160 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Stalk strength, Desc: , 87 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Starch, Desc: , 72 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Sucrose, Desc: , 27 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Tassel branch number, Desc: , 213 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Tassel length, Desc: , 194 Loci
+ [LOG] Fri Jun 28 15:08:48 2019 - Importing Term: Total amino acids, Desc: , 92 Loci
+ Build Successful:
+ Ontology:ZmWallaceRMIP5 - desc: Wallace Maize data with RMIP 5 - contains 41 terms for Reference Genome: zea mays - 5b - Zm5bFGS
+  
+
+We can see that the ZmWallace dataset contains 41 GWAS "Terms" with between 5 and 231 SNPs. In this case, an additional call to the `query` flag
+filtered out SNPs in the input file based on a criteria defined by the user.
