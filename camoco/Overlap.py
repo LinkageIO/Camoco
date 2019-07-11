@@ -235,7 +235,13 @@ class Overlap(Camoco):
             loci.ix['Total',window_size] = len(total.effective_loci(window_size))
         loci.columns = pd.MultiIndex.from_product([['Collapsed Loci'],list(map(bp_to_kb,loci.columns)),['-']],names=['Name','WindowSize','FlankLimit'])
         # Calculate number of Candidate Genes
-        genes = pd.pivot_table(results,index='Term',columns=['WindowSize','FlankLimit'],values='gene',aggfunc=lambda x: len(set(x)))
+        genes = pd.pivot_table(
+           results,
+           index='Term',
+           columns=['WindowSize','FlankLimit'],
+           values='gene',
+           aggfunc=lambda x: len(set(x))
+        )
         for window_size in get_level(genes,'WindowSize'):
             for flank_limit in get_level(genes,'FlankLimit'):
                 genes.ix['Total',(window_size,flank_limit)] = len(ref.candidate_genes(total.effective_loci(window_size=window_size),flank_limit=flank_limit))
@@ -420,7 +426,14 @@ class Overlap(Camoco):
             pvals.values[triu_indices(len(pvals),1)] = 0
             return (overlap+pvals).astype(float)
 
-    def num_hpo(self,fdr_cutoff=0.3,min_snp2gene_obs=2,dropna=False,drop_empty_cols=True):
+    def num_hpo(
+            self,
+            fdr_cutoff=0.3,
+            min_snp2gene_obs=2,
+            dropna=False,
+            drop_empty_cols=True,
+            reindex=True
+        ):
         '''
             Returns a summary table with the number of HPO genes discoverd
             for different networks
@@ -449,6 +462,12 @@ class Overlap(Camoco):
         num_hpo = by_term.append(total)
         if drop_empty_cols:
             num_hpo = num_hpo.loc[:,num_hpo.sum()>0]
+        if reindex:
+            num_hpo = num_hpo.reindex(
+                ['either','density','locality','both_any_net','both_same_net'],
+                level=1,
+                axis=1
+            )
         return num_hpo
 
     
