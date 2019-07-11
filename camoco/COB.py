@@ -1465,12 +1465,23 @@ class COB(Expr):
             plt.savefig(filename)
         return fig
 
-    def plot_heatmap(self, filename=None, genes=None,accessions=None,
-             gene_normalize=True, raw=False,
-             cluster_method='ward', include_accession_labels=None,
-             include_gene_labels=None, avg_by_cluster=False,
-             min_cluster_size=10, cluster_accessions=True,
-             plot_dendrogram=True,nan_color='black'):
+    def plot_heatmap(
+            self, 
+            filename=None, 
+            genes=None,
+            accessions=None,
+            gene_normalize=True, 
+            raw=False,
+            cluster_method='ward', 
+            include_accession_labels=None,
+            include_gene_labels=None, 
+            avg_by_cluster=False,
+            min_cluster_size=10, 
+            cluster_accessions=True,
+            plot_dendrogram=True,
+            nan_color='black',
+            cmap="viridis"
+        ):
         '''
             Plots a heatmap of genes x expression.
 
@@ -1583,7 +1594,8 @@ class COB(Expr):
             accession_ax = plt.subplot(gs[2])
         # Plot the Expression matrix 
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
-        cmap = self._cmap
+        #cmap = self._cmap
+        cmap = plt.get_cmap(cmap)
         cmap.set_bad(nan_color, 1.0)
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
