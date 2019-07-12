@@ -32,16 +32,15 @@ DEALINGS IN THE SOFTWARE.
 
 """
 
-__version__ = '0.6.3'
+__version__ = "0.6.3"
 
 import sys
 import os
 import numpy
 
 import pyximport
-pyximport.install(setup_args={
-    "include_dirs":numpy.get_include() 
-})
+
+pyximport.install(setup_args={"include_dirs": numpy.get_include()})
 
 import matplotlib
 
@@ -52,11 +51,11 @@ from .Expr import Expr
 from .COB import COB
 from .RefGen import RefGen
 
-from .Ontology import Ontology,Term
+from .Ontology import Ontology, Term
 from .GWAS import GWAS
 from .Locus import Locus
 from .GOnt import GOnt
 from .Overlap import Overlap
 
 # Create yourself
-Camoco.create('Camoco','Mother Database')
+Camoco.create("Camoco", "Mother Database")

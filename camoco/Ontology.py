@@ -17,8 +17,9 @@ import numpy
 import camoco as co
 import pandas as pd
 
+
 class Ontology(Camoco):
-    '''
+    """
         An Ontology is just a collection of terms. Each term is just a
         collection of genes. Sometimes terms are related or nested
         within each other, sometimes not. Simple enough.
@@ -31,23 +32,24 @@ class Ontology(Camoco):
         -------
         An Ontology Object
 
-    '''
-    def __init__(self, name, type='Ontology'):
+    """
+
+    def __init__(self, name, type="Ontology"):
         super().__init__(name, type=type)
         if self.refgen:
             self.refgen = RefGen(self.refgen)
 
     def __len__(self):
-        '''
+        """
             Return the number of non-empty terms
-        '''
+        """
         return self.num_terms(min_term_size=1)
 
     def __iter__(self):
         return self.iter_terms()
 
-    def num_terms(self,min_term_size=0,max_term_size=10e10):
-        '''
+    def num_terms(self, min_term_size=0, max_term_size=10e10):
+        """
             Returns the number of terms in the Ontology
             within the min_term_size and max_term_size
 
@@ -62,38 +64,48 @@ class Ontology(Camoco):
             -------
             the number of terms that fit the criteria
 
-        '''
-        return self.db.cursor().execute(
-            '''SELECT COUNT(*) FROM (
+        """
+        return (
+            self.db.cursor()
+            .execute(
+                """SELECT COUNT(*) FROM (
                 SELECT DISTINCT(term) FROM term_loci 
                 GROUP BY term 
                 HAVING COUNT(term) >= ? 
                     AND  COUNT(term) <= ?
-            );''',
-            (min_term_size, max_term_size)
-        ).fetchone()[0]
+            );""",
+                (min_term_size, max_term_size),
+            )
+            .fetchone()[0]
+        )
 
     @lru_cache(maxsize=131072)
     def __getitem__(self, id):
-        ''' retrieve a term by id '''
+        """ retrieve a term by id """
         try:
-            (id, desc) = self.db.cursor().execute(
-                'SELECT * from terms WHERE id = ?', (id, )
-            ).fetchone()
+            (id, desc) = (
+                self.db.cursor()
+                .execute("SELECT * from terms WHERE id = ?", (id,))
+                .fetchone()
+            )
             term_loci = [
-                self.refgen[gene_id] for gene_id, in self.db.cursor().execute(
-                ''' SELECT id FROM term_loci WHERE term = ?''', (id, )
-            ).fetchall()]
-            term_attrs = {k:v for k,v in self.db.cursor().execute(
-                ''' SELECT key,val FROM term_attrs WHERE term = ?''',(id,)         
+                self.refgen[gene_id]
+                for gene_id, in self.db.cursor()
+                .execute(""" SELECT id FROM term_loci WHERE term = ?""", (id,))
+                .fetchall()
+            ]
+            term_attrs = {
+                k: v
+                for k, v in self.db.cursor().execute(
+                    """ SELECT key,val FROM term_attrs WHERE term = ?""", (id,)
                 )
             }
-            return Term(id, desc=desc, loci=term_loci,**term_attrs)
-        except TypeError as e: # Not in database
+            return Term(id, desc=desc, loci=term_loci, **term_attrs)
+        except TypeError as e:  # Not in database
             raise e
 
-    def terms_containing(self,locus_list,max_term_size=10e10,min_term_size=0):
-        '''
+    def terms_containing(self, locus_list, max_term_size=10e10, min_term_size=0):
+        """
             Retrurns the set of terms which contains the 
             specified loci.
 
@@ -114,57 +126,70 @@ class Ontology(Camoco):
             Returns
             -------
             list of terms which contain provided loci
-        '''
+        """
         # Filter to unique set
         locus_list = set(locus_list)
         # query the database
-        terms = self.db.cursor().execute('''SELECT DISTINCT term 
+        terms = (
+            self.db.cursor()
+            .execute(
+                """SELECT DISTINCT term 
         FROM term_loci WHERE id IN ('{}')
-        '''.format(
-            "','".join([x.id for x in locus_list])
-        )).fetchall()
+        """.format(
+                    "','".join([x.id for x in locus_list])
+                )
+            )
+            .fetchall()
+        )
         # Fetch the terms with the proper size
         terms = list(
             filter(
                 lambda t: (len(t) >= min_term_size) and (len(t) <= max_term_size),
-                [self[name] for name, in terms]
+                [self[name] for name, in terms],
             )
         )
         return terms
 
-
     def num_distinct_loci(self):
-        return self.db.cursor().execute(
-            'SELECT COUNT(DISTINCT(id)) FROM term_loci;'
-        ).fetchone()[0]
+        return (
+            self.db.cursor()
+            .execute("SELECT COUNT(DISTINCT(id)) FROM term_loci;")
+            .fetchone()[0]
+        )
 
     def distinct_loci_ids(self):
-        return [x[0] for x in self.db.cursor().execute(
-            'SELECT DISTINCT(id) FROM term_loci'
-        )]
+        return [
+            x[0] for x in self.db.cursor().execute("SELECT DISTINCT(id) FROM term_loci")
+        ]
 
-    def iter_terms(self,min_term_size=0,max_term_size=10e10):
-        '''
+    def iter_terms(self, min_term_size=0, max_term_size=10e10):
+        """
             Return a generator that iterates over each term in the ontology.
-        '''
-        terms = self.db.cursor().execute('''
+        """
+        terms = self.db.cursor().execute(
+            """
             SELECT term from term_loci
             GROUP BY term
             HAVING COUNT(term) >= ?
                 AND COUNT(term) <= ?
-        ''',(min_term_size,max_term_size))
-        for id, in terms:
+        """,
+            (min_term_size, max_term_size),
+        )
+        for (id,) in terms:
             yield self[id]
 
-    def terms(self,min_term_size=0,max_term_size=10e10):
-        return list(self.iter_terms(min_term_size=min_term_size,max_term_size=max_term_size))
+    def terms(self, min_term_size=0, max_term_size=10e10):
+        return list(
+            self.iter_terms(min_term_size=min_term_size, max_term_size=max_term_size)
+        )
 
     def summary(self):
         return "Ontology:{} - desc: {} - contains {} terms for {}".format(
-            self.name, self.description, len(self), self.refgen)
+            self.name, self.description, len(self), self.refgen
+        )
 
     def rand(self, n=1, min_term_size=1, max_term_size=100000):
-        '''
+        """
             Return a random Term from the Ontology
 
             Parameters
@@ -176,20 +201,23 @@ class Ontology(Camoco):
                 i.e. the number of genes annotated to the term
             max_term_size : int (default: 100000)
                 The largest acceptable term size
-        '''
+        """
         cur = self.db.cursor()
-        ids = cur.execute(''' 
+        ids = cur.execute(
+            """ 
             SELECT term FROM term_loci 
             GROUP BY term 
             HAVING COUNT(term) >= ?
                 AND COUNT(term) <= ?
             ORDER BY RANDOM() 
             LIMIT ?;
-        ''',(min_term_size,max_term_size,n)).fetchall()
+        """,
+            (min_term_size, max_term_size, n),
+        ).fetchall()
         if len(ids) == 0:
             raise ValueError(
-                'No Terms exists with this criteria '
-                '{} < len(term) < {}:'.format(min_term_size,max_term_size)
+                "No Terms exists with this criteria "
+                "{} < len(term) < {}:".format(min_term_size, max_term_size)
             )
         terms = [self[id[0]] for id in ids]
         if len(terms) == 1:
@@ -198,7 +226,7 @@ class Ontology(Camoco):
             return terms
 
     def add_term(self, term, cursor=None, overwrite=False):
-        ''' 
+        """ 
         This will add a single term to the ontology
 
         Parameters
@@ -211,105 +239,116 @@ class Ontology(Camoco):
             passed in cursor has executed the "BEGIN TRANSACTION" command.
         overwrite : bool
             Indication to delete any existing entry before writing
-        '''
+        """
 
         if overwrite:
             self.del_term(term.id)
         if not cursor:
             cur = self.db.cursor()
-            cur.execute('BEGIN TRANSACTION')
+            cur.execute("BEGIN TRANSACTION")
         else:
             cur = cursor
 
         # Add the term id and description
-        cur.execute('''
+        cur.execute(
+            """
             INSERT OR ABORT INTO terms (id, desc)
-            VALUES (?, ?)''', (term.id, term.desc))
+            VALUES (?, ?)""",
+            (term.id, term.desc),
+        )
 
         # Add the term loci
         if term.loci:
             for locus in term.loci:
-                cur.execute('''
+                cur.execute(
+                    """
                     INSERT OR ABORT INTO term_loci (term, id)
                     VALUES (?, ?)
-                    ''', (term.id, locus.id))
+                    """,
+                    (term.id, locus.id),
+                )
 
         # Add the term attrs
         if term.attrs:
-            for key,val in term.attrs.items():
-                cur.execute('''
+            for key, val in term.attrs.items():
+                cur.execute(
+                    """
                     INSERT OR ABORT INTO term_attrs (term,key,val)
                     VALUES (?,?)
-                ''',(term.id,key,val))
+                """,
+                    (term.id, key, val),
+                )
 
         if not cursor:
-            cur.execute('END TRANSACTION')
+            cur.execute("END TRANSACTION")
 
     def del_term(self, term, cursor=None):
-        ''' This will delete a single term to the ontology
+        """ This will delete a single term to the ontology
 
         Parameters
         ----------
         term : Term object or str
             The term object or id you wish to remove.
         cursor : apsw cursor object
-            A initialized cursor object, for batch operation.'''
+            A initialized cursor object, for batch operation."""
 
         try:
             if not cursor:
                 cur = self.db.cursor()
-                cur.execute('BEGIN TRANSACTION')
+                cur.execute("BEGIN TRANSACTION")
             else:
                 cur = cursor
-    
+
             if not isinstance(term, str):
                 id = term.id
             else:
                 id = term
-    
-            cur.execute('''
+
+            cur.execute(
+                """
                 DELETE FROM term_loci WHERE term = ?;
                 DELETE FROM terms WHERE id = ?;
-                ''', (id, id))
+                """,
+                (id, id),
+            )
             if not cursor:
-                cur.execute('END TRANSACTION')
+                cur.execute("END TRANSACTION")
         except Exception as e:
-            cur.execute('ROLLBACK')
+            cur.execute("ROLLBACK")
             raise e
 
-
     def add_terms(self, terms, overwrite=True):
-        '''
+        """
             A Convenience function to add terms from an iterable.
 
             Parameters
             ----------
             terms : iterable of camoco.Term objects
-        '''
+        """
         if overwrite:
             self.del_terms(terms)
         cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
+        cur.execute("BEGIN TRANSACTION")
         for term in terms:
             self.add_term(term, cursor=cur, overwrite=False)
-        cur.execute('END TRANSACTION')
+        cur.execute("END TRANSACTION")
 
     def del_terms(self, terms):
-        '''
+        """
             A Convenience function to delete many term object
 
             Parameters
             ----------
             terms : iterable of camoco.Term objects.
-        '''
+        """
         cur = self.db.cursor()
-        cur.execute('BEGIN TRANSACTION')
+        cur.execute("BEGIN TRANSACTION")
         for term in terms:
             self.del_term(term, cursor=cur)
-        cur.execute('END TRANSACTION')
+        cur.execute("END TRANSACTION")
 
-    def set_strongest(self,attr=None,higher=None):
-        '''
+    def set_strongest(self, attr=None, higher=None):
+        """
             Convinience function that allows you to set default values for
             strongest SNP2Gene mapping tasks.
 
@@ -321,48 +360,48 @@ class Ontology(Camoco):
             higher:   Flag indicating whether the value in --strongest-attr
                       is stronger if it is higher. Default behavior is to
                       treatlower values as stronger (i.e. p-vals)
-        '''
-        if not(attr is None):
-            self._global('strongest_attr',attr)
-        if not(higher is None):
-            self._global('strongest_higher',higher)
+        """
+        if not (attr is None):
+            self._global("strongest_attr", attr)
+        if not (higher is None):
+            self._global("strongest_higher", higher)
 
     def get_strongest_attr(self):
-        '''
+        """
             Convinience function that allows you to get the default value for
             the locus attr used to determine which locus is the strongest locus
             strongest SNP2Gene mapping.
-        '''
-        return self._global('strongest_attr')
-    
+        """
+        return self._global("strongest_attr")
+
     def get_strongest_higher(self):
-        '''
+        """
             Convinience function that allows you to get default values for
             the flag indicating whether the value in `strongest-attr` is
             is stronger if higher for strongest SNP2Gene mapping tasks.
-        '''
-        return self._global('strongest_higher')
-
+        """
+        return self._global("strongest_higher")
 
     @classmethod
-    def create(cls, name, description, refgen, type='Ontology'):
-        '''
+    def create(cls, name, description, refgen, type="Ontology"):
+        """
             This method creates a fresh Ontology with nothing it it.
-        '''
+        """
         # run the inherited create method from Camoco
         self = super().create(name, description, type=type)
         # set the refgen for the current instance
         self.refgen = refgen
         # add the global refgen
-        self._global('refgen', refgen.name)
+        self._global("refgen", refgen.name)
         # build the tables
         self._create_tables()
         return self
-    
+
     @classmethod
-    def from_DataFrame(cls, dataframe, name, description, refgen,
-                      gene_col='gene',term_col='Term'):
-        '''
+    def from_DataFrame(
+        cls, dataframe, name, description, refgen, gene_col="gene", term_col="Term"
+    ):
+        """
             Convenience function to create a Ontology from an iterable
             terms object. 
 
@@ -387,24 +426,24 @@ class Ontology(Camoco):
                 The string designating the column in the dataframe containing
                 the term name.
 
-        '''
-        self = cls.create(name,description,refgen)
-        # create terms from 
+        """
+        self = cls.create(name, description, refgen)
+        # create terms from
         terms = [
-            Term(id,loci=refgen[set(df[gene_col])]) \
-            for id,df in dataframe.groupby(term_col)
+            Term(id, loci=refgen[set(df[gene_col])])
+            for id, df in dataframe.groupby(term_col)
         ]
-        self.log('Adding {} terms to the database.',len(terms))
+        self.log("Adding {} terms to the database.", len(terms))
         self.add_terms(terms, overwrite=True)
         # Build the indices
-        self.log('Building the indices.')
+        self.log("Building the indices.")
         self._build_indices()
-        self.log('Your gene ontology is built.')
+        self.log("Your gene ontology is built.")
         return self
 
     @classmethod
     def from_terms(cls, terms, name, description, refgen):
-        '''
+        """
             Convenience function to create a Ontology from an iterable
             terms object. 
 
@@ -419,57 +458,71 @@ class Ontology(Camoco):
                 A short message describing the dataset.
             refgen : camoco.RefGen
                 A RefGen object describing the genes in the dataset
-        '''
-        self = cls.create(name,description,refgen)
-        self.log('Adding {} terms to the database.',len(terms))
+        """
+        self = cls.create(name, description, refgen)
+        self.log("Adding {} terms to the database.", len(terms))
         self.add_terms(terms, overwrite=True)
         # Build the indices
-        self.log('Building the indices.')
+        self.log("Building the indices.")
         self._build_indices()
 
-        self.log('Your gene ontology is built.')
+        self.log("Your gene ontology is built.")
         return self
 
     def _create_tables(self):
         cur = self.db.cursor()
-        cur.execute('''
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS terms (
                 id TEXT UNIQUE,
                 desc TEXT
-            )'''
+            )"""
         )
-        cur.execute('''
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS term_loci (
                 term TEXT, 
                 id TEXT
-            );'''
+            );"""
         )
-        cur.execute('''
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS term_attrs (
                 term TEXT,
                 key TEXT,
                 val TEXT
             );
-        ''')
+        """
+        )
 
     def _clear_tables(self):
         cur = self.db.cursor()
-        cur.execute('DELETE FROM terms; DELETE FROM term_loci;')
+        cur.execute("DELETE FROM terms; DELETE FROM term_loci;")
 
     def _build_indices(self):
         cursor = self.db.cursor()
-        cursor.execute('CREATE INDEX IF NOT EXISTS termIND ON terms (id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS lociIND ON term_loci (term,id)')
+        cursor.execute("CREATE INDEX IF NOT EXISTS termIND ON terms (id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS lociIND ON term_loci (term,id)")
 
     def _drop_indices(self):
         cursor = self.db.cursor()
-        cursor.execute('DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;')
+        cursor.execute("DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;")
 
-    def enrichment(self, locus_list, term_list=None, pval_cutoff=0.05, max_term_size=300,
-                   min_term_size=2, num_universe=None, return_table=False,
-                   label=None,include_genes=False,bonferroni_correction=True,
-                   min_overlap=1):
-        '''
+    def enrichment(
+        self,
+        locus_list,
+        term_list=None,
+        pval_cutoff=0.05,
+        max_term_size=300,
+        min_term_size=2,
+        num_universe=None,
+        return_table=False,
+        label=None,
+        include_genes=False,
+        bonferroni_correction=True,
+        min_overlap=1,
+    ):
+        """
             Evaluates enrichment of loci within the locus list for terms within
             the ontology. NOTE: this only tests terms that have at least one
             locus that exists in locus_list.
@@ -513,17 +566,21 @@ class Ontology(Camoco):
                 The minimum overlap between genes in the term and genes in
                 the locus list. Increasing this value can minimize spurious
                 or uninformative terms
-        '''
-        if isinstance(locus_list,co.Ontology):
+        """
+        if isinstance(locus_list, co.Ontology):
             ontology = locus_list
-            self.log('Calculating enrichment for an  Ontology: {}',ontology.name)
+            self.log("Calculating enrichment for an  Ontology: {}", ontology.name)
 
             enrich = []
             if label is None:
                 label = ontology.name
             if num_universe is None:
-                num_universe = len(set(self.distinct_loci_ids()).union(ontology.distinct_loci_ids()))
-            for term in ontology.terms(min_term_size=min_term_size,max_term_size=max_term_size):
+                num_universe = len(
+                    set(self.distinct_loci_ids()).union(ontology.distinct_loci_ids())
+                )
+            for term in ontology.terms(
+                min_term_size=min_term_size, max_term_size=max_term_size
+            ):
                 term = copy.copy(term)
                 e = self.enrichment(
                     term.loci,
@@ -532,38 +589,39 @@ class Ontology(Camoco):
                     min_term_size=min_term_size,
                     num_universe=num_universe,
                     return_table=return_table,
-                    label=label+'_'+term.id,
+                    label=label + "_" + term.id,
                     include_genes=include_genes,
                     bonferroni_correction=bonferroni_correction,
                     min_overlap=min_overlap,
-                ) 
+                )
                 enrich.append(e)
             if return_table:
                 return pd.concat(enrich)
             else:
                 return enrich
-        # return a new copy of each 
-        terms = [copy.copy(term) for term in self.terms_containing(
-            locus_list,
-            min_term_size=min_term_size,
-            max_term_size=max_term_size
-        )]
+        # return a new copy of each
+        terms = [
+            copy.copy(term)
+            for term in self.terms_containing(
+                locus_list, min_term_size=min_term_size, max_term_size=max_term_size
+            )
+        ]
         if term_list is not None:
             terms = [x for x in terms if x in term_list]
             if len(terms) == 0:
-                raise ValueError('No term overlap with Ontology')
+                raise ValueError("No term overlap with Ontology")
         # Calculate the size of the Universe
         if num_universe is None:
-            num_universe = self.num_distinct_loci() 
+            num_universe = self.num_distinct_loci()
         self.log(
-            '{}: Loci occur in {} terms, containing {} genes'.format(
-                label,len(terms), num_universe
+            "{}: Loci occur in {} terms, containing {} genes".format(
+                label, len(terms), num_universe
             )
         )
         significant_terms = []
         for term in terms:
             term_genes = set(term.loci)
-            #if len(term_genes) > max_term_size:
+            # if len(term_genes) > max_term_size:
             #    continue
             num_common = len(term_genes.intersection(locus_list))
             num_in_term = len(term_genes)
@@ -571,7 +629,7 @@ class Ontology(Camoco):
             # the reason this is num_common - 1 is because we are looking for 1 - cdf
             # and we need to greater than OR EQUAL TO num_common
             # Look. Do this in ipython:
-            '''
+            """
                 In [99]: probs = [hypergeom.pmf(x,100,5,10) for x in range(0,6)]
                 In [100]: probs
                 Out[100]: 
@@ -591,55 +649,53 @@ class Ontology(Camoco):
                 In [106]: hypergeom.sf(3-1,100,5,10)
                 # See? You want num_common - 1
                 Out[106]: 0.0066379128971171221
-            '''
-            pval = hypergeom.sf(num_common-1,num_universe,num_in_term,num_sampled)
+            """
+            pval = hypergeom.sf(num_common - 1, num_universe, num_in_term, num_sampled)
             if pval <= pval_cutoff and num_common >= min_overlap:
-                term.attrs['hyper'] = OrderedDict([
-                    ('source'           , self.name),
-                    ('pval'             , pval),
-                    ('terms_tested'     , len(terms)),
-                    ('num_common'       , num_common),
-                    ('num_universe'     , num_universe),
-                    ('source_term_size' , num_in_term),
-                    ('target_term_size' , len(locus_list)),
-                    ('ontology_size'        , len(self)),
-                    #('num_sampled'      , num_sampled)
-                ])
+                term.attrs["hyper"] = OrderedDict(
+                    [
+                        ("source", self.name),
+                        ("pval", pval),
+                        ("terms_tested", len(terms)),
+                        ("num_common", num_common),
+                        ("num_universe", num_universe),
+                        ("source_term_size", num_in_term),
+                        ("target_term_size", len(locus_list)),
+                        ("ontology_size", len(self)),
+                        # ('num_sampled'      , num_sampled)
+                    ]
+                )
                 if label != None:
-                    term.attrs['hyper']['label'] = label
+                    term.attrs["hyper"]["label"] = label
                 if bonferroni_correction == True:
                     # Right now this isn't true bonferroni, its only correcting for
                     # the number of terms that had term genes in it
                     if pval > pval_cutoff / len(terms):
-                        term.attrs['hyper']['bonferroni'] = False
+                        term.attrs["hyper"]["bonferroni"] = False
                     else:
-                        term.attrs['hyper']['bonferroni'] = True
-                term.attrs['pval'] = pval
+                        term.attrs["hyper"]["bonferroni"] = True
+                term.attrs["pval"] = pval
                 if include_genes == True:
-                    term.attrs['hyper']['genes'] = ",".join(
+                    term.attrs["hyper"]["genes"] = ",".join(
                         [x.id for x in term_genes.intersection(locus_list)]
                     )
                 significant_terms.append(term)
-        self.log('\t\tFound {} was significant for {} terms',label,len(significant_terms))
+        self.log(
+            "\t\tFound {} was significant for {} terms", label, len(significant_terms)
+        )
         if return_table == True:
             tbl = []
             for x in significant_terms:
-                val = OrderedDict([
-                    ('name', x.name),
-                    ('id'  , x.id)
-                ])
-                val.update(x.attrs['hyper'])
+                val = OrderedDict([("name", x.name), ("id", x.id)])
+                val.update(x.attrs["hyper"])
                 val.update(x.attrs)
-                del val['hyper']
+                del val["hyper"]
                 tbl.append(val)
             tbl = DataFrame.from_records(tbl)
-            #if label != None:
+            # if label != None:
             #    tbl['label'] = label
             if len(tbl) > 0:
-                tbl = tbl.sort_values(by='pval')
+                tbl = tbl.sort_values(by="pval")
             return tbl
         else:
-            return sorted(significant_terms,key=lambda x: x.attrs['pval'])
-
-
-
+            return sorted(significant_terms, key=lambda x: x.attrs["pval"])

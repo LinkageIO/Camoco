@@ -4,8 +4,9 @@ import numpy as np
 
 from .Tools import log
 
+
 class Term(object):
-    '''
+    """
         A Term is a just named group of loci that are related.
 
         Parameters
@@ -19,8 +20,9 @@ class Term(object):
         -------
         A Term Object
 
-    '''
-    def __init__(self, id, desc='', loci=None, **kwargs):
+    """
+
+    def __init__(self, id, desc="", loci=None, **kwargs):
         self.id = id
         self.name = id
         self.desc = desc
@@ -31,39 +33,39 @@ class Term(object):
         for key, val in kwargs.items():
             self.attrs[key] = val
 
-    def __eq__(self,term):
+    def __eq__(self, term):
         if self.id == term.id:
             return True
         else:
             return False
 
     @property
-    def locus_list(self): #pragma: no cover
-        raise Exception('This is deprecated')
+    def locus_list(self):  # pragma: no cover
+        raise Exception("This is deprecated")
 
     def __len__(self):
-        '''
+        """
             Returns the number of loci in the term.
-        '''
+        """
         return len(self.loci)
 
-    def __getitem__(self,key):
+    def __getitem__(self, key):
         return self.attrs[key]
 
     def add_locus(self, locus):
-        '''
+        """
             Adds a locus to the Term.
-        '''
+        """
         self.loci.add(locus)
 
     def flanking_loci(self, locus, window_size=100000):
-        '''
+        """
             returns any nearby Term SNPs to a locus
-        '''
-        return [flank for flank in self.loci if abs(locus-flank) <= window_size]
+        """
+        return [flank for flank in self.loci if abs(locus - flank) <= window_size]
 
-    def copy(self,id=None,desc='',loci=None,**kwargs):
-        '''
+    def copy(self, id=None, desc="", loci=None, **kwargs):
+        """
             Creates a copy of a term with the option to 
             expand loci and attrs. 
 
@@ -84,7 +86,7 @@ class Term(object):
             Returns
             -------
             A Term object.
-        '''
+        """
         if id == None:
             id = self.id
         if loci == None:
@@ -92,17 +94,12 @@ class Term(object):
         loci = self.loci.union(loci)
         new_attrs = self.attrs.copy()
         new_attrs.update(**kwargs)
-        copy = Term(
-            id,
-            desc=desc,
-            loci=loci,
-            **new_attrs
-        )
+        copy = Term(id, desc=desc, loci=loci, **new_attrs)
 
         return copy
-    
+
     def effective_loci(self, window_size=None):
-        '''
+        """
             Collapse down loci that have overlapping windows into
             'effective' loci. Looks like:
 
@@ -119,7 +116,7 @@ class Term(object):
             ----------
             window_size : int (default: None)
                 If not None, maps a new window size to each locus.      
-        '''
+        """
         loci = sorted(self.loci)
         if window_size is not None:
             for locus in loci:
@@ -132,13 +129,17 @@ class Term(object):
                 collapsed[-1] = collapsed[-1] + locus
             else:
                 collapsed.append(locus)
-        log('{}: Found {} SNPs -> {} effective SNPs with window size {} bp', 
-            self.id, len(self.loci), len(collapsed), window_size
+        log(
+            "{}: Found {} SNPs -> {} effective SNPs with window size {} bp",
+            self.id,
+            len(self.loci),
+            len(collapsed),
+            window_size,
         )
         return collapsed
 
-    def strongest_loci(self, attr, window_size=None,lowest=True):
-        '''
+    def strongest_loci(self, attr, window_size=None, lowest=True):
+        """
             Collapses down loci that have overlapping windows,
             then returns the locus with the strongest 'attr'
             value. Looks like:
@@ -159,15 +160,16 @@ class Term(object):
                 If not None, maps a new window size to each locus.      
             lowest: bool (default: True)
                 When sorting by attr, lowest is strongest (i.e. p-vals) 
-        '''
+        """
         is_reverse = not lowest
         return [
             # sort by attr and take first item
             sorted(
                 locus.sub_loci,
-                key=lambda x: float(x.default_getitem(attr,np.inf)),
-                reverse=is_reverse
-            )[0] for locus in self.effective_loci(window_size=window_size)
+                key=lambda x: float(x.default_getitem(attr, np.inf)),
+                reverse=is_reverse,
+            )[0]
+            for locus in self.effective_loci(window_size=window_size)
         ]
 
     def __str__(self):
@@ -175,5 +177,3 @@ class Term(object):
 
     def __repr__(self):
         return str(self.id)
-
-

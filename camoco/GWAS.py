@@ -6,81 +6,106 @@ from .Locus import Locus
 
 
 class GWAS(Ontology):
-    '''
+    """
         Ontology extension for GWAS. This class implements when you
         do not have only loci found in a reference genome.
-    '''
-    def __init__(self,name):
-        super().__init__(name,type='GWAS')
+    """
+
+    def __init__(self, name):
+        super().__init__(name, type="GWAS")
 
     def __getitem__(self, id):
-        ''' retrieve a term by id '''
+        """ retrieve a term by id """
         try:
-            (id, desc) = self.db.cursor().execute(
-                'SELECT * from terms WHERE id = ?', (id, )
-            ).fetchone()
+            (id, desc) = (
+                self.db.cursor()
+                .execute("SELECT * from terms WHERE id = ?", (id,))
+                .fetchone()
+            )
             term_loci = [
-                Locus(chrom,start,end,id=id,) \
-                for term, id, chrom, start, end, window  in \
-                self.db.cursor().execute(''' 
+                Locus(chrom, start, end, id=id)
+                for term, id, chrom, start, end, window in self.db.cursor().execute(
+                    """ 
                     SELECT * from term_loci WHERE 
                     term = ?
-                ''',(id,))
+                """,
+                    (id,),
+                )
             ]
             # Iterate through loci and get attrs
             for locus in term_loci:
-                for key,val in self.db.cursor().execute('''
+                for key, val in (
+                    self.db.cursor()
+                    .execute(
+                        """
                         SELECT key,val FROM loci_attr
                         WHERE term = ? AND id = ?
-                        ''',(id,locus.id)).fetchall():
+                        """,
+                        (id, locus.id),
+                    )
+                    .fetchall()
+                ):
                     locus.attr[key] = val
             return Term(id, desc=desc, loci=term_loci)
-        except TypeError as e: #Not in database
+        except TypeError as e:  # Not in database
             raise e
 
     def add_term(self, term, cursor=None, overwrite=True):
-        ''' 
+        """ 
             This will add a single term to the ontology.
             Extends the functionality of the Ontology class.
-        '''
+        """
         try:
             if not cursor:
                 # create a new cursor and initiate a transaction
                 cur = self.db.cursor()
-                cur.execute('BEGIN TRANSACTION')
+                cur.execute("BEGIN TRANSACTION")
             else:
                 # Otherwise, assume that another transaction was initiated
                 # perhaps by self.add_terms (notice the plurality)
                 cur = cursor
             if overwrite:
-                self.del_term(term.id,cursor=cur)
+                self.del_term(term.id, cursor=cur)
             # Add the term name and description
-            cur.execute('''
+            cur.execute(
+                """
                 INSERT OR REPLACE INTO terms (id, desc)
-                VALUES (?, ?)''', (term.id, term.desc)
+                VALUES (?, ?)""",
+                (term.id, term.desc),
             )
             # Add the term loci
             for locus in term.loci:
-                cur.execute('''
+                cur.execute(
+                    """
                     INSERT OR REPLACE INTO term_loci 
                     (term, id, chrom, start, end, window)
                     VALUES (?, ?, ?, ? ,? ,?);
-                    ''', (term.id, locus.id, locus.chrom,
-                        locus.start, locus.end, locus.window)
+                    """,
+                    (
+                        term.id,
+                        locus.id,
+                        locus.chrom,
+                        locus.start,
+                        locus.end,
+                        locus.window,
+                    ),
                 )
-                cur.executemany('''
+                cur.executemany(
+                    """
                     INSERT OR REPLACE INTO loci_attr
                     (term,id,key,val) VALUES (?,?,?,?);
-                ''',[(term.id,locus.id,key,val) for key,val in locus.attr.items()])
-            if not cursor: 
-                # Still assume that 
-                cur.execute('END TRANSACTION')
+                """,
+                    [(term.id, locus.id, key, val) for key, val in locus.attr.items()],
+                )
+            if not cursor:
+                # Still assume that
+                cur.execute("END TRANSACTION")
         except Exception as e:
-            cur.execute('ROLLBACK')
+            cur.execute("ROLLBACK")
             raise e
 
-    def del_term(self,term,cursor=None):
-        super().del_term(term,cursor=cursor)
+    def del_term(self, term, cursor=None):
+        super().del_term(term, cursor=cursor)
 
         if not isinstance(term, str):
             id = term.id
@@ -91,20 +116,23 @@ class GWAS(Ontology):
             cur = self.db.cursor()
         else:
             cur = cursor
-        cur.execute(''' 
+        cur.execute(
+            """ 
             DELETE FROM loci_attr WHERE term = ?
-        ''',(id,))
+        """,
+            (id,),
+        )
 
-
-    ''' -----------------------------------------------------------------------
+    """ -----------------------------------------------------------------------
             Internal Methods -- Factory Methods
-    '''
+    """
 
     def _create_tables(self):
         super()._create_tables()
         # Add the loci table so it works with SNPs
         cur = self.db.cursor()
-        cur.execute('''
+        cur.execute(
+            """
             -- More concise to drop table and create new one.
             DROP TABLE term_loci;
             CREATE TABLE IF NOT EXISTS term_loci (
@@ -128,16 +156,16 @@ class GWAS(Ontology):
                 val TEXT,
                 PRIMARY KEY(term,id,key)
             );
-        ''')
+        """
+        )
 
-    
-    ''' -----------------------------------------------------------------------
+    """ -----------------------------------------------------------------------
             Class Methods -- Factory Methods
-    '''
+    """
 
     @classmethod
-    def create(cls, name, description, refgen, type='GWAS'):
-        '''
+    def create(cls, name, description, refgen, type="GWAS"):
+        """
             Create an empty GWAS dataset.
 
             Parameters
@@ -161,16 +189,26 @@ class GWAS(Ontology):
             for help building GWAS datasets from other common
             data types.
 
-        '''
-        return super().create(name, description, refgen, type='GWAS')
+        """
+        return super().create(name, description, refgen, type="GWAS")
 
     @classmethod
-    def from_DataFrame(cls, df, name, description, refgen,
-            term_col='Term', chr_col='CHR', pos_col=None,
-            start_col=None, end_col=None, id_col=None, 
-            strongest_attr='pval', strongest_higher=True
-            ):
-        '''
+    def from_DataFrame(
+        cls,
+        df,
+        name,
+        description,
+        refgen,
+        term_col="Term",
+        chr_col="CHR",
+        pos_col=None,
+        start_col=None,
+        end_col=None,
+        id_col=None,
+        strongest_attr="pval",
+        strongest_higher=True,
+    ):
+        """
             Import an GWAS dataset from a pandas dataframe.
             Groups by term_col, then iterates over the rows in the group.
             It adds each row as a locus to the term.
@@ -213,7 +251,7 @@ class GWAS(Ontology):
                 position of the locus associated with the trait.
             id_col : str (default: None)
                 Assign an id to the locus
-        '''
+        """
         self = cls.create(name, description, refgen)
         # group each trait by its name
         for term_id, df in df.groupby(term_col):
@@ -224,16 +262,20 @@ class GWAS(Ontology):
                     # make sure there are no collisions with the Locus instance
                     # function names. This is hackey and I dont like it
                     kwargs = {
-                        key:val for key, val in dict(row).items() \
-                        if key not in Locus.__init__.__code__.co_varnames \
-                        and key not in [chr_col,pos_col,start_col,end_col,id_col]
+                        key: val
+                        for key, val in dict(row).items()
+                        if key not in Locus.__init__.__code__.co_varnames
+                        and key not in [chr_col, pos_col, start_col, end_col, id_col]
                     }
                     snp = Locus(
-                        row[chr_col], int(row[pos_col]), int(row[pos_col]), 
-                        gene_build=self.refgen.build, **kwargs
+                        row[chr_col],
+                        int(row[pos_col]),
+                        int(row[pos_col]),
+                        gene_build=self.refgen.build,
+                        **kwargs
                     )
                     term.loci.add(snp)
             self.log("Importing {}", term)
             self.add_term(term)
-        self.set_strongest(attr=strongest_attr,higher=strongest_higher)
+        self.set_strongest(attr=strongest_attr, higher=strongest_higher)
         return self
