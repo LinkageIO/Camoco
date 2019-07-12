@@ -613,28 +613,20 @@ class Expr(Camoco):
     @property
     def _cmap(self):
         '''
-            Used for the heatmap function. Retruns a matplotlib cmap which is yellow/blue
+            Used for the heatmap function. Retruns a matplotlib cmap which is yellow/blue.
+            See: https://matplotlib.org/api/_as_gen/matplotlib.colors.LinearSegmentedColormap.html
         '''
-        white_middle_heatmapdict = {
-            'red': ((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'green':((0.0, 1.0, 1.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 0.0, 0.0)),
-            'blue': ((0.0, 0.0, 0.0),
-                    (0.5, 1.0, 1.0),
-                    (1.0, 1.0, 1.0))
-        }
         heatmapdict = {
             'red': ((0.0, 1.0, 1.0),
+                    (0.3, 0.5, 0.5),
                     (0.5, 0.0, 0.0),
                     (1.0, 0.0, 0.0)),
-            'green':((0.0, 1.0, 1.0),
+            'green':((0.0, 0.0, 0.0),
                     (0.5, 0.0, 0.0),
                     (1.0, 0.0, 0.0)),
             'blue': ((0.0, 0.0, 0.0),
                     (0.5, 0.0, 0.0),
+                    (0.7, 1.0, 1.0),
                     (1.0, 1.0, 1.0))}
         heatmap_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', heatmapdict, 256)
         return heatmap_cmap
