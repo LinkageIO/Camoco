@@ -465,7 +465,7 @@ class Ontology(Camoco):
         cursor = self.db.cursor()
         cursor.execute('DROP INDEX IF EXISTS termIND; DROP INDEX IF EXISTS lociIND;')
 
-    def enrichment(self, locus_list, pval_cutoff=0.05, max_term_size=300,
+    def enrichment(self, locus_list, term_list=None, pval_cutoff=0.05, max_term_size=300,
                    min_term_size=2, num_universe=None, return_table=False,
                    label=None,include_genes=False,bonferroni_correction=True,
                    min_overlap=1):
@@ -476,11 +476,15 @@ class Ontology(Camoco):
 
             Parameters
             ----------
-            locus_list : list of co.Locus *or* instance of co.Ontology
+            locus_list : (list of co.Locus *or* instance of co.Ontology)
                 A list of loci for which to test enrichment. i.e. is there
                 an over-representation of these loci within and the terms in
                 the Ontology. If an ontology is passed, each term in the ontology
                 will be iterated over and tested as if they were a locus_list.
+            term_list: a list of terms 
+                If specified, only the list of terms passed in will be
+                tested for enrichment. Useful for filtering only specific
+                terms for testing. NOTE: the term must be in the ontology.
             pval_cutoff : float (default: 0.05)
                 Report terms with a pval lower than this value
             bonferroni_correction : bool (default: True)
@@ -539,12 +543,15 @@ class Ontology(Camoco):
             else:
                 return enrich
         # return a new copy of each 
-
         terms = [copy.copy(term) for term in self.terms_containing(
             locus_list,
             min_term_size=min_term_size,
             max_term_size=max_term_size
         )]
+        if term_list is not None:
+            terms = [x for x in terms if x in term_list]
+            if len(terms) == 0:
+                raise ValueError('No term overlap with Ontology')
         # Calculate the size of the Universe
         if num_universe is None:
             num_universe = self.num_distinct_loci() 
@@ -595,7 +602,7 @@ class Ontology(Camoco):
                     ('num_universe'     , num_universe),
                     ('source_term_size' , num_in_term),
                     ('target_term_size' , len(locus_list)),
-                    ('num_terms'        , len(self)),
+                    ('ontology_size'        , len(self)),
                     #('num_sampled'      , num_sampled)
                 ])
                 if label != None:
