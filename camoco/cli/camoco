@@ -660,6 +660,13 @@ if __name__ == '__main__':
             'Provide a [comma, space, semicolon] separated list of input genes.'    
         )
     )
+    overlapCLI.add_argument(
+        '--ontology',
+        default=None,
+        help=(
+            'Calculate the overlap of genes within Ontology terms.'    
+        )
+    )
     # Or get genes from terms
     overlapCLI.add_argument(
         '--gwas', 
