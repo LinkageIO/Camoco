@@ -31,9 +31,11 @@ class Term(object):
         for key, val in kwargs.items():
             self.attrs[key] = val
 
-    #@property
-    #def name(self):
-    #    return self.id
+    def __eq__(self,term):
+        if self.id == term.id:
+            return True
+        else:
+            return False
 
     @property
     def locus_list(self): #pragma: no cover
