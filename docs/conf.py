@@ -63,7 +63,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Camoco'
-copyright = '2016, Rob Schaefer'
+copyright = '2019, Rob Schaefer'
 author = 'Rob Schaefer'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -101,7 +101,8 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 #html_theme = 'alabaster'
-html_theme = 'sphinx_materialdesign_theme'
+#html_theme = 'sphinx_materialdesign_theme'
+html_theme = 'sphinx_rtd_theme'
 
 # Html logo in drawer.
 # Fit in the drawer at the width of image is 240 px.
