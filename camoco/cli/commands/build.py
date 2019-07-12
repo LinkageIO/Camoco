@@ -35,7 +35,7 @@ def build_cob(args):
 
         quality_control = False if args.skip_quality_control else True
         normalize = False if args.skip_normalization else True
-        quantile = False if args.skip_quantile else True
+        quantile = True if args.quantile else False
 
         # Check to see if this dataset is already built
         if available_datasets('Expr',args.name):

@@ -395,12 +395,13 @@ if __name__ == '__main__':
         )
     )  
     bldcob.add_argument(
-        '--skip-quantile',
+        '--quantile',
         action='store_true',
         default=False,
         help=(
             'Flag specifies whether or not to perform quantile normalization '
             'on expression data.'
+            'Default: False'
         )
     ) 
     bldcob.add_argument(
