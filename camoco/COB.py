@@ -1479,8 +1479,8 @@ class COB(Expr):
             min_cluster_size=10, 
             cluster_accessions=True,
             plot_dendrogram=True,
-            nan_color='black',
-            cmap="viridis"
+            nan_color=None,
+            cmap=None
         ):
         '''
             Plots a heatmap of genes x expression.
@@ -1522,11 +1522,11 @@ class COB(Expr):
                 If true, accessions will be clustered
             plot_dendrogram : bool (default: True)
                 If true, dendrograms will be plotted
-            nan_color : str (default: 'black')
+            nan_color : str (default: None)
                 Specifies the color of nans in the heatmap. Changing this
                 to a high contrast color can help identify problem areas.
-                Otherwise, black represents 'background' level of expression
-                and is otherwise innocuous.
+                If not specified, nans will be the middle (neutral) value
+                in the heatmap.
             cmap : str (default: 'viridis')
                 A matplotlib color map for the heatmap. See
                 https://matplotlib.org/gallery/color/colormap_reference.html
@@ -1598,8 +1598,13 @@ class COB(Expr):
             accession_ax = plt.subplot(gs[2])
         # Plot the Expression matrix 
         nan_mask = np.ma.array(dm, mask=np.isnan(dm))
-        #cmap = self._cmap
-        cmap = plt.get_cmap(cmap)
+        if cmap is None:
+            cmap = self._cmap
+        else:
+            cmap = plt.get_cmap(cmap)
+        # Set the nan color to the middle unless a color is specifid
+        if nan_color is None:
+            nan_color = cmap(0.5)
         cmap.set_bad(nan_color, 1.0)
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax*-1
