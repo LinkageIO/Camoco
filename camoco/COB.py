@@ -1527,6 +1527,10 @@ class COB(Expr):
                 to a high contrast color can help identify problem areas.
                 Otherwise, black represents 'background' level of expression
                 and is otherwise innocuous.
+            cmap : str (default: 'viridis')
+                A matplotlib color map for the heatmap. See
+                https://matplotlib.org/gallery/color/colormap_reference.html
+                for options.
 
             Returns
             -------
