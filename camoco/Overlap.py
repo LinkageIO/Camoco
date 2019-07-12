@@ -573,7 +573,9 @@ class Overlap(Camoco):
             source = "go"
         elif args.gwas is not None:
             source = "gwas"
-        self = cls.create(source, description="CLI Overlap")
+        elif args.ontology is not None:
+            source = 'ontology'
+        self = cls.create(source+'_CLI', description="CLI Overlap")
         self.source = source
         self.args = args
         # Build base camoco objects
@@ -596,6 +598,8 @@ class Overlap(Camoco):
             args.candidate_flank_limit = 0
         elif source == "gwas":
             self.ont = co.GWAS(args.gwas)
+        elif source == 'ontology':
+            self.ont = co.Ontology(args.ontology)
         else:
             raise ValueError(
                 "Please provide a valid overlap source (--genes, --go or --gwas)"
