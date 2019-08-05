@@ -132,10 +132,10 @@ class Ontology(Camoco):
         # query the database
         terms = (
             self.db.cursor()
-            .execute(
-                """SELECT DISTINCT term 
-        FROM term_loci WHERE id IN ('{}')
-        """.format(
+            .execute('''
+                SELECT DISTINCT term 
+                FROM term_loci WHERE id IN ('{}')
+            '''.format(
                     "','".join([x.id for x in locus_list])
                 )
             )
@@ -274,7 +274,7 @@ class Ontology(Camoco):
                 cur.execute(
                     """
                     INSERT OR ABORT INTO term_attrs (term,key,val)
-                    VALUES (?,?)
+                    VALUES (?,?,?)
                 """,
                     (term.id, key, val),
                 )
@@ -621,8 +621,6 @@ class Ontology(Camoco):
         significant_terms = []
         for term in terms:
             term_genes = set(term.loci)
-            # if len(term_genes) > max_term_size:
-            #    continue
             num_common = len(term_genes.intersection(locus_list))
             num_in_term = len(term_genes)
             num_sampled = len(locus_list)
