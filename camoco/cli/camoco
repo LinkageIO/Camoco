@@ -278,21 +278,6 @@ if __name__ == '__main__':
         )
     )
     bldref.add_argument(
-        'build',
-        help=(   
-            "A string designating the genome build, used for comparison"
-            "operations, genes may share IDS but are different across build."
-        )
-    )
-    bldref.add_argument(
-        'organism',
-        help=(
-            'A short string describing the organims this RefGen is coming '
-            'from. Again, is used in comparing equality among genes which '
-            'may have the same id or name. '
-        )
-    )
-    bldref.add_argument(
         '--chrom-feature',
         default='chromosome',
         metavar='chromosome',
