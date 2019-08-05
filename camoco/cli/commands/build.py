@@ -86,8 +86,6 @@ def build_refgen(args):
         args.filename,
         args.name,
         args.description,
-        args.build,
-        args.organism,
         # Optional Arguments
         chrom_feature=args.chrom_feature,
         gene_feature=args.gene_feature,
