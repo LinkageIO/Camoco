@@ -77,7 +77,7 @@ To download all the data, you can use the following command:
 
 .. code:: bash
 
-  wget \
+  $ wget \
    https://github.com/LinkageIO/Camoco/raw/master/tests/raw/RefGen/ZmB73_5b_FGS.gff.gz \
    https://github.com/LinkageIO/Camoco/raw/master/tests/raw/Expr/RNASEQ/Hirsch2014_PANGenomeFPKM.txt.gz \
    https://github.com/LinkageIO/Camoco/raw/master/tests/raw/Expr/RNASEQ/Stelpflug2018_B73_Tissue_Atlas.txt.gz \
@@ -186,44 +186,45 @@ by looking at its help message
 
 .. code::
 
-  $ camoco build-refgen --help
+    $ camoco build-refgen --help                                                                                                               !10055
     usage: camoco build-refgen [-h] [--chrom-feature chromosome]
-                           [--gene-feature gene] [--ID-attr ID]
-                           [--attr-split =]
-                           filename name description build organism
+                               [--gene-feature gene] [--ID-attr ID]
+                               [--attr-split =]
+                               filename name description
 
     positional arguments:
-       filename              The path to the GFF file.
-       name                  The name if the RefGen object to be stored in the core
-                             camoco database.
-       description           A short description of the RefGen for future reference
-       build                 A string designating the genome build, used for
-                             comparisonoperations, genes may share IDS but are
-                             different across build.
-       organism              A short string describing the organism this RefGen is
-                             coming from. Again, is used in comparing equality
-                             among genes which may have the same id or name.
-    
+      filename              The path to the GFF file.
+      name                  The name if the RefGen object to be stored in the core
+                            camoco database.
+      description           A short description of the RefGen for future reference
+
     optional arguments:
-       -h, --help            show this help message and exit
-       --chrom-feature chromosome
-                             The name of the feature (in column 3) that designates
-                             a a chromosome. default: "chromosome"
-       --gene-feature gene   The name of the feature (in column 2) that designates
-                             a gene. These features will be the main object that
-                             the RefGen encompasses. default: "gene"
-       --ID-attr ID          The key in the attribute column which designates the
-                             ID or name of the feature. default: "ID"
-       --attr-split =        The delimiter for keys and values in the attribute
-                             column. default: "="
-   
+      -h, --help            show this help message and exit
+      --chrom-feature chromosome
+                            The name of the feature (in column 3) that designates
+                            a a chromosome. default: "chromosome"
+      --gene-feature gene   The name of the feature (in column 2) that designates
+                            a gene. These features will be the main object that
+                            the RefGen encompasses. default: "gene"
+      --ID-attr ID          The key in the attribute column which designates the
+                            ID or name of the feature. default: "ID"
+      --attr-split =        The delimiter for keys and values in the attribute
+                            column. default: "="
+
+.. note::
+
+    Starting in v0.6.3 the `build` and `organism` arguments are no longer needed.
+
 
 The command takes 5 required arguments (called positional argument): `filename`, `name`, `description`,
 `build`, and `organism`, as well as 5 optional arguments. Our build command will look something like:
 
 .. code::
 
-  $ camoco build-refgen ZmB73_5b_FGS.gff "Zm5bFGS" "Maize 5b Filtered Gene Set" 5b "Zea mays"
+  $ camoco build-refgen \
+        ZmB73_5b_FGS.gff \
+        "Zm5bFGS" \
+        "Maize 5b Filtered Gene Set"
 
 The `filename` corresponds to the raw file we downloaded. The `name` is a short name supplied by you, 
 that references the dataset. Correspondingly, `description` is used to supply a little more information.
@@ -258,7 +259,7 @@ We can thus run the above command as is. We will see this following output:
 
 .. code::
 
-    $ camoco build-refgen ZmB73_5b_FGS.gff "Zm5bFGS" "Maize 5b Filtered Gene Set" 5b "Zea mays"
+    $ camoco build-refgen ZmB73_5b_FGS.gff "Zm5bFGS" "Maize 5b Filtered Gene Set"
     [LOG] Wed Nov 14 11:10:58 2018 - Building Indices
     [LOG] Wed Nov 14 11:10:58 2018 - Building Indices
     [LOG] Wed Nov 14 11:10:58 2018 - Found a chromosome: 9
@@ -376,7 +377,7 @@ dataset: `Schaefer2018_ROOTFPKM.tsv`.
 
 Lets look at the fist few lines of the file.
 
-.. code::
+.. code-block:: none
 
     $ head 
     A5554   B57     B73     B76     B97     CML103  CML108  CML157Q CML158Q CML228  CML277 [...truncated]
@@ -402,7 +403,7 @@ an accession.
 
 The build command will look something like:
 
-.. code::
+.. code-block:: none
 
     $ camoco build-cob Schaefer2018_ROOTFPKM.tsv ZmRoot "Maize Root Network" Zm5bFGS
 
@@ -411,7 +412,7 @@ We specified the raw data file, we called out network `ZmRoot` giving it a short
 the gene information for our data. Camoco will attempt to build the network using the data
 provided. The output will look something like:
 
-.. code::
+.. code-block:: none
 
     [LOG] Wed Nov 14 12:07:22 2018 - Building Indices
     [LOG] Wed Nov 14 12:07:23 2018 - Loading Expr table
@@ -443,7 +444,7 @@ For example, Camoco is reporting that it found `39655` genes and `46` accessions
 was expected, the input file was probably not formatted correctly and the build will fail. Lets look at
 the next few lines of the output:
 
-.. code::
+.. code-block:: none
 
 
     [...]
@@ -510,7 +511,7 @@ will allow you to customize the quality control steps. Finally, there is an opti
 
 The next bit of output shows the steps taken to normalize the data:
 
-.. code::
+.. code-block:: none
 
     [...]
     [LOG] Wed Nov 14 17:31:46 2018 - ------------ Normalizing
@@ -545,7 +546,7 @@ are being added to the internal Camoco databases.
 
 Next, Camoco is ready to calculate gene co-expression:
 
-.. code::
+.. code-block:: none
 
     [...]
     [LOG] Wed Nov 14 17:32:07 2018 - Calculating Coexpression
@@ -592,7 +593,7 @@ section for more details on this.
 
 Finally, a summary of the network is printed:
 
-.. code::
+.. code-block:: none
 
     [...]
     [LOG] Wed Nov 14 17:35:58 2018 - Extracting raw expression values
@@ -669,7 +670,7 @@ We must first specify the gene-to-term mapping file: `zm_go.tsv` then the obo
 file: `go.obo` before our familiar `name`, `description`, and `refgen` arguments.
 
 
-.. code:: 
+.. code-block:: none 
 
     $ camoco build-go \
       zm_go.tsv \
@@ -954,12 +955,11 @@ Calculating co-expression of a gene set
 ---------------------------------------
 
 22 Random Genes:
-
-GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,
-GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,
-GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,
-GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,
-GRMZM2G108090,AC194970.5_FG009
+    GRMZM2G338161,GRMZM2G067943,GRMZM5G859099,GRMZM2G127050,GRMZM2G122498,
+    GRMZM2G392798,GRMZM2G096585,GRMZM2G012280,GRMZM5G844080,GRMZM2G160351,
+    GRMZM2G395535,GRMZM2G176576,GRMZM2G151873,GRMZM2G479596,GRMZM2G058910,
+    GRMZM2G164649,GRMZM2G127101,GRMZM2G043396,GRMZM2G132780,AC189750.4_FG004,
+    GRMZM2G108090,AC194970.5_FG009
 
 .. code::
 
@@ -1129,9 +1129,9 @@ terms in the Ontology that meet the filtering criteria in the command options.
 .. code::
 
   $ camoco overlap \
-  ZmRoot \
-  locality \
-  --go ZmGO
+    ZmRoot \
+    locality \
+    --go ZmGO
 
 This command will calculate the co-expression of *all* terms in the Ontology! We can refine
 our calculation in several different ways. The first, is we can specify a list of terms 
@@ -1211,7 +1211,7 @@ be utilized if the window does not cover any genes. These options are specified 
 Again, to avoid calculating the co-expression for **all** GWAS terms (i.e. traits) we specify a `--term` with the option
 `Al27` to calculate co-expression for the Aluminum GWAS. The output looks like:
 
-.. code::
+.. code-block:: none
 
     [LOG] Thu Nov 15 23:07:14 2018 - Loading Expr table
     [LOG] Thu Nov 15 23:07:14 2018 - Building Expr Index
@@ -1326,7 +1326,7 @@ SNP list only contains significant SNPs (or an FDR the researcher is comfortable
 The `build-gwas` help command has the following flag that allows for filtering to be done using a 
 `pandas <https://pandas.pydata.org>`_ data frame query.
 
-.. code::
+.. code-block:: none
 
   $ camoco build-gwas --help
 
@@ -1343,7 +1343,7 @@ The `build-gwas` help command has the following flag that allows for filtering t
 
 We can build the dataset using the following camoco command:
 
-.. code::
+.. code-block:: none
 
  $ camoco build-gwas Wallace_etal_2014_PLoSGenet_GWAS_hits-150112.txt.gz \
     "ZmWallaceRMIP5" \
