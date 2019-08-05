@@ -71,7 +71,7 @@ setup(
         'numpy==1.16.4',		
         'scipy==1.2.1',		
         'pandas==0.23.4',		
-
+        'fa2==0.3.5',
         'scikit-learn==0.21.2',
         'statsmodels==0.8.0',
         'termcolor==1.1.0',
