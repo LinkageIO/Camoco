@@ -1514,6 +1514,7 @@ class COB(Expr):
         lcc_only=True,
         force=False,
         plot_clusters=True,
+        color_clusters=True,
         min_cluster_size=100,
         max_clusters=None,
         background_color=None,
@@ -1537,7 +1538,6 @@ class COB(Expr):
         # Plot clusters
         if plot_clusters:
             from matplotlib.patches import Ellipse
-
             big_clusters = [
                 k
                 for k, v in Counter(self.clusters.cluster).items()
@@ -1548,7 +1548,9 @@ class COB(Expr):
                     break
                 ids = [x.id for x in self.cluster_genes(clus) if x.id in coor.index]
                 ccoor = coor.loc[ids]
-                ax.scatter(ccoor.x, ccoor.y)
+                if color_clusters:
+                    # This will overwrite the genes in the cluster giving them colors 
+                    ax.scatter(ccoor.x, ccoor.y)
                 try:
                     c = self.cluster_coordinates(clus)
                 except KeyError as e:
