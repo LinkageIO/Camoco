@@ -167,7 +167,7 @@ class RefGen(Camoco):
                 SELECT chromosome,start,end,id FROM genes
             """
         ):
-            yield self.Gene(*x, build=self.build, organism=self.organism)
+            yield self.Gene(*x)
 
     @lru_cache(maxsize=131072)
     def from_id(self, gene_id, **kwargs):
@@ -196,7 +196,7 @@ class RefGen(Camoco):
         info = cur.execute(
             "SELECT chromosome,start,end,id FROM genes WHERE id = ?", [gene_id]
         ).fetchone()
-        return self.Gene(*info, build=self.build, organism=self.organism, **kwargs)
+        return self.Gene(*info, **kwargs)
 
     def from_ids(self, gene_ids, check_shape=False, **kwargs):
         """
@@ -287,7 +287,7 @@ class RefGen(Camoco):
         """
         if isinstance(loci, Locus):
             return [
-                self.Gene(*x, build=self.build, organism=self.organism)
+                self.Gene(*x)
                 for x in self.db.cursor().execute(
                     """
                     SELECT chromosome,start,end,id FROM genes
@@ -318,7 +318,7 @@ class RefGen(Camoco):
         """
         if isinstance(loci, Locus):
             return [
-                self.Gene(*x, build=self.build, organism=self.organism)
+                self.Gene(*x)
                 for x in self.db.cursor().execute(
                     """
                     SELECT chromosome,start,end,id FROM genes
@@ -360,7 +360,7 @@ class RefGen(Camoco):
         else:
             upstream = locus.upstream
         return [
-            self.Gene(*x, build=self.build, organism=self.organism)
+            self.Gene(*x)
             for x in self.db.cursor().execute(
                 """
                 SELECT chromosome,start,end,id FROM genes
@@ -401,7 +401,7 @@ class RefGen(Camoco):
             downstream = locus.downstream
 
         return [
-            self.Gene(*x, build=self.build, organism=self.organism)
+            self.Gene(*x)
             for x in self.db.cursor().execute(
                 """
                 SELECT chromosome,start,end,id FROM genes
@@ -750,9 +750,9 @@ class RefGen(Camoco):
     def summary(self):  # C
         print(
             "\n".join(
-                ["Reference Genome: {} - {} - {}", "{} genes", "Genome:", "{}"]
+                ["Reference Genome: {}", "{} genes", "Genome:", "{}"]
             ).format(
-                self.organism, self.build, self.name, self.num_genes(), self.genome
+                self.name, self.num_genes(), self.genome
             )
         )
 
@@ -850,8 +850,8 @@ class RefGen(Camoco):
         return f
 
     def __repr__(self):
-        return "Reference Genome: {} - {} - {}".format(
-            self.organism, self.build, self.name
+        return "Reference Genome: - {}".format(
+            self.name
         )
 
     def __len__(self):
@@ -1185,8 +1185,6 @@ class RefGen(Camoco):
         df,
         name,
         description,
-        build,
-        organism,
         chrom_col="chrom",
         start_col="start",
         stop_col="stop",
@@ -1196,8 +1194,6 @@ class RefGen(Camoco):
             Imports a RefGen object from a CSV.
         """
         self = cls.create(name, description, type="RefGen")
-        self._global("build", build)
-        self._global("organism", "organism")
         genes = list()
         for i, row in df.iterrows():
             genes.append(
@@ -1206,8 +1202,6 @@ class RefGen(Camoco):
                     int(row[start_col]),
                     int(row[stop_col]),
                     id=row[id_col],
-                    build=build,
-                    organism=organism,
                 ).update(dict(row.items()))
             )
         self.add_gene(genes)
@@ -1220,8 +1214,6 @@ class RefGen(Camoco):
         filename,
         name,
         description,
-        build,
-        organism,
         chrom_feature="chromosome",
         gene_feature="gene",
         ID_attr="ID",
@@ -1242,13 +1234,6 @@ class RefGen(Camoco):
                 camoco database.
             description : str
                 A short description of the RefGen for future reference
-            build : str
-                A string designating the genome build, used for comparison
-                operations, genes may share IDS but are different across build.
-            organism : str
-                A short string describing the organims this RefGen is coming
-                from. Again, is used in comparing equality among genes which
-                may have the same id or name.
             chrom_feature : str (default: chromosome)
                 The name of the feature (in column 3) that designates a
                 a chromosome.
@@ -1263,8 +1248,6 @@ class RefGen(Camoco):
                 The delimiter for keys and values in the attribute column
         """
         self = cls.create(name, description, type="RefGen")
-        self._global("build", build)
-        self._global("organism", organism)
         genes = list()
         chroms = dict()
         if filename.endswith(".gz"):
@@ -1303,8 +1286,6 @@ class RefGen(Camoco):
                         int(end),
                         attributes[ID_attr].upper().strip('"'),
                         strand=strand,
-                        build=build,
-                        organism=organism,
                         **attributes
                     ).update(attributes)
                 )
@@ -1337,8 +1318,6 @@ class RefGen(Camoco):
                 chromosomems as the original.
         """
         copy = self.create(name, description, "RefGen")
-        copy._global("build", self.build)
-        copy._global("organism", self.organism)
         # Should have the same chromosomems
         for chrom in self.iter_chromosomes():
             copy.add_chromosome(chrom)
@@ -1354,8 +1333,6 @@ class RefGen(Camoco):
             each gene is within gene list
         """
         self = cls.create(name, description, "RefGen")
-        self._global("build", refgen.build)
-        self._global("organism", refgen.organism)
         # Should have the same chromosomes
         for chrom in refgen.iter_chromosomes():
             self.add_chromosome(chrom)
