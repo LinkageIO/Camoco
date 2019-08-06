@@ -564,7 +564,7 @@ class Expr(Camoco):
             if rank_ties > len(values) * 0.20:
                 raise ValueError(
                     f"{self.name}:{accession_name} has {rank_ties} "
-                    f"({rank_times/len(values)}%) rank ties"
+                    f"({rank_ties/len(values)}%) rank ties"
                 )
         # assign ranks by accession (column)
         expr_ranks = expr.rank(axis=0, method="first", na_option="keep")
