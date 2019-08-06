@@ -25,6 +25,7 @@ import gzip
 import bz2
 
 
+
 def mean_confidence_interval(data):  # pragma no cover
     """
         Convenience function to return both the mean as well as the 
