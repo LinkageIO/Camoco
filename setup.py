@@ -5,7 +5,13 @@ from setuptools import setup, find_packages, Extension
 import os
 import io
 import re
-import numpy
+try:
+    import numpy
+except ModuleNotFoundError as e:
+    raise ModuleNotFoundError(
+        "Please install numpy before installing Camoco,"        
+    )
+    sys.exit(1)
 
 def read(*names, **kwargs):
     with io.open(
