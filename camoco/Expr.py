@@ -99,6 +99,13 @@ class Expr(Camoco):
         """
             return the expression profile for a gene
         """
+        # try to use as gene object
+        try:
+            return self._expr.loc[gene.id]
+        except AttributeError:
+            pass
+        # try to get gene object from refgen
+        gene = self.refgen[gene]
         return self._expr.loc[gene.id]
 
     def is_normalized(self, max_val=None, raw=False):
