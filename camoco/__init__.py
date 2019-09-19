@@ -38,9 +38,9 @@ import sys
 import os
 import numpy
 
-import pyximport
+#import pyximport
 
-pyximport.install(setup_args={"include_dirs": numpy.get_include()})
+#pyximport.install(setup_args={"include_dirs": numpy.get_include()})
 
 import matplotlib
 
