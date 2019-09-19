@@ -7,7 +7,7 @@ def gene_distances(double[:] chr, long[:] start, long[:] end):
     # to remember which permutation we are one
     cdef long i, j, index
 
-    print("Calculating for {} genes".format(len(chr)))
+    #print("Calculating for {} genes".format(len(chr)))
 
     # Loop through genes and calcualate distances
     index = 0
