@@ -1925,7 +1925,8 @@ class COB(Expr):
         num_bytes_needed = comb(self.shape()[0], 2) * 8
         if num_bytes_needed > psutil.virtual_memory().available:
             raise MemoryError("Not enough RAM to calculate co-expression network")
-        pccs = 1 - PCCUP.pair_correlation(
+        # pass in a contigious array to the cython function to calculate PCCs
+        pccs = PCCUP.pair_correlation(
             np.ascontiguousarray(
                 # PCCUP expects floats
                 self._expr.as_matrix().astype("float")
