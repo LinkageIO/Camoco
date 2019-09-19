@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages, Extension
-from Cython.Build import cythonize
 
 import os
 import io
@@ -53,7 +52,7 @@ setup(
     scripts = [
         'camoco/cli/camoco'
     ],
-    ext_modules = cythonize([pccup,refgendist]),
+    ext_modules = [pccup,refgendist],
     cmdclass = {
     },
     package_data = {
