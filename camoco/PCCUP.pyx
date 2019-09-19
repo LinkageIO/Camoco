@@ -15,49 +15,103 @@ cdef extern from "numpy/npy_math.h" nogil:
 #    bint isnan(double x)
 #    double sqrt(double x)
 
+def pcc2(double[:] x, double[:] y):
+    '''
+    This implements the PCC as defined by Wikipedia
+    '''
+    cdef long k
+    cdef long double xi, yi, n
+    cdef long double xsum, ysum
+    cdef long double xbar, ybar
+    cdef long double xsquare, ysquare
+    cdef long double xy
+
+    assert x.shape[0] == y.shape[0]
+    n = xsum = ysum = xbar = ybar = xy = xsquare = ysquare = 0.0
+    for k in range(x.shape[0]):
+        xi = x[k]
+        yi = y[k]
+        # Only iterate over values that are not nan in 
+        # both x AND y (nan == nan returns False for a nan value)
+        if xi == xi and yi == yi:
+            xy += (xi*yi)
+            xsum += xi
+            ysum += yi
+            xsquare += xi**2
+            ysquare += yi**2
+            n += 1
+    # Short circuit if there are not enough values
+    if n < 10:
+        r = np.nan
+    else:
+        xbar = xsum / n
+        ybar = ysum / n
+
+        numerator   = xy - n*(xbar*ybar)
+        denominator = sqrt(xsquare - (n*(xbar**2))) * sqrt(ysquare - (n*(ybar**2)))
+        if denominator == 0:
+            r = np.nan
+        else:
+            r = numerator / denominator
+            if r > 1 or r < -1:
+                raise ValueError(f"PCC out of range")
+    return r
+
+def pcc(double[:] x, double[:] y):
+    # ref: https://stackoverflow.com/questions/25077080/calculate-special-correlation-distance-matrix-faster?rq=1
+    # NOTE: This returns the pcc + 1 because its an implementation of the pdist function
+    cdef float u, v
+    cdef int k, count
+    cdef long num_rows, num_cols
+    cdef double du, dv, d, n
+    cdef long double sum_u, sum_v, sum_u2, sum_v2, sum_uv
+    cdef long index
+    cdef float r
+
+    num_cols = x.shape[0]
+    sum_u = sum_v = sum_u2 = sum_v2 = sum_uv = 0.0
+    count = 0            
+    for k in range(num_cols):
+        u = x[k]
+        v = y[k]
+        # skips if u or v are nans
+        if u == u and v == v:
+            sum_u += u
+            sum_v += v
+            sum_u2 += u*u
+            sum_v2 += v*v
+            sum_uv += u*v
+            count += 1
+    if count < 10:
+        r = np.nan
+    else:
+        um = sum_u / count
+        vm = sum_v / count
+        n = sum_uv - sum_u * vm - sum_v * um + um * vm * count
+        du = sqrt(sum_u2 - 2 * sum_u * um + um * um * count) 
+        dv = sqrt(sum_v2 - 2 * sum_v * vm + vm * vm * count)
+        if (du * dv) == 0:
+            r = np.nan
+        else:
+            r = 1 - n / (du * dv)
+    return r
+
+
 # input is a typed numpy memoryview (::1 means c contiguous array)
 def pair_correlation(double[:, ::1] x):
     # Define a new memoryview on an empty gene X gene matrix
     cdef float[::1] pccs = np.empty(comb(x.shape[0],2,exact=True)).astype('float32')
-    cdef float u, v
-    cdef int i, j, k, count
-    cdef long num_rows, num_cols
-    cdef float du, dv, d, n, r
-    cdef float sum_u, sum_v, sum_u2, sum_v2, sum_uv
+    cdef long i, j
+    cdef long num_rows
     cdef long index
+    cdef float r
 
     index = 0
     num_rows = x.shape[0]
-    num_cols = x.shape[1]
     for i in range(num_rows):
         for j in range(i+1, num_rows):
-            sum_u = sum_v = sum_u2 = sum_v2 = sum_uv = 0.0
-            count = 0            
-            # Iterate over the column values
-            for k in range(num_cols):
-                u = x[i, k]
-                v = x[j, k]
-                # skips if u or v are nans
-                if u == u and v == v:
-                    sum_u += u
-                    sum_v += v
-                    sum_u2 += u*u
-                    sum_v2 += v*v
-                    sum_uv += u*v
-                    count += 1
-            if count < 10:
-                pccs[index] = np.nan
-            else:
-                um = sum_u / count
-                vm = sum_v / count
-                n = sum_uv - sum_u * vm - sum_v * um + um * vm * count
-                du = sqrt(sum_u2 - 2 * sum_u * um + um * um * count) 
-                dv = sqrt(sum_v2 - 2 * sum_v * vm + vm * vm * count)
-                if (du * dv) == 0:
-                    pccs[index] = np.nan
-                else:
-                    r = 1 - n / (du * dv)
-                    pccs[index] = r
+            r = pcc2(x[i,:],x[j,:])
+            pccs[index] = r
             index += 1
     # Return the base of the memory view
     return pccs.base
