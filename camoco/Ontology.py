@@ -596,7 +596,10 @@ class Ontology(Camoco):
                 )
                 enrich.append(e)
             if return_table:
-                return pd.concat(enrich)
+                if len(enrich) > 0:
+                    return pd.concat(enrich)
+                else:
+                    return pd.DataFrame()
             else:
                 return enrich
         # return a new copy of each
