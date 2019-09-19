@@ -53,7 +53,7 @@ def pcc2(double[:] x, double[:] y):
             r = np.nan
         else:
             r = numerator / denominator
-            if r > 1 or r < -1:
+            if abs(r) > 1.1:
                 raise ValueError(f"PCC out of range")
     return r
 
