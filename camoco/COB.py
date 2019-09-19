@@ -1103,7 +1103,6 @@ class COB(Expr):
         self,
         gene_list=None,
         I=2.0,
-        scheme=7,
         min_distance=None,
         min_cluster_size=0,
         max_cluster_size=10e10,
@@ -1131,12 +1130,15 @@ class COB(Expr):
             -------
             A list clusters containing a lists of genes within each cluster
         """
-        # Inspired by https://github.com/networkx/networkx/blob/master/networkx/convert_matrix.py
         import markov_clustering as mc
 
         matrix, gene_index = self.to_sparse_matrix(gene_list=gene_list)
         # Run MCL
-        result = mc.run_mcl(matrix)
+        result = mc.run_mcl(
+            matrix,
+            inflation=I,
+            verbose=True
+        )
         clusters = mc.get_clusters(result)
         # MCL traditionally returns clusters by size with 0 being the largest
         clusters = sorted(clusters, key=lambda x: len(x), reverse=True)
@@ -2101,7 +2103,7 @@ class COB(Expr):
         self.log("Finished finding clusters")
         return self
 
-    def _coex_concordance(self, gene_a, gene_b, maxnan=10):
+    def _coex_concordance(self, gene_a, gene_b, maxnan=10, return_dict=False):
         """
             This is a sanity method to ensure that the pcc calculated
             directly from the expr profiles matches the one stored in
@@ -2118,7 +2120,10 @@ class COB(Expr):
         z = np.arctanh(r - 0.0000001)
         # standard normalize it
         z = (z - float(self._global("pcc_mean"))) / float(self._global("pcc_std"))
-        return z
+        if return_dict:
+            return {'pearsonr': r, 'zscore': z}
+        else:
+            return z
 
     """ -----------------------------------------------------------------------
             Class Methods -- Factory Methods
