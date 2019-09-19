@@ -624,6 +624,18 @@ class Expr(Camoco):
             See: https://matplotlib.org/api/_as_gen/matplotlib.colors.LinearSegmentedColormap.html
         """
         heatmapdict = {
+            'red': ((0.0, 1.0, 1.0),
+                    (0.5, 0.0, 0.0),
+                    (1.0, 0.0, 0.0)),
+            'green':((0.0, 1.0, 1.0),
+                    (0.5, 0.0, 0.0),
+                    (1.0, 0.0, 0.0)),
+            'blue': ((0.0, 0.0, 0.0),
+                    (0.5, 0.0, 0.0),
+                    (1.0, 1.0, 1.0))} 
+
+
+        heatmapdict2 = {
             "red": ((0.0, 1.0, 1.0), (0.3, 0.5, 0.5), (0.5, 0.0, 0.0), (1.0, 0.0, 0.0)),
             "green": ((0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (1.0, 0.0, 0.0)),
             "blue": (
