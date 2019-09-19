@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages, Extension
+from Cython.Build import cythonize
 
 import os
 import io
@@ -8,7 +9,8 @@ import re
 try:
     import numpy
 except ModuleNotFoundError as e:
-    raise ModuleNotFoundError(
+    #raise ModuleNotFoundError(
+    print(
         "Please install numpy before installing Camoco,"        
     )
     sys.exit(1)
@@ -31,13 +33,11 @@ def find_version(*file_paths):
 pccup = Extension(
     'camoco.PCCUP',
     sources=['camoco/PCCUP.pyx'],
-#   extra_compile_args=['-ffast-math'],
     include_dirs=[numpy.get_include()]
 )
 refgendist = Extension(
     'camoco.RefGenDist',
     sources=['camoco/RefGenDist.pyx'],
-#   extra_compile_args=['-ffast-math'],
     include_dirs=[numpy.get_include()]
 )
 
@@ -53,10 +53,9 @@ setup(
     scripts = [
         'camoco/cli/camoco'
     ],
-    ext_modules = [pccup,refgendist],
+    ext_modules = cythonize([pccup,refgendist]),
     cmdclass = {
     },
-
     package_data = {
         '':['*.cyx']    
     },
@@ -65,9 +64,8 @@ setup(
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=18.0',
         #'numpy==1.14.5',
-        'cython',
+        'cython==0.29.10',
     ],
-#   include_dirs=['camoco/include'],
     install_requires = [		
         'minus80>=0.3.3',
         'cython>=0.29.10',    		
@@ -75,7 +73,7 @@ setup(
         'pyyaml>=5.1.1',
         'matplotlib>=3.1.0',		
         'numpy>=1.16.4',		
-        'scipy>=1.2.1',		
+        'scipy==1.2.1',		
         'pandas==0.23.4',		
         'fa2>=0.3.5',
         'scikit-learn>=0.21.2',
@@ -101,7 +99,6 @@ setup(
         #'git+https://github.com/rogerbinns/apsw' 
     ],
     include_package_data=True,
-
     author = 'Rob Schaefer',
     author_email = 'rob@linkgae.io',
     description = 'Library for Co-Analysis of Molecular Componenets.',
