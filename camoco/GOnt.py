@@ -424,10 +424,7 @@ class GOnt(Ontology):
 
     def plot_network(self, terms=None, remove_orphans=True):
         """
-
         """
-        # Get term objects
-        terms = [self[x] for x in terms]
         # get coordinates
         coor = self._coordinates()
         fig = plt.figure(facecolor="white", figsize=(20, 20))
@@ -436,29 +433,37 @@ class GOnt(Ontology):
         ax.grid(False)
         ax.set_xticks([])
         ax.set_yticks([])
+        G = nx.DiGraph()
         # Keep track of genes to plot
-        background_terms = set()
+        background_terms = list()
         if terms is not None:
-            highlighted_terms = set(terms)
+            terms = [self[x] for x in terms]
+            highlighted_terms = list(terms)
         else:
-            highlighted_terms = set()
+            highlighted_terms = []
+        term_edges = []
+        term_nodes = []
         # plot the edges
         for term in self.iter_terms():
             if remove_orphans and len(term.is_a) == 0 and self.num_children(term) == 0:
                 continue
             else:
-                background_terms.add(term)
+                background_terms.append(term)
+                G.add_node(term.id,goname=term.name,desc=term.desc)
             for parent in term.is_a:
                 tcor = coor.loc[term.id]
                 pcor = coor.loc[parent]
                 ax.plot([tcor.x, pcor.x], [tcor.y, pcor.y], "gray", alpha=0.7, zorder=1)
+                term_edges.append((term.id,parent))
         # plot the genes
         background_terms = coor.loc[[x.id for x in background_terms], :]
         ax.scatter(background_terms.x, background_terms.y, alpha=1, zorder=2)
         # plot the highlighted terms
         highlighted_terms = coor.loc[[x.id for x in highlighted_terms], :]
         ax.scatter(highlighted_terms.x, highlighted_terms.y, alpha=1, zorder=3)
-        return fig
+        #G.add_nodes_from(term_nodes)
+        G.add_edges_from(term_edges)
+        return fig,G
 
     def to_json(self, filename=None, terms=None):
         """
