@@ -84,7 +84,8 @@ setup(
         'fastcluster>=1.1.25',
         'bcolz>=1.2.1',
         'psutil>=5.6.3',
-        'odo>=0.5.0'
+        'odo>=0.5.0',
+        'blaze>=0.10.1'
     ],
     extras_require={
         'docs' : [
