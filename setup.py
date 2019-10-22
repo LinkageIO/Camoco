@@ -81,7 +81,10 @@ setup(
         'powerlaw>=1.4.6',
         'flask==1.0.3',
         'markov-clustering>=0.0.6.dev0',
-        'fastcluster>=1.1.25'
+        'fastcluster>=1.1.25',
+        'bcolz>=1.2.1',
+        'psutil>=5.6.3',
+        'odo>=0.5.0'
     ],
     extras_require={
         'docs' : [
