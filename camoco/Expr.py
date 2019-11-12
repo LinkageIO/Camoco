@@ -360,8 +360,7 @@ class Expr(Camoco):
             raise TypeError(
                 (
                     "Attempting normalization on already normalized"
-                    " dataset. Consider passing a --max_val "
-                    "< {} if Im wrong."
+                    " dataset. See the --max-val option to over ride."
                 ).format(min(self.max_values()))
             )
         else:
