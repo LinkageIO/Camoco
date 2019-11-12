@@ -103,7 +103,7 @@ setup(
     ],
     include_package_data=True,
     author = 'Rob Schaefer',
-    author_email = 'rob@linkgae.io',
+    author_email = 'rob@linkage.io',
     description = 'Library for Co-Analysis of Molecular Componenets.',
     license = "Copyright Linkage Analytics 2017, Available under the MIT License",
     url = 'https://github.com/schae234/camoco'
