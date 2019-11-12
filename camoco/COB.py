@@ -1459,17 +1459,21 @@ class COB(Expr):
         from fa2 import ForceAtlas2
 
         forceatlas2 = ForceAtlas2(
+            # Behavior alternatives
             outboundAttractionDistribution=False,
             linLogMode=False,
             adjustSizes=False,
             edgeWeightInfluence=1.0,
+            # Performance
             jitterTolerance=1.0,
-            barnesHutOptimize=True,
+            barnesHutOptimize=False,
             barnesHutTheta=1.2,
             multiThreaded=False,
-            scalingRatio=2.0,
+            # Tuning
+            scalingRatio=1.0,
             strongGravityMode=False,
-            gravity=1.0,
+            gravity=0.5,
+            # Logging
             verbose=True,
         )
         pos = self._bcolz("coordinates")
@@ -1536,7 +1540,7 @@ class COB(Expr):
         # Plot the genes
         if genes is not None:
             ids = coor.loc[[x.id for x in genes if x.id in coor.index]]
-            ax.scatter(ids.x, ids.y, color="g")
+            ax.scatter(ids.x, ids.y, color="g",s=100)
         # Plot clusters
         if plot_clusters:
             from matplotlib.patches import Ellipse
@@ -1560,7 +1564,7 @@ class COB(Expr):
                 c.update(
                     {
                         "edgecolor": "black",
-                        "fill": False,
+                        "fill"     : False,
                         "linestyle": ":",
                         "linewidth": 3,
                     }
@@ -1587,6 +1591,7 @@ class COB(Expr):
         plot_dendrogram=True,
         nan_color=None,
         cmap=None,
+        expr_boundaries=3.5,
     ):
         """
             Plots a heatmap of genes x expression.
@@ -1637,6 +1642,9 @@ class COB(Expr):
                 A matplotlib color map for the heatmap. See
                 https://matplotlib.org/gallery/color/colormap_reference.html
                 for options.
+            expr_boundaries : int (default: 3)
+                Set the min/max boundaries for expression values so that
+                the cmap colors aren't dominated by outliers
 
             Returns
             -------
@@ -1666,6 +1674,8 @@ class COB(Expr):
                 raw=raw,
                 gene_normalize=gene_normalize,
             )
+        # set the outliers to the maximium value for the heatmap
+        dm[abs(dm)>expr_boundaries] = expr_boundaries
         # Get the Gene clustering order
         if cluster_method in hier_cluster_methods:
             self.log("Ordering rows by leaf")
@@ -1699,7 +1709,7 @@ class COB(Expr):
             dm = dm.iloc[:, order]
         # Save plot if provided filename
         if plot_dendrogram == False:
-            fig = plt.figure(facecolor="white", figsize=(20, 20))
+            fig = plt.figure(facecolor="white", figsize=(20, 20),constrained_layout=True)
             ax = fig.add_subplot(111)
         else:
             fig = plt.figure(facecolor="white", figsize=(20, 20))
@@ -1726,9 +1736,11 @@ class COB(Expr):
         vmin = vmax * -1
         im = ax.matshow(nan_mask, aspect="auto", cmap=cmap, vmax=vmax, vmin=vmin)
         ax.grid(False)
-        ax.tick_params(labelsize=4)
+        ax.tick_params(labelsize=8)
         ax.tick_params("x", labelrotation=45)
         ax.set(xticklabels=dm.columns.values, yticklabels=dm.index.values)
+        for label in ax.get_xticklabels():
+            label.set_horizontalalignment('left')
         # Intelligently add labels
         if (
             include_accession_labels is None and len(dm.columns) < 60
