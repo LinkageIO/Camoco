@@ -1523,7 +1523,9 @@ class COB(Expr):
         color_clusters=True,
         min_cluster_size=100,
         max_clusters=None,
-        background_color=None,
+        background_color='tab:blue',
+        plot_edges=False,
+        max_edges=100000
     ):
         """
 
@@ -1536,11 +1538,46 @@ class COB(Expr):
         ax.grid(False)
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.scatter(coor.x, coor.y, alpha=1, color=background_color)
+        # Plot edges
+        if plot_edges:
+            self.log("Plotting edges")
+            edges = self.subnetwork(
+                gene_list=self.refgen.from_ids(
+                    coor.index.values
+                )
+            )
+            edges = edges.sort_values(by="score", ascending=False)[0:max_edges].reset_index()
+            # Extract the coordinates for edges
+            a_coor = coor.loc[edges.gene_a]
+            b_coor = coor.loc[edges.gene_b]
+            #Plot using a matplotlib lines collection
+            lines = LineCollection(
+                zip(zip(a_coor.x,a_coor.y),zip(b_coor.x,b_coor.y)),
+                colors='k',
+                antialiased=(1,),
+                alpha=0.7
+            )
+            lines.set_zorder(1)
+            ax.add_collection(lines)
+
+        ax.scatter(
+            coor.x, 
+            coor.y, 
+            alpha=1, 
+            color=background_color,
+            s=150
+        )
         # Plot the genes
         if genes is not None:
+            self.log("Plotting genes")
             ids = coor.loc[[x.id for x in genes if x.id in coor.index]]
-            ax.scatter(ids.x, ids.y, color="g",s=100)
+            nodes = ax.scatter(
+                ids.x, 
+                ids.y, 
+                color="r",
+                s=150,
+            )
+            nodes.set_zorder(2)
         # Plot clusters
         if plot_clusters:
             from matplotlib.patches import Ellipse
@@ -1556,7 +1593,7 @@ class COB(Expr):
                 ccoor = coor.loc[ids]
                 if color_clusters:
                     # This will overwrite the genes in the cluster giving them colors 
-                    ax.scatter(ccoor.x, ccoor.y)
+                    ax.scatter(ccoor.x, ccoor.y,s=150)
                 try:
                     c = self.cluster_coordinates(clus)
                 except KeyError as e:
@@ -1675,7 +1712,8 @@ class COB(Expr):
                 gene_normalize=gene_normalize,
             )
         # set the outliers to the maximium value for the heatmap
-        dm[abs(dm)>expr_boundaries] = expr_boundaries
+        dm[dm > expr_boundaries] = expr_boundaries
+        dm[dm < -1*expr_boundaries] = -1 * expr_boundaries
         # Get the Gene clustering order
         if cluster_method in hier_cluster_methods:
             self.log("Ordering rows by leaf")
@@ -1760,19 +1798,19 @@ class COB(Expr):
 
                 # Plot the accession dendrogram
                 import sys
-
-                sys.setrecursionlimit(10000)
-                dendrogram(
-                    accession_linkage,
-                    ax=accession_ax,
-                    color_threshold=np.inf,
-                    orientation="bottom",
-                )
-                accession_ax.set_facecolor("w")
-                accession_ax.set_xticks([])
-                accession_ax.set_yticks([])
+                if cluster_accessions == True:
+                    sys.setrecursionlimit(10000)
+                    dendrogram(
+                        accession_linkage,
+                        ax=accession_ax,
+                        color_threshold=np.inf,
+                        orientation="bottom",
+                    )
+                    accession_ax.set_facecolor("w")
+                    accession_ax.set_xticks([])
+                    accession_ax.set_yticks([])
                 # Plot the gene dendrogram
-                if cluster_method != "mcl":
+                if cluster_method in hier_cluster_methods:
                     dendrogram(
                         expr_linkage,
                         ax=gene_ax,
