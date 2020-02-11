@@ -780,8 +780,7 @@ if __name__ == '__main__':
     )
     overlapCLI.set_defaults(func=Overlap.from_CLI)
 
-
-    ''' --------------------------
+    ''' -------------------------
         Health
     --------------------------'''
     health = subparsers.add_parser(
@@ -793,9 +792,14 @@ if __name__ == '__main__':
         default=None
     )
     health.add_argument(
-        '--out',
+        '--out-dir',
         default=None,
-        help='Output file prefix.'
+        help='Output directory for report files.'
+    )
+    health.add_argument(
+        '--out-prefix',
+        default=None,
+        help='Output file prefix. Defaults to <COBNAME>_Health'
     )
     health.add_argument(
         '--refgen',
