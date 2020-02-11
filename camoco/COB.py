@@ -6,6 +6,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import camoco.PCCUP as PCCUP
 
+
 from .Camoco import Camoco
 from .RefGen import RefGen
 from .Locus import Locus, Gene
@@ -115,65 +116,45 @@ class COB(Expr):
         None
             The summary is printed either to stdout or a provided file.
         """
+        import camoco as co
         print(
-            """
-            COB Dataset: {}
-                Desc: {}
-                RawType: {}
-                TransformationLog: {}
-                Num Genes: {:,}({:.2g}% of total)
-                Num Accessions: {}
+           f"""
+            CAMOCO (version:{co.__version__})
+            ---------------------------------------
+
+            COB Dataset: {self.name}
+                Desc: {self.description}
+                RawType: {self.rawtype}
+                TransformationLog: {self._transformation_log}
+                Num Genes: {self.num_genes():,}({(self.num_genes() / self.num_genes(raw=True)) * 100:.2g}% of total)
+                Num Accessions: {self.num_accessions()}
 
             Network Stats
             -------------
-            Unthresholded Interactions: {:,}
-            Thresholded (Z >= {}): {:,}
+            Unthresholded Interactions: {len(self.coex):,}
+            Thresholded (Z >= {self._global("current_significance_threshold")}): {len(self.sigs):,}
 
             Raw
             ------------------
-            Num Raw Genes: {:,}
-            Num Raw Accessions: {}
+            Num Raw Genes: {len(self.expr(raw=True)):,}
+            Num Raw Accessions: {len(self.expr(raw=True).columns)}
 
             QC Parameters
             ------------------
-            min expr level: {} 
+            min expr level: {self._global("qc_min_expr")} 
                 - expression below this is set to NaN
-            max gene missing data: {} 
+            max gene missing data: {self._global("qc_max_gene_missing_data")} 
                 - genes missing more than this percent are removed
-            max accession missing data: {}
+            max accession missing data: {self._global("qc_max_accession_missing_data")}
                 - Accession missing more than this percent are removed
-            min single sample expr: {} 
+            min single sample expr: {self._global("qc_min_single_sample_expr")} 
                 - genes must have this amount of expression in 
                   at least one accession.
 
             Clusters
             ------------------
-            Num clusters (size >= 10): {}
-
-
-        """.format(
-                # Dataset
-                self.name,
-                self.description,
-                self.rawtype,
-                self._transformation_log(),
-                self.num_genes(),
-                (self.num_genes() / self.num_genes(raw=True)) * 100,
-                self.num_accessions(),
-                len(self.coex),
-                self._global("current_significance_threshold"),
-                len(self.sigs),
-                # Raw
-                len(self.expr(raw=True)),
-                len(self.expr(raw=True).columns),
-                # QC
-                self._global("qc_min_expr"),
-                self._global("qc_max_gene_missing_data"),
-                self._global("qc_max_accession_missing_data"),
-                self._global("qc_min_single_sample_expr"),
-                # Clusters
-                sum(self.clusters.groupby("cluster").apply(len) >= 10),
-            ),
+            Num clusters (size >= 10): {sum(self.clusters.groupby("cluster").apply(len) >= 10)}
+        """,
             file=file,
         )
 
@@ -872,35 +853,6 @@ class COB(Expr):
         del net
         return
 
-    def to_treeview(self, filename, cluster_method="mcl", gene_normalize=True):
-        dm = self.expr(gene_normalize=gene_normalize)
-        if cluster_method == "leaf":
-            order = self._bcolz("leaves").sort("index").index.values
-        elif cluster_method == "mcl":
-            order = (
-                self._bcolz("clusters")
-                .loc[dm.index]
-                .fillna(np.inf)
-                .sort("cluster")
-                .index.values
-            )
-        else:
-            order = dm.index
-        dm = dm.loc[order, :]
-
-        aliases_raw = (
-            self.refgen.db.cursor().execute("SELECT alias,id FROM aliases").fetchall()
-        )
-        aliases = dict()
-        for alias, id in aliases_raw:
-            if id in aliases:
-                aliases[id] += alias + " "
-            else:
-                aliases[id] = alias + " "
-        als = pd.Series(aliases)
-        dm.insert(0, "Aliases", als)
-        dm.to_csv(filename)
-
     def to_json(
         self,
         gene_list=None,
@@ -1450,7 +1402,13 @@ class COB(Expr):
             return None
         return dm
 
-    def coordinates(self, iterations=50, force=False, max_edges=100000, lcc_only=True):
+    def coordinates(
+            self, 
+            iterations=1000, 
+            force=False, 
+            max_edges=100000, 
+            lcc_only=True
+        ):
         """ 
             returns the static layout, you can change the stored layout by
             passing in a new layout object. If no layout has been stored or a gene
@@ -1460,19 +1418,19 @@ class COB(Expr):
 
         forceatlas2 = ForceAtlas2(
             # Behavior alternatives
-            outboundAttractionDistribution=False,
+            outboundAttractionDistribution=True,
             linLogMode=False,
             adjustSizes=False,
             edgeWeightInfluence=1.0,
             # Performance
             jitterTolerance=1.0,
-            barnesHutOptimize=False,
+            barnesHutOptimize=True,
             barnesHutTheta=1.2,
             multiThreaded=False,
             # Tuning
-            scalingRatio=1.0,
+            scalingRatio=2.0,
             strongGravityMode=False,
-            gravity=0.5,
+            gravity=3.0,
             # Logging
             verbose=True,
         )
@@ -1527,9 +1485,9 @@ class COB(Expr):
         plot_edges=False,
         max_edges=100000
     ):
-        """
-
-        """
+        '''
+            Plot a "hairball" image of the network.
+        '''
         coor = self.coordinates(lcc_only=lcc_only, force=force)
         fig = plt.figure(facecolor="white", figsize=(20, 20))
         ax = fig.add_subplot(111)
