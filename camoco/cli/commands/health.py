@@ -1,18 +1,16 @@
+import os
+import pathlib
+import powerlaw
+import matplotlib
+import numpy as np
 import pandas as pd
 import camoco as co
-import numpy as np
-import powerlaw
-import os
-
-from os import path
-
-from camoco.Tools import log as coblog
-
-import matplotlib
-
-matplotlib.style.use("ggplot")
 import matplotlib.pylab as plt
 
+from os import path
+from camoco.Tools import log as coblog
+
+matplotlib.style.use("ggplot")
 
 def cob_health(args):
     log = coblog()
@@ -22,49 +20,48 @@ def cob_health(args):
         f"   Network Health:{args.cob} \n"
         f"-----------------------------\n"
     )
-    log(f"\nCreating reports in {os.getcwd()}\n\n")
+    if args.out_dir is None:
+        args.out_dir = os.getcwd()
+    else: # append the cwd
+        args.out_dir = os.getcwd() + '/' + args.out_dir
+    # Make sure the output dir exists
+    os.makedirs(args.out_dir,exist_ok=True)
+
+    log(f"\nCreating reports in {args.out_dir}\n\n")
 
     cob = co.COB(args.cob)
-    if args.out is None:
-        args.out = "{}_Health".format(cob.name)
-    log(f"Output prefix: {args.out}")
+    # generate the prefix for the output files
+    if args.out_prefix is None:
+        args.out_prefix = f"{cob.name}_Health"
+    args.out_prefix = str(pathlib.Path(args.out_dir) / args.out_prefix)
 
     if args.edge_zscore_cutoff is not None:
         log("Changing Z-Score cutoff to {}", args.edge_zscore_cutoff)
         cob.set_sig_edge_zscore(args.edge_zscore_cutoff)
 
     log("Printing Summary ---------------------------------------------------")
-    if not path.exists("{}.summary.txt".format(args.out)):
-        with open("{}.summary.txt".format(args.out), "w") as OUT:
+    if not path.exists("{}.summary.txt".format(args.out_prefix)):
+        with open("{}.summary.txt".format(args.out_prefix), "w") as OUT:
             # Print out the network summary
             cob.summary(file=OUT)
     else:
         log("Skipped summary.")
 
     log("Plotting Scores ----------------------------------------------------")
-    if not path.exists("{}_CoexPCC_raw.png".format(args.out)):
-        cob.plot_scores("{}_CoexPCC_raw.png".format(args.out), pcc=True)
+    if not path.exists("{}_CoexPCC_raw.png".format(args.out_prefix)):
+        cob.plot_scores("{}_CoexPCC_raw.png".format(args.out_prefix), pcc=True)
     else:
         log("Skipped Raw.")
 
-    if not path.exists("{}_CoexScore_zscore.png".format(args.out)):
-        cob.plot_scores("{}_CoexScore_zscore.png".format(args.out), pcc=False)
+    if not path.exists("{}_CoexScore_zscore.png".format(args.out_prefix)):
+        cob.plot_scores("{}_CoexScore_zscore.png".format(args.out_prefix), pcc=False)
     else:
         log("Skipped Norm.")
 
     log("Plotting Expression ------------------------------------------------")
-    # if not path.exists('{}_Expr_raw.png'.format(args.out)):
-    #    cob.plot(
-    #        '{}_Expr_raw.png'.format(args.out),
-    #        include_accession_labels=True,
-    #        raw=True,
-    #        cluster_method=None
-    #    )
-    # else:
-    #    log('Skipped raw.')
-    if not path.exists("{}_Expr_norm.png".format(args.out)):
+    if not path.exists("{}_Expr_norm.png".format(args.out_prefix)):
         cob.plot_heatmap(
-            "{}_Expr_norm.png".format(args.out),
+            "{}_Expr_norm.png".format(args.out_prefix),
             include_accession_labels=True,
             raw=False,
             cluster_method="ward",
@@ -72,21 +69,10 @@ def cob_health(args):
         )
     else:
         log("Skipped norm.")
-    # log('Plotting Cluster Expression-----------------------------------------')
-    # if not path.exists('{}_Expr_cluster.png'.format(args.out)):
-    #    cob.plot(
-    #        '{}_Expr_cluster.png'.format(args.out),
-    #        include_accession_labels=True,
-    #        raw=False,
-    #        cluster_accessions=True,
-    #        avg_by_cluster=True
-    #    )
-    # else:
-    #    log('Skipped norm.')
 
     log("Printing QC Statistics ---------------------------------------------")
     if args.refgen is not None:
-        if not path.exists("{}_qc_gene.txt".format(args.out)):
+        if not path.exists("{}_qc_gene.txt".format(args.out_prefix)):
             # Print out the breakdown of QC Values
             refgen = co.RefGen(args.refgen)
             gene_qc = cob._bcolz("qc_gene")
@@ -97,12 +83,12 @@ def cob_health(args):
             totals = gene_qc.ix[:, slice(1, None)].apply(sum)
             totals.name = "TOTAL"
             gene_qc = gene_qc.append(totals)
-            gene_qc.to_csv("{}_qc_gene.txt".format(args.out), sep="\t")
+            gene_qc.to_csv("{}_qc_gene.txt".format(args.out_prefix), sep="\t")
         else:
             log("Skipped QC summary.")
 
     log("Plotting Degree Distribution ---------------------------------------")
-    if not path.exists("{}_DegreeDist.png".format(args.out)):
+    if not path.exists("{}_DegreeDist.png".format(args.out_prefix)):
         degree = cob.degree["Degree"].values
         # Using powerlaw makes run-time warning the first time you use it.
         # This is still an open issue on the creators github.
@@ -133,7 +119,7 @@ def cob_health(args):
         plt.title("{} Degree Distribution".format(cob.name))
         # Save Fig
         try:
-            plt.savefig("{}_DegreeDist.png".format(args.out))
+            plt.savefig("{}_DegreeDist.png".format(args.out_prefix))
         except FutureWarning as e:
             # This is a matplotlib bug
             pass
@@ -148,7 +134,7 @@ def cob_health(args):
         else:
             alpha = 0.05
         # Generate the GO Table
-        if not path.exists("{}_GO.csv".format(args.out)):
+        if not path.exists("{}_GO.csv".format(args.out_prefix)):
             go = co.GOnt(args.go)
             term_ids = []
             density_emp = []
@@ -244,14 +230,14 @@ def cob_health(args):
             )
             # Store the GO results in a CSV
             go_enrichment.sort_values(by="density_pval", ascending=True).to_csv(
-                "{}_GO.csv".format(args.out), index=False
+                "{}_GO.csv".format(args.out_prefix), index=False
             )
             if terms_tested == 0:
                 log.warn("No GO terms met your min/max gene criteria!")
         else:
-            go_enrichment = pd.read_table("{}_GO.csv".format(args.out), sep=",")
+            go_enrichment = pd.read_table("{}_GO.csv".format(args.out_prefix), sep=",")
 
-        if not path.exists("{}_GO.png".format(args.out)):
+        if not path.exists("{}_GO.png".format(args.out_prefix)):
             # Convert pvals to log10
             with np.errstate(divide="ignore"):
                 # When no bootstraps are more extreme than the term, the minus log pval yields an infinite
@@ -386,7 +372,7 @@ def cob_health(args):
             # Save Figure
             plt.tight_layout()
             try:
-                plt.savefig("{}_GO.png".format(args.out))
+                plt.savefig("{}_GO.png".format(args.out_prefix))
             except FutureWarning as e:
                 pass
         else:
