@@ -58,21 +58,21 @@ setup(
     package_data = {
         '':['*.cyx']    
     },
-    python_requires='>=3.6,<3.8',
+    python_requires='>=3.6,<3.9',
     setup_requires = [
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=18.0',
         #'numpy==1.14.5',
-        'cython==0.29.10',
+        'cython>=0.29.10',
     ],
     install_requires = [		
         'minus80>=0.3.3',
-        'cython>=0.29.10',    		
+       #'cython>=0.29.10',    		
         'igraph==0.1.11',		
         'pyyaml>=5.1.1',
         'matplotlib>=3.1.0',		
         'numpy>=1.16.4',		
-        'scipy==1.2.1',		
+        'scipy>=1.2.1',		
         'pandas==0.23.4',		
         'fa2>=0.3.5',
         'scikit-learn>=0.21.2',
