@@ -1,9 +1,5 @@
 #! /usr/bin/python3
-from .Camoco import Camoco
-from .RefGen import RefGen
-from .Tools import memoize
-from .Locus import Locus
-from .Exceptions import (
+from .exceptions import (
     CamocoGeneNameError,
     CamocoAccessionNameError,
     CamocoGeneAbsentError,
@@ -22,9 +18,6 @@ import matplotlib.pyplot as plt
 import io
 import re
 import string
-
-pd.set_option("display.width", 100)
-
 
 class Expr(Camoco):
     """
