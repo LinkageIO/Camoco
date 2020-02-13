@@ -6,14 +6,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import camoco.PCCUP as PCCUP
 
-
-from .Camoco import Camoco
-from .RefGen import RefGen
-from .Locus import Locus, Gene
 from .Expr import Expr
-from .Tools import memoize, available_datasets
-from .Term import Term
-from .Ontology import Ontology
 
 from math import isinf
 from numpy import matrix, arcsinh, tanh
@@ -26,6 +19,7 @@ from scipy.special import comb
 from scipy.stats import norm, pearsonr
 from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
+
 from io import UnsupportedOperation
 
 import matplotlib.pyplot as plt
@@ -38,11 +32,6 @@ import itertools
 import fastcluster
 import psutil
 
-from odo import odo
-
-from matplotlib import rcParams
-
-rcParams.update({"figure.autolayout": True})
 
 import operator
 import statsmodels.api as sm
@@ -178,8 +167,7 @@ class COB(Expr):
         return qc_gene.groupby("chrom").aggregate(sum, axis=0)
 
     @property
-    @memoize
-    def edge_FDR(self):  # C
+    def edge_FDR(self): 
         """
         Returns a calculated false discovery rate of the Edges. This is 
         calculated from the number of expected edges from the standard normal
@@ -1104,84 +1092,6 @@ class COB(Expr):
             loci = self.refgen.from_ids([gene_id_index[i] for i in c])
             result.append(loci)
         return result
-
-    def _mcl_legacy(
-        self,
-        gene_list=None,
-        I=2.0,
-        scheme=7,
-        min_distance=None,
-        min_cluster_size=0,
-        max_cluster_size=10e10,
-    ):
-        """
-            A *very* thin wrapper to the MCL program. The MCL program must
-            be accessible by a subprocess (i.e. by the shell).
-            Returns clusters (as list) as designated by MCL.
-
-            Parameters
-            ----------
-            gene_list : a gene iterable
-                These are the genes which will be clustered
-            I : float (default: 2.0)
-                This is the inflation parameter passed into mcl.
-            scheme : int in 1:7
-                MCL accepts parameter schemes. See mcl docs for more details
-            min_distance : int (default: None)
-                The minimum distance between genes for which to consider
-                co-expression interactions. This filters out cis edges.
-            min_cluster_size : int (default: 0)
-                The minimum cluster size to return. Filter out clusters smaller
-                than this.
-            max_cluster_size : float (default: 10e10)
-                The maximum cluster size to return. Filter out clusters larger
-                than this.
-
-            Returns
-            -------
-            A list clusters containing a lists of genes within each cluster
-        """
-        # output dat to tmpfile
-        tmp = self._tmpfile()
-        self.to_dat(
-            filename=tmp.name,
-            gene_list=gene_list,
-            min_distance=min_distance,
-            sig_only=True,
-        )
-        # build the mcl command
-        cmd = "mcl {} --abc -scheme {} -I {} -o -".format(tmp.name, scheme, I)
-        self.log("running MCL: {}", cmd)
-        try:
-            p = Popen(cmd, stdout=PIPE, stderr=sys.stderr, shell=True)
-            self.log("waiting for MCL to finish...")
-            sout = p.communicate()[0]
-            p.wait()
-            self.log("MCL done, Reading results.")
-            if p.returncode == 0:
-                # Filter out cluters who are smaller than the min size
-                return list(
-                    filter(
-                        lambda x: len(x) > min_cluster_size
-                        and len(x) < max_cluster_size,
-                        # Generate ids from the refgen
-                        [
-                            self.refgen.from_ids(
-                                [gene.decode("utf-8") for gene in line.split()]
-                            )
-                            for line in sout.splitlines()
-                        ],
-                    )
-                )
-            else:
-                if p.returncode == 127:
-                    raise FileNotFoundError()
-                else:
-                    raise ValueError("MCL failed: return code: {}".format(p.returncode))
-        except FileNotFoundError as e:
-            self.log(
-                'Could not find MCL in PATH. Make sure its installed and shell accessible as "mcl".'
-            )
 
     def local_degree(self, gene_list, trans_locus_only=False):
         """
