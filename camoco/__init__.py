@@ -36,4 +36,4 @@ import sys
 import os
 import numpy
 
-from .coexnet import CoexNet
+from .coexnet import Coex
