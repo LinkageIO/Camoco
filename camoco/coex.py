@@ -1,5 +1,7 @@
+import logging
 import warnings
 
+import numpy as np
 import pandas as pd
 import minus80 as m80
 import locuspocus as lp
@@ -10,6 +12,7 @@ from .exceptions import (
     CoexEmptyError, CoexExistsError   
 )
 
+log = logging.getLogger(__name__)
 
 class Coex(m80.Freezable):
 
@@ -79,7 +82,8 @@ class Coex(m80.Freezable):
         min_expr: float = 0.001,
         max_locus_missing_data: float = 0.2,
         max_accession_missing_data: float = 0.3,
-        min_single_accession_expr: float = 0.08
+        min_single_accession_expr: float = 0.08,
+        force: bool = False
     ) -> "Coex":
         '''
             Create a Coex object from a Pandas DataFrame and 
@@ -120,12 +124,36 @@ class Coex(m80.Freezable):
                 value above this threshold are removed from analysis. These are
                 likely presence/absence and will not have a strong coexpression
                 pattern.
+            force : bool
+                If true and a Coex already exists with the same name, it will
+                be overwritten.
         '''
+        if force:
+            m80.Tools.delete('Coex',name)
         # Sanity check
         if m80.Tools.available('Coex',name):
             raise CoexExistsError(f'{name} already exists.') 
         # Create an empty class
         self = cls(name)
+        # get the list of loci that are in the df
+        log.info("Creating filtered Loci object")
+        # we need to do this using the minus80 API so its fast
+        lids = []
+        cur = loci.m80.db.cursor()
+        
+        for (LID,) in cur.executemany(
+            'SELECT LID from loci WHERE name = ?',((name,) for name in df.index)        
+        ): 
+            
+
+        # Calculate QC for loci and accessions
+        qc_loci = pd.DataFrame({"has_id": True}, index=df.index)
+        qc_accession = pd.DataFrame({"has_id": True}, index=df.columns)
+        qc_loci['pass_in_loci'] = [x in loci for x in df.index]
+        log.info(
+            f"Found {sum(qc_loci['pass_in_loci'] == False)} "
+            f"df row IDs not in {loci.m80.name}"
+        )
 
         # Set the raw data to be the original df
         self.m80.col['raw_expr'] = df
