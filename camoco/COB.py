@@ -985,7 +985,10 @@ class COB(Expr):
             return net
 
     def to_sparse_matrix(
-        self, gene_list=None, min_distance=None, max_edges=None, remove_orphans=False
+        self, gene_list=None, 
+        min_distance=None, 
+        max_edges=None, 
+        remove_orphans=False
     ):
         """
             Convert the co-expression interactions to a 
@@ -999,6 +1002,14 @@ class COB(Expr):
             min_distance : int (default: None)
                 The minimum distance between genes for which to consider
                 co-expression interactions. This filters out cis edges.
+            max_edges : int (default: None)
+                If specified, only the maximum number of 
+                edges will be included. Priority of edges
+                is assigned based on score.
+            remove_orphans : bool (default: True)
+                Remove genes that have no edges in the 
+                network.
+
 
             Returns
             -------
@@ -1023,11 +1034,6 @@ class COB(Expr):
             edges = edges.sort_values(by="score", ascending=False)[
                 0 : min(max_edges, len(edges))
             ]
-        # Option to restrict gene list to only genes with edges
-        if remove_orphans:
-            self.log("Removing orphans")
-            not_orphans = set(edges.gene_a).union(edges.gene_b)
-            gene_list = [g for g in gene_list if g.id in not_orphans]
         # Create a gene index
         self.log("Creating Index")
         if gene_list == None:
@@ -1036,6 +1042,12 @@ class COB(Expr):
             gene_list = set(gene_list)
         gene_index = {g.id: i for i, g in enumerate(gene_list)}
         nlen = len(gene_list)
+        # Option to restrict gene list to only genes with edges
+        if remove_orphans:
+            self.log("Removing orphans")
+            not_orphans = set(edges.gene_a).union(edges.gene_b)
+            gene_list = [g for g in gene_list if g.id in not_orphans]
+            self.log(f"Removed {len()}")
         # get the expression matrix indices for all the genes
         row = [gene_index[x] for x in edges.gene_a.values]
         col = [gene_index[x] for x in edges.gene_b.values]
@@ -1402,17 +1414,33 @@ class COB(Expr):
             return None
         return dm
 
+    def import_coordinates_from_cyjs(
+        self,
+        cyjs_path
+    ):
+        '''
+
+        '''
+        cyjs = json.load(open(cyjs_path,'r'))
+        pos  = pd.DataFrame(
+            [(n['data']['id_original'].upper(), n['position']['x'], n['position']['y']) \
+                for n in cyjs['elements']['nodes']],
+            columns=['gene','x','y']
+        )
+        self._bcolz("coordinates", df=pos)
+
     def coordinates(
             self, 
-            iterations=1000, 
+            iterations=100, 
             force=False, 
             max_edges=100000, 
             lcc_only=True
         ):
         """ 
-            returns the static layout, you can change the stored layout by
-            passing in a new layout object. If no layout has been stored or a gene
-            does not have coordinates, returns (0, 0) for each mystery gene
+            Returns x,y coordinates for (a subset of) genes in the network. 
+            If coordinates have not been previously calculated OR the force
+            kwarg is True, gene coordinates will be calculated using the 
+            ForceAtlas2 algorithm. NOTE: by default
         """
         from fa2 import ForceAtlas2
 
@@ -1423,14 +1451,14 @@ class COB(Expr):
             adjustSizes=False,
             edgeWeightInfluence=1.0,
             # Performance
-            jitterTolerance=1.0,
+            jitterTolerance=0.1,
             barnesHutOptimize=True,
-            barnesHutTheta=1.2,
+            barnesHutTheta=0.6, #1.2,
             multiThreaded=False,
             # Tuning
             scalingRatio=2.0,
-            strongGravityMode=False,
-            gravity=3.0,
+            strongGravityMode=True,
+            gravity=0.1,
             # Logging
             verbose=True,
         )
@@ -1475,20 +1503,29 @@ class COB(Expr):
         self,
         filename=None,
         genes=None,
-        lcc_only=True,
+        # coordinate kwargs 
         force=False,
-        plot_clusters=True,
+        lcc_only=True,
+        max_edges=100000,
+        iterations=100, 
+        # cluster kwargs
+        draw_clusters=True,
         color_clusters=True,
         min_cluster_size=100,
+        max_cluster_size=10e100,
         max_clusters=None,
+        cluster_std=1,
+        # 
+        node_size=50,
+        edge_color='k',
+        edge_alpha=0.7,
+        draw_edges=False,
         background_color='tab:blue',
-        plot_edges=False,
-        max_edges=100000
     ):
         '''
             Plot a "hairball" image of the network.
         '''
-        coor = self.coordinates(lcc_only=lcc_only, force=force)
+        coor = self.coordinates(lcc_only=lcc_only, force=force, iterations=iterations)
         fig = plt.figure(facecolor="white", figsize=(20, 20))
         ax = fig.add_subplot(111)
         # Plot the background genes
@@ -1497,7 +1534,7 @@ class COB(Expr):
         ax.set_xticks([])
         ax.set_yticks([])
         # Plot edges
-        if plot_edges:
+        if draw_edges:
             self.log("Plotting edges")
             edges = self.subnetwork(
                 gene_list=self.refgen.from_ids(
@@ -1511,9 +1548,9 @@ class COB(Expr):
             #Plot using a matplotlib lines collection
             lines = LineCollection(
                 zip(zip(a_coor.x,a_coor.y),zip(b_coor.x,b_coor.y)),
-                colors='k',
+                colors=edge_color,
                 antialiased=(1,),
-                alpha=0.7
+                alpha=edge_alpha
             )
             lines.set_zorder(1)
             ax.add_collection(lines)
@@ -1523,7 +1560,7 @@ class COB(Expr):
             coor.y, 
             alpha=1, 
             color=background_color,
-            s=150
+            s=node_size
         )
         # Plot the genes
         if genes is not None:
@@ -1533,16 +1570,17 @@ class COB(Expr):
                 ids.x, 
                 ids.y, 
                 color="r",
-                s=150,
+                s=node_size,
             )
             nodes.set_zorder(2)
         # Plot clusters
-        if plot_clusters:
+        if draw_clusters:
             from matplotlib.patches import Ellipse
             big_clusters = [
                 k
                 for k, v in Counter(self.clusters.cluster).items()
                 if v > min_cluster_size
+                and v < max_cluster_size
             ]
             for i, clus in enumerate(big_clusters):
                 if max_clusters is not None and i + 1 > max_clusters:
@@ -1551,10 +1589,10 @@ class COB(Expr):
                 ccoor = coor.loc[ids]
                 if color_clusters:
                     # This will overwrite the genes in the cluster giving them colors 
-                    ax.scatter(ccoor.x, ccoor.y,s=150)
+                    ax.scatter(ccoor.x, ccoor.y,s=node_size)
                 try:
-                    c = self.cluster_coordinates(clus)
-                except KeyError as e:
+                    c = self.cluster_coordinates(clus,nstd=cluster_std)
+                except (KeyError,np.linalg.LinAlgError) as e:
                     continue
                 c.update(
                     {
@@ -1587,6 +1625,7 @@ class COB(Expr):
         nan_color=None,
         cmap=None,
         expr_boundaries=3.5,
+        figsize=(20,20)
     ):
         """
             Plots a heatmap of genes x expression.
@@ -1705,10 +1744,10 @@ class COB(Expr):
             dm = dm.iloc[:, order]
         # Save plot if provided filename
         if plot_dendrogram == False:
-            fig = plt.figure(facecolor="white", figsize=(20, 20),constrained_layout=True)
+            fig = plt.figure(facecolor="white", figsize=figsize,constrained_layout=True)
             ax = fig.add_subplot(111)
         else:
-            fig = plt.figure(facecolor="white", figsize=(20, 20))
+            fig = plt.figure(facecolor="white", figsize=figsize)
             gs = fig.add_gridspec(
                 2, 2, height_ratios=[3, 1], width_ratios=[3, 1], hspace=0, wspace=0
             )
@@ -1731,25 +1770,27 @@ class COB(Expr):
         vmax = max(np.nanmin(abs(dm)), np.nanmax(abs(dm)))
         vmin = vmax * -1
         im = ax.matshow(nan_mask, aspect="auto", cmap=cmap, vmax=vmax, vmin=vmin)
+        # Intelligently add labels
         ax.grid(False)
         ax.tick_params(labelsize=8)
-        ax.tick_params("x", labelrotation=45)
-        ax.set(xticklabels=dm.columns.values, yticklabels=dm.index.values)
-        for label in ax.get_xticklabels():
-            label.set_horizontalalignment('left')
-        # Intelligently add labels
         if (
-            include_accession_labels is None and len(dm.columns) < 60
-        ) or include_accession_labels == True:
+            (include_accession_labels is None and len(dm.columns) < 60)
+             or include_accession_labels == True
+        ):
+            ax.set(xticklabels=dm.columns.values, yticklabels=dm.index.values)
+            ax.tick_params("x", labelrotation=45)
+            for label in ax.get_xticklabels():
+                label.set_horizontalalignment('left')
             ax.set(xticks=np.arange(len(dm.columns)))
         if (
-            include_gene_labels is None and len(dm.index) < 100
-        ) or include_gene_labels == True:
+            (include_gene_labels is None and len(dm.index) < 100)
+             or include_gene_labels == True
+        ):
             ax.set(yticks=np.arange(len(dm.index)))
         fig.align_labels()
         # ax.figure.colorbar(im)
         if plot_dendrogram == True:
-            with plt.rc_context({"lines.linewidth": 0.5}):
+            with plt.rc_context({"lines.linewidth": 1.0}):
                 from scipy.cluster import hierarchy
 
                 hierarchy.set_link_color_palette(["k"])
@@ -1780,7 +1821,7 @@ class COB(Expr):
                     gene_ax.set_facecolor("w")
         # Save if you wish
         if filename is not None:
-            plt.savefig(filename, dpi=300, figsize=(20, 20))
+            plt.savefig(filename, dpi=300, figsize=figsize)
             plt.close()
         return ax.figure
 
