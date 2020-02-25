@@ -862,6 +862,7 @@ class COB(Expr):
         max_edges=None,
         remove_orphans=True,
         ontology=None,
+        include_coordinates=True
     ):
         """
             Produce a JSON network object that can be loaded in cytoscape.js
@@ -899,6 +900,10 @@ class COB(Expr):
                 the ontology. This is useful for highlighting 
                 groups of genes once they are inside of
                 cytoscape(.js).
+            include_coordinates : bool (default: True)
+                If true, include coordinates for available
+                genes. Genes without calculated coordinates will
+                be left blank.
 
             Returns
             -------
@@ -956,24 +961,7 @@ class COB(Expr):
                     node["data"][x] = True
             node["data"].update(gene.attr)
             net["nodes"].append(node)
-            if "parent_locus" in gene.attr:
-                parents[str(gene.attr["parent_locus"])].append(gene.id)
-        # Add parents first
-        for parent, children in parents.items():
-            net["nodes"].insert(
-                0, {"data": {"id": parent, "parent": None, "classes": "snp"}}
-            )
-            for child in children:
-                net["edges"].append(
-                    {
-                        "data": {
-                            "source": child,
-                            "target": parent,
-                            "score": 50,
-                            "distance": 0,
-                        }
-                    }
-                )
+
         # Return the correct output
         net = {"elements": net}
         if filename:
