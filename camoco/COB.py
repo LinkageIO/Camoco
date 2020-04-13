@@ -862,7 +862,10 @@ class COB(Expr):
         max_edges=None,
         remove_orphans=True,
         ontology=None,
-        include_coordinates=True
+        include_coordinates=True,
+        invert_y_coor=True,
+        min_degree=None,
+        include_edges=True
     ):
         """
             Produce a JSON network object that can be loaded in cytoscape.js
@@ -893,8 +896,8 @@ class COB(Expr):
                 is assigned based on score.
             remove_orphans : bool (default: True)
                 Remove genes that have no edges in the 
-                network.
-            ontology : camoco.Ontology (default: None)
+                networ#.
+            ontology :#camoco.Ontology (default: None)
                 If an ontology is specified, genes will
                 be annotated to belonging to terms within 
                 the ontology. This is useful for highlighting 
@@ -904,12 +907,23 @@ class COB(Expr):
                 If true, include coordinates for available
                 genes. Genes without calculated coordinates will
                 be left blank.
+            invert_y_coor : boor (default: True)
+                If True, the y-coordinate will be inverted (y=-1*y).
+                For some reason Cytoscape has an inverted y-coordinate
+                system, toggling this will fix it.
 
             Returns
             -------
             A JSON string or None if a filename is specified
         """
         net = {"nodes": [], "edges": []}
+        # calculate included genes
+        if gene_list is None:
+            gene_list = self.genes()
+        # Filter by minimum degree
+        if min_degree is not None:
+            included = set(self.degree.query(f'Degree >= {min_degree}').index)
+            gene_list = [x for x in gene_list if x.id in included]
         # Get the edge indexes
         self.log("Getting the network.")
         edges = self.subnetwork(
@@ -922,20 +936,30 @@ class COB(Expr):
         if max_edges != None:
             # Filter out only the top X edges by score
             edges = edges.sort_values(by="score", ascending=False)[0:max_edges]
+
+        if include_coordinates == True:
+            # Create a map with x,y coordinates
+            coor = self.coordinates() 
+            if invert_y_coor:
+                coor.y = -1*coor.y
+            coor_map = { 
+                id:coor for id,coor in zip(coor.index,zip(coor.x,coor.y))
+            }
         # Add edges to json data structure
-        for source, target, score, distance, significant in edges.itertuples(
-            index=False
-        ):
-            net["edges"].append(
-                {
-                    "data": {
-                        "source": source,
-                        "target": target,
-                        "score": float(score),
-                        "distance": float(fix_val(distance)),
+        if include_edges:
+            for source, target, score, distance, significant in edges.itertuples(
+                index=False
+            ):
+                net["edges"].append(
+                    {
+                        "data": {
+                            "source": source,
+                            "target": target,
+                            "score": float(score),
+                            "distance": float(fix_val(distance)),
+                        }
                     }
-                }
-            )
+                )
         # Handle any ontological business
         if ontology != None:
             # Make a map from gene name to ontology
@@ -960,6 +984,16 @@ class COB(Expr):
                 for x in ont_map[gene.id]:
                     node["data"][x] = True
             node["data"].update(gene.attr)
+            if include_coordinates:
+                try:
+                    pos = coor_map[gene.id]
+                except KeyError:
+                    pos = (0,0)
+                node['position'] = {
+                    "x" : pos[0],
+                    "y" : pos[1]
+                }
+
             net["nodes"].append(node)
 
         # Return the correct output
@@ -1331,7 +1365,12 @@ class COB(Expr):
         ids = self.clusters.query(f"cluster == {cluster_id}").index.values
         return self.refgen[ids]
 
-    def cluster_coordinates(self, cluster_number, nstd=2):
+    def cluster_coordinates(
+        self, 
+        cluster_number, 
+        nstd=2,
+        min_ratio=1.618
+    ):
         """
             Calculate the rough coordinates around an MCL 
             cluster.
@@ -1361,9 +1400,21 @@ class COB(Expr):
         vals, vecs = eigsorted(cov)
         theta = np.degrees(np.arctan2(*vecs[:, 0][::-1]))
         width, height = 2 * nstd * np.sqrt(vals)
+        if min_ratio:
+            small_axis,big_axis = sorted([width,height])
+            if big_axis / small_axis < min_ratio:
+                small_axis = big_axis / min_ratio
+            if width < height:
+                width = small_axis
+            else:
+                height = small_axis
         return {"xy": pos, "width": width, "height": height, "angle": theta}
 
-    def cluster_expression(self, min_cluster_size=10, normalize=True):
+    def cluster_expression(self, 
+        min_cluster_size=10, 
+        max_cluster_size=10e10, 
+        normalize=True
+    ):
         """
             Get a matrix of cluster x accession gene expression.
             Each row represents the average gene expression in each accession
@@ -1391,7 +1442,7 @@ class COB(Expr):
         # Extract clusters
         dm = (
             self.clusters.groupby("cluster")
-            .filter(lambda x: len(x) >= min_cluster_size)
+            .filter(lambda x: len(x) >= min_cluster_size and len(x) <= max_cluster_size)
             .groupby("cluster")
             .apply(lambda x: self.expr(genes=self.refgen[x.index]).mean())
         )
@@ -1404,10 +1455,20 @@ class COB(Expr):
 
     def import_coordinates_from_cyjs(
         self,
-        cyjs_path
+        cyjs_path,
+        invert_y_coor=True
     ):
         '''
-
+            Import node coordinates from a cyjs file.
+           
+            Parameters
+            ----------
+            cyjs_path : str (Pathlike)
+                Path the cytoscape JSON file
+            invert_y_coor : bool (default: True)
+                If True, the y-coordinate will be inverted (y=-1*y).
+                For some reason Cytoscape has an inverted y-coordinate
+                system, toggling this will fix it.
         '''
         cyjs = json.load(open(cyjs_path,'r'))
         pos  = pd.DataFrame(
@@ -1415,14 +1476,20 @@ class COB(Expr):
                 for n in cyjs['elements']['nodes']],
             columns=['gene','x','y']
         )
+        if invert_y_coor:
+            pos['y'] = -1*pos['y']
+        index = pos['gene']
+        pos = pos[['x','y']]
+        pos.index = index
         self._bcolz("coordinates", df=pos)
 
     def coordinates(
             self, 
-            iterations=100, 
+            method='spring',
+            iterations=10, 
             force=False, 
-            max_edges=100000, 
-            lcc_only=True
+            max_edges=10e100, 
+            lcc_only=True,
         ):
         """ 
             Returns x,y coordinates for (a subset of) genes in the network. 
@@ -1432,24 +1499,6 @@ class COB(Expr):
         """
         from fa2 import ForceAtlas2
 
-        forceatlas2 = ForceAtlas2(
-            # Behavior alternatives
-            outboundAttractionDistribution=True,
-            linLogMode=False,
-            adjustSizes=False,
-            edgeWeightInfluence=1.0,
-            # Performance
-            jitterTolerance=0.1,
-            barnesHutOptimize=True,
-            barnesHutTheta=0.6, #1.2,
-            multiThreaded=False,
-            # Tuning
-            scalingRatio=2.0,
-            strongGravityMode=True,
-            gravity=0.1,
-            # Logging
-            verbose=True,
-        )
         pos = self._bcolz("coordinates")
         if pos is None or force == True:
             import scipy.sparse.csgraph as csgraph
@@ -1473,10 +1522,33 @@ class COB(Expr):
             else:
                 labels = [rev_i[x] for x in range(L.shape[0])]
             self.log("Calculating positions")
-            # coordinates = networkx.layout._sparse_fruchterman_reingold(L,iterations=iterations)
-            coordinates = positions = forceatlas2.forceatlas2(
-                L, pos=None, iterations=iterations
-            )
+            if method == 'spring':
+                coordinates = nx.layout._sparse_fruchterman_reingold(
+                    L,
+                    iterations=iterations
+                )
+            elif method == 'forceatlas2':
+                forceatlas2 = ForceAtlas2(
+                    # Behavior alternatives
+                    outboundAttractionDistribution=True,
+                    linLogMode=False,
+                    adjustSizes=False,
+                    edgeWeightInfluence=1.0,
+                    # Performance
+                    jitterTolerance=0.1,
+                    barnesHutOptimize=True,
+                    barnesHutTheta=0.6, #1.2,
+                    multiThreaded=False,
+                    # Tuning
+                    scalingRatio=2.0,
+                    strongGravityMode=True,
+                    gravity=0.1,
+                    # Logging
+                    verbose=True,
+                )
+                coordinates = positions = forceatlas2.forceatlas2(
+                    L, pos=None, iterations=iterations
+                )
             pos = pd.DataFrame(coordinates)
             pos.index = labels
             pos.columns = ["x", "y"]
@@ -1490,32 +1562,46 @@ class COB(Expr):
     def plot_network(
         self,
         filename=None,
-        genes=None,
+        target_genes=None,
+        target_gene_alpha=0.5,
+        ax=None,
+        include_title=True,
         # coordinate kwargs 
         force=False,
         lcc_only=True,
-        max_edges=100000,
+        max_edges=None,
+        min_degree=None,
         iterations=100, 
         # cluster kwargs
         draw_clusters=True,
         color_clusters=True,
+        label_clusters=True,
+        label_size=20,
         min_cluster_size=100,
         max_cluster_size=10e100,
         max_clusters=None,
         cluster_std=1,
-        # 
-        node_size=50,
+        cluster_line_width=2,
+        # style kwargs 
+        node_size=20,
         edge_color='k',
         edge_alpha=0.7,
         draw_edges=False,
-        background_color='tab:blue',
+        background_color='#2196F3',#'xkcd:dark',
+        foreground_color='#BD0000'#"xkcd:crimson"
     ):
         '''
             Plot a "hairball" image of the network.
         '''
+        from matplotlib.colors import XKCD_COLORS
+        xkcd = XKCD_COLORS.copy()
         coor = self.coordinates(lcc_only=lcc_only, force=force, iterations=iterations)
-        fig = plt.figure(facecolor="white", figsize=(20, 20))
-        ax = fig.add_subplot(111)
+        # Filter by degree
+        if min_degree is not None:
+            coor =  coor.loc[self.degree.query(f'Degree >= {min_degree}').index]
+        if ax is None:
+            fig = plt.figure(facecolor="white", figsize=(8, 8))
+            ax = fig.add_subplot(111)
         # Plot the background genes
         ax.set_facecolor("white")
         ax.grid(False)
@@ -1528,8 +1614,10 @@ class COB(Expr):
                 gene_list=self.refgen.from_ids(
                     coor.index.values
                 )
-            )
-            edges = edges.sort_values(by="score", ascending=False)[0:max_edges].reset_index()
+            ).reset_index()
+            if max_edges is not None:
+                max_edges = min(max_edges,len(edges))
+                edges = edges.sort_values(by="score", ascending=False)[0:max_edges]
             # Extract the coordinates for edges
             a_coor = coor.loc[edges.gene_a]
             b_coor = coor.loc[edges.gene_b]
@@ -1547,18 +1635,19 @@ class COB(Expr):
             coor.x, 
             coor.y, 
             alpha=1, 
-            color=background_color,
+            color=background_color,  #xkcd.pop(background_color),
             s=node_size
         )
         # Plot the genes
-        if genes is not None:
+        if target_genes is not None:
             self.log("Plotting genes")
-            ids = coor.loc[[x.id for x in genes if x.id in coor.index]]
+            ids = coor.loc[[x.id for x in target_genes if x.id in coor.index]]
             nodes = ax.scatter(
                 ids.x, 
                 ids.y, 
-                color="r",
+                color=foreground_color,
                 s=node_size,
+                alpha=target_gene_alpha
             )
             nodes.set_zorder(2)
         # Plot clusters
@@ -1570,6 +1659,8 @@ class COB(Expr):
                 if v > min_cluster_size
                 and v < max_cluster_size
             ]
+            # define cluster colors
+            cluster_colors = list(xkcd.values())
             for i, clus in enumerate(big_clusters):
                 if max_clusters is not None and i + 1 > max_clusters:
                     break
@@ -1577,9 +1668,17 @@ class COB(Expr):
                 ccoor = coor.loc[ids]
                 if color_clusters:
                     # This will overwrite the genes in the cluster giving them colors 
-                    ax.scatter(ccoor.x, ccoor.y,s=node_size)
+                    ax.scatter(
+                        ccoor.x, 
+                        ccoor.y,
+                        s=node_size,
+                        color=cluster_colors[i]
+                    )
                 try:
-                    c = self.cluster_coordinates(clus,nstd=cluster_std)
+                    c = self.cluster_coordinates(
+                        clus,
+                        nstd=cluster_std
+                    )
                 except (KeyError,np.linalg.LinAlgError) as e:
                     continue
                 c.update(
@@ -1587,18 +1686,28 @@ class COB(Expr):
                         "edgecolor": "black",
                         "fill"     : False,
                         "linestyle": ":",
-                        "linewidth": 3,
+                        "linewidth": cluster_line_width,
                     }
                 )
                 e = Ellipse(**c)
                 ax.add_artist(e)
+                if label_clusters:
+                    ax.annotate(
+                        clus,
+                        size=label_size,
+                        xy=(c['xy']['x'],c['xy']['y']),
+                        bbox=dict(boxstyle="round", fc="w")
+                    )
+        if include_title:
+            ax.set_title(self.name,size='large')
         if filename is not None:
             plt.savefig(filename)
-        return fig
+        return ax
 
     def plot_heatmap(
         self,
         filename=None,
+        ax=None,
         genes=None,
         accessions=None,
         gene_normalize=True,
@@ -1608,6 +1717,7 @@ class COB(Expr):
         include_gene_labels=None,
         avg_by_cluster=False,
         min_cluster_size=10,
+        max_cluster_size=10e10,
         cluster_accessions=True,
         plot_dendrogram=True,
         nan_color=None,
@@ -1686,7 +1796,9 @@ class COB(Expr):
         # Get the Expressiom Matrix
         if avg_by_cluster == True:
             dm = self.cluster_expression(
-                min_cluster_size=min_cluster_size, normalize=True
+                min_cluster_size=min_cluster_size,
+                max_cluster_size=max_cluster_size,
+                normalize=True
             )
         else:
             # Fetch the Expr Matrix
@@ -1730,12 +1842,13 @@ class COB(Expr):
             # Re-order the matrix based on tree
             order = leaves_list(accession_linkage)
             dm = dm.iloc[:, order]
+
+
         # Save plot if provided filename
-        if plot_dendrogram == False:
+        if ax is None:
             fig = plt.figure(facecolor="white", figsize=figsize,constrained_layout=True)
             ax = fig.add_subplot(111)
-        else:
-            fig = plt.figure(facecolor="white", figsize=figsize)
+        if plot_dendrogram == True:
             gs = fig.add_gridspec(
                 2, 2, height_ratios=[3, 1], width_ratios=[3, 1], hspace=0, wspace=0
             )
@@ -1845,64 +1958,6 @@ class COB(Expr):
             plt.close()
         else:
             return fig
-
-    def plot_locality(self, gene_list, bootstraps=10, num_windows=100, sd_thresh=2):
-        """
-            Make a fancy locality plot.
-        """
-        # Generate a blank fig
-        fig, ax = plt.subplots(figsize=(8, 6))
-        fig.hold(True)
-        # Y axis is local degree (what we are TRYING to predict)
-        degree = self.locality(gene_list).sort("global")
-        ax.set_ylim(0, max(degree["local"]))
-        ax.set_xlim(0, max(degree["global"]))
-        if bootstraps > 0:
-            bs = pd.concat(
-                [
-                    self.locality(self.refgen.bootstrap_candidate_genes(gene_list))
-                    for x in range(10)
-                ]
-            ).sort("global")
-            ax.set_ylim(0, max(bs["local"]))
-            ax.set_xlim(0, max(bs["global"]))
-            plt.plot(bs["global"], bs["local"], "ro", alpha=0.05, label="Bootstraps")
-        # Plot the bootstraps and the empirical
-        plt.plot(degree["global"], degree["local"], "bo", label="Empirical")
-        emp_ols = sm.OLS(degree["local"], degree["global"]).fit()
-        ax.plot(degree["global"], emp_ols.fittedvalues, "k:", label="Empirical OLS")
-
-        if bootstraps > 0:
-            # Get the OLS
-            bs_ols = sm.OLS(bs["local"], bs["global"]).fit()
-            bs["resid"] = bs_ols.resid
-            bs["fitted"] = bs_ols.fittedvalues
-            ax.plot(bs["global"], bs_ols.fittedvalues, "g--", label="bootstrap OLS")
-            # Do lowess on the residuals
-            # We only care about windows within the empirical part
-            window_tick = len(bs) / num_windows
-            bs["window"] = [int(x / window_tick) for x in range(len(bs))]
-            # get std for each window
-            win_std = bs.groupby("window").apply(lambda df: df["resid"].std()).to_dict()
-            bs["std_envelope"] = [win_std[x] for x in bs.window.values]
-            # Plot confidence intervals
-            prstd, iv_l, iv_u = wls_prediction_std(bs_ols)
-            ax.plot(bs["global"], iv_u, "g--", label="conf int.")
-            ax.plot(bs["global"], iv_l, "g--")
-            # plot the
-            ax.plot(
-                bs["global"],
-                bs["fitted"] + (sd_thresh * bs["std_envelope"]),
-                "r--",
-                label="{} s.d. envelope".format(sd_thresh),
-            )
-            ax.plot(
-                bs["global"], bs["fitted"] - (sd_thresh * bs["std_envelope"]), "r--"
-            )
-        ax.set_xlabel("Number Global Interactions")
-        ax.set_ylabel("Number Local Interactions")
-        legend = ax.legend(loc="best")
-        return plt
 
     def compare_degree(self, obj, diff_genes=10, score_cutoff=3):
         """
@@ -2163,6 +2218,122 @@ class COB(Expr):
         else:
             return z
 
+    def _sparse_fruchterman_reingold(
+            self,
+            A, 
+            k=None, 
+            pos=None, 
+            fixed=None, 
+            iterations=50,
+            threshold=1e-4, 
+            seed=42
+        ):
+        '''
+            This code was modified from the NetworkX algorithm for 
+            sparse_fruchterman_reingold spring embedded algorithm.
+
+            See the following page for details on the source:
+            https://github.com/networkx/networkx/blob/15e17c0a2072ea56df3d9cd9152ee682203e8cd9/networkx/drawing/layout.py#L502
+
+            =======
+            NetworkX is distributed with the 3-clause BSD license.
+
+            ::
+
+               Copyright (C) 2004-2020, NetworkX Developers
+               Aric Hagberg <hagberg@lanl.gov>
+               Dan Schult <dschult@colgate.edu>
+               Pieter Swart <swart@lanl.gov>
+               All rights reserved.
+
+               Redistribution and use in source and binary forms, with or without
+               modification, are permitted provided that the following conditions are
+               met:
+
+                 * Redistributions of source code must retain the above copyright
+                   notice, this list of conditions and the following disclaimer.
+
+                 * Redistributions in binary form must reproduce the above
+                   copyright notice, this list of conditions and the following
+                   disclaimer in the documentation and/or other materials provided
+                   with the distribution.
+
+                 * Neither the name of the NetworkX Developers nor the names of its
+                   contributors may be used to endorse or promote products derived
+                   from this software without specific prior written permission.
+
+               THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+               "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+               LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+               A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+               OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+               SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+               LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+               DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+               THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+               (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+               OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        '''
+        try:
+            nnodes, _ = A.shape
+        except AttributeError:
+            msg = "fruchterman_reingold() takes an adjacency matrix as input"
+            raise ValueError(msg)
+
+        # Create random positions based on the seed
+        if pos is None:
+            # random initial positions
+            pos = np.asarray(
+                np.random.RandomState().rand(nnodes,2),
+                dtype=A.dtype
+            )
+        else:
+            # make sure positions are of same type as matrix
+            pos = pos.astype(A.dtype)
+
+        # optimal distance between nodes
+        if k is None:
+            k = np.sqrt(1.0 / nnodes)
+        # the initial "temperature"  is about .1 of domain area (=1x1)
+        # this is the largest step allowed in the dynamics.
+        # We need to calculate this in case our fixed positions force our domain
+        # to be much bigger than 1x1
+        t = max(max(pos.T[0]) - min(pos.T[0]), max(pos.T[1]) - min(pos.T[1])) * 0.1
+        # simple cooling scheme.
+        # linearly step down by dt on each iteration so last iteration is size dt.
+        dt = t / float(iterations + 1)
+        delta = np.zeros((pos.shape[0], pos.shape[0], pos.shape[1]), dtype=A.dtype)
+        # the inscrutable (but fast) version
+        # this is still O(V^2)
+        # could use multilevel methods to speed this up significantly
+        for iteration in range(iterations):
+            self.log(f"On iteration {iteration}")
+            # matrix of difference between points
+            delta = pos[:, np.newaxis, :] - pos[np.newaxis, :, :]
+            # distance between points
+            distance = np.linalg.norm(delta, axis=-1)
+            # enforce minimum distance of 0.01
+            np.clip(distance, 0.01, None, out=distance)
+            # displacement "force"
+            displacement = np.einsum('ijk,ij->ik',
+                                     delta,
+                                     (k * k / distance**2 - A * distance / k))
+            # update positions
+            length = np.linalg.norm(displacement, axis=-1)
+            length = np.where(length < 0.01, 0.1, length)
+            delta_pos = np.einsum('ij,i->ij', displacement, t / length)
+            if fixed is not None:
+                # don't change positions of fixed nodes
+                delta_pos[fixed] = 0.0
+            pos += delta_pos
+            # cool temperature
+            t -= dt
+            err = np.linalg.norm(delta_pos) / nnodes
+            if err < threshold:
+                break
+        return pos
+
+
     """ -----------------------------------------------------------------------
             Class Methods -- Factory Methods
     """
@@ -2212,55 +2383,6 @@ class COB(Expr):
         self._calculate_leaves()
         self._calculate_clusters()
         return self
-
-    @classmethod
-    def from_COBs(
-        cls, cobs, name, description, refgen, rawtype=None, zscore_cutoff=3, **kwargs
-    ):
-        """
-            This method will combine the expression tables from
-            an iterable to COBs in order to create a new co-expression
-            network.
-
-            Parameters
-            ----------
-            cobs : iterable to camoco.COB objects
-                The co-expression networks to combine
-                expression data from
-            name : str
-                The name of the resultant COB
-            description : str
-                A short description of the COB
-            refgen : camoco.RefGen
-                A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This
-                is cross references during import so we can pull information
-                about genes we are interested in during analysis.
-            rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype
-                passed to camoco.Expr.from_DataFrame. See docs there
-                for more information.
-            zscore_cutoff : int (defualt: 3)
-                The zscore cutoff for the network.
-            \*\*kwargs : key,value pairs
-                additional parameters passed to subsequent methods.
-                (see Expr.from_DataFrame)
-
-        """
-        dfs = [c.expr(raw=True) for c in cobs]
-        for cob, df in zip(cobs, dfs):
-            df.columns = [f"{acc}_{cob.name}" for acc in df.columns]
-        all_expr = pd.concat(dfs, axis=1, sort=False)
-        # Call the internal from_dataframe method
-        return cls.from_DataFrame(
-            all_expr,
-            name,
-            description,
-            refgen,
-            rawtype,
-            zscore_cutoff=zscore_cutoff,
-            **kwargs,
-        )
 
     @classmethod
     def from_DataFrame(
@@ -2374,6 +2496,7 @@ class COB(Expr):
             zscore_cutoff=zscore_cutoff,
             **kwargs,
         )
+    
 
 
 def fix_val(val):
@@ -2384,3 +2507,8 @@ def fix_val(val):
         return "null"
     else:
         return val
+
+
+
+
+
