@@ -5,6 +5,8 @@ from setuptools import setup, find_packages, Extension
 import os
 import io
 import re
+import sys
+
 try:
     import numpy
 except ModuleNotFoundError as e:
@@ -40,9 +42,16 @@ refgendist = Extension(
     include_dirs=[numpy.get_include()]
 )
 
-# Check if running Windows
-if os.name == 'nt':
-    raise ValueError("Camoco isn't supported for windows! Camoco runs best on Linux!")
+# Check if running Windows or OSX
+if (
+    not sys.platform.startswith('linux') 
+    and int(os.environ.get('CAMOCO_FORCE_INSTALL',default='0')) != 1
+    ):
+    print(
+        "Sorry! Camoco is not currently supported on non-linux systems "
+        "If you would like to proceed with installation please set the "
+        "ENV variable 'CAMOCO_FORCE_INSTALL' to '1'"
+    )
     sys.exit(1)
 
 setup(
