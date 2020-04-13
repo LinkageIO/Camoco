@@ -300,7 +300,13 @@ class GOnt(Ontology):
         G.add_edges_from(edges)
         return G
 
-    def GOGraph(self, terms, filename=None, min_overlap=1):
+    def GOGraph(
+        self, 
+        terms, 
+        filename=None, 
+        min_overlap=1,
+        attr_dict=None
+    ):
         """
             Create a cytoscape compatible GO Network from a set of 
             terms. Nodes in the nework will be tagged with enrichment 
@@ -312,6 +318,16 @@ class GOnt(Ontology):
             min_overlap : int (default: 1)
                 Terms with less than this enrichment overlap will be ignored.
                 See the docstring for Camoco.Ontology.enrichment.
+            attr_dict : dict (default: None)
+                A dict with additional attrs for each GO Term. Each key is a 
+                GO Term ID and the value is a dict of key:val pairs with term
+                attrs. For example:
+                {
+                    'GO:000014' : {
+                        'pval'  : 0.01,
+                        'color' : blue,
+                    }
+                }
         """
         enrich = []
         for term in terms:
@@ -340,7 +356,11 @@ class GOnt(Ontology):
                     x.attrs["label"] = "{},{}".format(
                         x.attrs["label"], term.attrs["label"]
                     )
-        return self.to_json(terms=list(unique_terms.values()), filename=filename)
+        return self.to_json(
+            terms=list(unique_terms.values()), 
+            filename=filename,
+            attr_dict=attr_dict
+        )
 
     def to_sparse_matrix(self):
         """
@@ -465,21 +485,52 @@ class GOnt(Ontology):
         G.add_edges_from(term_edges)
         return fig,G
 
-    def to_json(self, filename=None, terms=None):
+    def to_json(
+        self, 
+        filename=None, 
+        terms=None,
+        min_term_size=0,
+        max_term_size=10e10,
+        attr_dict=None
+    ):
         """
             Create a JSON representation of a Gene Ontology
+
+            terms : iterable of co.Terms
+                The terms to include in the GOGraph
+            filename : str (default: None)
+                If provided, the graph will be output to this filename
+            attr_dict : dict (default: None)
+                A dict with additional attrs for each GO Term. Each key is a 
+                GO Term ID and the value is a dict of key:val pairs with term
+                attrs. For example:
+                {
+                    'GO:000014' : {
+                        'pval'  : 0.01,
+                        'color' : blue,
+                    }
+                }
+
         """
         if terms == None:
-            terms = self.iter_terms()
-        else:
-            # terms include
-            parents = list(chain(*[self.parents(term) for term in terms]))
-            terms.extend(parents)
+            terms = list(self.iter_terms(
+                min_term_size=min_term_size,
+                max_term_size=max_term_size
+            ))
+        parents = list(chain(*[self.parents(term) for term in terms]))
+        terms.extend(parents)
         net = {"nodes": [], "edges": []}
         seen_nodes = dict()
         seen_edges = set()
         for term in terms:
-            node_data = {"id": term.id, "name": term.name, "desc": term.desc}
+            node_data = {
+                "id": term.id, 
+                "name": term.name, 
+                "desc": term.desc
+            }
+            node_data.update(
+                attr_dict.get(term.id,{})        
+            )
             node_data.update(term.attrs)
             if term.id not in seen_nodes:
                 seen_nodes[term.id] = node_data
