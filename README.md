@@ -14,10 +14,11 @@ Installation
 ------------
 At this time, the only supported (and tested) system for Camoco is on Linux.
 
-Camoco was developed using python >=3.8 and requires numpy to be installed.
+Camoco was developed using python >=3.8 and requires numpy (<1.19) to be installed.
+
 Install the latest tagged version with pip:
 ```
-$ pip install numpy
+$ pip install "numpy<1.19"
 $ pip install camoco
 ```
 Or install the latest developmental version by cloning the github repository:
