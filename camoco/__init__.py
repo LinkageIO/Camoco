@@ -8,7 +8,7 @@ __license__ = """
 
 The "MIT" License
 
-Copyright (c) 2017-2020 Robert Schaefer
+Copyright (c) 2017-2021 Robert Schaefer
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -32,17 +32,19 @@ DEALINGS IN THE SOFTWARE.
 
 __version__ = "1.0.0"
 
-import sys
-import os
-import numpy
+
+__all__ = ["Coex"]
+
 import logging
 
-log = logging.getLogger('camoco')
+log = logging.getLogger("camoco")
 # One of DEBUG, INFO, WARNING, ERROR, CRITICAL
 log.setLevel(logging.INFO)
 # Set up the console handler
 ch = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s - %(message)s',datefmt='%d-%b-%y %H:%M:%S')
+formatter = logging.Formatter(
+    "%(asctime)s | %(name)s | %(levelname)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S"
+)
 ch.setFormatter(formatter)
 ch.setLevel(logging.INFO)
 log.addHandler(ch)
