@@ -41,12 +41,13 @@ log = logging.getLogger("camoco")
 # One of DEBUG, INFO, WARNING, ERROR, CRITICAL
 log.setLevel(logging.INFO)
 # Set up the console handler
-ch = logging.StreamHandler()
-formatter = logging.Formatter(
-    "%(asctime)s | %(name)s | %(levelname)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S"
-)
-ch.setFormatter(formatter)
-ch.setLevel(logging.INFO)
-log.addHandler(ch)
+if not log.hasHandlers():
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter(
+        "%(asctime)s | %(name)s | %(levelname)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S"
+    )
+    ch.setFormatter(formatter)
+    ch.setLevel(logging.INFO)
+    log.addHandler(ch)
 
 from .coex import Coex
