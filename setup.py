@@ -5,14 +5,9 @@ from setuptools import setup, find_packages, Extension
 import os
 import io
 import re
-try:
-    import numpy
-except ModuleNotFoundError as e:
-    #raise ModuleNotFoundError(
-    print(
-        "Please install numpy before installing Camoco,"        
-    )
-    sys.exit(1)
+import sys
+import numpy
+
 
 def read(*names, **kwargs):
     with io.open(
@@ -56,13 +51,14 @@ setup(
     setup_requires = [
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=45.1.0',
-        'numpy==1.18.1',
+        'numpy>=1.19.4',
         'cython>=0.29.13',
     ],
     install_requires = [		
         'minus80>=1.0.0',
         'locuspocus>=1.0.2',
         'tinymongo>=0.2.0',
+        'fastcluster>=1.1.25',
        #'matplotlib>=3.1.3',		
        #'scipy>=1.4.1',		
        #'pandas>=1.0.1',		
@@ -73,7 +69,6 @@ setup(
        #'powerlaw>=1.4.6',
        #'flask==1.0.3',
        #'markov-clustering>=0.0.6.dev0',
-       #'fastcluster>=1.1.25',
        #'psutil>=5.6.3',
     ],
     extras_require={
