@@ -44,7 +44,8 @@ log.setLevel(logging.INFO)
 if not log.hasHandlers():
     ch = logging.StreamHandler()
     formatter = logging.Formatter(
-        "%(asctime)s | %(name)s | %(levelname)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S"
+        "%(asctime)s | %(name)s | %(levelname)s - %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
     )
     ch.setFormatter(formatter)
     ch.setLevel(logging.INFO)
