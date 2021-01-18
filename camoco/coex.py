@@ -13,7 +13,7 @@ from collections import Counter
 from itertools import chain
 from scipy.special import comb
 from tinydb import where
-from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
+from scipy.cluster.hierarchy import leaves_list
 
 from .exceptions import (
     CoexExistsError,
@@ -23,6 +23,9 @@ log = logging.getLogger(__name__)
 
 
 class Coex(m80.Freezable):
+    """
+    A Co-expression Network.
+    """
 
     def __init__(self, name: str, rootdir: str = None) -> None:
         # Init the minus80 freezer
@@ -66,27 +69,238 @@ class Coex(m80.Freezable):
         return self._degree
 
     @property
-    def num_genes(self):
+    def num_loci(self):
         return len(self.expr.index)
 
     @property
     def num_accessions(self):
         return len(self.expr.columns)
 
-
     # -----------------------------------------
     #       Methods
     # -----------------------------------------
 
+    def subnetwork(
+        self,
+        loci=None,
+        sig_only=True,
+        min_distance=None,
+        filter_missing_gene_ids=True,
+        trans_locus_only=False,
+        names_as_index=True,
+        names_as_cols=False,
+    ):
+        """
+        Extract a subnetwork of edges exclusively between loci
+        within the gene_list. Also includes various options for
+        what information to report, see Parameters.
+
+        Parameters
+        ----------
+        gene_list : lp.Loci
+            The loci from which to extract a subnetwork.
+            If gene_list is None, the function will assume
+            gene_list is all loci in COB object (self).
+        sig_only : bool
+            A flag to include only significant interactions.
+        min_distance : bool (default: None)
+            If not None, only include interactions that are
+            between loci that are a `min_distance` away from
+            one another.
+        filter_missing_gene_ids : bool (default: True)
+            Filter out gene ids that are not in the current
+            COB object (self).
+        trans_locus_only : bool (default: True)
+            Filter out gene interactions that are not in Trans,
+            this argument requires that locus attr object has
+            the 'parent_locus' key:val set to distinguish between
+            cis and trans elements.
+        names_as_index : bool (default: True)
+            Include gene names as the index.
+        names_as_cols : bool (default: False)
+            Include gene names as two columns named 'gene_a' and 'gene_b'.
+
+        Returns
+        -------
+        A pandas.DataFrame containing the edges. Columns
+        include score, significant (bool), and inter-genic distance.
+        """
+        if loci is None:
+            if sig_only:
+                df = self.coex[self.coex.significant]
+            else:
+                df = self.coex
+        else:
+            # Extract the ids for each Gene
+            gene_list = set(sorted(gene_list))
+            ids = np.array([self._expr_index[x.id] for x in gene_list])
+            if filter_missing_gene_ids:
+                # filter out the Nones
+                ids = np.array([x for x in ids if x is not None])
+            if len(ids) == 0:
+                df = pd.DataFrame(columns=["score", "significant", "distance"])
+            else:
+                # Grab the coexpression indices for the genes
+                ids = PCCUP.coex_index(ids, num_genes)
+                df = self._coex_DataFrame(ids=ids, sig_only=sig_only)
+        if min_distance is not None:
+            df = df[df.distance >= min_distance]
+        if names_as_index or names_as_cols or trans_locus_only:
+            names = self._expr.index.values
+            ids = df.index.values
+            if len(ids) > 0:
+                ids = PCCUP.coex_expr_index(ids, num_genes)
+                df.insert(0, "gene_a", names[ids[:, 0]])
+                df.insert(1, "gene_b", names[ids[:, 1]])
+                del ids
+                del names
+            else:
+                df.insert(0, "gene_a", [])
+                df.insert(0, "gene_b", [])
+        if names_as_index and not names_as_cols:
+            df = df.set_index(["gene_a", "gene_b"])
+        if trans_locus_only:
+            try:
+                parents = {x.id: x.attr["parent_locus"] for x in gene_list}
+            except KeyError as e:
+                raise KeyError(
+                    "Each locus must have 'parent_locus'"
+                    " attr set to calculate trans only"
+                )
+            df["trans"] = [
+                parents[gene_a] != parents[gene_b]
+                for gene_a, gene_b in zip(
+                    df.index.get_level_values(0), df.index.get_level_values(1)
+                )
+            ]
+        return df
+
+
+    def to_sparse_matrix(
+        self, gene_list=None, min_distance=None, max_edges=None, remove_orphans=False
+    ):
+        """
+        Convert the co-expression interactions to a
+        scipy sparse matrix.
+
+        Parameters
+        -----
+        gene_list: iter of Loci (default: None)
+            If specified, return only the interactions among
+            loci in the list. If None, use all genes.
+        min_distance : int (default: None)
+            The minimum distance between genes for which to consider
+            co-expression interactions. This filters out cis edges.
+
+        Returns
+        -------
+        A tuple (a,b) where 'a' is a scipy sparse matrix and
+        'b' is a mapping from gene_id to index.
+        """
+        from scipy import sparse
+
+        log.info("Getting genes")
+        # first get the subnetwork in pair form
+        log.info("Pulling edges")
+        edges = self.subnetwork(
+            gene_list=gene_list,
+            min_distance=min_distance,
+            sig_only=True,
+            names_as_cols=True,
+            names_as_index=False,
+        )
+        # Option to limit the number of edges
+        if max_edges is not None:
+            log.info("Filtering edges")
+            edges = edges.sort_values(by="score", ascending=False)[
+                0 : min(max_edges, len(edges))
+            ]
+        # Option to restrict gene list to only genes with edges
+        if remove_orphans:
+            log.info("Removing orphans")
+            not_orphans = set(edges.gene_a).union(edges.gene_b)
+            gene_list = [g for g in gene_list if g.id in not_orphans]
+        # Create a gene index
+        log.info("Creating Index")
+        if gene_list == None:
+            gene_list = list(self.refgen.iter_genes())
+        else:
+            gene_list = set(gene_list)
+        gene_index = {g.id: i for i, g in enumerate(gene_list)}
+        nlen = len(gene_list)
+        # get the expression matrix indices for all the genes
+        row = [gene_index[x] for x in edges.gene_a.values]
+        col = [gene_index[x] for x in edges.gene_b.values]
+        data = list(edges.score.values)
+        # Make the values symmetric by doubling everything
+        # Note: by nature we dont have cycles so we dont have to
+        #   worry about the diagonal
+        log.info("Making matrix symmetric")
+        d = data + data
+        r = row + col
+        c = col + row
+        log.info("Creating matrix")
+        matrix = sparse.coo_matrix((d, (r, c)), shape=(nlen, nlen), dtype=None)
+        return (matrix, gene_index)
+
+    def mcl(
+        self,
+        gene_list=None,
+        I=2.0,
+        min_distance=None,
+        min_cluster_size=0,
+        max_cluster_size=10e10,
+    ):
+        """
+        Returns clusters (as list) as designated by MCL (Markov Clustering).
+
+        Parameters
+        ----------
+        gene_list : a gene iterable
+            These are the loci which will be clustered
+        I : float (default: 2.0)
+            This is the inflation parameter passed into mcl.
+        min_distance : int (default: None)
+            The minimum distance between loci for which to consider
+            co-expression interactions. This filters out cis edges.
+        min_cluster_size : int (default: 0)
+            The minimum cluster size to return. Filter out clusters smaller
+            than this.
+        max_cluster_size : float (default: 10e10)
+            The maximum cluster size to return. Filter out clusters larger
+            than this.
+
+        Returns
+        -------
+        A list clusters containing a lists of loci within each cluster
+        """
+        import markov_clustering as mc
+
+        matrix, gene_index = self.to_sparse_matrix(gene_list=gene_list)
+        # Run MCL
+        result = mc.run_mcl(matrix, inflation=I, verbose=True)
+        clusters = mc.get_clusters(result)
+        # MCL traditionally returns clusters by size with 0 being the largest
+        clusters = sorted(clusters, key=lambda x: len(x), reverse=True)
+        # Create a dictionary to map ids to gene names
+        gene_id_index = {v: k for k, v in gene_index.items()}
+        result = []
+        for c in clusters:
+            if len(c) < min_cluster_size or len(c) > max_cluster_size:
+                continue
+            # convert to loci
+            loci = self.refgen.from_ids([gene_id_index[i] for i in c])
+            result.append(loci)
+        return result
 
     # -----------------------------------------
     #       Internal Methods
     # -----------------------------------------
 
-    def _calculate_coexpression(self,significance_threshold=3.0):
+    def _calculate_coexpression(self, significance_threshold: float = 3.0):
         """
-            Generates pairwise PCCs for gene expression profiles in self.expr.
-            Also calculates pairwise gene distance.
+        Generates pairwise PCCs for gene expression profiles in self.expr.
+        Also calculates pairwise gene distance.
         """
         # Calculate the PCCs -------------------------------------------------------------------------------------------
         log.info("Calculating Coexpression")
@@ -117,46 +331,59 @@ class Coex(m80.Freezable):
 
         log.info("Calculating Mean and STD")
         # Sometimes, with certain datasets, the NaN mask overlap
-        # completely for the two genes expression data making its PCC a nan.
+        # completely for the two loci expression data making its PCC a nan.
         # This affects the mean and std fro the gene.
         pcc_mean = np.ma.masked_array(pccs, np.isnan(pccs)).mean()
-        self.metadata.insert({
-            'name': 'pcc_mean',
-            'val':  pcc_mean,
-            'type':'coexpression_parameter'
-        })
+        self.metadata.insert(
+            {"name": "pcc_mean", "val": pcc_mean, "type": "coexpression_parameter"}
+        )
         pcc_std = np.ma.masked_array(pccs, np.isnan(pccs)).std()
-        self.metadata.insert({
-            'name': 'pcc_std',
-            'val':  pcc_std,
-            'type':'coexpression_parameter'
-        })
+        self.metadata.insert(
+            {"name": "pcc_std", "val": pcc_std, "type": "coexpression_parameter"}
+        )
 
         # Calculate Z Scores -------------------------------------------------------------------------------------------
         log.info("Finding adjusted scores")
         pccs = (pccs - pcc_mean) / pcc_std
         # 3. Build the dataframe
         log.info("Build the dataframe and set the significance threshold")
-        self.metadata.insert({
-            'name': "significance_threshold", 
-            'val':  significance_threshold,
-            'type':'coexpression_parameter'
-        })
-        significant = pccs >= significance_threshold 
+        self.metadata.insert(
+            {
+                "name": "significance_threshold",
+                "val": significance_threshold,
+                "type": "coexpression_parameter",
+            }
+        )
+        significant = pccs >= significance_threshold
+
+        log.info("Calculating pairwise gene distances")
+        # Calculate the pairwise gene distances
+        loci_positions = self.loci.m80.db.query("SELECT chromosome,start,end FROM loci")
+        # Make sure types are as expected
+        distances = np.absolute(PCCUP.pairwise_gene_distances(
+            np.ascontiguousarray(loci_positions.chromosome.values),
+            np.ascontiguousarray(loci_positions.start.values.astype(np.long)),
+            np.ascontiguousarray(loci_positions.end.values.astype(np.long))
+        ))
 
         # Save data ----------------------------------------------------------------------------------------------------
-        self.m80.col["coex"] = pd.DataFrame({"score":pccs, "significant": significant})
-        log.info("Done")
+        self.m80.col["coex"] = pd.DataFrame({
+            "score": pccs,
+            "significant": significant, 
+            "distance": distances
+        })
 
     def _calculate_degree(self):
         log.info("Building Degree")
-        # Generate a df that starts all genes at 0
+        # Generate a df that starts all loci at 0
         names = self.expr.index.values
         degree = pd.DataFrame(0, index=names, columns=["Degree"])
         # Get the index and find the counts
         log.info("Calculating Gene degree")
         # Use the Cython function to convert the coex array index to the expr matrix index
-        sigs = PCCUP.coex_expr_index(self.coex[self.coex.significant].index.values, self.num_genes)
+        sigs = PCCUP.coex_expr_index(
+            self.coex[self.coex.significant].index.values, self.num_loci
+        )
         sigs = list(Counter(chain(*sigs)).items())
         if len(sigs) > 0:
             # Translate the expr indexes to the gene names
@@ -164,15 +391,17 @@ class Coex(m80.Freezable):
                 degree.loc[names[i]] = node_degree
         self.m80.col["degree"] = degree
 
-
-    def _calculate_gene_hierarchy(self, method='single'):
+    def _calculate_gene_hierarchy(
+        self, method: str = "single"
+    ) -> np.ndarray:
         """
-            Calculate the hierarchical gene distance for the Expr matrix
-            using the coex data.
+        Calculate the hierarchical gene distance for the Expr matrix
+        using the coex data.
 
-            Notes
-            -----
-            This is kind of expenive.
+        Parameters
+        ----------
+        method: a string that is passed to fastcluster used to calculate linkage metric
+
         """
         import fastcluster
 
@@ -180,8 +409,8 @@ class Coex(m80.Freezable):
         log.info("Calculating hierarchical clustering using {}".format(method))
         if len(self.coex) == 0:
             raise ValueError("Cannot calculate leaves without coex")
-        pcc_mean = self.metadata.search(where('name')=='pcc_mean').pop()['val']
-        pcc_std = self.metadata.search(where('name')=='pcc_std').pop()['val']
+        pcc_mean = self.metadata.search(where("name") == "pcc_mean").pop()["val"]
+        pcc_std = self.metadata.search(where("name") == "pcc_std").pop()["val"]
         # Get score column and dump coex from memory for time being
         dists = self.coex.score
         # Subtract pccs from 1 so we do not get negative distances
@@ -194,23 +423,17 @@ class Coex(m80.Freezable):
         gene_link = fastcluster.linkage(dists, method=method)
         return gene_link
 
-    def _calculate_leaves(self):
+    def _calculate_leaves(self, method: str = "single") -> None:
         """
-            This calculates the leaves of the dendrogram from the coex
+        This calculates the leaves of the dendrogram from the coex
         """
         gene_link = self._calculate_gene_hierarchy(method=method)
-        self.log("Finding the leaves")
+        log.info("Finding the leaves")
         leaves = leaves_list(gene_link)
 
         # Put them in a dataframe and stow them
-        self.leaves = pd.DataFrame(leaves, index=self._expr.index, columns=["index"])
-        self._gene_link = gene_link
-        self._bcolz("leaves", df=self.leaves)
-
-        # Cleanup and reinstate the coex table
-        return self
-
-        pass
+        leaves = pd.DataFrame(leaves, index=self.expr.index, columns=["index"])
+        self.m80.col["leaves"] = leaves
 
     def _calculate_clusters(self):
         pass
@@ -288,20 +511,22 @@ class Coex(m80.Freezable):
         self = cls(name)
 
         metadata = {
-            'key': 'qc_parameters',
-            'normalize_expr_values': normalize_expr_values,
-            'min_expr': min_expr,
-            'max_locus_missing_data': max_locus_missing_data,
-            'max_accession_missing_data': max_accession_missing_data,
-            'min_single_accession_expr': min_single_accession_expr,
+            "key": "qc_parameters",
+            "normalize_expr_values": normalize_expr_values,
+            "min_expr": min_expr,
+            "max_locus_missing_data": max_locus_missing_data,
+            "max_accession_missing_data": max_accession_missing_data,
+            "min_single_accession_expr": min_single_accession_expr,
         }
-       
-        for k,v in metadata.items():
-            self.metadata.insert({
-                'name':k,
-                'val':v,
-                'type':'qc_parameter',
-            })
+
+        for k, v in metadata.items():
+            self.metadata.insert(
+                {
+                    "name": k,
+                    "val": v,
+                    "type": "qc_parameter",
+                }
+            )
 
         # Make a copy of the input df
         df = df.copy()
@@ -339,19 +564,21 @@ class Coex(m80.Freezable):
         )
         log.info(
             "Found {} loci with > {} missing data".format(
-            sum(qc_loci["pass_missing_data"] == False),
-            max_locus_missing_data,
-        ))
+                sum(qc_loci["pass_missing_data"] == False),
+                max_locus_missing_data,
+            )
+        )
 
         # Filter out loci with do not meet a minimum expr threshold in at least 1 accession
         qc_loci["pass_min_expression"] = df.apply(
             lambda x: any(x >= min_single_accession_expr), axis=1  # 1 is column
         )
         log.info(
-            "Found {} loci which " "do not have one accession above {}".format(
-            sum(qc_loci["pass_min_expression"] == False),
-            min_single_accession_expr
-        ))
+            "Found {} loci which "
+            "do not have one accession above {}".format(
+                sum(qc_loci["pass_min_expression"] == False), min_single_accession_expr
+            )
+        )
 
         qc_loci["PASS_ALL"] = qc_loci.apply(lambda row: np.all(row), axis=1)
         df = df.loc[qc_loci["PASS_ALL"], :]
@@ -368,18 +595,22 @@ class Coex(m80.Freezable):
             "Found {} accessions with > {} missing data".format(
                 sum(qc_accession["pass_missing_data"] == False),
                 max_accession_missing_data,
-        ))
+            )
+        )
         # Update the total QC passing column
         qc_accession["PASS_ALL"] = qc_accession.apply(lambda row: np.all(row), axis=1)
         df = df.loc[:, qc_accession["PASS_ALL"]]
-       
+
         # Update the database
         log.info("Filtering loci to only those passing QC")
-        lp.Loci.from_loci(self.m80.name,[loci[x] for x in df.index if x in loci], rootdir=self.m80.thawed_dir)
+        lp.Loci.from_loci(
+            self.m80.name,
+            [loci[x] for x in df.index if x in loci],
+            rootdir=self.m80.thawed_dir,
+        )
         self.m80.col["qc_accession"] = qc_accession
         self.m80.col["qc_loci"] = qc_loci
         self.m80.col["expr"] = df
-
 
         # Do some reporting --------------------------------------------------------------------------------------------
         log.info(f"Loci passing QC:\n{str(qc_loci.apply(sum, axis=0))}")
@@ -389,8 +620,9 @@ class Coex(m80.Freezable):
         qc_loci["chromosome"] = [loci[x].chromosome for x in qc_loci.index]
         log.info(
             "Loci passing QC by chromosome:\n{}".format(
-                 str(qc_loci.groupby("chromosome").aggregate(sum)),
-        ))
+                str(qc_loci.groupby("chromosome").aggregate(sum)),
+            )
+        )
         # update the df to reflect only locis/accession passing QC
         log.info("Kept: {} locis {} accessions".format(len(df.index), len(df.columns)))
 
