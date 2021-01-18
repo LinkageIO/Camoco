@@ -43,8 +43,8 @@ import gc
 
 class COB(Expr):
     """
-        A COB object represents an easily browsable Co-expression network.
-        (COB-> co-expression browser)
+    A COB object represents an easily browsable Co-expression network.
+    (COB-> co-expression browser)
     """
 
     def __init__(self, name):  # pragma: no cover
@@ -106,8 +106,9 @@ class COB(Expr):
             The summary is printed either to stdout or a provided file.
         """
         import camoco as co
+
         print(
-           f"""
+            f"""
             CAMOCO (version:{co.__version__})
             ---------------------------------------
 
@@ -149,16 +150,16 @@ class COB(Expr):
 
     def qc_gene(self):
         """
-            Returns qc statistics broken down by chromosome
+        Returns qc statistics broken down by chromosome
 
-            Paramaters
-            ----------
-            None
+        Paramaters
+        ----------
+        None
 
-            Returns
-            -------
-            DataFrame
-                A dataframe containing QC info
+        Returns
+        -------
+        DataFrame
+            A dataframe containing QC info
         """
         qc_gene = self._bcolz("qc_gene")
         # generate the parent refegen
@@ -167,13 +168,13 @@ class COB(Expr):
         return qc_gene.groupby("chrom").aggregate(sum, axis=0)
 
     @property
-    def edge_FDR(self): 
+    def edge_FDR(self):
         """
-        Returns a calculated false discovery rate of the Edges. This is 
+        Returns a calculated false discovery rate of the Edges. This is
         calculated from the number of expected edges from the standard normal
         distribution, which a network will follow if the gene expression matrix
-        is simply random data. This function looks at the number of expected 
-        'significant' edges and divides that by the number of observed edges in 
+        is simply random data. This function looks at the number of expected
+        'significant' edges and divides that by the number of observed edges in
         the network.
 
         Parameters
@@ -196,7 +197,7 @@ class COB(Expr):
         """
         Sets the 'significance' threshold for the coex network. This will
         affect thresholded network metrics that use degree (e.g. locality)
-        It will not affect unthresholded metrics like Density. 
+        It will not affect unthresholded metrics like Density.
 
         Parameters
         ----------
@@ -243,28 +244,28 @@ class COB(Expr):
 
     def _coex_DataFrame(self, ids=None, sig_only=True):
         """
-            Converts the underlying coexpression table into
-            a pandas dataframe 
+        Converts the underlying coexpression table into
+        a pandas dataframe
 
-            Parameters
-            ----------
-                ids : array-like of ints (default: None)
-                    Indices to include in the data frame. Usually
-                    computed from another COB method (e.g. 
-                    PCCUP.coex_index). If None, then all indices
-                    will be included.
-                sig_only : bool (default: True)
-                    If true, only "significant" edges will be 
-                    included in the table. If False, all edges will
-                    be included.
+        Parameters
+        ----------
+            ids : array-like of ints (default: None)
+                Indices to include in the data frame. Usually
+                computed from another COB method (e.g.
+                PCCUP.coex_index). If None, then all indices
+                will be included.
+            sig_only : bool (default: True)
+                If true, only "significant" edges will be
+                included in the table. If False, all edges will
+                be included.
 
-            Returns
-            -------
-                A Pandas Dataframe
+        Returns
+        -------
+            A Pandas Dataframe
 
 
-            .. warning:: This will put the entire gene-by-accession
-                         dataframe into memory.
+        .. warning:: This will put the entire gene-by-accession
+                     dataframe into memory.
         """
         # If no ids are provided, get all of them
         if ids is None:
@@ -294,27 +295,27 @@ class COB(Expr):
         return_gene_set=False,
     ):
         """
-            Returns a DataFrame containing the neighbors for gene.
+        Returns a DataFrame containing the neighbors for gene.
 
-            Parameters
-            ----------
-            gene : co.Locus
-                The gene for which to extract neighbors
-            sig_only : bool (default: True)
-                A flag to include only significant interactions.
-            names_as_index : bool (default: True)
-                Include gene names as the index. If this and `names_as_cols` are
-                both False, only the interactions are returned which is a faster
-                operation than including gene names.
-            names_as_cols : bool (default: False)
-                Include gene names as two columns named 'gene_a' and 'gene_b'.
-            return_gene_set : bool (default: False)
-                Return the set of neighbors instead of a dataframe
+        Parameters
+        ----------
+        gene : co.Locus
+            The gene for which to extract neighbors
+        sig_only : bool (default: True)
+            A flag to include only significant interactions.
+        names_as_index : bool (default: True)
+            Include gene names as the index. If this and `names_as_cols` are
+            both False, only the interactions are returned which is a faster
+            operation than including gene names.
+        names_as_cols : bool (default: False)
+            Include gene names as two columns named 'gene_a' and 'gene_b'.
+        return_gene_set : bool (default: False)
+            Return the set of neighbors instead of a dataframe
 
-            Returns
-            -------
-            - A DataFrame containing edges 
-            - A Gene set IF return_gene_set is true
+        Returns
+        -------
+        - A DataFrame containing edges
+        - A Gene set IF return_gene_set is true
 
         """
         # Find the neighbors
@@ -353,19 +354,19 @@ class COB(Expr):
         return edges
 
     def neighborhood(self, gene_list, return_genes=False, neighbors_only=False):
-        """ 
-            Find the genes that have network connections the the gene_list.
-        
-            Parameters
-            ----------
-            Input: A gene List
-                The gene list used to obtain the neighborhood.
-            
-            Returns
-            -------
-            A Dataframe containing gene ids which have at least
-            one edge with another gene in the input list. Also returns
-            global degree
+        """
+        Find the genes that have network connections the the gene_list.
+
+        Parameters
+        ----------
+        Input: A gene List
+            The gene list used to obtain the neighborhood.
+
+        Returns
+        -------
+        A Dataframe containing gene ids which have at least
+        one edge with another gene in the input list. Also returns
+        global degree
         """
         if isinstance(gene_list, Locus):
             gene_list = [gene_list]
@@ -394,28 +395,28 @@ class COB(Expr):
     def next_neighbors(
         self, gene_list, n=None, return_table=False, include_query=False
     ):
-        """ 
-            Given a set of input genes, return the next (n) neighbors
-            that have the stronges connection to the input set.
+        """
+        Given a set of input genes, return the next (n) neighbors
+        that have the stronges connection to the input set.
 
-            Parameters
-            ----------
-            gene_list : list-like of co.Locus
-                An iterable of genes for which the next neighbors will be 
-                calculated.
-            n : int (default: None)
-                The number of next neighbors to return. If None, the method
-                will return ALL neighbors
-            return_table : bool (default:False)
-                If true, a table with neighbors and scores will be 
-                returned
-            include_query : bool (default:False)
-                If True (and return table is False) the query gene(s) will
-                be included in the return list
+        Parameters
+        ----------
+        gene_list : list-like of co.Locus
+            An iterable of genes for which the next neighbors will be
+            calculated.
+        n : int (default: None)
+            The number of next neighbors to return. If None, the method
+            will return ALL neighbors
+        return_table : bool (default:False)
+            If true, a table with neighbors and scores will be
+            returned
+        include_query : bool (default:False)
+            If True (and return table is False) the query gene(s) will
+            be included in the return list
 
-            Returns
-            -------
-            returns a list containing the strongest connected neighbors 
+        Returns
+        -------
+        returns a list containing the strongest connected neighbors
         """
         if isinstance(gene_list, Locus):
             gene_list = [gene_list]
@@ -442,20 +443,20 @@ class COB(Expr):
 
     def coexpression(self, gene_a, gene_b):
         """
-            Returns a coexpression z-score between two genes. This
-            is the pearson correlation coefficient of the two genes'
-            expression profiles across the accessions (experiments).
-            This value is pulled from the
+        Returns a coexpression z-score between two genes. This
+        is the pearson correlation coefficient of the two genes'
+        expression profiles across the accessions (experiments).
+        This value is pulled from the
 
-            Parameters
-            ----------
-            gene_a : camoco.Locus
-                The first gene
-            gene_b : camoco.Locus
-                The second gene
+        Parameters
+        ----------
+        gene_a : camoco.Locus
+            The first gene
+        gene_b : camoco.Locus
+            The second gene
 
-            Returns
-            Coexpression Z-Score
+        Returns
+        Coexpression Z-Score
 
         """
         if gene_a.id == gene_b.id:
@@ -481,39 +482,39 @@ class COB(Expr):
         names_as_cols=False,
     ):
         """
-            Extract a subnetwork of edges exclusively between genes
-            within the gene_list. Also includes various options for
-            what information to report, see Parameters.
+        Extract a subnetwork of edges exclusively between genes
+        within the gene_list. Also includes various options for
+        what information to report, see Parameters.
 
-            Parameters
-            ----------
-            gene_list : iter of Loci
-                The genes from which to extract a subnetwork.
-                If gene_list is None, the function will assume
-                gene_list is all genes in COB object (self).
-            sig_only : bool
-                A flag to include only significant interactions.
-            min_distance : bool (default: None)
-                If not None, only include interactions that are
-                between genes that are a `min_distance` away from
-                one another.
-            filter_missing_gene_ids : bool (default: True)
-                Filter out gene ids that are not in the current
-                COB object (self).
-            trans_locus_only : bool (default: True)
-                Filter out gene interactions that are not in Trans,
-                this argument requires that locus attr object has
-                the 'parent_locus' key:val set to distinguish between
-                cis and trans elements.
-            names_as_index : bool (default: True)
-                Include gene names as the index.
-            names_as_cols : bool (default: False)
-                Include gene names as two columns named 'gene_a' and 'gene_b'.
+        Parameters
+        ----------
+        gene_list : iter of Loci
+            The genes from which to extract a subnetwork.
+            If gene_list is None, the function will assume
+            gene_list is all genes in COB object (self).
+        sig_only : bool
+            A flag to include only significant interactions.
+        min_distance : bool (default: None)
+            If not None, only include interactions that are
+            between genes that are a `min_distance` away from
+            one another.
+        filter_missing_gene_ids : bool (default: True)
+            Filter out gene ids that are not in the current
+            COB object (self).
+        trans_locus_only : bool (default: True)
+            Filter out gene interactions that are not in Trans,
+            this argument requires that locus attr object has
+            the 'parent_locus' key:val set to distinguish between
+            cis and trans elements.
+        names_as_index : bool (default: True)
+            Include gene names as the index.
+        names_as_cols : bool (default: False)
+            Include gene names as two columns named 'gene_a' and 'gene_b'.
 
-            Returns
-            -------
-            A pandas.DataFrame containing the edges. Columns
-            include score, significant (bool), and inter-genic distance.
+        Returns
+        -------
+        A pandas.DataFrame containing the edges. Columns
+        include score, significant (bool), and inter-genic distance.
         """
         num_genes = self.num_genes()
         if gene_list is None:
@@ -575,31 +576,31 @@ class COB(Expr):
         iter_name=None,
     ):
         """
-            Calculates the density of edges which span loci. Must take in a locus
-            list so we can exlude cis-locus interactions.
+        Calculates the density of edges which span loci. Must take in a locus
+        list so we can exlude cis-locus interactions.
 
-            Parameters
-            ----------
-            locus_list : iter of Loci
-                an iterable of loci
-            flank_limit : int
-                The number of flanking genes passed to be pulled out
-                for each locus (passed onto the refgen.candidate_genes method)
-            return_mean : bool (default: True)
-                If false, raw edges will be returned
-            bootstrap : bool (default: False)
-                If true, candidate genes will be bootstrapped from the COB
-                reference genome
-            by_gene : bool (default: False)
-                Return a per-gene breakdown of density within the subnetwork.
-            iter_name : str (default: None)
-                Optional string which will be added as a column. Useful for
-                keeping track of bootstraps in an aggregated data frame.
+        Parameters
+        ----------
+        locus_list : iter of Loci
+            an iterable of loci
+        flank_limit : int
+            The number of flanking genes passed to be pulled out
+            for each locus (passed onto the refgen.candidate_genes method)
+        return_mean : bool (default: True)
+            If false, raw edges will be returned
+        bootstrap : bool (default: False)
+            If true, candidate genes will be bootstrapped from the COB
+            reference genome
+        by_gene : bool (default: False)
+            Return a per-gene breakdown of density within the subnetwork.
+        iter_name : str (default: None)
+            Optional string which will be added as a column. Useful for
+            keeping track of bootstraps in an aggregated data frame.
 
-            Returns
-            -------
-            Z-score of interactions if return_mean is True
-            otherwise a dataframe of trans edges
+        Returns
+        -------
+        Z-score of interactions if return_mean is True
+        otherwise a dataframe of trans edges
 
         """
         # convert to list of loci to lists of genes
@@ -649,7 +650,9 @@ class COB(Expr):
                 scores = edges.loc[edges["trans"] == True, "score"]
                 return np.nanmean(scores) / (1 / np.sqrt(len(scores)))
             else:
-                return edges.loc[edges["trans"] == True,]
+                return edges.loc[
+                    edges["trans"] == True,
+                ]
 
     def trans_locus_locality(
         self,
@@ -661,36 +664,36 @@ class COB(Expr):
         include_regression=False,
     ):
         """
-            Computes a table comparing local degree to global degree
-            of genes COMPUTED from a set of loci.
-            NOTE: interactions from genes originating from the same
-            locus are not counted for global or local degree.
+        Computes a table comparing local degree to global degree
+        of genes COMPUTED from a set of loci.
+        NOTE: interactions from genes originating from the same
+        locus are not counted for global or local degree.
 
-            Parameters
-            ----------
-            locus_list : iterable of camoco.Loci
-                A list or equivalent of loci
-            flank_limit : int
-                The number of flanking genes passed to be pulled out
-                for each locus (passed onto the refgen.candidate_genes method)
-            bootstrap : bool (default: False)
-                If true, candidate genes will be bootstrapped from the COB
-                reference genome
-            iter_name : object (default: none)
-                This will be added as a column. Useful for
-                generating bootstraps of locality and keeping
-                track of which one a row came from after catting
-                multiple bootstraps together.
-            by_gene : bool (default: False)
-                Return a per-gene breakdown of density within the subnetwork.
-            include_regression : bool (default: False)
-                Include the OLS regression residuals and fitted values
-                on local ~ global.
+        Parameters
+        ----------
+        locus_list : iterable of camoco.Loci
+            A list or equivalent of loci
+        flank_limit : int
+            The number of flanking genes passed to be pulled out
+            for each locus (passed onto the refgen.candidate_genes method)
+        bootstrap : bool (default: False)
+            If true, candidate genes will be bootstrapped from the COB
+            reference genome
+        iter_name : object (default: none)
+            This will be added as a column. Useful for
+            generating bootstraps of locality and keeping
+            track of which one a row came from after catting
+            multiple bootstraps together.
+        by_gene : bool (default: False)
+            Return a per-gene breakdown of density within the subnetwork.
+        include_regression : bool (default: False)
+            Include the OLS regression residuals and fitted values
+            on local ~ global.
 
-            Returns
-            -------
-            A pandas DataFrame with local, global and residual columns
-            based on linear regression of local on global degree.
+        Returns
+        -------
+        A pandas DataFrame with local, global and residual columns
+        based on linear regression of local on global degree.
         """
         # convert to list of loci to lists of genes
         if not bootstrap:
@@ -730,25 +733,25 @@ class COB(Expr):
 
     def density(self, gene_list, min_distance=None, by_gene=False):
         """
-            Calculates the density of the non-thresholded network edges
-            amongst genes within gene_list. Includes parameters to perform
-            measurements for genes within a certain distance of each other.
-            This corrects for cis regulatory elements increasing noise
-            in coexpression network.
+        Calculates the density of the non-thresholded network edges
+        amongst genes within gene_list. Includes parameters to perform
+        measurements for genes within a certain distance of each other.
+        This corrects for cis regulatory elements increasing noise
+        in coexpression network.
 
-            Parameters
-            ----------
-            gene_list : iter of Loci
-                List of genes from which to calculate density.
-            min_distance : int (default: None)
-                Ignore edges between genes less than min_distance
-                in density calculation.
-            by_gene : bool (default: False)
-                Return a per-gene breakdown of density within the subnetwork.
+        Parameters
+        ----------
+        gene_list : iter of Loci
+            List of genes from which to calculate density.
+        min_distance : int (default: None)
+            Ignore edges between genes less than min_distance
+            in density calculation.
+        by_gene : bool (default: False)
+            Return a per-gene breakdown of density within the subnetwork.
 
-            Returns
-            -------
-            A network density OR density on a gene-wise basis
+        Returns
+        -------
+        A network density OR density on a gene-wise basis
         """
         # filter for only genes within network
         edges = self.subnetwork(gene_list, min_distance=min_distance, sig_only=False)
@@ -773,7 +776,7 @@ class COB(Expr):
 
     def to_dat(self, gene_list=None, filename=None, sig_only=True, min_distance=0):
         """
-            Outputs a .DAT file (see Sleipnir library)
+        Outputs a .DAT file (see Sleipnir library)
         """
         if filename is None:
             filename = self.name + ".dat"
@@ -809,8 +812,7 @@ class COB(Expr):
             self.log("Done")
 
     def to_graphml(self, file, gene_list=None, sig_only=True, min_distance=0):
-        """
-        """
+        """"""
         # Get the edge indexes
         self.log("Getting the network.")
         edges = self.subnetwork(
@@ -852,45 +854,45 @@ class COB(Expr):
         ontology=None,
     ):
         """
-            Produce a JSON network object that can be loaded in cytoscape.js
-            or Cytoscape v3+.
+        Produce a JSON network object that can be loaded in cytoscape.js
+        or Cytoscape v3+.
 
-            Parameters
-            ----------
-            gene_list : iterable of Locus objects
-                These loci or more specifically, genes,
-                must be in the COB RefGen object,
-                they are the genes in the network.
-            filename : str (default None)
-                If specified, the JSON string will be output to 
-                file. 
-            sig_only : bool (default: True)
-                Flag specifying whether or not to only
-                include the significant edges only. If
-                False, **All pairwise interactions** will
-                be included. (warning: it can be large).
-            min_distance : bool (default: None)
-                If specified, only interactions between
-                genes larger than this distance will be 
-                included. This corrects for potential 
-                cis-biased co-expression.
-            max_edges : int (default: None)
-                If specified, only the maximum number of 
-                edges will be included. Priority of edges
-                is assigned based on score.
-            remove_orphans : bool (default: True)
-                Remove genes that have no edges in the 
-                network.
-            ontology : camoco.Ontology (default: None)
-                If an ontology is specified, genes will
-                be annotated to belonging to terms within 
-                the ontology. This is useful for highlighting 
-                groups of genes once they are inside of
-                cytoscape(.js).
+        Parameters
+        ----------
+        gene_list : iterable of Locus objects
+            These loci or more specifically, genes,
+            must be in the COB RefGen object,
+            they are the genes in the network.
+        filename : str (default None)
+            If specified, the JSON string will be output to
+            file.
+        sig_only : bool (default: True)
+            Flag specifying whether or not to only
+            include the significant edges only. If
+            False, **All pairwise interactions** will
+            be included. (warning: it can be large).
+        min_distance : bool (default: None)
+            If specified, only interactions between
+            genes larger than this distance will be
+            included. This corrects for potential
+            cis-biased co-expression.
+        max_edges : int (default: None)
+            If specified, only the maximum number of
+            edges will be included. Priority of edges
+            is assigned based on score.
+        remove_orphans : bool (default: True)
+            Remove genes that have no edges in the
+            network.
+        ontology : camoco.Ontology (default: None)
+            If an ontology is specified, genes will
+            be annotated to belonging to terms within
+            the ontology. This is useful for highlighting
+            groups of genes once they are inside of
+            cytoscape(.js).
 
-            Returns
-            -------
-            A JSON string or None if a filename is specified
+        Returns
+        -------
+        A JSON string or None if a filename is specified
         """
         net = {"nodes": [], "edges": []}
         # Get the edge indexes
@@ -976,22 +978,22 @@ class COB(Expr):
         self, gene_list=None, min_distance=None, max_edges=None, remove_orphans=False
     ):
         """
-            Convert the co-expression interactions to a 
-            scipy sparse matrix.
+        Convert the co-expression interactions to a
+        scipy sparse matrix.
 
-            Parameters
-            -----
-            gene_list: iter of Loci (default: None)
-                If specified, return only the interactions among
-                loci in the list. If None, use all genes.
-            min_distance : int (default: None)
-                The minimum distance between genes for which to consider
-                co-expression interactions. This filters out cis edges.
+        Parameters
+        -----
+        gene_list: iter of Loci (default: None)
+            If specified, return only the interactions among
+            loci in the list. If None, use all genes.
+        min_distance : int (default: None)
+            The minimum distance between genes for which to consider
+            co-expression interactions. This filters out cis edges.
 
-            Returns
-            -------
-            A tuple (a,b) where 'a' is a scipy sparse matrix and
-            'b' is a mapping from gene_id to index.
+        Returns
+        -------
+        A tuple (a,b) where 'a' is a scipy sparse matrix and
+        'b' is a mapping from gene_id to index.
         """
         from scipy import sparse
 
@@ -1048,37 +1050,33 @@ class COB(Expr):
         max_cluster_size=10e10,
     ):
         """
-            Returns clusters (as list) as designated by MCL (Markov Clustering).
+        Returns clusters (as list) as designated by MCL (Markov Clustering).
 
-            Parameters
-            ----------
-            gene_list : a gene iterable
-                These are the genes which will be clustered
-            I : float (default: 2.0)
-                This is the inflation parameter passed into mcl.
-            min_distance : int (default: None)
-                The minimum distance between genes for which to consider
-                co-expression interactions. This filters out cis edges.
-            min_cluster_size : int (default: 0)
-                The minimum cluster size to return. Filter out clusters smaller
-                than this.
-            max_cluster_size : float (default: 10e10)
-                The maximum cluster size to return. Filter out clusters larger
-                than this.
+        Parameters
+        ----------
+        gene_list : a gene iterable
+            These are the genes which will be clustered
+        I : float (default: 2.0)
+            This is the inflation parameter passed into mcl.
+        min_distance : int (default: None)
+            The minimum distance between genes for which to consider
+            co-expression interactions. This filters out cis edges.
+        min_cluster_size : int (default: 0)
+            The minimum cluster size to return. Filter out clusters smaller
+            than this.
+        max_cluster_size : float (default: 10e10)
+            The maximum cluster size to return. Filter out clusters larger
+            than this.
 
-            Returns
-            -------
-            A list clusters containing a lists of genes within each cluster
+        Returns
+        -------
+        A list clusters containing a lists of genes within each cluster
         """
         import markov_clustering as mc
 
         matrix, gene_index = self.to_sparse_matrix(gene_list=gene_list)
         # Run MCL
-        result = mc.run_mcl(
-            matrix,
-            inflation=I,
-            verbose=True
-        )
+        result = mc.run_mcl(matrix, inflation=I, verbose=True)
         clusters = mc.get_clusters(result)
         # MCL traditionally returns clusters by size with 0 being the largest
         clusters = sorted(clusters, key=lambda x: len(x), reverse=True)
@@ -1095,17 +1093,17 @@ class COB(Expr):
 
     def local_degree(self, gene_list, trans_locus_only=False):
         """
-            Returns the local degree of a list of genes
+        Returns the local degree of a list of genes
 
-            Parameters
-            ----------
-            gene_list : iterable (co.Locus object)
-                a list of genes for which to retrieve local degree for. The
-                genes must be in the COB object (of course)
-            trans_locus_only : bool (default: False)
-                only count edges if they are from genes originating from
-                different loci. Each gene MUST have 'parent_locus' set in
-                its attr object.
+        Parameters
+        ----------
+        gene_list : iterable (co.Locus object)
+            a list of genes for which to retrieve local degree for. The
+            genes must be in the COB object (of course)
+        trans_locus_only : bool (default: False)
+            only count edges if they are from genes originating from
+            different loci. Each gene MUST have 'parent_locus' set in
+            its attr object.
         """
         subnetwork = self.subnetwork(
             gene_list, sig_only=True, trans_locus_only=trans_locus_only
@@ -1127,17 +1125,17 @@ class COB(Expr):
 
     def global_degree(self, gene_list, trans_locus_only=False):
         """
-            Returns the global degree of a list of genes
-    
-            Parameters
-            ----------
-            gene_list : iterable (co.Locus object)
-                a list of genes for which to retrieve local degree for. The
-                genes must be in the COB object (of course)
-            trans_locus_only : bool (default: False)
-                only count edges if they are from genes originating from
-                different loci. Each gene MUST have 'parent_locus' set in
-                its attr object.
+        Returns the global degree of a list of genes
+
+        Parameters
+        ----------
+        gene_list : iterable (co.Locus object)
+            a list of genes for which to retrieve local degree for. The
+            genes must be in the COB object (of course)
+        trans_locus_only : bool (default: False)
+            only count edges if they are from genes originating from
+            different loci. Each gene MUST have 'parent_locus' set in
+            its attr object.
         """
         try:
             if isinstance(gene_list, Locus):
@@ -1154,13 +1152,13 @@ class COB(Expr):
 
     def cis_degree(self, gene_list):
         """
-            Returns the number of *cis* interactions for each gene in the gene
-            list. Two genes are is *cis* if they share the same parent locus.
-            **Therefore: each gene object MUST have its 'parent_locus' attr set!!**
+        Returns the number of *cis* interactions for each gene in the gene
+        list. Two genes are is *cis* if they share the same parent locus.
+        **Therefore: each gene object MUST have its 'parent_locus' attr set!!**
 
-            Parameters
-            ----------
-            gene_list : iterable of Gene Objects
+        Parameters
+        ----------
+        gene_list : iterable of Gene Objects
         """
         subnetwork = self.subnetwork(gene_list, sig_only=True, trans_locus_only=True)
         # Invert the trans column
@@ -1181,25 +1179,25 @@ class COB(Expr):
 
     def locality(self, gene_list, iter_name=None, include_regression=False):
         """
-            Computes the merged local vs global degree table
+        Computes the merged local vs global degree table
 
-            Parameters
-            ----------
-            gene_list : iterable of camoco.Loci
-                A list or equivalent of loci
-            iter_name : object (default: none)
-                This will be added as a column. Useful for
-                generating bootstraps of locality and keeping
-                track of which one a row came from after catting
-                multiple bootstraps together.
-            include_regression : bool (default: False)
-                Include the OLS regression residuals and fitted values
-                on local ~ global.
+        Parameters
+        ----------
+        gene_list : iterable of camoco.Loci
+            A list or equivalent of loci
+        iter_name : object (default: none)
+            This will be added as a column. Useful for
+            generating bootstraps of locality and keeping
+            track of which one a row came from after catting
+            multiple bootstraps together.
+        include_regression : bool (default: False)
+            Include the OLS regression residuals and fitted values
+            on local ~ global.
 
-            Returns
-            -------
-            A pandas DataFrame with local, global and residual columns
-            based on linear regression of local on global degree.
+        Returns
+        -------
+        A pandas DataFrame with local, global and residual columns
+        based on linear regression of local on global degree.
 
         """
         global_degree = self.global_degree(gene_list)
@@ -1225,31 +1223,31 @@ class COB(Expr):
 
     def cluster_genes(self, cluster_id):
         """
-            Return the genes that are in a cluster
+        Return the genes that are in a cluster
 
-            Parameters
-            ----------
-            cluster_id: str / int
-                The ID of the cluster for which to get the gene IDs.
-                Technically a string, but MCL clusters are assigned
-                numbers. This is automatically converted so '0' == 0.
+        Parameters
+        ----------
+        cluster_id: str / int
+            The ID of the cluster for which to get the gene IDs.
+            Technically a string, but MCL clusters are assigned
+            numbers. This is automatically converted so '0' == 0.
 
-            Returns
-            -------
-            A list of Loci (genes) that are in the cluster
+        Returns
+        -------
+        A list of Loci (genes) that are in the cluster
         """
         ids = self.clusters.query(f"cluster == {cluster_id}").index.values
         return self.refgen[ids]
 
     def cluster_coordinates(self, cluster_number, nstd=2):
         """
-            Calculate the rough coordinates around an MCL 
-            cluster.
+        Calculate the rough coordinates around an MCL
+        cluster.
 
-            Returns parameters that can be used to draw an ellipse.
-            e.g. for cluster #5
-            >>> from matplotlib.patches import Ellipse
-            >>> e = Ellipse(**self.cluster_coordinates(5))
+        Returns parameters that can be used to draw an ellipse.
+        e.g. for cluster #5
+        >>> from matplotlib.patches import Ellipse
+        >>> e = Ellipse(**self.cluster_coordinates(5))
 
         """
         # Solution inspired by:
@@ -1275,27 +1273,27 @@ class COB(Expr):
 
     def cluster_expression(self, min_cluster_size=10, normalize=True):
         """
-            Get a matrix of cluster x accession gene expression.
-            Each row represents the average gene expression in each accession
-            for the genes in the cluster.
+        Get a matrix of cluster x accession gene expression.
+        Each row represents the average gene expression in each accession
+        for the genes in the cluster.
 
-            Parameters
-            ----------
-            min_cluster_size : int (default:10)
-                Clusters smaller than this will not be included in the
-                expression matrix.
-            normalize : bool (default:True)
-                If true, each row will be standard normalized meaning that
-                0 will represent the average (mean) across all accessions
-                and the resultant values in the row will represent the number 
-                of standard deviations from the mean.
+        Parameters
+        ----------
+        min_cluster_size : int (default:10)
+            Clusters smaller than this will not be included in the
+            expression matrix.
+        normalize : bool (default:True)
+            If true, each row will be standard normalized meaning that
+            0 will represent the average (mean) across all accessions
+            and the resultant values in the row will represent the number
+            of standard deviations from the mean.
 
-            Returns
-            -------
-            A DataFrame containing gene expression values. Each row represents
-            a cluster and each column represents an accession. The values of
-            the matrix are the average gene expression (of genes in the cluster)
-            for each accession.
+        Returns
+        -------
+        A DataFrame containing gene expression values. Each row represents
+        a cluster and each column represents an accession. The values of
+        the matrix are the average gene expression (of genes in the cluster)
+        for each accession.
 
         """
         # Extract clusters
@@ -1313,16 +1311,12 @@ class COB(Expr):
         return dm
 
     def coordinates(
-            self, 
-            iterations=1000, 
-            force=False, 
-            max_edges=100000, 
-            lcc_only=True
-        ):
-        """ 
-            returns the static layout, you can change the stored layout by
-            passing in a new layout object. If no layout has been stored or a gene
-            does not have coordinates, returns (0, 0) for each mystery gene
+        self, iterations=1000, force=False, max_edges=100000, lcc_only=True
+    ):
+        """
+        returns the static layout, you can change the stored layout by
+        passing in a new layout object. If no layout has been stored or a gene
+        does not have coordinates, returns (0, 0) for each mystery gene
         """
         from fa2 import ForceAtlas2
 
@@ -1391,13 +1385,13 @@ class COB(Expr):
         color_clusters=True,
         min_cluster_size=100,
         max_clusters=None,
-        background_color='tab:blue',
+        background_color="tab:blue",
         plot_edges=False,
-        max_edges=100000
+        max_edges=100000,
     ):
-        '''
-            Plot a "hairball" image of the network.
-        '''
+        """
+        Plot a "hairball" image of the network.
+        """
         coor = self.coordinates(lcc_only=lcc_only, force=force)
         fig = plt.figure(facecolor="white", figsize=(20, 20))
         ax = fig.add_subplot(111)
@@ -1409,39 +1403,31 @@ class COB(Expr):
         # Plot edges
         if plot_edges:
             self.log("Plotting edges")
-            edges = self.subnetwork(
-                gene_list=self.refgen.from_ids(
-                    coor.index.values
-                )
-            )
-            edges = edges.sort_values(by="score", ascending=False)[0:max_edges].reset_index()
+            edges = self.subnetwork(gene_list=self.refgen.from_ids(coor.index.values))
+            edges = edges.sort_values(by="score", ascending=False)[
+                0:max_edges
+            ].reset_index()
             # Extract the coordinates for edges
             a_coor = coor.loc[edges.gene_a]
             b_coor = coor.loc[edges.gene_b]
-            #Plot using a matplotlib lines collection
+            # Plot using a matplotlib lines collection
             lines = LineCollection(
-                zip(zip(a_coor.x,a_coor.y),zip(b_coor.x,b_coor.y)),
-                colors='k',
+                zip(zip(a_coor.x, a_coor.y), zip(b_coor.x, b_coor.y)),
+                colors="k",
                 antialiased=(1,),
-                alpha=0.7
+                alpha=0.7,
             )
             lines.set_zorder(1)
             ax.add_collection(lines)
 
-        ax.scatter(
-            coor.x, 
-            coor.y, 
-            alpha=1, 
-            color=background_color,
-            s=150
-        )
+        ax.scatter(coor.x, coor.y, alpha=1, color=background_color, s=150)
         # Plot the genes
         if genes is not None:
             self.log("Plotting genes")
             ids = coor.loc[[x.id for x in genes if x.id in coor.index]]
             nodes = ax.scatter(
-                ids.x, 
-                ids.y, 
+                ids.x,
+                ids.y,
                 color="r",
                 s=150,
             )
@@ -1449,6 +1435,7 @@ class COB(Expr):
         # Plot clusters
         if plot_clusters:
             from matplotlib.patches import Ellipse
+
             big_clusters = [
                 k
                 for k, v in Counter(self.clusters.cluster).items()
@@ -1460,8 +1447,8 @@ class COB(Expr):
                 ids = [x.id for x in self.cluster_genes(clus) if x.id in coor.index]
                 ccoor = coor.loc[ids]
                 if color_clusters:
-                    # This will overwrite the genes in the cluster giving them colors 
-                    ax.scatter(ccoor.x, ccoor.y,s=150)
+                    # This will overwrite the genes in the cluster giving them colors
+                    ax.scatter(ccoor.x, ccoor.y, s=150)
                 try:
                     c = self.cluster_coordinates(clus)
                 except KeyError as e:
@@ -1469,7 +1456,7 @@ class COB(Expr):
                 c.update(
                     {
                         "edgecolor": "black",
-                        "fill"     : False,
+                        "fill": False,
                         "linestyle": ":",
                         "linewidth": 3,
                     }
@@ -1499,61 +1486,61 @@ class COB(Expr):
         expr_boundaries=3.5,
     ):
         """
-            Plots a heatmap of genes x expression.
+        Plots a heatmap of genes x expression.
 
-            Parameters
-            ----------
-            filename : str 
-                If specified, figure will be written to output filename
-            genes : co.Locus iterable (default: None)
-                An iterable of genes to plot expression for
-            accessions : iterable of str
-                An iterable of strings to extract for expression values.
-                Values must be a subset of column values in expression matrix
-            gene_normalize: bool (default: True)
-                normalize gene values in heatmap to show expression patterns.
-            raw : bool (default: False)
-                If true, raw expression data will be used. Default is to use
-                the normailzed, QC'd data.
-            cluster_method : str (default: 'single')
-                Specifies how to organize the gene axis in the heatmap. If
-                'mcl', genes will be organized by MCL cluster. Otherwise
-                the value must be one of the linkage methods defined by 
-                the scipy.cluster.hierarchy.linkage function: [single,
-                complete, average, weighted, centroid, median, ward].
-                https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.linkage.html
-            include_accession_labels : bool (default: None)
-                Force the rendering of accession labels. If None, accession 
-                lables will be included as long as there are less than 30.
-            include_gene_lables : bool (default: None)
-                Force rendering of gene labels in heatmap. If None, gene
-                labels will be rendered as long as there are less than 100.
-            avg_by_cluster : bool (default: False)
-                If True, gene expression values will be averaged by MCL cluster
-                showing a single row per cluster.
-            min_cluster_size : int ( default: 10)
-                If avg_by_cluster, only cluster sizes larger than min_cluster_size
-                will be included.
-            cluster_accessions : bool (default: True)
-                If true, accessions will be clustered
-            plot_dendrogram : bool (default: True)
-                If true, dendrograms will be plotted
-            nan_color : str (default: None)
-                Specifies the color of nans in the heatmap. Changing this
-                to a high contrast color can help identify problem areas.
-                If not specified, nans will be the middle (neutral) value
-                in the heatmap.
-            cmap : str (default: 'viridis')
-                A matplotlib color map for the heatmap. See
-                https://matplotlib.org/gallery/color/colormap_reference.html
-                for options.
-            expr_boundaries : int (default: 3)
-                Set the min/max boundaries for expression values so that
-                the cmap colors aren't dominated by outliers
+        Parameters
+        ----------
+        filename : str
+            If specified, figure will be written to output filename
+        genes : co.Locus iterable (default: None)
+            An iterable of genes to plot expression for
+        accessions : iterable of str
+            An iterable of strings to extract for expression values.
+            Values must be a subset of column values in expression matrix
+        gene_normalize: bool (default: True)
+            normalize gene values in heatmap to show expression patterns.
+        raw : bool (default: False)
+            If true, raw expression data will be used. Default is to use
+            the normailzed, QC'd data.
+        cluster_method : str (default: 'single')
+            Specifies how to organize the gene axis in the heatmap. If
+            'mcl', genes will be organized by MCL cluster. Otherwise
+            the value must be one of the linkage methods defined by
+            the scipy.cluster.hierarchy.linkage function: [single,
+            complete, average, weighted, centroid, median, ward].
+            https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.linkage.html
+        include_accession_labels : bool (default: None)
+            Force the rendering of accession labels. If None, accession
+            lables will be included as long as there are less than 30.
+        include_gene_lables : bool (default: None)
+            Force rendering of gene labels in heatmap. If None, gene
+            labels will be rendered as long as there are less than 100.
+        avg_by_cluster : bool (default: False)
+            If True, gene expression values will be averaged by MCL cluster
+            showing a single row per cluster.
+        min_cluster_size : int ( default: 10)
+            If avg_by_cluster, only cluster sizes larger than min_cluster_size
+            will be included.
+        cluster_accessions : bool (default: True)
+            If true, accessions will be clustered
+        plot_dendrogram : bool (default: True)
+            If true, dendrograms will be plotted
+        nan_color : str (default: None)
+            Specifies the color of nans in the heatmap. Changing this
+            to a high contrast color can help identify problem areas.
+            If not specified, nans will be the middle (neutral) value
+            in the heatmap.
+        cmap : str (default: 'viridis')
+            A matplotlib color map for the heatmap. See
+            https://matplotlib.org/gallery/color/colormap_reference.html
+            for options.
+        expr_boundaries : int (default: 3)
+            Set the min/max boundaries for expression values so that
+            the cmap colors aren't dominated by outliers
 
-            Returns
-            -------
-            a populated matplotlib figure object
+        Returns
+        -------
+        a populated matplotlib figure object
 
         """
         # These are valid hierarchical clustering methods
@@ -1581,7 +1568,7 @@ class COB(Expr):
             )
         # set the outliers to the maximium value for the heatmap
         dm[dm > expr_boundaries] = expr_boundaries
-        dm[dm < -1*expr_boundaries] = -1 * expr_boundaries
+        dm[dm < -1 * expr_boundaries] = -1 * expr_boundaries
         # Get the Gene clustering order
         if cluster_method in hier_cluster_methods:
             self.log("Ordering rows by leaf")
@@ -1615,7 +1602,9 @@ class COB(Expr):
             dm = dm.iloc[:, order]
         # Save plot if provided filename
         if plot_dendrogram == False:
-            fig = plt.figure(facecolor="white", figsize=(20, 20),constrained_layout=True)
+            fig = plt.figure(
+                facecolor="white", figsize=(20, 20), constrained_layout=True
+            )
             ax = fig.add_subplot(111)
         else:
             fig = plt.figure(facecolor="white", figsize=(20, 20))
@@ -1646,7 +1635,7 @@ class COB(Expr):
         ax.tick_params("x", labelrotation=45)
         ax.set(xticklabels=dm.columns.values, yticklabels=dm.index.values)
         for label in ax.get_xticklabels():
-            label.set_horizontalalignment('left')
+            label.set_horizontalalignment("left")
         # Intelligently add labels
         if (
             include_accession_labels is None and len(dm.columns) < 60
@@ -1666,6 +1655,7 @@ class COB(Expr):
 
                 # Plot the accession dendrogram
                 import sys
+
                 if cluster_accessions == True:
                     sys.setrecursionlimit(10000)
                     dendrogram(
@@ -1696,16 +1686,16 @@ class COB(Expr):
 
     def plot_scores(self, filename=None, pcc=True, bins=50):
         """
-            Plot the histogram of PCCs.
+        Plot the histogram of PCCs.
 
-            Parameters
-            ----------
-            filename : str (default: None)
-                The output filename, if none will return the matplotlib object
-            pcc : bool (default:True)
-                flag to convert scores to pccs
-            bins : int (default: 50)
-                the number of bins in the histogram
+        Parameters
+        ----------
+        filename : str (default: None)
+            The output filename, if none will return the matplotlib object
+        pcc : bool (default:True)
+            flag to convert scores to pccs
+        bins : int (default: 50)
+            the number of bins in the histogram
         """
         fig = plt.figure(figsize=(8, 6))
         # grab the scores only and put in a
@@ -1729,7 +1719,7 @@ class COB(Expr):
 
     def plot_locality(self, gene_list, bootstraps=10, num_windows=100, sd_thresh=2):
         """
-            Make a fancy locality plot.
+        Make a fancy locality plot.
         """
         # Generate a blank fig
         fig, ax = plt.subplots(figsize=(8, 6))
@@ -1787,18 +1777,18 @@ class COB(Expr):
 
     def compare_degree(self, obj, diff_genes=10, score_cutoff=3):
         """
-            Compares the degree of one COB to another.
+        Compares the degree of one COB to another.
 
-            Parameters
-            ----------
-            obj : COB instance
-                The object you are comparing the degree to.
-            diff_genes : int (default: 10)
-                The number of highest and lowest different
-                genes to report
-            score_cutoff : int (default: 3)
-                The edge score cutoff used to called
-                significant.
+        Parameters
+        ----------
+        obj : COB instance
+            The object you are comparing the degree to.
+        diff_genes : int (default: 10)
+            The number of highest and lowest different
+            genes to report
+        score_cutoff : int (default: 3)
+            The edge score cutoff used to called
+            significant.
         """
         self.log("Comparing degrees of {} and {}", self.name, obj.name)
 
@@ -1835,8 +1825,8 @@ class COB(Expr):
 
     def _calculate_coexpression(self, significance_thresh=3):
         """
-            Generates pairwise PCCs for gene expression profiles in self._expr.
-            Also calculates pairwise gene distance.
+        Generates pairwise PCCs for gene expression profiles in self._expr.
+        Also calculates pairwise gene distance.
         """
         # 1. Calculate the PCCs
         self.log("Calculating Coexpression")
@@ -1911,7 +1901,7 @@ class COB(Expr):
 
     def _calculate_degree(self, update_db=True):
         """
-            Calculates degrees of genes within network. 
+        Calculates degrees of genes within network.
         """
         self.log("Building Degree")
         # Get significant expressions and dump coex from memory for time being
@@ -1938,12 +1928,12 @@ class COB(Expr):
 
     def _calculate_gene_hierarchy(self, method="single"):
         """
-            Calculate the hierarchical gene distance for the Expr matrix
-            using the coex data.
+        Calculate the hierarchical gene distance for the Expr matrix
+        using the coex data.
 
-            Notes
-            -----
-            This is kind of expenive.
+        Notes
+        -----
+        This is kind of expenive.
         """
         import fastcluster
 
@@ -1968,7 +1958,7 @@ class COB(Expr):
 
     def _calculate_leaves(self, method="single"):
         """
-            This calculates the leaves of the dendrogram from the coex
+        This calculates the leaves of the dendrogram from the coex
         """
         gene_link = self._calculate_gene_hierarchy(method=method)
         self.log("Finding the leaves")
@@ -1986,7 +1976,7 @@ class COB(Expr):
 
     def _calculate_clusters(self):
         """
-            Calculates global clusters
+        Calculates global clusters
         """
         clusters = self.mcl()
         self.log("Building cluster dataframe")
@@ -2024,9 +2014,9 @@ class COB(Expr):
 
     def _coex_concordance(self, gene_a, gene_b, maxnan=10, return_dict=False):
         """
-            This is a sanity method to ensure that the pcc calculated
-            directly from the expr profiles matches the one stored in
-            the database
+        This is a sanity method to ensure that the pcc calculated
+        directly from the expr profiles matches the one stored in
+        the database
         """
         expr_a = self.expr_profile(gene_a).values
         expr_b = self.expr_profile(gene_b).values
@@ -2040,7 +2030,7 @@ class COB(Expr):
         # standard normalize it
         z = (z - float(self._global("pcc_mean"))) / float(self._global("pcc_std"))
         if return_dict:
-            return {'pearsonr': r, 'zscore': z}
+            return {"pearsonr": r, "zscore": z}
         else:
             return z
 
@@ -2050,8 +2040,7 @@ class COB(Expr):
 
     @classmethod
     def create(cls, name, description, refgen):
-        """
-        """
+        """"""
         self = super().create(name, description, refgen)
         self._bcolz("gene_qc_status", df=pd.DataFrame())
         self._bcolz("accession_qc_status", df=pd.DataFrame())
@@ -2067,23 +2056,23 @@ class COB(Expr):
     @classmethod
     def from_Expr(cls, expr, zscore_cutoff=3, **kwargs):
         """
-            Create a COB instance from an camoco.Expr (Expression) instance.
-            A COB inherits all the methods of a Expr instance and implements
-            additional coexpression specific methods. This method accepts an
-            already build Expr instance and then performs the additional
-            computations needed to build a full fledged COB instance.
+        Create a COB instance from an camoco.Expr (Expression) instance.
+        A COB inherits all the methods of a Expr instance and implements
+        additional coexpression specific methods. This method accepts an
+        already build Expr instance and then performs the additional
+        computations needed to build a full fledged COB instance.
 
-            Parameters
-            ----------
-            expr : camoco.Expr
-                The camoco expression object used to build the 
-                co-expression network.
-            zscore_cutoff : int (defualt: 3)
-                The zscore cutoff for the network.
+        Parameters
+        ----------
+        expr : camoco.Expr
+            The camoco expression object used to build the
+            co-expression network.
+        zscore_cutoff : int (defualt: 3)
+            The zscore cutoff for the network.
 
-            Returns
-            -------
-            camoco.COB instance
+        Returns
+        -------
+        camoco.COB instance
 
         """
         # The Expr object already exists, just get a handle on it
@@ -2099,33 +2088,33 @@ class COB(Expr):
         cls, cobs, name, description, refgen, rawtype=None, zscore_cutoff=3, **kwargs
     ):
         """
-            This method will combine the expression tables from
-            an iterable to COBs in order to create a new co-expression
-            network.
+        This method will combine the expression tables from
+        an iterable to COBs in order to create a new co-expression
+        network.
 
-            Parameters
-            ----------
-            cobs : iterable to camoco.COB objects
-                The co-expression networks to combine
-                expression data from
-            name : str
-                The name of the resultant COB
-            description : str
-                A short description of the COB
-            refgen : camoco.RefGen
-                A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This
-                is cross references during import so we can pull information
-                about genes we are interested in during analysis.
-            rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype
-                passed to camoco.Expr.from_DataFrame. See docs there
-                for more information.
-            zscore_cutoff : int (defualt: 3)
-                The zscore cutoff for the network.
-            \*\*kwargs : key,value pairs
-                additional parameters passed to subsequent methods.
-                (see Expr.from_DataFrame)
+        Parameters
+        ----------
+        cobs : iterable to camoco.COB objects
+            The co-expression networks to combine
+            expression data from
+        name : str
+            The name of the resultant COB
+        description : str
+            A short description of the COB
+        refgen : camoco.RefGen
+            A Camoco refgen object which describes the reference
+            genome referred to by the genes in the dataset. This
+            is cross references during import so we can pull information
+            about genes we are interested in during analysis.
+        rawtype : str (default: None)
+            This is noted here to reinforce the impotance of the rawtype
+            passed to camoco.Expr.from_DataFrame. See docs there
+            for more information.
+        zscore_cutoff : int (defualt: 3)
+            The zscore cutoff for the network.
+        \*\*kwargs : key,value pairs
+            additional parameters passed to subsequent methods.
+            (see Expr.from_DataFrame)
 
         """
         dfs = [c.expr(raw=True) for c in cobs]
@@ -2148,35 +2137,35 @@ class COB(Expr):
         cls, df, name, description, refgen, rawtype=None, zscore_cutoff=3, **kwargs
     ):
         """
-            The method will read the table in (as a pandas dataframe),
-            build the Expr object passing all keyword arguments in ``**``kwargs
-            to the classmethod Expr.from_DataFrame(...). See additional
-            ``**``kwargs in COB.from_Expr(...)
+        The method will read the table in (as a pandas dataframe),
+        build the Expr object passing all keyword arguments in ``**``kwargs
+        to the classmethod Expr.from_DataFrame(...). See additional
+        ``**``kwargs in COB.from_Expr(...)
 
-            Parameters
-            ----------
-            df : pandas.DataFrame
-                A Pandas dataframe containing the expression information.
-                Assumes gene names are in the index while accessions
-                (experiments) are stored in the columns.
-            name : str
-                Name of the dataset stored in camoco database
-            description : str
-                Short string describing the dataset
-            refgen : camoco.RefGen
-                A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This
-                is cross references during import so we can pull information
-                about genes we are interested in during analysis.
-            rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype
-                passed to camoco.Expr.from_DataFrame. See docs there
-                for more information.
-            zscore_cutoff : int (defualt: 3)
-                The zscore cutoff for the network.
-            \*\*kwargs : key,value pairs
-                additional parameters passed to subsequent methods.
-                (see Expr.from_DataFrame)
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            A Pandas dataframe containing the expression information.
+            Assumes gene names are in the index while accessions
+            (experiments) are stored in the columns.
+        name : str
+            Name of the dataset stored in camoco database
+        description : str
+            Short string describing the dataset
+        refgen : camoco.RefGen
+            A Camoco refgen object which describes the reference
+            genome referred to by the genes in the dataset. This
+            is cross references during import so we can pull information
+            about genes we are interested in during analysis.
+        rawtype : str (default: None)
+            This is noted here to reinforce the impotance of the rawtype
+            passed to camoco.Expr.from_DataFrame. See docs there
+            for more information.
+        zscore_cutoff : int (defualt: 3)
+            The zscore cutoff for the network.
+        \*\*kwargs : key,value pairs
+            additional parameters passed to subsequent methods.
+            (see Expr.from_DataFrame)
 
         """
         # Create a new Expr object from a data frame
@@ -2205,45 +2194,45 @@ class COB(Expr):
         **kwargs,
     ):
         """
-            Build a COB Object from an FPKM or Micrarray CSV. This is a
-            convenience method which handles reading in of tables.
-            Files need to have gene names as the first column and
-            accession (i.e. experiment) names as the first row. All
-            kwargs will be passed to COB.from_DataFrame(...). See
-            docstring there for option descriptions.
+        Build a COB Object from an FPKM or Micrarray CSV. This is a
+        convenience method which handles reading in of tables.
+        Files need to have gene names as the first column and
+        accession (i.e. experiment) names as the first row. All
+        kwargs will be passed to COB.from_DataFrame(...). See
+        docstring there for option descriptions.
 
-            Parameters
-            ----------
-            filename : str (path)
-                the path to the FPKM table in csv or tsv
-            name : str
-                Name of the dataset stored in camoco database
-            description : str
-                Short string describing the dataset
-            refgen : camoco.RefGen
-                A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This
-                is cross references during import so we can pull information
-                about genes we are interested in during analysis.
-            rawtype : str (default: None)
-                This is noted here to reinforce the importance of the rawtype
-                passed to camoco.Expr.from_DataFrame. See docs there for
-                more information.
-            sep : str (default: \\t)
-                Specifies the delimiter of the file referenced by the
-                filename parameter.
-            index_col : str (default: None)
-                If not None, this column will be set as the gene index
-                column. Useful if there is a column name in the text file
-                for gene names.
-            zscore_cutoff : int (defualt: 3)
-                The zscore cutoff for the network.
-            **kwargs : key value pairs
-                additional parameters passed to subsequent methods.
+        Parameters
+        ----------
+        filename : str (path)
+            the path to the FPKM table in csv or tsv
+        name : str
+            Name of the dataset stored in camoco database
+        description : str
+            Short string describing the dataset
+        refgen : camoco.RefGen
+            A Camoco refgen object which describes the reference
+            genome referred to by the genes in the dataset. This
+            is cross references during import so we can pull information
+            about genes we are interested in during analysis.
+        rawtype : str (default: None)
+            This is noted here to reinforce the importance of the rawtype
+            passed to camoco.Expr.from_DataFrame. See docs there for
+            more information.
+        sep : str (default: \\t)
+            Specifies the delimiter of the file referenced by the
+            filename parameter.
+        index_col : str (default: None)
+            If not None, this column will be set as the gene index
+            column. Useful if there is a column name in the text file
+            for gene names.
+        zscore_cutoff : int (defualt: 3)
+            The zscore cutoff for the network.
+        **kwargs : key value pairs
+            additional parameters passed to subsequent methods.
 
-            Returns
-            -------
-                a COB object
+        Returns
+        -------
+            a COB object
         """
         df = pd.read_table(filename, sep=sep, compression="infer", index_col=index_col)
         return cls.from_DataFrame(

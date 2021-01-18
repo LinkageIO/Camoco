@@ -34,8 +34,8 @@ from .Tools import log
 
 class Overlap(Camoco):
     """
-        The Overlap class represents the statistical enrichment of co-expression
-        among a set of loci. 
+    The Overlap class represents the statistical enrichment of co-expression
+    among a set of loci.
 
     """
 
@@ -125,11 +125,11 @@ class Overlap(Camoco):
 
     def generate_bootstraps(self, loci, overlap):
         """
-            bootstrapping procedure. Our target here is to provide enough bootstraps
-            to identify loci that are significant at n==1000 bootstraps. The auto 
-            procedure will continue untill we meet n==1000 OR we find 50 bootstraps
-            that are have higher score such that we will never be significant at 1000
-            boostraps (0.05 * 1000 = 50).
+        bootstrapping procedure. Our target here is to provide enough bootstraps
+        to identify loci that are significant at n==1000 bootstraps. The auto
+        procedure will continue untill we meet n==1000 OR we find 50 bootstraps
+        that are have higher score such that we will never be significant at 1000
+        boostraps (0.05 * 1000 = 50).
         """
         target_score = overlap.score.mean()
         max_bs = 1000
@@ -161,9 +161,9 @@ class Overlap(Camoco):
 
     def overlap(self, loci, bootstrap=False, iter_name=None):
         """
-            Calculate Network-Term Overlap based on the method in CLI args
+        Calculate Network-Term Overlap based on the method in CLI args
 
-            This method must return a DataFrame 
+        This method must return a DataFrame
         """
         # generate emirical and bootstrap values
         if self.args.method == "density":
@@ -280,22 +280,22 @@ class Overlap(Camoco):
         self, fdr_cutoff=0.3, min_snp2gene_obs=2, original_COB_only=False
     ):
         """
-            Return the number of candidate genes, seen at multiple SNP2Gene
-            mappings and in multiple networks (both)
+        Return the number of candidate genes, seen at multiple SNP2Gene
+        mappings and in multiple networks (both)
 
-            Parameters
-            ----------
-            fdr_cutoff : float (default: 0.3)
-                The FDR cutoff required to be high priority
-            min_snp2gene_obs : int (default: 2)
-                The minimum number of SNP to gene mappings that
-                must be observed to be "high priority"
-            original_COB_only: bool (default: False)
-                If true, only include HPO genes that were observed
-                strictly in the original COBs. I.e. do not include
-                HPO genes that were discovered in "any" network.
-                e.g. 100kb/1Flank in network X and 50kb/2Flank in
-                network Y.
+        Parameters
+        ----------
+        fdr_cutoff : float (default: 0.3)
+            The FDR cutoff required to be high priority
+        min_snp2gene_obs : int (default: 2)
+            The minimum number of SNP to gene mappings that
+            must be observed to be "high priority"
+        original_COB_only: bool (default: False)
+            If true, only include HPO genes that were observed
+            strictly in the original COBs. I.e. do not include
+            HPO genes that were discovered in "any" network.
+            e.g. 100kb/1Flank in network X and 50kb/2Flank in
+            network Y.
         """
         df = self.results[np.isfinite(self.results.fdr)]
         df = df[df.fdr <= fdr_cutoff]
@@ -346,9 +346,9 @@ class Overlap(Camoco):
 
     def parent_snp_info(self, gwas, cob_list):
         """
-            This is a function that recovers parental SNP information
-            from a completed overlap. It matches the COBs that are in 
-            the self.results.COB dataframe
+        This is a function that recovers parental SNP information
+        from a completed overlap. It matches the COBs that are in
+        the self.results.COB dataframe
         """
         all_candidates = []
         windows = self.results.WindowSize.unique()
@@ -386,26 +386,26 @@ class Overlap(Camoco):
         second_overlap=None,
     ):
         """
-            Return a matrix showing the number of shared HPO genes by Term.
-            The diagonal of the matrix is the number of genes discoverd by that 
-            term. The upper diagonal shows the overlap between the row and column
-            and the lower diagonal shows the hypergeomitric pval for the overlap
-            between the two terms. The universe used is the number of unique genes
-            in the overlap results.
+        Return a matrix showing the number of shared HPO genes by Term.
+        The diagonal of the matrix is the number of genes discoverd by that
+        term. The upper diagonal shows the overlap between the row and column
+        and the lower diagonal shows the hypergeomitric pval for the overlap
+        between the two terms. The universe used is the number of unique genes
+        in the overlap results.
 
-            min_snp2gene_obs : int (default: 2)
-                The min SNP2gene mappinging observations needed to be HPO
-            fdr_cutoff: float (default: 0.3)
-                The FDR cutoff the be considered HPO
-            return_genes : bool (default: False)
-                Return the candidate gene list instead of the overlap table
-            second_overlap : Overlap Object (default: None)
-                If specified, overlap between terms will be calculated 
-                between this overlaps HPO genes and the second overlaps
-                HPO genes resulting in a adjacency matrix where the 
-                x-axis is overlap 1's terms and the y-axis is overlap
-                2's terms and the values are the number of shared genes
-                per term.
+        min_snp2gene_obs : int (default: 2)
+            The min SNP2gene mappinging observations needed to be HPO
+        fdr_cutoff: float (default: 0.3)
+            The FDR cutoff the be considered HPO
+        return_genes : bool (default: False)
+            Return the candidate gene list instead of the overlap table
+        second_overlap : Overlap Object (default: None)
+            If specified, overlap between terms will be calculated
+            between this overlaps HPO genes and the second overlaps
+            HPO genes resulting in a adjacency matrix where the
+            x-axis is overlap 1's terms and the y-axis is overlap
+            2's terms and the values are the number of shared genes
+            per term.
         """
         hpo1 = self.high_priority_candidates(
             fdr_cutoff=fdr_cutoff,
@@ -484,8 +484,8 @@ class Overlap(Camoco):
         reindex=True,
     ):
         """
-            Returns a summary table with the number of HPO genes discoverd
-            for different networks
+        Returns a summary table with the number of HPO genes discoverd
+        for different networks
         """
         candidates = self.high_priority_candidates(
             fdr_cutoff=fdr_cutoff, min_snp2gene_obs=min_snp2gene_obs
@@ -564,8 +564,8 @@ class Overlap(Camoco):
     @classmethod
     def from_CLI(cls, args):
         """
-            Implements an interface for the CLI to perform overlap
-            Analysis
+        Implements an interface for the CLI to perform overlap
+        Analysis
         """
         if args.genes != [None]:
             source = "genes"
@@ -574,8 +574,8 @@ class Overlap(Camoco):
         elif args.gwas is not None:
             source = "gwas"
         elif args.ontology is not None:
-            source = 'ontology'
-        self = cls.create(source+'_CLI', description="CLI Overlap")
+            source = "ontology"
+        self = cls.create(source + "_CLI", description="CLI Overlap")
         self.source = source
         self.args = args
         # Build base camoco objects
@@ -598,7 +598,7 @@ class Overlap(Camoco):
             args.candidate_flank_limit = 0
         elif source == "gwas":
             self.ont = co.GWAS(args.gwas)
-        elif source == 'ontology':
+        elif source == "ontology":
             self.ont = co.Ontology(args.ontology)
         else:
             raise ValueError(
@@ -773,22 +773,22 @@ class Overlap(Camoco):
         skip_terms=None,
     ):
         """
-            Generate a heatmap based on TermPVal
+        Generate a heatmap based on TermPVal
 
-            Parameters
-            ----------
-            filename : str
-                output file name
-            pval_cutoff : float (default:0.05)
-                The term p-value cutoff for shading the heatmap
-            collapse_snp2gene : bool (default: False)
-                If true, candidates will be collapsed around
-                snp to gene mapping parameters
-            figsize : tuple(int,int) (default:(15,10))
-                Control the size of the figure
-            skip_terms : iter (default:None)
-                If provided, terms in the iterable will
-                not be plotted
+        Parameters
+        ----------
+        filename : str
+            output file name
+        pval_cutoff : float (default:0.05)
+            The term p-value cutoff for shading the heatmap
+        collapse_snp2gene : bool (default: False)
+            If true, candidates will be collapsed around
+            snp to gene mapping parameters
+        figsize : tuple(int,int) (default:(15,10))
+            Control the size of the figure
+        skip_terms : iter (default:None)
+            If provided, terms in the iterable will
+            not be plotted
         """
         methods = sorted(self.results.Method.unique())
         cobs = sorted(self.results.COB.unique())

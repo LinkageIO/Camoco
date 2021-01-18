@@ -19,10 +19,11 @@ import io
 import re
 import string
 
+
 class Expr(Camoco):
     """
-        A gene expression dataset. Build, normalize, filter and 
-        easily access different parts of the gene expression matrix.
+    A gene expression dataset. Build, normalize, filter and
+    easily access different parts of the gene expression matrix.
     """
 
     def __init__(self, name):
@@ -90,7 +91,7 @@ class Expr(Camoco):
 
     def expr_profile(self, gene):
         """
-            return the expression profile for a gene
+        return the expression profile for a gene
         """
         # try to use as gene object
         try:
@@ -117,32 +118,32 @@ class Expr(Camoco):
 
     def anynancol(self):
         """
-            A gut check method to make sure none of the expression columns
-            got turned into all nans. Because apparently that is a problem.
+        A gut check method to make sure none of the expression columns
+        got turned into all nans. Because apparently that is a problem.
         """
         return any(self._expr.apply(lambda col: all(np.isnan(col)), axis=0))
 
     def expr(self, genes=None, accessions=None, raw=False, gene_normalize=False):
         """
-            Access raw and QC'd expression data.
+        Access raw and QC'd expression data.
 
-            Parameters
-            ----------
-            genes : iterable of camoco.Locus objects (default: None)
-                If not None, this will retrieve the expression values for
-                the loci specified within the iterable, otherwise it will
-                include ALL loci in the expr dataset
-            accessions : iterable of str (default: None)
-                If not None, will retrieve expression values for the
-                accessions (experiments) specified, otherwise will
-                retrieve ALL accessions.
-            raw : bool (default: False)
-                Flag to indicate on using the raw table versus the current
-                expr table. See the transformation_log for more details on
-                the difference.
-            gene_normalize : bool (default: False)
-                Perform standard normalization on gene-wise data
-            zscore : bool (default: False)
+        Parameters
+        ----------
+        genes : iterable of camoco.Locus objects (default: None)
+            If not None, this will retrieve the expression values for
+            the loci specified within the iterable, otherwise it will
+            include ALL loci in the expr dataset
+        accessions : iterable of str (default: None)
+            If not None, will retrieve expression values for the
+            accessions (experiments) specified, otherwise will
+            retrieve ALL accessions.
+        raw : bool (default: False)
+            Flag to indicate on using the raw table versus the current
+            expr table. See the transformation_log for more details on
+            the difference.
+        gene_normalize : bool (default: False)
+            Perform standard normalization on gene-wise data
+        zscore : bool (default: False)
 
         """
         if raw is True:
@@ -164,7 +165,7 @@ class Expr(Camoco):
 
     def plot_accession_histograms(self, bins=50, figsize=(16, 8)):
         """
-            Plot histogram of accession expression values.
+        Plot histogram of accession expression values.
         """
         raw = self._bcolz("raw_expr")
         qcd = self._expr
@@ -200,30 +201,30 @@ class Expr(Camoco):
 
     def _update_values(self, df, transform_name, raw=False):
         """
-            updates the 'expression' table values with values from df.
-            Requires a transformation name for the log.
-            Option to overwrite raw table or working table.
+        updates the 'expression' table values with values from df.
+        Requires a transformation name for the log.
+        Option to overwrite raw table or working table.
 
-            Parameters
-            ----------
-            df : DataFrame
-                Updates the internal values for the Expr object
-                with values in the data frame.
-            transform_name : str
-                A short justification for what was done to the
-                updated values.
-            raw : bool (default: False)
-                A flag to update the raw values. This also resets
-                the current values to what is in df.
+        Parameters
+        ----------
+        df : DataFrame
+            Updates the internal values for the Expr object
+            with values in the data frame.
+        transform_name : str
+            A short justification for what was done to the
+            updated values.
+        raw : bool (default: False)
+            A flag to update the raw values. This also resets
+            the current values to what is in df.
 
-            Returns
-            -------
-            self : Expr Object
+        Returns
+        -------
+        self : Expr Object
 
-            Raises:
-            ------
-            CamocoGeneNamesError
-            CamocoAccessNamesError
+        Raises:
+        ------
+        CamocoGeneNamesError
+        CamocoAccessNamesError
         """
         # update the transformation log
         if len(set(df.columns)) != len(df.columns):
@@ -274,21 +275,21 @@ class Expr(Camoco):
 
     def _get_gene_index(self, gene):
         """
-            Retrieve the row index for a gene.
-            
-            Parameters
-            ----------
-            gene : co.Locus object
-                The gene object the get the index for
+        Retrieve the row index for a gene.
 
-            Returns
-            -------
-            an integer containing the expr dataframe index
+        Parameters
+        ----------
+        gene : co.Locus object
+            The gene object the get the index for
 
-            Raises
-            ------
-            CamocoGeneAbsentError
-                If the gene requested is not in the Expr dataframe
+        Returns
+        -------
+        an integer containing the expr dataframe index
+
+        Raises
+        ------
+        CamocoGeneAbsentError
+            If the gene requested is not in the Expr dataframe
         """
         if isinstance(gene, Locus):
             id = gene.id
@@ -313,8 +314,8 @@ class Expr(Camoco):
 
     def _reset(self, raw=False):
         """
-            resets the expression values to their raw
-            state undoing any normalizations
+        resets the expression values to their raw
+        state undoing any normalizations
         """
         if raw:
             # kill the raw table too
@@ -326,23 +327,23 @@ class Expr(Camoco):
         self._transformation_log("reset")
 
     def _normalize(self, norm_method=None, max_val=None, **kwargs):
-        """ 
-            Evaluates QC expression data and re-enters 
-            normalized data into database 
+        """
+        Evaluates QC expression data and re-enters
+        normalized data into database
 
-            Parameters
-            ----------
-            norm_method : The normalization method to use. This can be inferred
-                from the raw data type. By default RNASeq uses np.arcsinh and
-                microarray data uses np.log2. A different normalization function
-                can be passed directly in. 
-                Default: None (inferred from Expr.rawtype)
-            max_val : This value is used to determine if any columns of the 
-                dataset have already been normalized. If any 'normailzed' 
-                values in an Accession column is larger than max_val, an
-                exception is thown. max_val is determined by Expr.raw_type
-                (default 100 for MicroArray and 1100 for RNASeq) but a 
-                max_val can be passed in to override these defaults.
+        Parameters
+        ----------
+        norm_method : The normalization method to use. This can be inferred
+            from the raw data type. By default RNASeq uses np.arcsinh and
+            microarray data uses np.log2. A different normalization function
+            can be passed directly in.
+            Default: None (inferred from Expr.rawtype)
+        max_val : This value is used to determine if any columns of the
+            dataset have already been normalized. If any 'normailzed'
+            values in an Accession column is larger than max_val, an
+            exception is thown. max_val is determined by Expr.raw_type
+            (default 100 for MicroArray and 1100 for RNASeq) but a
+            max_val can be passed in to override these defaults.
 
         """
         self.log("------------ Normalizing")
@@ -388,42 +389,42 @@ class Expr(Camoco):
         **kwargs,
     ):
         """
-            Perform Quality Control on raw expression data. This method filters
-            genes based on membership to some RefGen instance, filters based on
-            a minimum FPKM or equivalent expression value, filters out genes
-            and accessions with too much missing data, filters out genes which
-            are lowly expressed (do not have at least one accession that meets
-            an FPKM threshold, i.e. likely presence absense). See parameters
-            for more details.
+        Perform Quality Control on raw expression data. This method filters
+        genes based on membership to some RefGen instance, filters based on
+        a minimum FPKM or equivalent expression value, filters out genes
+        and accessions with too much missing data, filters out genes which
+        are lowly expressed (do not have at least one accession that meets
+        an FPKM threshold, i.e. likely presence absense). See parameters
+        for more details.
 
-            Parameters
-            ----------
-            min_expr : int (default: 0.01)
-                FPKM (or equivalent) values under this threshold will be set to
-                NaN and not used during correlation calculations.
-            max_gene_missing_data : float (default: 0.2)
-                Maximum percentage missing data a gene can have. Genes under
-                this are removed from dataset.
-            min_single_sample_expr : int (default: 5)
-                Genes that do not have a single accession having an expression
-                value above this threshold are removed from analysis. These are
-                likely presence/absence and will not have a strong coexpression
-                pattern.
-            max_accession_missing_data : float (default: 0.5)
-                maximum percentage missing data an accession (experiment) can
-                have before it is removed.
-            membership : RefGen
-                Genes which are not contained within this RefGen will be
-                removed. Note: this could also be another object that will
-                implement an interface that will check to see if gene ids are
-                contained within it i.e. a set of gene ids.
-            dry_run : bool (default: False)
-                Used in testing to speed up calculations. Limits the QC
-                dataframe to only have 100 genes.
-            presence_absence : bool (default: False)
-                Used to convert 0's within the data to a 0.001 after min 
-                expression values are filtered out to allow for presence
-                absence variation
+        Parameters
+        ----------
+        min_expr : int (default: 0.01)
+            FPKM (or equivalent) values under this threshold will be set to
+            NaN and not used during correlation calculations.
+        max_gene_missing_data : float (default: 0.2)
+            Maximum percentage missing data a gene can have. Genes under
+            this are removed from dataset.
+        min_single_sample_expr : int (default: 5)
+            Genes that do not have a single accession having an expression
+            value above this threshold are removed from analysis. These are
+            likely presence/absence and will not have a strong coexpression
+            pattern.
+        max_accession_missing_data : float (default: 0.5)
+            maximum percentage missing data an accession (experiment) can
+            have before it is removed.
+        membership : RefGen
+            Genes which are not contained within this RefGen will be
+            removed. Note: this could also be another object that will
+            implement an interface that will check to see if gene ids are
+            contained within it i.e. a set of gene ids.
+        dry_run : bool (default: False)
+            Used in testing to speed up calculations. Limits the QC
+            dataframe to only have 100 genes.
+        presence_absence : bool (default: False)
+            Used to convert 0's within the data to a 0.001 after min
+            expression values are filtered out to allow for presence
+            absence variation
         """
         self.log("------------Quality Control")
         df = self.expr()
@@ -548,9 +549,9 @@ class Expr(Camoco):
 
     def _quantile(self):
         """
-            Perform quantile normalization across each accession.
-            Each accessions gene expression values are replaced with
-            ranked gene averages.
+        Perform quantile normalization across each accession.
+        Each accessions gene expression values are replaced with
+        ranked gene averages.
         """
         self.log("------------ Quantile ")
         if "quantile" in self._transformation_log():
@@ -603,7 +604,7 @@ class Expr(Camoco):
 
     def _set_refgen(self, refgen, filter=True):
         """
-            Sets the current refgen. Its complicated.
+        Sets the current refgen. Its complicated.
         """
         # Keep a record of parent refgen
         self._global("parent_refgen", refgen.name)
@@ -619,20 +620,14 @@ class Expr(Camoco):
     @property
     def _cmap(self):
         """
-            Used for the heatmap function. Retruns a matplotlib cmap which is yellow/blue.
-            See: https://matplotlib.org/api/_as_gen/matplotlib.colors.LinearSegmentedColormap.html
+        Used for the heatmap function. Retruns a matplotlib cmap which is yellow/blue.
+        See: https://matplotlib.org/api/_as_gen/matplotlib.colors.LinearSegmentedColormap.html
         """
         heatmapdict = {
-            'red': ((0.0, 1.0, 1.0),
-                    (0.5, 0.0, 0.0),
-                    (1.0, 0.0, 0.0)),
-            'green':((0.0, 1.0, 1.0),
-                    (0.5, 0.0, 0.0),
-                    (1.0, 0.0, 0.0)),
-            'blue': ((0.0, 0.0, 0.0),
-                    (0.5, 0.0, 0.0),
-                    (1.0, 1.0, 1.0))} 
-
+            "red": ((0.0, 1.0, 1.0), (0.5, 0.0, 0.0), (1.0, 0.0, 0.0)),
+            "green": ((0.0, 1.0, 1.0), (0.5, 0.0, 0.0), (1.0, 0.0, 0.0)),
+            "blue": ((0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (1.0, 1.0, 1.0)),
+        }
 
         heatmapdict2 = {
             "red": ((0.0, 1.0, 1.0), (0.3, 0.5, 0.5), (0.5, 0.0, 0.0), (1.0, 0.0, 0.0)),
@@ -656,24 +651,24 @@ class Expr(Camoco):
     @classmethod
     def create(cls, name, description, refgen, type="Expr"):
         """
-            Create an empty Expr instance. Overloads the Camoco
-            create method. See Camoco.create(...)
+        Create an empty Expr instance. Overloads the Camoco
+        create method. See Camoco.create(...)
 
-            Parameters
-            ----------
-            name : str
-                A name for the Expr object to reference in the Camoco database
-            description : str
-                A short description for the dataset
-            refgen : camoco.RefGen
-                A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This
-                is cross references during import so we can pull information
-                about genes we are interested in during analysis.
+        Parameters
+        ----------
+        name : str
+            A name for the Expr object to reference in the Camoco database
+        description : str
+            A short description for the dataset
+        refgen : camoco.RefGen
+            A Camoco refgen object which describes the reference
+            genome referred to by the genes in the dataset. This
+            is cross references during import so we can pull information
+            about genes we are interested in during analysis.
 
-            Returns
-            -------
-                An empty Expr instance
+        Returns
+        -------
+            An empty Expr instance
 
         """
         # Piggy back on the super create method
@@ -699,47 +694,47 @@ class Expr(Camoco):
         **kwargs,
     ):
         """
-            Create a Expr instance from a file containing raw expression data.
-            For instance FPKM or results from a microarray experiment. This is
-            a convenience method which reads the table in to a pandas DataFrame
-            object and passes the object the Expr.from_DataFrame(...). See the
-            doc on Expr.from_DataFrame(...) for more options.
+        Create a Expr instance from a file containing raw expression data.
+        For instance FPKM or results from a microarray experiment. This is
+        a convenience method which reads the table in to a pandas DataFrame
+        object and passes the object the Expr.from_DataFrame(...). See the
+        doc on Expr.from_DataFrame(...) for more options.
 
-            Parameters
-            ----------
-            filename : str (path)
-                a path the the table containing the raw expression data.
-            name : str
-                A short name to refer to from the camoco dataset API.
-            description : str
-                A short description for the dataset
-            refgen : camoco.RefGen
-                A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This
-                is cross references during import so we can pull information
-                about genes we are interested in during analysis.
-            rawtype : str (default: None)
-                This is noted here to reinforce the impotance of the rawtype
-                passed to camoco.Expr.from_DataFrame. See docs there for more
-                information.
-            sep : str (default: \t)
-                Column delimiter for the data in filename path
-            normalize : bool (Default: True)
-                Specifies whether or not to normalize the data so raw
-                expression values lie within a log space. This is best
-                practices for generating interpretable expression analyses. See
-                Expr._normalize method for more information.  info.
-            quality_control : bool (Default: True)
-                A flag which specifies whether or not to perform QC. Parameters
-                for QC are passed in using the **kwargs arguments. For default
-                parameters and options see Expr._quality_control.
-            **kwargs : key value pairs
-                additional parameters passed to subsequent methods. (see
-                Expr.from_DataFrame)
+        Parameters
+        ----------
+        filename : str (path)
+            a path the the table containing the raw expression data.
+        name : str
+            A short name to refer to from the camoco dataset API.
+        description : str
+            A short description for the dataset
+        refgen : camoco.RefGen
+            A Camoco refgen object which describes the reference
+            genome referred to by the genes in the dataset. This
+            is cross references during import so we can pull information
+            about genes we are interested in during analysis.
+        rawtype : str (default: None)
+            This is noted here to reinforce the impotance of the rawtype
+            passed to camoco.Expr.from_DataFrame. See docs there for more
+            information.
+        sep : str (default: \t)
+            Column delimiter for the data in filename path
+        normalize : bool (Default: True)
+            Specifies whether or not to normalize the data so raw
+            expression values lie within a log space. This is best
+            practices for generating interpretable expression analyses. See
+            Expr._normalize method for more information.  info.
+        quality_control : bool (Default: True)
+            A flag which specifies whether or not to perform QC. Parameters
+            for QC are passed in using the **kwargs arguments. For default
+            parameters and options see Expr._quality_control.
+        **kwargs : key value pairs
+            additional parameters passed to subsequent methods. (see
+            Expr.from_DataFrame)
 
-            Returns
-            -------
-            An Expr instance
+        Returns
+        -------
+        An Expr instance
 
         """
         tbl = pd.read_table(filename, sep=sep)
@@ -761,55 +756,55 @@ class Expr(Camoco):
         quality_control=True,
         **kwargs,
     ):
-        """ 
-            Creates an Expr instance from a pandas DataFrame. Expects that the
-            DataFrame index is gene names and the column names are accessions
-            (i.e. experiments).  This is the preferred method for creating an
-            Expr instance, in other words, other classmethods transform their
-            data so they can call this method.
+        """
+        Creates an Expr instance from a pandas DataFrame. Expects that the
+        DataFrame index is gene names and the column names are accessions
+        (i.e. experiments).  This is the preferred method for creating an
+        Expr instance, in other words, other classmethods transform their
+        data so they can call this method.
 
-            Parameters
-            ----------
-            df : pandas.DataFrame
-                a DataFrame containing expression data. Assumes index is the
-                genes and columns is the accessions (experiment names)
-            name : str
-                A short name to refer to from the camoco dataset API.
-            description : str
-                A short description for the dataset
-            refgen : camoco.RefGen
-                A Camoco refgen object which describes the reference
-                genome referred to by the genes in the dataset. This
-                is cross references during import so we can pull information
-                about genes we are interested in during analysis.
-            rawtype : str (one of: 'RNASEQ' or 'MICROARRAY')
-                Specifies the fundamental datatype used to measure expression.
-                During importation of the raw expression data, this value is
-                used to make decisions in converting data to log-space.
-            normalize : bool (Default: True)
-                Specifies whether or not to normalize the data so raw
-                expression values lie within a log space. This is best
-                practices for generating interpretable expression analyses. See
-                Expr._normalize method for more information.  info.
-            norm_method : None OR python function
-                If rawtype is NOT RNASEQ or MICROARRY AND normalize is still
-                True, the normalization method for the raw expression values
-                needs to be passed in. This is for extreme customization
-                situations.
-            quantile : bool (Default : False)
-                Specifies whether or not to perform quantile normalization on
-                import.
-            quality_control : bool (Default: True)
-                A flag which specifies whether or not to perform QC. Parameters
-                for QC are passed in using the **kwargs arguments. For default
-                parameters and options see Expr._quality_control.
-            **kwargs : key value pairs
-                additional parameters passed to subsequent methods.
-                See arguments for Expr._normalize(), Expr._quality_control()
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            a DataFrame containing expression data. Assumes index is the
+            genes and columns is the accessions (experiment names)
+        name : str
+            A short name to refer to from the camoco dataset API.
+        description : str
+            A short description for the dataset
+        refgen : camoco.RefGen
+            A Camoco refgen object which describes the reference
+            genome referred to by the genes in the dataset. This
+            is cross references during import so we can pull information
+            about genes we are interested in during analysis.
+        rawtype : str (one of: 'RNASEQ' or 'MICROARRAY')
+            Specifies the fundamental datatype used to measure expression.
+            During importation of the raw expression data, this value is
+            used to make decisions in converting data to log-space.
+        normalize : bool (Default: True)
+            Specifies whether or not to normalize the data so raw
+            expression values lie within a log space. This is best
+            practices for generating interpretable expression analyses. See
+            Expr._normalize method for more information.  info.
+        norm_method : None OR python function
+            If rawtype is NOT RNASEQ or MICROARRY AND normalize is still
+            True, the normalization method for the raw expression values
+            needs to be passed in. This is for extreme customization
+            situations.
+        quantile : bool (Default : False)
+            Specifies whether or not to perform quantile normalization on
+            import.
+        quality_control : bool (Default: True)
+            A flag which specifies whether or not to perform QC. Parameters
+            for QC are passed in using the **kwargs arguments. For default
+            parameters and options see Expr._quality_control.
+        **kwargs : key value pairs
+            additional parameters passed to subsequent methods.
+            See arguments for Expr._normalize(), Expr._quality_control()
 
-            Returns
-            -------
-            An Expr instance
+        Returns
+        -------
+        An Expr instance
 
         """
         # we are all pandas on the inside O.O
