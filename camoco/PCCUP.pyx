@@ -1,10 +1,16 @@
 import numpy as np
-cimport numpy as np
-from scipy.special import comb
 
+cimport numpy as np
 cimport cython
 
+from scipy.special import comb
+
 from libc.math cimport sqrt
+
+# To allow development compilation in ipython, import the following:
+# import pyximport
+# pyximport.install(setup_args={"include_dirs": numpy.get_include()})
+
 #from libc.math cimport isnan
 cdef extern from "numpy/npy_math.h" nogil:
     long double NAN "NPY_NAN"
@@ -99,7 +105,7 @@ def pcc(double[:] x, double[:] y):
 
 # input is a typed numpy memoryview (::1 means c contiguous array)
 def pair_correlation(double[:, ::1] x):
-    # Define a new memoryview on an empty gene X gene matrix
+    # Define a new memoryview on an empty loci by loci matrix
     cdef float[::1] pccs = np.empty(comb(x.shape[0],2,exact=True)).astype('float32')
     cdef long i, j
     cdef long num_rows
@@ -127,9 +133,9 @@ def coex_index(long[:] ids, int mi):
         Parameters
         ----------
         ids : array of indices 
-            gene indices from the Expr matrix
+            loci indices from the Expr matrix
         mi : int
-            The total number of genes in the Expr matrix
+            The total number of loci in the Expr matrix
 
         Returns
         -------
@@ -163,7 +169,7 @@ cdef square_to_vector(long i, long j, mi):
     d = i + 1
     return k-ld-d
 
-def coex_expr_index(long[:] ids, int num_genes):
+def coex_expr_index(long[:] ids, int num_loci):
     '''
         Convert a list of coex indexes to a tuple of expr indexes
     '''
@@ -175,9 +181,9 @@ def coex_expr_index(long[:] ids, int num_genes):
     idx = 0
     pos = 0
     
-    for i in range(num_genes):
-        if (ids[idx] < (pos + (num_genes - (i+1)))):
-            for j in range(i+1, num_genes):
+    for i in range(num_loci):
+        if (ids[idx] < (pos + (num_loci - (i+1)))):
+            for j in range(i+1, num_loci):
                 if ids[idx] == pos:
                     coors[idx, 0] = i
                     coors[idx, 1] = j
@@ -186,7 +192,7 @@ def coex_expr_index(long[:] ids, int num_genes):
                     break
                 pos += 1
         else:
-            pos += (num_genes - (i+1))
+            pos += (num_loci - (i+1))
         
         if idx >= num_rows:
             break
@@ -229,3 +235,29 @@ def coex_neighbors(long id, int mi):
         pivot += 1
         count += 1
     return indices.base
+
+
+
+def pairwise_locus_distances(str[:] chr, long[:] start, long[:] end):
+    """
+    Return the absolute distance calculated pairwise among loci
+    """
+    # Create an array to put the results in
+    cdef float[:] distances = np.empty(comb(chr.shape[0],2,exact=True)).astype('float32')
+    # to remember which permutation we are one
+    cdef long i, j, index
+
+    # Loop through loci and calcualate distances
+    index = 0
+    for i in range(chr.shape[0]):
+        for j in range(i+1,chr.shape[0]):
+            # We Cant compare loci on different chromosomes
+            if chr[i] != chr[j]:
+                distances[index] = np.inf 
+            elif start[i] < start[j]: # i is upstream of j
+                distances[index] = np.float32(start[j] - end[i])
+            else: # i is upstream of j
+                distances[index] = np.float32(start[i] - end[j])
+            index += 1
+    assert index == len(distances)
+    return distances.base
