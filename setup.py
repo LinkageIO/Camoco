@@ -9,6 +9,7 @@ import sys
 import numpy
 
 
+
 def read(*names, **kwargs):
     with io.open(
         os.path.join(os.path.dirname(__file__), *names),
@@ -59,17 +60,13 @@ setup(
         'locuspocus>=1.0.2',
         'tinymongo>=0.2.0',
         'fastcluster>=1.1.25',
-       #'matplotlib>=3.1.3',		
         'scipy>=1.4.1',		
         'pandas>=1.0.1',		
-       #'fa2>=0.3.5',
-       #'scikit-learn>=0.21.2',
-       #'statsmodels>=0.8.0',
-       #'termcolor>=1.1.0',
+        'fa2>=0.3.5',
+        'statsmodels>=0.8.0',
        #'powerlaw>=1.4.6',
-       #'flask==1.0.3',
         'markov-clustering>=0.0.6.dev0',
-       #'psutil>=5.6.3',
+        'psutil>=5.6.3',
     ],
     extras_require={
         'docs' : [
