@@ -51,4 +51,9 @@ if not log.hasHandlers():
     ch.setLevel(logging.INFO)
     log.addHandler(ch)
 
+# To allow development compilation in ipython, import the following:
+import numpy
+import pyximport
+pyximport.install(setup_args={"include_dirs": numpy.get_include()})
+
 from .coex import Coex
