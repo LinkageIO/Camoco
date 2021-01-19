@@ -7,9 +7,6 @@ from scipy.special import comb
 
 from libc.math cimport sqrt
 
-# To allow development compilation in ipython, import the following:
-# import pyximport
-# pyximport.install(setup_args={"include_dirs": numpy.get_include()})
 
 #from libc.math cimport isnan
 cdef extern from "numpy/npy_math.h" nogil:
@@ -124,22 +121,22 @@ def pair_correlation(double[:, ::1] x):
 
 def coex_index(long[:] ids, int mi):
     '''
-        Camoco stores the coexpression matrix in long form. This is 
-        space efficient, but accessing elements in an [i,j] format 
-        requires additional overhead. This function takes in the original
-        indicies for the [i,j] matrix and returns the long form indices for each 
-        pairwise combinations of ids.
+    Camoco stores the coexpression matrix in long form. This is 
+    space efficient, but accessing elements in an [i,j] format 
+    requires additional overhead. This function takes in the original
+    indicies for the [i,j] matrix and returns the long form indices for each 
+    pairwise combinations of ids.
 
-        Parameters
-        ----------
-        ids : array of indices 
-            loci indices from the Expr matrix
-        mi : int
-            The total number of loci in the Expr matrix
+    Parameters
+    ----------
+    ids : array of indices 
+        loci indices from the Expr matrix
+    mi : int
+        The total number of loci in the Expr matrix
 
-        Returns
-        -------
-        An array of indices you can extract from the coex table
+    Returns
+    -------
+    An array of indices you can extract from the coex table
 
     '''
     cdef long[::] indices = np.empty(comb(ids.shape[0],2,exact=True),dtype=np.long)
@@ -157,11 +154,26 @@ def coex_index(long[:] ids, int mi):
             count += 1
     return indices.base 
 
-cdef square_to_vector(long i, long j, mi):
+def square_to_vector(long i, long j, mi):
     '''
-        Convert an index from its square form
-        to its vector form
+    Convert an index from its square form
+    to its long vector form.
+
+    For example, consider the example where the number of loci mi=5:
+
+      Expr:
+         01234  The square index [1,3] designated by $. Camoco stores
+      0  -0000  the upper diagonal of expr as coex. The vector position
+      1  0-0$0  of [1,3] gets converted to 5.
+      2  00-00
+      3  000-0
+      4  0000-
+              |
+              | Coex: 
+              |-> [00000$0000]
     '''
+    # calculate the number of expr cells with indices less than [i,j]
+    # AKA cells in rows < i in addition to j cells in row i
     k = ((i * mi) + j) 
     # Calculate the number of cells in the lower diagonal
     ld = (((i+1)**2) - (i+1))/2
@@ -169,22 +181,34 @@ cdef square_to_vector(long i, long j, mi):
     d = i + 1
     return k-ld-d
 
-def coex_expr_index(long[:] ids, int num_loci):
+
+def coex_expr_index(long[:] c, int num_loci):
     '''
-        Convert a list of coex indexes to a tuple of expr indexes
+    Convert a list of coex indexes (c) to list of expr indexes (i,j).
+    This is an iterative solution as it is difficult to directly compute
+    (i,j) from c. We take advantage of the fact that often, multiple
+    values of c need to be converted to (i,j) and perform the conversion
+    in the same loop.
+    
+    NOTE: this function expects the input coex indices to be SORTED
     '''
-    cdef int num_rows = ids.shape[0]
+    # the output will be the same length as the input 
+    cdef int num_rows = c.shape[0]
+    # however, the output will be two numbers (i,j) for each input c
     coors = np.zeros([num_rows,2], dtype=np.int32)
     if num_rows == 0:
         return coors
+    # declare some index variables for our loop
     cdef long idx, pos, i, j
     idx = 0
     pos = 0
-    
+   
+    # loop through the values of i, keeping track of values of j (where j > i)
     for i in range(num_loci):
-        if (ids[idx] < (pos + (num_loci - (i+1)))):
+        if (c[idx] < (pos + (num_loci - (i+1)))):
             for j in range(i+1, num_loci):
-                if ids[idx] == pos:
+                if c[idx] == pos:
+                    # if we find an index value matching one we are looking for, insert into output
                     coors[idx, 0] = i
                     coors[idx, 1] = j
                     idx += 1
