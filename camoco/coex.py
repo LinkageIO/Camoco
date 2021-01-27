@@ -115,9 +115,9 @@ class Coex(m80.Freezable):
         )
 
     @property
-    def clusters(self):
+    def clusters(self) -> lp.Ontology:
         if self._clusters is None:
-            self._clusters = self.m80.col["clusters"]
+            self._clusters = lp.Ontology("MCL", rootdir=self.m80.thawed_dir)
         return self._clusters
 
     # -----------------------------------------
@@ -429,7 +429,7 @@ class Coex(m80.Freezable):
             result = self.subnetwork([locus_a, locus_b], sig_only=False).iloc[0]
         return result
 
-    def density(self, loci, min_distance=None, by_locus=False):
+    def density(self, loci, min_distance=None, by_locus=False, filter_missing_loci=False):
         """
         Calculates the density of the non-thresholded network edges
         amongst loci within locus_list. Includes parameters to perform
@@ -446,13 +446,19 @@ class Coex(m80.Freezable):
             in density calculation.
         by_locus : bool (default: False)
             Return a per-locus breakdown of density within the subnetwork.
+        filter_missing_loci : bool (default: True)
+            Filter out loci that are not in the current
+            Coex object (self). 
 
         Returns
         -------
         A network density OR density on a locus-wise basis
         """
         # filter for only loci within network
-        edges = self.subnetwork(loci, min_distance=min_distance, sig_only=False)
+        edges = self.subnetwork(
+            loci, min_distance=min_distance, 
+            sig_only=False,filter_missing_loci=filter_missing_loci
+        )
 
         if by_locus == True:
             x = pd.DataFrame.from_records(
@@ -681,43 +687,19 @@ class Coex(m80.Freezable):
         leaves = pd.DataFrame(leaves, index=self.expr.index, columns=["index"])
         self.m80.col["leaves"] = leaves
 
-    def _calculate_clusters(self):
+    def _calculate_clusters(self) -> None:
         """
         Calculates global clusters
         """
-        clusters = self.mcl()
-        log.info("Building cluster dataframe")
-        names = self.expr.index.values
-        self.clusters = pd.DataFrame(np.nan, index=names, columns=["cluster"])
-        if len(clusters) > 0:
-            self.clusters = pd.DataFrame(
-                data=[
-                    (locus.name, i)
-                    for i, cluster in enumerate(clusters)
-                    for locus in cluster
-                ],
-                columns=["Gene", "cluster"],
-            ).set_index("Gene")
-            self.m80.col["clusters"] = self.clusters
-       #log.info("Creating Cluster Ontology")
-       #terms = []
-       #for i, x in enumerate(self.clusters.groupby("cluster")):
-       #    loci = self.refgen[x[1].index.values]
-       #    terms.append(
-       #        Term(
-       #            "MCL{}".format(i),
-       #            desc="{} MCL Cluster {}".format(self.name, i),
-       #            loci=loci,
-       #        )
-       #    )
-       #self.MCL = Ontology.from_terms(
-       #    terms,
-       #    "{}MCL".format(self.name),
-       #    "{} MCL Clusters".format(self.name),
-       #    self.refgen,
-       #)
-       #log.info("Finished finding clusters")
-       #return self
+        terms = [lp.Term(f"MCL_{i}", loci=loci) for i,loci in enumerate(self.mcl())]
+
+        log.info("Creating Cluster Ontology")
+        self.MCL = lp.Ontology.from_terms(
+            "MCL",
+            terms,
+            rootdir=self.m80.thawed_dir
+        )
+        log.info("Finished finding clusters")
 
     # -----------------------------------------
     #       Factory Methods
@@ -727,10 +709,8 @@ class Coex(m80.Freezable):
     def from_DataFrame(
         cls,
         name: str,
-        description: str,
         df: pd.DataFrame,
         loci: lp.Loci,
-        rootdir: str = None,
         /,
         min_expr: float = 0.001,
         max_locus_missing_data: float = 0.2,
@@ -739,6 +719,7 @@ class Coex(m80.Freezable):
         normalize_expr_values: bool = True,
         significance: float = 3.0,
         force: bool = False,
+        rootdir: str = None,
     ) -> "Coex":
         """
         Create a Coex object from a Pandas DataFrame and
@@ -748,8 +729,6 @@ class Coex(m80.Freezable):
         -------------------
         name : str
             A name for the Coex object
-        description : str
-            A short description for the Coex object
         df : pandas.DataFrame
             A DataFrame containing expression values. Rows are Loci and
             columns are Accessions.
@@ -788,135 +767,141 @@ class Coex(m80.Freezable):
         # Sanity check
         if m80.exists("Coex", name):
             raise CoexExistsError(f"{name} already exists.")
-        # Create an empty class
-        self = cls(name)
 
-        # Store the metadata used to build the network
-        metadata = {
-            "key": "qc_parameters",
-            "normalize_expr_values": normalize_expr_values,
-            "min_expr": min_expr,
-            "max_locus_missing_data": max_locus_missing_data,
-            "max_accession_missing_data": max_accession_missing_data,
-            "min_single_accession_expr": min_single_accession_expr,
-        }
-        for k, v in metadata.items():
-            self.metadata.insert(
-                {
-                    "name": k,
-                    "val": v,
-                    "type": "qc_parameter",
-                }
+        try:
+            # Create an empty class
+            self = cls(name)
+
+            # Store the metadata used to build the network
+            metadata = {
+                "key": "qc_parameters",
+                "normalize_expr_values": normalize_expr_values,
+                "min_expr": min_expr,
+                "max_locus_missing_data": max_locus_missing_data,
+                "max_accession_missing_data": max_accession_missing_data,
+                "min_single_accession_expr": min_single_accession_expr,
+            }
+            for k, v in metadata.items():
+                self.metadata.insert(
+                    {
+                        "name": k,
+                        "val": v,
+                        "type": "qc_parameter",
+                    }
+                )
+
+            # Make a copy of the input df
+            df = df.copy()
+
+            # Set the raw data to be the original df
+            self.m80.col["raw_expr"] = df
+
+            # Perform Quality Control on loci -----------------------------------------------------------------------------
+
+            # Create a bool df for each: row, col to store if each passes QC
+            qc_loci = pd.DataFrame({"has_id": True}, index=df.index)
+            qc_accession = pd.DataFrame({"has_id": True}, index=df.columns)
+
+            # include only loci that are NAMED in the refgen
+            cur = loci.m80.db.cursor()
+            qc_loci["pass_in_loci"] = np.array(
+                [
+                    bool(x)
+                    for x, in cur.executemany(
+                        "SELECT EXISTS ( SELECT 1 FROM loci WHERE name = ?)",
+                        ((name,) for name in df.index),
+                    ).fetchall()
+                ]
+            )
+            log.info(
+                f"Found {sum(qc_loci['pass_in_loci'] == False)} df row IDs not in {loci.m80.name}"
             )
 
-        # Make a copy of the input df
-        df = df.copy()
+            # Set minimum expr threshold
+            df[df < min_expr] = np.nan
 
-        # Set the raw data to be the original df
-        self.m80.col["raw_expr"] = df
-
-        # Perform Quality Control on loci -----------------------------------------------------------------------------
-
-        # Create a bool df for each: row, col to store if each passes QC
-        qc_loci = pd.DataFrame({"has_id": True}, index=df.index)
-        qc_accession = pd.DataFrame({"has_id": True}, index=df.columns)
-
-        # include only loci that are NAMED in the refgen
-        cur = loci.m80.db.cursor()
-        qc_loci["pass_in_loci"] = np.array(
-            [
-                bool(x)
-                for x, in cur.executemany(
-                    "SELECT EXISTS ( SELECT 1 FROM loci WHERE name = ?)",
-                    ((name,) for name in df.index),
-                ).fetchall()
-            ]
-        )
-        log.info(
-            f"Found {sum(qc_loci['pass_in_loci'] == False)} df row IDs not in {loci.m80.name}"
-        )
-
-        # Set minimum expr threshold
-        df[df < min_expr] = np.nan
-
-        # Filter out loci with too much missing data
-        qc_loci["pass_missing_data"] = df.apply(
-            lambda x: ((sum(np.isnan(x))) < len(x) * max_locus_missing_data), axis=1
-        )
-        log.info(
-            "Found {} loci with > {} missing data".format(
-                sum(qc_loci["pass_missing_data"] == False),
-                max_locus_missing_data,
+            # Filter out loci with too much missing data
+            qc_loci["pass_missing_data"] = df.apply(
+                lambda x: ((sum(np.isnan(x))) < len(x) * max_locus_missing_data), axis=1
             )
-        )
-
-        # Filter out loci with do not meet a minimum expr threshold in at least 1 accession
-        qc_loci["pass_min_expression"] = df.apply(
-            lambda x: any(x >= min_single_accession_expr), axis=1  # 1 is column
-        )
-        log.info(
-            "Found {} loci which "
-            "do not have one accession above {}".format(
-                sum(qc_loci["pass_min_expression"] == False), min_single_accession_expr
+            log.info(
+                "Found {} loci with > {} missing data".format(
+                    sum(qc_loci["pass_missing_data"] == False),
+                    max_locus_missing_data,
+                )
             )
-        )
 
-        qc_loci["PASS_ALL"] = qc_loci.apply(lambda row: np.all(row), axis=1)
-        df = df.loc[qc_loci["PASS_ALL"], :]
-
-        # Perform quality control on accessions ------------------------------------------------------------------------
-        # Filter out ACCESSIONS with too much missing data
-        qc_accession["pass_missing_data"] = df.apply(
-            lambda col: (
-                ((sum(np.isnan(col)) / len(col)) <= max_accession_missing_data)
-            ),
-            axis=0,  # 0 is columns
-        )
-        log.info(
-            "Found {} accessions with > {} missing data".format(
-                sum(qc_accession["pass_missing_data"] == False),
-                max_accession_missing_data,
+            # Filter out loci with do not meet a minimum expr threshold in at least 1 accession
+            qc_loci["pass_min_expression"] = df.apply(
+                lambda x: any(x >= min_single_accession_expr), axis=1  # 1 is column
             )
-        )
-        # Update the total QC passing column
-        qc_accession["PASS_ALL"] = qc_accession.apply(lambda row: np.all(row), axis=1)
-        df = df.loc[:, qc_accession["PASS_ALL"]]
-
-        # Update the database ------------------------------------------------------------------------------------------
-        log.info("Filtering loci to only those passing QC")
-        lp.Loci.from_loci(
-            self.m80.name,
-            [loci[x] for x in df.index if x in loci],
-            rootdir=self.m80.thawed_dir,
-        )
-        self.m80.col["qc_accession"] = qc_accession
-        self.m80.col["qc_loci"] = qc_loci
-        self.m80.col["expr"] = df
-
-        # Do some reporting --------------------------------------------------------------------------------------------
-        log.info(f"Loci passing QC:\n{str(qc_loci.apply(sum, axis=0))}")
-        log.info(f"Accessions passing QC:\n{str(qc_accession.apply(sum, axis=0))}")
-        # Also report a breakdown by chromosome
-        qc_loci = qc_loci[qc_loci["pass_in_loci"]]
-        qc_loci["chromosome"] = [loci[x].chromosome for x in qc_loci.index]
-        log.info(
-            "Loci passing QC by chromosome:\n{}".format(
-                str(qc_loci.groupby("chromosome").aggregate(sum)),
+            log.info(
+                "Found {} loci which "
+                "do not have one accession above {}".format(
+                    sum(qc_loci["pass_min_expression"] == False), min_single_accession_expr
+                )
             )
-        )
-        # update the df to reflect only locis/accession passing QC
-        log.info("Kept: {} locis {} accessions".format(len(df.index), len(df.columns)))
 
-        if normalize_expr_values:
-            # Apply inverse hyperbolic sine
-            # per https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3634062/
-            df = df.apply(np.arcsinh, axis=0)
-        # Remove DF entries that are not in Loci
+            qc_loci["PASS_ALL"] = qc_loci.apply(lambda row: np.all(row), axis=1)
+            df = df.loc[qc_loci["PASS_ALL"], :]
 
-        self._calculate_coexpression()
-        self._calculate_degree()
-        self._calculate_leaves()
-        self._calculate_clusters()
+            # Perform quality control on accessions ------------------------------------------------------------------------
+            # Filter out ACCESSIONS with too much missing data
+            qc_accession["pass_missing_data"] = df.apply(
+                lambda col: (
+                    ((sum(np.isnan(col)) / len(col)) <= max_accession_missing_data)
+                ),
+                axis=0,  # 0 is columns
+            )
+            log.info(
+                "Found {} accessions with > {} missing data".format(
+                    sum(qc_accession["pass_missing_data"] == False),
+                    max_accession_missing_data,
+                )
+            )
+            # Update the total QC passing column
+            qc_accession["PASS_ALL"] = qc_accession.apply(lambda row: np.all(row), axis=1)
+            df = df.loc[:, qc_accession["PASS_ALL"]]
+
+            # Update the database ------------------------------------------------------------------------------------------
+            log.info("Filtering loci to only those passing QC")
+            lp.Loci.from_loci(
+                self.m80.name,
+                [loci[x] for x in df.index if x in loci],
+                rootdir=self.m80.thawed_dir,
+            )
+            self.m80.col["qc_accession"] = qc_accession
+            self.m80.col["qc_loci"] = qc_loci
+            self.m80.col["expr"] = df
+
+            # Do some reporting --------------------------------------------------------------------------------------------
+            log.info(f"Loci passing QC:\n{str(qc_loci.apply(sum, axis=0))}")
+            log.info(f"Accessions passing QC:\n{str(qc_accession.apply(sum, axis=0))}")
+            # Also report a breakdown by chromosome
+            qc_loci = qc_loci[qc_loci["pass_in_loci"]]
+            qc_loci["chromosome"] = [loci[x].chromosome for x in qc_loci.index]
+            log.info(
+                "Loci passing QC by chromosome:\n{}".format(
+                    str(qc_loci.groupby("chromosome").aggregate(sum)),
+                )
+            )
+            # update the df to reflect only locis/accession passing QC
+            log.info("Kept: {} locis {} accessions".format(len(df.index), len(df.columns)))
+
+            if normalize_expr_values:
+                # Apply inverse hyperbolic sine
+                # per https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3634062/
+                df = df.apply(np.arcsinh, axis=0)
+            # Remove DF entries that are not in Loci
+
+            self._calculate_coexpression()
+            self._calculate_degree()
+            self._calculate_leaves()
+            self._calculate_clusters()
+
+        except Exception as e:
+            m80.delete("Coex", name, rootdir=rootdir)
+            raise e
 
         # Return an instance
         return self
