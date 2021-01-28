@@ -23,18 +23,17 @@ def Zm5bFGS():
     return loci
 
 
-@pytest.fixture(scope='module')
-def ZmTissue(Zm5bFGs):
-    if not m80.exists('Coex','ZmTissue'):
+@pytest.fixture(scope="module")
+def ZmRNASeqTissueAtlas(Zm5bFGS):
+    if not m80.exists('Coex', 'ZmRNASeqTissueAtlas'):
         # Get the pd DataFrame
         df = pd.read_table(
             'raw/Expr/RNASEQ/MaizeRNASeqTissue.tsv.bz2'
         )
-        # Create the refgen object
-        Zm5bFGS = lp.Loci('Zm5bFGS')
-        ZmTissue = co.Coex.from_DataFrame(
-            'ZmTissue',
-            'Maize RNASeq Tissue Atlas Network, Sekhon 2013, PLoS ONE',
+
+        # Build it
+        return co.Coex.from_DataFrame(
+            'ZmRNASeqTissueAtlas',
             df,
             Zm5bFGS,
             min_expr=0.001,
@@ -43,7 +42,5 @@ def ZmTissue(Zm5bFGs):
             min_single_accession_expr=1,
         )
     else:
-        ZmTissue = co.Coex('ZmTissue')
-
-    return ZmTissue
+        return co.COB('ZmRNASeqTissueAtlas')
 
