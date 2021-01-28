@@ -2,6 +2,7 @@
 
 import logging
 import psutil
+import sys
 
 import numpy as np
 import pandas as pd
@@ -521,7 +522,47 @@ class Coex(m80.Freezable):
             degree["iter_name"] = iter_name
         return degree
 
+    def summary(self,file=sys.stdout):
+        import camoco as co
+        print(
+           f"""
+            CAMOCO (version:{co.__version__})
+            ---------------------------------------
+            COB Dataset: {self.m80.name}
+                Num Genes: {len(self.expr):,}({(len(self.expr) / len(self.m80.col["raw_expr"])) * 100:.2g}% of total)
+                Num Accessions: {self.num_accessions}
+
+            Network Stats
+            -------------
+            Unthresholded Interactions: {len(self.coex):,}
+            Thresholded (Z >= {self.zscore_cutoff}): {self.coex.significant.sum():,}
+
+            Raw
+            ------------------
+            Num Raw Genes: {len(self.m80.col["raw_expr"]):,}
+            Num Raw Accessions: {len(self.m80.col["raw_expr"].columns)}
+
+            QC Parameters
+            ------------------
+            min expr level: {self.metadata.search(where('name')=='min_expr')[0]['val']} 
+                - expression below this is set to NaN
+            max locus missing data: {self.metadata.search(where('name')=='max_locus_missing_data')[0]['val']} 
+                - genes missing more than this percent are removed
+            max accession missing data: {self.metadata.search(where('name')=='max_accession_missing_data')[0]['val']}
+                - Accession missing more than this percent are removed
+            min single sample expr: {self.metadata.search(where('name')=='min_single_accession_expr')[0]['val']} 
+                - genes must have this amount of expression in 
+                  at least one accession.
+
+            Clusters
+            ------------------
+            Num clusters (size >= 10): {len(list(self.clusters.terms(min_term_size=10)))}
+        """,
+            file=file,
+        )
+
     # -----------------------------------------
+
     #       Internal Methods
     # -----------------------------------------
 
@@ -863,18 +904,15 @@ class Coex(m80.Freezable):
             qc_accession["PASS_ALL"] = qc_accession.apply(lambda row: np.all(row), axis=1)
             df = df.loc[:, qc_accession["PASS_ALL"]]
 
-            # Update the database ------------------------------------------------------------------------------------------
+            # Add Loci to the Coex--------------------------------------------------------------------------------------
             log.info("Filtering loci to only those passing QC")
             lp.Loci.from_loci(
                 self.m80.name,
                 [loci[x] for x in df.index if x in loci],
                 rootdir=self.m80.thawed_dir,
             )
-            self.m80.col["qc_accession"] = qc_accession
-            self.m80.col["qc_loci"] = qc_loci
-            self.m80.col["expr"] = df
 
-            # Do some reporting --------------------------------------------------------------------------------------------
+            # Do some reporting ----------------------------------------------------------------------------------------
             log.info(f"Loci passing QC:\n{str(qc_loci.apply(sum, axis=0))}")
             log.info(f"Accessions passing QC:\n{str(qc_accession.apply(sum, axis=0))}")
             # Also report a breakdown by chromosome
@@ -893,6 +931,11 @@ class Coex(m80.Freezable):
                 # per https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3634062/
                 df = df.apply(np.arcsinh, axis=0)
             # Remove DF entries that are not in Loci
+
+            # Save the data for the Coex -------------------------------------------------------------------------------
+            self.m80.col["qc_accession"] = qc_accession
+            self.m80.col["qc_loci"] = qc_loci
+            self.m80.col["expr"] = df
 
             self._calculate_coexpression()
             self._calculate_degree()
