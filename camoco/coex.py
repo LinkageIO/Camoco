@@ -125,7 +125,6 @@ class Coex(m80.Freezable):
     #       Methods
     # -----------------------------------------
 
-
     def subnetwork(
         self,
         loci=None,
@@ -217,7 +216,7 @@ class Coex(m80.Freezable):
             except KeyError as e:
                 raise KeyError(
                     "Each locus must have 'parent_locus'"
-                    " attr set to calculate trans only"
+                    " attr set to calculate trans-only subnetwork"
                 ) from e
             df["trans"] = [
                 parents[locus_a] != parents[locus_b]
@@ -457,8 +456,10 @@ class Coex(m80.Freezable):
         """
         # filter for only loci within network
         edges = self.subnetwork(
-            loci, min_distance=min_distance, 
-            sig_only=False,filter_missing_loci=filter_missing_loci
+            loci,
+            min_distance=min_distance, 
+            sig_only=False,
+            filter_missing_loci=filter_missing_loci
         )
 
         if by_locus == True:
@@ -923,8 +924,8 @@ class Coex(m80.Freezable):
                     str(qc_loci.groupby("chromosome").aggregate(sum)),
                 )
             )
-            # update the df to reflect only locis/accession passing QC
-            log.info("Kept: {} locis {} accessions".format(len(df.index), len(df.columns)))
+            # update the df to reflect only loci/accession passing QC
+            log.info("Kept: {} loci {} accessions".format(len(df.index), len(df.columns)))
 
             if normalize_expr_values:
                 # Apply inverse hyperbolic sine
@@ -941,6 +942,7 @@ class Coex(m80.Freezable):
             self._calculate_degree()
             self._calculate_leaves()
             self._calculate_clusters()
+            self.summary()
 
         except Exception as e:
             m80.delete("Coex", name, rootdir=rootdir)
