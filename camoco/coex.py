@@ -733,7 +733,7 @@ class Coex(m80.Freezable):
         """
         Calculates global clusters
         """
-        terms = [lp.Term(f"MCL_{i}", loci=loci) for i,loci in enumerate(self.mcl())]
+        terms = [lp.Term(f"MCL{i}", loci=loci) for i,loci in enumerate(self.mcl())]
 
         log.info("Creating Cluster Ontology")
         self.MCL = lp.Ontology.from_terms(
