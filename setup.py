@@ -88,7 +88,7 @@ setup(
         'statsmodels>=0.8.0',
         'termcolor>=1.1.0',
         'powerlaw>=1.4.6',
-        'flask==1.0.3',
+        'flask==2.3.2',
         'markov-clustering>=0.0.6.dev0',
         'fastcluster>=1.1.25',
         'bcolz>=1.2.1',
