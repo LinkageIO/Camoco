@@ -75,7 +75,7 @@ def cob_health(args):
         if not path.exists("{}_qc_gene.txt".format(args.out_prefix)):
             # Print out the breakdown of QC Values
             refgen = co.RefGen(args.refgen)
-            gene_qc = cob._bcolz("qc_gene")
+            gene_qc = cob._df("qc_gene")
             gene_qc = gene_qc[gene_qc.pass_membership]
             gene_qc["chrom"] = ["chr" + str(refgen[x].chrom) for x in gene_qc.index]
             gene_qc = gene_qc.groupby("chrom").agg(sum, axis=0)

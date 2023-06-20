@@ -73,14 +73,14 @@ class COB(Expr):
         """
         super().__init__(name=name)
         self.log("Loading Coex table")
-        self.coex = self._bcolz("coex")
+        self.coex = self._df("coex")
         self.sigs = None
         if self.coex is None:
             self.log("{} is empty", name)
         if not self._global("significance_threshold") is None:
             self.set_sig_edge_zscore(float(self._global("significance_threshold")))
         self.log("Loading Global Degree")
-        self.degree = self._bcolz("degree")
+        self.degree = self._df("degree")
         if self.degree is None:
             self.log("{} is empty", name)
         if (
@@ -89,7 +89,7 @@ class COB(Expr):
         ):
             self._calculate_clusters()
         self.log("Loading Clusters")
-        self.clusters = self._bcolz("clusters")
+        self.clusters = self._df("clusters")
         if self.clusters is None:
             self.log("Clusters not loaded for: {} ()", name)
             self.MCL = None
@@ -170,7 +170,7 @@ class COB(Expr):
             DataFrame
                 A dataframe containing QC info
         """
-        qc_gene = self._bcolz("qc_gene")
+        qc_gene = self._df("qc_gene")
         # generate the parent refegen
         rg = self._parent_refgen
         qc_gene["chrom"] = [rg[x].chrom if x in rg else "None" for x in qc_gene.index]
@@ -227,24 +227,15 @@ class COB(Expr):
 
         # Set the new significant value
         if new_sig:
-            # If the column doesn't exist because of an error it may fail
-            try:
-                self.coex.data.delcol(name="significant")
-            except ValueError:
-                pass
-            # Add the column to the underlying data structure
-            self.coex.data.addcol(
-                self.coex.data.eval("score >= " + str(zscore)),
-                pos=2,
-                name="significant",
-            )
-            self.coex.data.flush()
-
+            
+            self.coex.sig = self.coex.score >= zscore
+            self._df("coex",df=self.coex)
             # Keep track of the current threshold
             self._global("current_significance_threshold", zscore)
             self._calculate_degree(update_db=False)
 
         # Rebuild significant index set
+        import ipdb; ipdb.set_trace()
         if new_sig or self.sigs is None:
             self.sigs = np.array(
                 [ind for ind in self.coex.data["significant"].wheretrue()]
@@ -1479,7 +1470,7 @@ class COB(Expr):
         index = pos['gene']
         pos = pos[['x','y']]
         pos.index = index
-        self._bcolz("coordinates", df=pos)
+        self._df("coordinates", df=pos)
 
     def coordinates(
             self, 
@@ -1497,7 +1488,7 @@ class COB(Expr):
         """
         from fa2 import ForceAtlas2
 
-        pos = self._bcolz("coordinates")
+        pos = self._df("coordinates")
         if pos is None or force == True:
             import scipy.sparse.csgraph as csgraph
             import networkx
@@ -1550,7 +1541,7 @@ class COB(Expr):
             pos = pd.DataFrame(coordinates)
             pos.index = labels
             pos.columns = ["x", "y"]
-            self._bcolz("coordinates", df=pos)
+            self._df("coordinates", df=pos)
         return pos
 
     """ ----------------------------------------------------------------------
@@ -2019,7 +2010,7 @@ class COB(Expr):
         pccs = PCCUP.pair_correlation(
             np.ascontiguousarray(
                 # PCCUP expects floats
-                self._expr.as_matrix().astype("float")
+                self._expr.to_numpy().astype("float")
             )
         )
 
@@ -2027,7 +2018,6 @@ class COB(Expr):
         pccs[pccs >= 1.0] = 0.9999999
         pccs[pccs <= -1.0] = -0.9999999
         pccs = np.arctanh(pccs)
-        gc.collect()
 
         # Do a PCC check to make sure they are not all NaNs
         if not any(np.logical_not(np.isnan(pccs))):
@@ -2042,41 +2032,27 @@ class COB(Expr):
         # This affects the mean and std fro the gene.
         pcc_mean = np.ma.masked_array(pccs, np.isnan(pccs)).mean()
         self._global("pcc_mean", pcc_mean)
-        gc.collect()
         pcc_std = np.ma.masked_array(pccs, np.isnan(pccs)).std()
         self._global("pcc_std", pcc_std)
-        gc.collect()
 
         # 2. Calculate Z Scores
         self.log("Finding adjusted scores")
         pccs = (pccs - pcc_mean) / pcc_std
-        gc.collect()
 
         # 3. Build the dataframe
         self.log("Build the dataframe and set the significance threshold")
         self._global("significance_threshold", significance_thresh)
-        raw_coex = self._raw_coex(pccs, significance_thresh)
-        del pccs
-        gc.collect()
+
+        sigs = pccs >= significance_thresh
+        self.coex = pd.DataFrame({"score":pccs, "significant":sigs}) 
 
         # 4. Calculate Gene Distance
         self.log("Calculating Gene Distance")
-        raw_coex.addcol(
-            self.refgen.pairwise_distance(
-                gene_list=self.refgen.from_ids(self._expr.index)
-            ),
-            pos=1,
-            name="distance",
-        )
-        gc.collect()
+        self.coex['distance'] = self.refgen.pairwise_distance(gene_list=self.refgen.from_ids(self._expr.index))
 
-        # 5. Cleanup
-        raw_coex.flush()
-        del raw_coex
-        gc.collect()
-
-        # 6. Load the new table into the object
-        self.coex = self._bcolz("coex")
+        
+        # 5. Load the new table into the object
+        self._df("coex",df=self.coex)
         self.set_sig_edge_zscore(float(self._global("significance_threshold")))
         self.log("Done")
         return self
@@ -2101,7 +2077,7 @@ class COB(Expr):
                 self.degree.ix[names[i]] = degree
         # Update the database
         if update_db:
-            self._bcolz("degree", df=self.degree)
+            self._df("degree", df=self.degree)
         # Cleanup
         del sigs
         del names
@@ -2150,7 +2126,7 @@ class COB(Expr):
         # Put them in a dataframe and stow them
         self.leaves = pd.DataFrame(leaves, index=self._expr.index, columns=["index"])
         self._gene_link = gene_link
-        self._bcolz("leaves", df=self.leaves)
+        self._df("leaves", df=self.leaves)
 
         # Cleanup and reinstate the coex table
         gc.collect()
@@ -2173,7 +2149,7 @@ class COB(Expr):
                 ],
                 columns=["Gene", "cluster"],
             ).set_index("Gene")
-            self._bcolz("clusters", df=self.clusters)
+            self._df("clusters", df=self.clusters)
         self.log("Creating Cluster Ontology")
         terms = []
         for i, x in enumerate(self.clusters.groupby("cluster")):
@@ -2341,12 +2317,12 @@ class COB(Expr):
         """
         """
         self = super().create(name, description, refgen)
-        self._bcolz("gene_qc_status", df=pd.DataFrame())
-        self._bcolz("accession_qc_status", df=pd.DataFrame())
-        self._bcolz("coex", df=pd.DataFrame())
-        self._bcolz("degree", df=pd.DataFrame())
-        self._bcolz("mcl_cluster", df=pd.DataFrame())
-        self._bcolz("leaves", df=pd.DataFrame())
+        self._df("gene_qc_status", df=pd.DataFrame())
+        self._df("accession_qc_status", df=pd.DataFrame())
+        self._df("coex", df=pd.DataFrame())
+        self._df("degree", df=pd.DataFrame())
+        self._df("mcl_cluster", df=pd.DataFrame())
+        self._df("leaves", df=pd.DataFrame())
         self._expr_index = defaultdict(
             lambda: None, {gene: index for index, gene in enumerate(self._expr.index)}
         )

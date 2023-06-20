@@ -403,7 +403,7 @@ class GOnt(Ontology):
             gravity=1.0,
             verbose=True,
         )
-        pos = self._bcolz("coordinates")
+        pos = self._df("coordinates")
         if pos is None or force == True:
             import scipy.sparse.csgraph as csgraph
             import networkx
@@ -439,7 +439,7 @@ class GOnt(Ontology):
                 offset = coordinates.x.max()
                 component_coordinates.append(coordinates)
             pos = pd.concat(component_coordinates)
-            self._bcolz("coordinates", df=pos)
+            self._df("coordinates", df=pos)
         return pos
 
     def plot_network(self, terms=None, remove_orphans=True):

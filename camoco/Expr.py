@@ -37,8 +37,8 @@ class Expr(Camoco):
         super().__init__(name=name, type="Expr")
         # Part I: Load the Expression dataset
         self.log("Loading Expr table")
-        self._expr = self._bcolz("expr")
-        self._gene_qc_status = self._bcolz("gene_qc_status")
+        self._expr = self._df("expr")
+        self._gene_qc_status = self._df("gene_qc_status")
         if (self._expr is None) or (self._gene_qc_status is None):
             self._expr = pd.DataFrame()
 
@@ -93,7 +93,7 @@ class Expr(Camoco):
         if raw is False:
             return self.refgen.from_ids(self._expr.index)
         else:
-            return self.refgen.from_ids(self._bcolz("raw_expr").index)
+            return self.refgen.from_ids(self._df("raw_expr").index)
 
     def expr_profile(self, gene):
         """
@@ -154,7 +154,7 @@ class Expr(Camoco):
         """
         if raw is True:
             self.log("Extracting raw expression values")
-            df = self._bcolz("raw_expr")
+            df = self._df("raw_expr")
         else:
             df = self._expr
         if genes is not None:
@@ -173,7 +173,7 @@ class Expr(Camoco):
         """
             Plot histogram of accession expression values.
         """
-        raw = self._bcolz("raw_expr")
+        raw = self._df("raw_expr")
         qcd = self._expr
 
         for name, values in qcd.iteritems():
@@ -268,7 +268,7 @@ class Expr(Camoco):
         idxP = re.compile("[^A-Za-z0-9_, ;:().]")
         df.index = [idxP.sub("", str(x)).upper() for x in df.index.values]
         try:
-            self._bcolz(table, df=df)
+            self._df(table, df=df)
             self._expr = df
         except Exception as e:
             self.log("Unable to update expression table values: {}", e)
@@ -326,10 +326,10 @@ class Expr(Camoco):
         if raw:
             # kill the raw table too
             self.log("Resetting raw expression data")
-            self._bcolz("raw_expr", df=pd.DataFrame())
+            self._df("raw_expr", df=pd.DataFrame())
         self.log("Resetting expression data")
         self._expr = self.expr(raw=True)
-        self._bcolz("expr", df=self._expr)
+        self._df("expr", df=self._expr)
         self._transformation_log("reset")
 
     def _normalize(self, norm_method=None, max_val=None, **kwargs):
@@ -517,8 +517,8 @@ class Expr(Camoco):
         qc_accession["PASS_ALL"] = qc_accession.apply(lambda row: np.all(row), axis=1)
         df = df.loc[:, qc_accession["PASS_ALL"]]
         # Update the database
-        self._bcolz("qc_accession", df=qc_accession)
-        self._bcolz("qc_gene", df=qc_gene)
+        self._df("qc_accession", df=qc_accession)
+        self._df("qc_gene", df=qc_gene)
         # Report your findings
         self.log("Genes passing QC:\n{}", str(qc_gene.apply(sum, axis=0)))
         self.log("Accessions passing QC:\n{}", str(qc_accession.apply(sum, axis=0)))
@@ -527,7 +527,7 @@ class Expr(Camoco):
         qc_gene["chrom"] = [self.refgen[x].chrom for x in qc_gene.index]
         self.log(
             "Genes passing QC by chromosome:\n{}",
-            str(qc_gene.groupby("chrom").aggregate(sum, axis=0)),
+            str(qc_gene.groupby("chrom").aggregate(sum)),
         )
         # update the df to reflect only genes/accession passing QC
         self.log("Kept: {} genes {} accessions".format(len(df.index), len(df.columns)))
@@ -685,9 +685,9 @@ class Expr(Camoco):
         """
         # Piggy back on the super create method
         self = super().create(name, description, type=type)
-        # Create appropriate bcolz tables
-        self._bcolz("expr", df=pd.DataFrame())
-        self._bcolz("raw_expr", df=pd.DataFrame())
+        # Create appropriate df tables
+        self._df("expr", df=pd.DataFrame())
+        self._df("raw_expr", df=pd.DataFrame())
         # Delete existing datasets
         self._set_refgen(refgen, filter=False)
         return self

@@ -72,27 +72,30 @@ class Camoco(object):
         con.setbusyhandler(busyhandler)
         return con
 
-    def _bcolz(self, tblname, dbname=None, type=None, df=None):
+    def _df(self, tblname, dbname=None, type=None, df=None):
         # Suppress the warning until the next wersion
-        import warnings
-        warnings.simplefilter("ignore", FutureWarning)
 
         if type is None:
             type = self.type
         if dbname is None:
             dbname = self.name
+
+        # If DF is not specified, read the df from 
         if df is None:
             # return the dataframe if it exists
-            df = pd.read_hdf(
-                os.path.expanduser(
-                    os.path.join(
-                        cf.options.basedir,
-                        "databases",
-                        "{}.{}.{}".format(type, dbname, tblname),
-                    )
-                ),
-                key='df'
-            )
+            try:
+                return pd.read_hdf(
+                    os.path.expanduser(
+                        os.path.join(
+                            cf.options.basedir,
+                            "databases",
+                            "{}.{}.{}".format(type, dbname, tblname),
+                        )
+                    ),
+                    key='df'
+                )
+            except FileNotFoundError:
+                return None
 
         else:
             path = os.path.expanduser(
@@ -103,24 +106,6 @@ class Camoco(object):
                 )
             )
             df.to_hdf(path,key='df',mode='w')
-            return
-
-    def _raw_coex(self, scores, significance_threshold):
-        path = os.path.expanduser(
-            os.path.join(
-                cf.options.basedir,
-                "databases",
-                "{}.{}.{}".format(self.type, self.name, "coex"),
-            )
-        )
-        self._global("current_significance_threshold", significance_threshold)
-        sigs = scores >= significance_threshold
-        return bcz.ctable(
-            columns=[scores, sigs],
-            names=["score", "significant"],
-            mode="w",
-            rootdir=path,
-        )
 
     def _tmpfile(self):
         # returns a handle to a tmp file
