@@ -38,7 +38,6 @@ import itertools
 import fastcluster
 import psutil
 
-from odo import odo
 
 from matplotlib import rcParams
 
@@ -74,7 +73,7 @@ class COB(Expr):
         """
         super().__init__(name=name)
         self.log("Loading Coex table")
-        self.coex = self._bcolz("coex", blaze=True)
+        self.coex = self._bcolz("coex")
         self.sigs = None
         if self.coex is None:
             self.log("{} is empty", name)
@@ -290,10 +289,9 @@ class COB(Expr):
                 ids = np.intersect1d(ids, self.sigs, assume_unique=True)
 
         # Get the DataFrame
-        df = pd.DataFrame.from_items(
+        df = pd.DataFrame(
             ((key, self.coex.data[key][ids]) for key in self.coex.data.names)
         )
-        # df = odo(self.coex[ids],pd.DataFrame)
         df.set_index(ids, inplace=True)
         return df
 
@@ -1942,7 +1940,7 @@ class COB(Expr):
         fig = plt.figure(figsize=(8, 6))
         # grab the scores only and put in a
         # np array to save space (pandas DF was HUGE)
-        scores = odo(self.coex.score, np.ndarray)[~np.isnan(self.coex.score)]
+        scores = self.coex.score[~np.isnan(self.coex.score)]
         if pcc:
             self.log("Transforming scores")
             scores = (scores * float(self._global("pcc_std"))) + float(
@@ -2078,7 +2076,7 @@ class COB(Expr):
         gc.collect()
 
         # 6. Load the new table into the object
-        self.coex = self._bcolz("coex", blaze=True)
+        self.coex = self._bcolz("coex")
         self.set_sig_edge_zscore(float(self._global("significance_threshold")))
         self.log("Done")
         return self
@@ -2094,7 +2092,7 @@ class COB(Expr):
         self.degree = pd.DataFrame(0, index=names, columns=["Degree"])
         # Get the index and find the counts
         self.log("Calculating Gene degree")
-        sigs = np.arange(len(self.coex))[odo(self.coex.significant, np.ndarray)]
+        sigs = np.arange(len(self.coex))[self.coex.significant]
         sigs = PCCUP.coex_expr_index(sigs, len(self._expr.index.values))
         sigs = list(Counter(chain(*sigs)).items())
         if len(sigs) > 0:
@@ -2128,7 +2126,7 @@ class COB(Expr):
         pcc_mean = float(self._global("pcc_mean"))
         pcc_std = float(self._global("pcc_std"))
         # Get score column and dump coex from memory for time being
-        dists = odo(self.coex.score, np.ndarray)
+        dists = self.coex.score
         # Subtract pccs from 1 so we do not get negative distances
         dists = (dists * pcc_std) + pcc_mean
         dists = np.tanh(dists)

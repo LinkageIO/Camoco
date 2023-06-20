@@ -4,7 +4,6 @@ import os as os
 import tempfile
 import numpy as np
 import pandas as pd
-import bcolz as bcz
 import time
 import time
 
@@ -73,14 +72,10 @@ class Camoco(object):
         con.setbusyhandler(busyhandler)
         return con
 
-    def _bcolz(self, tblname, dbname=None, type=None, df=None, blaze=False):
+    def _bcolz(self, tblname, dbname=None, type=None, df=None):
         # Suppress the warning until the next wersion
         import warnings
-
-        # from flask.exthook import ExtDeprecationWarning
-        # warnings.simplefilter('ignore',ExtDeprecationWarning)
         warnings.simplefilter("ignore", FutureWarning)
-        import blaze as blz
 
         if type is None:
             type = self.type
@@ -88,52 +83,26 @@ class Camoco(object):
             dbname = self.name
         if df is None:
             # return the dataframe if it exists
-            try:
-                df = bcz.open(
-                    os.path.expanduser(
-                        os.path.join(
-                            cf.options.basedir,
-                            "databases",
-                            "{}.{}.{}".format(type, dbname, tblname),
-                        )
-                    )
-                )
-            except IOError:
-                return None
-            else:
-                if len(df) == 0:
-                    df = pd.DataFrame()
-                    if blaze:
-                        df = blz.data(df)
-                else:
-                    if blaze:
-                        df = blz.data(df)
-                    else:
-                        df = df.todataframe()
-                if not blaze and "idx" in df.columns.values:
-                    df.set_index("idx", drop=True, inplace=True)
-                    df.index.name = None
-                return df
-
-        else:
-            if not (df.index.dtype_str == "int64") and not (df.empty):
-                df = df.copy()
-                df["idx"] = df.index
-            if isinstance(df, pd.DataFrame):
-                path = os.path.expanduser(
+            df = pd.read_hdf(
+                os.path.expanduser(
                     os.path.join(
                         cf.options.basedir,
                         "databases",
                         "{}.{}.{}".format(type, dbname, tblname),
                     )
-                )
-                if df.empty:
-                    bcz.fromiter((), dtype=np.int32, mode="w", count=0, rootdir=path)
-                else:
-                    bcz.ctable.fromdataframe(df, mode="w", rootdir=path)
+                ),
+                key='df'
+            )
 
-            if "idx" in df.columns.values:
-                del df
+        else:
+            path = os.path.expanduser(
+                os.path.join(
+                    cf.options.basedir,
+                    "databases",
+                    "{}.{}.{}".format(type, dbname, tblname),
+                )
+            )
+            df.to_hdf(path,key='df',mode='w')
             return
 
     def _raw_coex(self, scores, significance_threshold):
