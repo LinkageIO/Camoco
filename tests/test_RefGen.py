@@ -259,7 +259,7 @@ def test_from_id_not_in_there(testRefGen):
     try:
         x=testRefGen['ABC123']
     except ValueError as e:
-        return True
+        assert True
 
 def test_from_ids_with_invalid_ids(testRefGen):
     random_genes = sorted([x.id for x in testRefGen.random_genes(n=10)]) + ['ABC123']

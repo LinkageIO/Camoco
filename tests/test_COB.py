@@ -3,7 +3,6 @@
 '''
 
 import os
-import pytest
 import random
 import itertools
 import scipy.stats
@@ -145,10 +144,14 @@ def test_coex_score_concordance(testCOB):
 
 def test_coex_distance_concordance(testCOB):
     for a, b in itertools.combinations(
-            [testCOB.refgen.random_gene() for x in range(cf.test.num)], 2
+            [testCOB.refgen.random_gene() for _ in range(cf.test.num)], 2
         ):
-        dis_dif = abs(testCOB.coexpression(a, b).distance - abs(a-b))
-        assert np.isnan(dis_dif) or dis_dif < 100
+        distance = testCOB.coexpression(a,b).distance
+        if np.isinf(distance) and np.isinf(a-b):
+            assert True
+        else:
+            dis_dif = abs(distance - abs(a-b))
+            assert dis_dif < 100
 
 def test_coex_id_concordance(testCOB):
     for a, b in itertools.combinations(
