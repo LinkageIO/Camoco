@@ -54,8 +54,8 @@ class Camoco(object):
                 CREATE UNIQUE INDEX IF NOT EXISTS uniqkey ON globals(key)
                 """
             )
-        except TypeError:
-            raise TypeError("{}.{} does not exist".format(type, name))
+        except TypeError as err:
+            raise TypeError("{}.{} does not exist: {}".format(type, name, err))
 
     def _database(self, dbname, type=None):
         # This lets us grab databases for other types

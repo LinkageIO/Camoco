@@ -331,7 +331,7 @@ def testGO(Zm5bFGS):
            'Test GO', Zm5bFGS
         )
     else:
-        return co.GOnt('testGO')
+        return co.GOnt('TestGO')
 
 
 

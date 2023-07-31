@@ -1,16 +1,14 @@
 import os
 import sys
 import time
-import re
 import functools
 import glob
 import shutil
+import scipy
 
-from termcolor import colored, cprint
-from itertools import chain
+from termcolor import colored
 from collections import OrderedDict
 
-from .Locus import Locus
 from .Config import cf
 from apsw import CantOpenError
 
@@ -19,7 +17,6 @@ import camoco as co
 import matplotlib.pylab as pylab
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
 
 import gzip
 import bz2
@@ -125,7 +122,7 @@ def del_dataset(type, name, force=False):  # pragma no cover
                 os.remove(f)
             except IsADirectoryError:
                 shutil.rmtree(f)
-    except FileNotFoundError as e:
+    except FileNotFoundError: 
         pass
     if type == "Expr":
         # also have to remove the COB specific refgen

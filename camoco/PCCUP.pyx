@@ -136,7 +136,7 @@ def coex_index(long[:] ids, int mi):
         An array of indices you can extract from the coex table
 
     '''
-    cdef long[::] indices = np.empty(comb(ids.shape[0],2,exact=True),dtype=np.long)
+    cdef long[::] indices = np.empty(comb(ids.shape[0],2,exact=True),dtype=np.int_)
     cdef long count = 0
     cdef long ix, jx, i, j
     cdef long num_rows
@@ -216,7 +216,7 @@ def coex_neighbors(long id, int mi):
 
     '''
 
-    cdef long[::] indices = np.empty(mi-1,dtype=np.long)
+    cdef long[::] indices = np.empty(mi-1,dtype=np.int_)
     cdef long count = 0
     cdef long pivot
 
