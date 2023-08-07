@@ -1548,7 +1548,8 @@ class COB(Expr):
         coor = self.coordinates(lcc_only=lcc_only, force=force, iterations=iterations)
         # Filter by degree
         if min_degree is not None:
-            coor =  coor.loc[self.degree.query(f'Degree >= {min_degree}').index]
+            start_set = self.degree.query(f'Degree >= {min_degree}').index
+            coor =  coor.loc[list(set(start_set).intersection(coor.index))]
         if ax is None:
             fig = plt.figure(facecolor="white", figsize=(8, 8))
             ax = fig.add_subplot(111)
